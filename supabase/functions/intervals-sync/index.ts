@@ -22,8 +22,9 @@ serve(async (req) => {
       );
     }
 
-    const { workouts, clearRange } = await req.json() as {
-      workouts: Array<{
+    const body = await req.json();
+    const { workouts, clearRange, deleteRange } = body as {
+      workouts?: Array<{
         date: string;
         name: string;
         description: string;
@@ -35,14 +36,8 @@ serve(async (req) => {
         }>;
       }>;
       clearRange?: { oldest: string; newest: string };
+      deleteRange?: { oldest: string; newest: string };
     };
-
-    if (!workouts || workouts.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No workouts provided" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
     const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
@@ -50,6 +45,52 @@ serve(async (req) => {
       Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/json",
     };
+
+    // Delete-only mode: remove all planned workouts in range
+    if (deleteRange) {
+      try {
+        const eventsResp = await fetch(
+          `${baseUrl}/events?oldest=${deleteRange.oldest}&newest=${deleteRange.newest}`,
+          { headers: authHeaders }
+        );
+        if (eventsResp.ok) {
+          const events = await eventsResp.json();
+          const workoutEvents = events.filter(
+            (e: { category: string }) => e.category === "WORKOUT"
+          );
+          let deleted = 0;
+          for (const evt of workoutEvents) {
+            const delResp = await fetch(`${baseUrl}/events/${evt.id}`, {
+              method: "DELETE",
+              headers: authHeaders,
+            });
+            if (delResp.ok) deleted++;
+          }
+          return new Response(
+            JSON.stringify({ deleted, total: workoutEvents.length }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const errText = await eventsResp.text();
+        return new Response(
+          JSON.stringify({ error: `Failed to fetch events: ${eventsResp.status} ${errText}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    if (!workouts || workouts.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No workouts provided" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Step 1: Delete existing planned workouts in range if requested
     if (clearRange) {

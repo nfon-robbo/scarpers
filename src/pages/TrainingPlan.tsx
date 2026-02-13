@@ -303,6 +303,31 @@ const TrainingPlanPage = () => {
     }
   };
 
+  const handleDeleteFromIntervals = async () => {
+    const workouts = parseWorkoutsFromPlan(content);
+    const withDates = workouts.filter(w => w.dateObj);
+    if (withDates.length === 0) {
+      toast({ title: "No workouts with dates found", variant: "destructive" });
+      return;
+    }
+    const dates = withDates.map(w => w.dateObj!.toISOString().split("T")[0]).sort();
+    setSyncing(true);
+    try {
+      const resp = await supabase.functions.invoke("intervals-sync", {
+        body: { deleteRange: { oldest: dates[0], newest: dates[dates.length - 1] } },
+      });
+      if (resp.error) {
+        toast({ title: "Delete failed", description: resp.error.message, variant: "destructive" });
+      } else {
+        toast({ title: `Deleted ${resp.data.deleted} workouts from intervals.icu` });
+      }
+    } catch (e) {
+      toast({ title: "Delete error", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleExportIcs = () => {
     const workouts = parseWorkoutsFromPlan(content);
     if (workouts.length === 0) {
@@ -346,6 +371,10 @@ const TrainingPlanPage = () => {
               <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh on intervals.icu
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDeleteFromIntervals} disabled={syncing}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete from intervals.icu
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />
