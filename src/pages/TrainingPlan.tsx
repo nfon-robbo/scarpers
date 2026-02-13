@@ -165,6 +165,8 @@ const TrainingPlanPage = () => {
 
   const handleExportFit = async () => {
     const workouts = parseWorkoutsFromPlan(content);
+    console.log("Parsed workouts:", workouts.length, "with segments:", workouts.map(w => ({ title: w.title, segments: w.segments.length })));
+    console.log("First 500 chars of content:", content.slice(0, 500));
     if (workouts.length === 0 || workouts.every(w => w.segments.length === 0)) {
       toast({ title: "No structured workouts found", description: "The plan needs workout tables with Segment/Duration/HR Zone columns.", variant: "destructive" });
       return;
