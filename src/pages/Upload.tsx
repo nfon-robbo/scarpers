@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { parseZipFile, type ParseResult } from "@/lib/fit-parser";
+import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -19,14 +19,21 @@ const UploadPage = () => {
   const [savedCount, setSavedCount] = useState(0);
   const [dragOver, setDragOver] = useState(false);
 
-  const processFile = useCallback(async (file: File) => {
-    if (!user) return;
-    if (!file.name.toLowerCase().endsWith(".zip")) {
-      toast({ title: "Invalid file", description: "Please upload a ZIP file containing FIT files.", variant: "destructive" });
+  const processFiles = useCallback(async (files: File[]) => {
+    if (!user || files.length === 0) return;
+
+    const totalSize = files.reduce((s, f) => s + f.size, 0);
+    if (totalSize > 100 * 1024 * 1024) {
+      toast({ title: "Files too large", description: "Maximum total size is 100MB.", variant: "destructive" });
       return;
     }
-    if (file.size > 100 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Maximum file size is 100MB.", variant: "destructive" });
+
+    const fitFiles = files.filter(f => f.name.toLowerCase().endsWith(".fit"));
+    const zipFiles = files.filter(f => f.name.toLowerCase().endsWith(".zip"));
+    const invalid = files.filter(f => !f.name.toLowerCase().endsWith(".fit") && !f.name.toLowerCase().endsWith(".zip"));
+
+    if (invalid.length > 0) {
+      toast({ title: "Invalid files", description: "Please upload .fit or .zip files only.", variant: "destructive" });
       return;
     }
 
@@ -36,10 +43,35 @@ const UploadPage = () => {
     setSavedCount(0);
 
     try {
-      // Parse ZIP + FIT files
       setState("parsing");
       setProgress(30);
-      const parseResult = await parseZipFile(file);
+
+      // Parse all sources and merge results
+      const allActivities: ParsedActivity[] = [];
+      const allErrors: string[] = [];
+      let totalFileCount = 0;
+
+      // Parse ZIP files
+      for (const zipFile of zipFiles) {
+        const r = await parseZipFile(zipFile);
+        allActivities.push(...r.activities);
+        allErrors.push(...r.errors);
+        totalFileCount += r.fileCount;
+      }
+
+      // Parse standalone FIT files
+      for (const fitFile of fitFiles) {
+        try {
+          const buffer = await fitFile.arrayBuffer();
+          const parsed = await parseFitBuffer(buffer, fitFile.name);
+          allActivities.push(...parsed);
+          totalFileCount++;
+        } catch (e: any) {
+          allErrors.push(e.message || `Error parsing ${fitFile.name}`);
+        }
+      }
+
+      const parseResult: ParseResult = { activities: allActivities, errors: allErrors, fileCount: totalFileCount };
       setResult(parseResult);
 
       if (parseResult.activities.length === 0) {
@@ -56,8 +88,8 @@ const UploadPage = () => {
         .from("uploads")
         .insert({
           user_id: user.id,
-          file_name: file.name,
-          file_type: "zip",
+          file_name: files.map(f => f.name).join(", "),
+          file_type: zipFiles.length > 0 ? "zip" : "fit",
           record_count: parseResult.activities.length,
           status: "completed",
         })
@@ -114,15 +146,15 @@ const UploadPage = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }, [processFile]);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) processFiles(files);
+  }, [processFiles]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length) processFiles(files);
     e.target.value = "";
-  }, [processFile]);
+  }, [processFiles]);
 
   const reset = () => {
     setState("idle");
@@ -135,7 +167,7 @@ const UploadPage = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Import Data</h1>
-        <p className="text-muted-foreground mt-1">Upload a ZIP file containing your Garmin FIT files</p>
+        <p className="text-muted-foreground mt-1">Upload FIT files or a ZIP archive containing them</p>
       </div>
 
       {/* Drop zone */}
@@ -151,14 +183,15 @@ const UploadPage = () => {
               onDrop={handleDrop}
             >
               <FileArchive className="w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium mb-1">Drop your ZIP file here</p>
-              <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
+              <p className="text-lg font-medium mb-1">Drop your files here</p>
+              <p className="text-sm text-muted-foreground mb-4">.fit files or .zip archives</p>
               <Button variant="outline" asChild>
-                <span>Select ZIP File</span>
+                <span>Select Files</span>
               </Button>
               <input
                 type="file"
-                accept=".zip"
+                accept=".zip,.fit"
+                multiple
                 className="hidden"
                 onChange={handleFileSelect}
               />
