@@ -49,13 +49,20 @@ serve(async (req) => {
 
     for (const workout of workouts) {
       // Build workout_doc steps for intervals.icu
-      const steps = workout.steps.map((s) => ({
-        duration: s.duration,
-        hr: { units: "bpm", start: s.hrLow, end: s.hrHigh },
-        ramp: false,
-      }));
+      // Each step uses HR targets with low/high BPM range
+      const steps = workout.steps.map((s: { duration: number; hrLow: number; hrHigh: number; intensity: string }) => {
+        const step: Record<string, unknown> = {
+          duration: s.duration,
+          hr: { units: "bpm", start: s.hrLow, end: s.hrHigh },
+        };
+        // Mark resting steps
+        if (s.intensity === "Resting") {
+          step.resting = true;
+        }
+        return step;
+      });
 
-      const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
+      const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);
 
       const payload = {
         start_date_local: `${workout.date}T00:00:00`,
@@ -63,7 +70,6 @@ serve(async (req) => {
         name: workout.name,
         description: workout.description,
         type: "Run",
-        color: null,
         moving_time: totalDuration,
         workout_doc: {
           steps,
