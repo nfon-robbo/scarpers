@@ -203,8 +203,9 @@ Deno.serve(async (req) => {
     // Get request params
     const body = await req.json().catch(() => ({}));
     const page = body.page || 1;
-    const perPage = body.per_page || 30; // Reduced to allow time for stream fetches
+    const perPage = body.per_page || 30;
     const after = body.after;
+    const activityTypes: string[] | null = body.activity_types || null; // e.g. ["Run", "Walk"]
 
     // Fetch activities from Strava
     let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
@@ -219,7 +220,16 @@ Deno.serve(async (req) => {
       throw new Error(`Strava API error [${stravaRes.status}]: ${errText}`);
     }
 
-    const stravaActivities = await stravaRes.json();
+    let stravaActivities = await stravaRes.json();
+
+    // Filter by activity type if specified
+    if (activityTypes && activityTypes.length > 0) {
+      const typeSet = new Set(activityTypes.map(t => t.toLowerCase()));
+      stravaActivities = stravaActivities.filter((a: any) => {
+        const type = (a.type || "").toLowerCase();
+        return typeSet.has(type) || typeSet.has(type.replace("virtual", ""));
+      });
+    }
 
     if (!stravaActivities.length) {
       return new Response(
