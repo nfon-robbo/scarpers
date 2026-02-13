@@ -201,16 +201,16 @@ serve(async (req) => {
         }
       }
 
-      const workoutDefinition = lines.join("\n");
+      const workoutText = lines.join("\n");
 
       const payload = {
         start_date_local: `${workout.date}T00:00:00`,
         category: "WORKOUT",
         name: workout.name,
-        description: workout.description,
+        description: workoutText,
         type: "Run",
         moving_time: totalDuration,
-        workout_definition: workoutDefinition,
+        workout_doc: {},
       };
 
       try {
