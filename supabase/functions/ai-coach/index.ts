@@ -32,7 +32,7 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type, race_distance } = await req.json();
+    const { type, race_distance, training_days, start_date } = await req.json();
     // type: "analysis" | "training-plan"
 
     // Fetch user profile
@@ -127,7 +127,14 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
         "marathon": "Marathon",
       }[race_distance as string] || "Half Marathon";
 
+      const daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+      const planStart = start_date || new Date().toISOString().split("T")[0];
+
       systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
+
+The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStart}.
 
 Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
 
@@ -139,15 +146,17 @@ Create a macro-cycle plan (12-24 weeks) with:
 - Race anchors and key dates
 
 ## 📋 4-Week Training Plan
-Generate a detailed 28-day plan in this format for each day:
+Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.
+
+For each day use this format:
 
 ### Week 1: [Theme]
-**Monday** - [Rest/Active Recovery/Workout Type]
+**Monday ${planStart}** - [Rest/Active Recovery/Workout Type]
 - Description of the session
 - Target zones/paces/power
 - Duration and key metrics to hit
 
-Continue for all 28 days across 4 weeks.
+Continue for all 28 days across 4 weeks with actual dates.
 
 Include:
 - Progression across weeks (build weeks + recovery week)
@@ -163,7 +172,7 @@ Be specific with paces, durations, and intensities. Use the athlete's actual per
 
 ${dataContext}
 
-Generate a comprehensive ${raceLabel} season strategy and detailed 4-week training plan. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate a comprehensive ${raceLabel} season strategy and detailed 4-week training plan starting ${planStart}. Schedule workouts only on ${daysStr}. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     }
 
     // Stream from Lovable AI
