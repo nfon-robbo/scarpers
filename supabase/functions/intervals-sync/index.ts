@@ -171,11 +171,11 @@ serve(async (req) => {
 
           if (reps > 1) {
             lines.push(`${reps}x`);
-            lines.push(`- ${fmtDur(workDur)}`);
-            if (restDur > 0) lines.push(`- ${fmtDur(restDur)}`);
+            lines.push(`- ${fmtDur(workDur)} # Run`);
+            if (restDur > 0) lines.push(`- ${fmtDur(restDur)} # Walk`);
             i = j;
           } else {
-            lines.push(`- ${fmtDur(s.duration)}`);
+            lines.push(`- ${fmtDur(s.duration)} # Run`);
             i++;
           }
         } else {
