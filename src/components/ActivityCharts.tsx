@@ -101,9 +101,12 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       if (curr.speed) splitSpeeds.push(curr.speed);
 
       if (dist >= 1000) {
-        const elapsed = curr.time && track[kmStart].time
-          ? (new Date(curr.time).getTime() - new Date(track[kmStart].time).getTime()) / 1000
-          : 0;
+        let elapsed = 0;
+        if (curr.time && track[kmStart].time) {
+          elapsed = (new Date(curr.time).getTime() - new Date(track[kmStart].time).getTime()) / 1000;
+        } else if (curr.elapsed_time != null && track[kmStart].elapsed_time != null) {
+          elapsed = curr.elapsed_time - track[kmStart].elapsed_time;
+        }
         // speeds are already in km/h
         const rawAvgSpd = splitSpeeds.length ? splitSpeeds.reduce((a, b) => a + b, 0) / splitSpeeds.length : 0;
         const displayAvgSpd = units.speed === "mph" ? rawAvgSpd * KM_TO_MI : rawAvgSpd;
