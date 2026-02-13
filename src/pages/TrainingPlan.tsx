@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -250,7 +250,7 @@ const TrainingPlanPage = () => {
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const handleSyncToIntervals = async () => {
+  const handleSyncToIntervals = async (refresh = false) => {
     const workouts = parseWorkoutsFromPlan(content);
     const withSegments = workouts.filter(w => w.segments.length > 0 && w.dateObj);
     if (withSegments.length === 0) {
@@ -275,18 +275,25 @@ const TrainingPlanPage = () => {
         return { date: dateStr, name: w.title, description, steps };
       });
 
+      // Calculate date range for clearing
+      const dates = apiWorkouts.map(w => w.date).sort();
+      const clearRange = refresh && dates.length > 0
+        ? { oldest: dates[0], newest: dates[dates.length - 1] }
+        : undefined;
+
       const resp = await supabase.functions.invoke("intervals-sync", {
-        body: { workouts: apiWorkouts },
+        body: { workouts: apiWorkouts, clearRange },
       });
 
       if (resp.error) {
         toast({ title: "Sync failed", description: resp.error.message, variant: "destructive" });
       } else {
         const { succeeded, failed } = resp.data;
+        const action = refresh ? "Refreshed" : "Synced";
         if (failed > 0) {
-          toast({ title: `Synced ${succeeded} workouts`, description: `${failed} failed. Check intervals.icu for details.` });
+          toast({ title: `${action} ${succeeded} workouts`, description: `${failed} failed. Check intervals.icu for details.` });
         } else {
-          toast({ title: `Synced ${succeeded} workouts to intervals.icu!` });
+          toast({ title: `${action} ${succeeded} workouts to intervals.icu!` });
         }
       }
     } catch (e) {
@@ -332,9 +339,13 @@ const TrainingPlanPage = () => {
         <div className="flex gap-2">
           {content && !loading && (
             <>
-              <Button variant="outline" size="sm" onClick={handleSyncToIntervals} disabled={syncing}>
+              <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
                 {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
                 {syncing ? "Syncing..." : "Sync to intervals.icu"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh on intervals.icu
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />
