@@ -123,25 +123,48 @@ serve(async (req) => {
     const results: Array<{ date: string; name: string; success: boolean; error?: string }> = [];
 
     for (const workout of workouts) {
-      const steps = workout.steps.map((s: { duration: number; hrLow: number; hrHigh: number; intensity: string }) => {
-        let stepType = "Active";
-        switch (s.intensity) {
-          case "Warmup": stepType = "Warmup"; break;
-          case "Cooldown": stepType = "Cooldown"; break;
-          case "Interval": stepType = "Interval"; break;
-          case "Rest": stepType = "Rest"; break;
-          case "Recovery": stepType = "Recovery"; break;
-          case "Resting": stepType = "Recovery"; break;
-          default: stepType = "Active"; break;
-        }
-        return {
-          type: stepType,
-          duration: s.duration,
-          hr: { units: "bpm", start: s.hrLow, end: s.hrHigh },
-        };
-      });
-
       const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);
+
+      // Build text-based workout_definition that intervals.icu parses into proper step types
+      const lines: string[] = [];
+      let currentSection = "";
+      for (const s of workout.steps) {
+        // Determine section header based on intensity
+        let section = "";
+        switch (s.intensity) {
+          case "Warmup": section = "Warmup"; break;
+          case "Cooldown": section = "Cooldown"; break;
+          default: section = ""; break;
+        }
+
+        // Add section header if it changed
+        if (section && section !== currentSection) {
+          lines.push(section);
+          currentSection = section;
+        } else if (!section && currentSection !== "Main") {
+          // No special section = main set
+          currentSection = "Main";
+        }
+
+        // Format duration
+        const mins = Math.floor(s.duration / 60);
+        const secs = s.duration % 60;
+        let durStr = "";
+        if (mins > 0 && secs > 0) durStr = `${mins}m${secs}s`;
+        else if (mins > 0) durStr = `${mins}m`;
+        else durStr = `${secs}s`;
+
+        // Format HR target
+        const hrStr = `${s.hrLow}-${s.hrHigh}bpm`;
+
+        // Mark recovery/rest steps
+        let label = "";
+        if (s.intensity === "Recovery" || s.intensity === "Rest") label = " #recovery";
+
+        lines.push(`- ${durStr} ${hrStr}${label}`);
+      }
+
+      const workoutDefinition = lines.join("\n");
 
       const payload = {
         start_date_local: `${workout.date}T00:00:00`,
@@ -150,10 +173,7 @@ serve(async (req) => {
         description: workout.description,
         type: "Run",
         moving_time: totalDuration,
-        workout_doc: {
-          steps,
-          duration: totalDuration,
-        },
+        workout_definition: workoutDefinition,
       };
 
       try {
