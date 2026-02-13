@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Heart, Timer, Zap, TrendingUp } from "lucide-react";
+import { Loader2, Heart, Timer, Zap, TrendingUp, Mountain, Gauge } from "lucide-react";
 
 const Activities = () => {
   const { user } = useAuth();
@@ -23,16 +23,10 @@ const Activities = () => {
       });
   }, [user]);
 
-  const formatDuration = (seconds: number | null) => {
+  const fmt = (seconds: number | null) => {
     if (!seconds) return "—";
     const m = Math.floor(seconds / 60);
-    const s = Math.round(seconds % 60);
-    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${s}s`;
-  };
-
-  const formatSpeed = (speed: number | null) => {
-    if (!speed) return null;
-    return `${speed.toFixed(1)} km/h`;
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
   };
 
   if (loading) {
@@ -59,12 +53,12 @@ const Activities = () => {
       ) : (
         <div className="space-y-3">
           {activities.map((a) => (
-            <Card key={a.id}>
+            <Card key={a.id} className="hover:shadow-sm transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">
                         {a.start_time
                           ? new Date(a.start_time).toLocaleDateString(undefined, {
                               weekday: "short", year: "numeric", month: "short", day: "numeric",
@@ -72,31 +66,37 @@ const Activities = () => {
                           : "Unknown date"}
                       </span>
                       {a.activity_type && (
-                        <Badge variant="secondary" className="capitalize">
+                        <Badge variant="secondary" className="capitalize text-xs">
                           {a.activity_type}
                         </Badge>
                       )}
+                      {a.training_effect && (
+                        <Badge variant="outline" className="text-xs">
+                          TE {Number(a.training_effect).toFixed(1)}
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">{a.source_file}</p>
+                    <p className="text-xs text-muted-foreground truncate">{a.source_file}</p>
                   </div>
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {a.start_time && new Date(a.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  <Metric icon={Timer} label="Duration" value={formatDuration(a.duration_seconds)} />
-                  <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm` : null} />
-                  <Metric icon={TrendingUp} label="Avg Speed" value={formatSpeed(a.avg_speed)} />
-                  <Metric icon={Zap} label="Avg Power" value={a.avg_power ? `${Math.round(a.avg_power)} W` : null} />
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-3">
+                  <Metric icon={Timer} label="Duration" value={fmt(a.duration_seconds)} />
+                  <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)}` : null} unit="bpm" />
+                  <Metric icon={Heart} label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)}` : null} unit="bpm" />
+                  <Metric icon={TrendingUp} label="Speed" value={a.avg_speed ? `${Number(a.avg_speed).toFixed(1)}` : null} unit="km/h" />
+                  <Metric icon={Zap} label="Power" value={a.avg_power ? `${Math.round(a.avg_power)}` : null} unit="W" />
+                  <Metric icon={Mountain} label="Ascent" value={a.total_ascent ? `${Math.round(a.total_ascent)}` : null} unit="m" />
                 </div>
 
-                {(a.max_heart_rate || a.calories || a.total_ascent != null) && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                    <Metric label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)} bpm` : null} />
-                    <Metric label="Calories" value={a.calories ? `${Math.round(a.calories)} kcal` : null} />
-                    <Metric label="Ascent" value={a.total_ascent ? `${Math.round(a.total_ascent)} m` : null} />
-                    <Metric label="Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)} rpm` : null} />
+                {(a.avg_cadence || a.calories || a.distance_meters) && (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-2">
+                    <Metric icon={Gauge} label="Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)}` : null} unit="rpm" />
+                    <Metric label="Calories" value={a.calories ? `${Math.round(a.calories)}` : null} unit="kcal" />
+                    <Metric label="Distance" value={a.distance_meters ? `${(a.distance_meters / 1000).toFixed(1)}` : null} unit="km" />
                   </div>
                 )}
               </CardContent>
@@ -108,14 +108,17 @@ const Activities = () => {
   );
 };
 
-const Metric = ({ icon: Icon, label, value }: { icon?: any; label: string; value: string | null }) => {
+const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string; value: string | null; unit?: string }) => {
   if (!value) return <div />;
   return (
-    <div className="flex items-center gap-2">
-      {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" />}
-      <div>
+    <div className="flex items-center gap-1.5">
+      {Icon && <Icon className="w-3 h-3 text-muted-foreground shrink-0" />}
+      <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
+        <p className="text-sm font-medium">
+          {value}
+          {unit && <span className="text-xs text-muted-foreground ml-0.5">{unit}</span>}
+        </p>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import {
   Upload,
   Brain,
   Calendar,
-  History,
+  ListChecks,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -16,10 +16,9 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/upload", icon: Upload, label: "Import Data" },
-  { to: "/activities", icon: Activity, label: "Activities" },
+  { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/analysis", icon: Brain, label: "AI Analysis" },
   { to: "/training-plan", icon: Calendar, label: "Training Plan" },
-  { to: "/history", icon: History, label: "History" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -33,7 +32,7 @@ const AppLayout = () => {
       <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar p-4">
         <div className="flex items-center gap-2.5 px-2 mb-8">
           <Activity className="w-7 h-7 text-primary" />
-          <span className="text-lg font-bold text-sidebar-foreground">Garmin AI Coach</span>
+          <span className="text-lg font-bold text-sidebar-foreground">AI Coach</span>
         </div>
 
         <nav className="flex-1 space-y-1">
