@@ -131,7 +131,9 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
         ? (training_days as string[]).join(", ")
         : "Mon, Wed, Fri, Sat";
       const planStart = start_date || new Date().toISOString().split("T")[0];
-
+      // Convert to UK format for display
+      const [y, m, d] = planStart.split("-");
+      const planStartUK = `${d}/${m}/${y}`;
       systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
 
 The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStart}.
@@ -157,10 +159,10 @@ Create a macro-cycle plan (12-24 weeks) with:
 ## 📋 4-Week Training Plan
 Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.
 
-For each workout day, use this Zepp-compatible format:
+For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
 ### Week 1: [Theme]
-**Monday ${planStart}** - [Workout Type] (Total: Xmin / Xkm)
+**Monday ${planStartUK}** - [Workout Type] (Total: Xmin / Xkm)
 | Segment | Duration/Distance | Target | HR Zone | Notes |
 |---------|-------------------|--------|---------|-------|
 | Warm-up | 10 min | easy pace | Z1-Z2 | |
