@@ -112,8 +112,10 @@ const Activities = () => {
                         )}
                         {a.training_effect && (
                           <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="outline" className="text-xs cursor-help">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                            <TooltipTrigger>
+                              <span className="cursor-help">
+                                <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs text-xs">
                               <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
