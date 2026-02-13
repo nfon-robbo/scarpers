@@ -52,10 +52,16 @@ const Activities = () => {
     setDeleting(null);
   };
 
-  const fmtDuration = (seconds: number | null) => {
+  const fmtDuration = (seconds: number | null, detailed = false) => {
     if (!seconds) return "—";
-    const m = Math.floor(seconds / 60);
-    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.round(seconds % 60);
+    if (detailed) {
+      if (h > 0) return `${h}h ${m}m ${s}s`;
+      return `${m}m ${s}s`;
+    }
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
   if (loading) {
@@ -182,7 +188,7 @@ const Activities = () => {
                       {/* All parsed fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <DetailField label="Distance" value={fmt.distance(a.distance_meters)} />
-                        <DetailField label="Duration" value={a.duration_seconds ? `${Math.floor(a.duration_seconds / 60)}m ${Math.round(a.duration_seconds % 60)}s` : null} />
+                        <DetailField label="Duration" value={fmtDuration(a.duration_seconds, true)} />
                         <DetailField label="Avg Heart Rate" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm` : null} />
                         <DetailField label="Max Heart Rate" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)} bpm` : null} />
                         <DetailField label="Avg Speed" value={fmt.speed(a.avg_speed)} />
