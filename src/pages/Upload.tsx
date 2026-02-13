@@ -123,7 +123,7 @@ const UploadPage = () => {
           training_effect: a.training_effect,
           training_load: a.training_load,
           source_file: a.source_file,
-          raw_data: a.raw_data,
+          raw_data: { ...a.raw_data as object, gps_track: a.gps_track },
         }));
 
         const { error } = await supabase.from("activities").insert(batch as any);

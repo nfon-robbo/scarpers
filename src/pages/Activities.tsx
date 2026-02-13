@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Loader2, Heart, Timer, Zap, TrendingUp, Mountain, Gauge,
-  Trash2, ChevronDown, ChevronUp, Thermometer, Flame, Target,
+  Trash2, ChevronDown, ChevronUp, MapPin,
 } from "lucide-react";
+import ActivityMap from "@/components/ActivityMap";
 
 const Activities = () => {
   const { user } = useAuth();
@@ -155,6 +156,15 @@ const Activities = () => {
                   {/* Expanded detail view */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-border space-y-4">
+                      {/* GPS Route Map */}
+                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 2 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> Route Map
+                          </p>
+                          <ActivityMap track={a.raw_data.gps_track} />
+                        </div>
+                      )}
                       {/* All parsed fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <DetailField label="Distance" value={a.distance_meters ? `${(a.distance_meters / 1000).toFixed(2)} km` : null} />
