@@ -125,43 +125,80 @@ serve(async (req) => {
     for (const workout of workouts) {
       const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);
 
-      // Build text-based workout_definition that intervals.icu parses into proper step types
+      // Convert bpm to HR zone string
+      function bpmToZone(hrLow: number): string {
+        if (hrLow >= 175) return "Z5 HR";
+        if (hrLow >= 160) return "Z4 HR";
+        if (hrLow >= 140) return "Z3 HR";
+        if (hrLow >= 120) return "Z2 HR";
+        return "Z1 HR";
+      }
+
+      // Format duration for intervals.icu
+      function fmtDur(secs: number): string {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        if (m > 0 && s > 0) return `${m}m${s}s`;
+        if (m > 0) return `${m}m`;
+        return `${s}s`;
+      }
+
+      // Build workout_definition text
+      const steps = workout.steps;
       const lines: string[] = [];
-      let currentSection = "";
-      for (const s of workout.steps) {
-        // Determine section header based on intensity
-        let section = "";
-        switch (s.intensity) {
-          case "Warmup": section = "Warmup"; break;
-          case "Cooldown": section = "Cooldown"; break;
-          default: section = ""; break;
+      let i = 0;
+
+      while (i < steps.length) {
+        const s = steps[i];
+
+        if (s.intensity === "Warmup") {
+          lines.push("Warmup");
+          lines.push(`- ${fmtDur(s.duration)} ${bpmToZone(s.hrLow)}`);
+          i++;
+        } else if (s.intensity === "Cooldown") {
+          lines.push("Cooldown");
+          lines.push(`- ${fmtDur(s.duration)} ${bpmToZone(s.hrLow)}`);
+          i++;
+        } else if (s.intensity === "Interval") {
+          // Count consecutive Interval/Recovery pairs
+          let reps = 0;
+          let j = i;
+          const workDur = s.duration;
+          const workZone = bpmToZone(s.hrLow);
+          let restDur = 0;
+          let restZone = "Z1 HR";
+
+          while (j < steps.length && steps[j].intensity === "Interval" &&
+                 steps[j].duration === workDur &&
+                 bpmToZone(steps[j].hrLow) === workZone) {
+            reps++;
+            if (j + 1 < steps.length && (steps[j + 1].intensity === "Recovery" || steps[j + 1].intensity === "Rest")) {
+              restDur = steps[j + 1].duration;
+              restZone = bpmToZone(steps[j + 1].hrLow);
+              j += 2;
+            } else {
+              j++;
+              break;
+            }
+          }
+
+          if (reps > 1) {
+            lines.push(`${reps}x`);
+            lines.push(`- ${fmtDur(workDur)} ${workZone}`);
+            if (restDur > 0) lines.push(`- ${fmtDur(restDur)} ${restZone}`);
+            i = j;
+          } else {
+            lines.push(`- ${fmtDur(s.duration)} ${bpmToZone(s.hrLow)}`);
+            i++;
+          }
+        } else if (s.intensity === "Recovery" || s.intensity === "Rest") {
+          lines.push(`- ${fmtDur(s.duration)} ${bpmToZone(s.hrLow)}`);
+          i++;
+        } else {
+          // Active or other
+          lines.push(`- ${fmtDur(s.duration)} ${bpmToZone(s.hrLow)}`);
+          i++;
         }
-
-        // Add section header if it changed
-        if (section && section !== currentSection) {
-          lines.push(section);
-          currentSection = section;
-        } else if (!section && currentSection !== "Main") {
-          // No special section = main set
-          currentSection = "Main";
-        }
-
-        // Format duration
-        const mins = Math.floor(s.duration / 60);
-        const secs = s.duration % 60;
-        let durStr = "";
-        if (mins > 0 && secs > 0) durStr = `${mins}m${secs}s`;
-        else if (mins > 0) durStr = `${mins}m`;
-        else durStr = `${secs}s`;
-
-        // Format HR target
-        const hrStr = `${s.hrLow}-${s.hrHigh}bpm`;
-
-        // Mark recovery/rest steps
-        let label = "";
-        if (s.intensity === "Recovery" || s.intensity === "Rest") label = " #recovery";
-
-        lines.push(`- ${durStr} ${hrStr}${label}`);
       }
 
       const workoutDefinition = lines.join("\n");
