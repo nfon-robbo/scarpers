@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, CheckCircle2, Unlink } from "lucide-react";
+import { Loader2, CheckCircle2, Unlink, Trash2 } from "lucide-react";
 
 const StravaConnect = () => {
   const { user, session } = useAuth();
@@ -13,6 +13,7 @@ const StravaConnect = () => {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const checkStatus = useCallback(async () => {
     if (!session?.access_token) return;
@@ -159,6 +160,31 @@ const StravaConnect = () => {
               <Button variant="outline" onClick={handleDisconnect}>
                 <Unlink className="w-4 h-4 mr-2" />
                 Disconnect
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!confirm("Delete all Strava-imported activities? This cannot be undone.")) return;
+                  setDeleting(true);
+                  try {
+                    const { count, error } = await supabase
+                      .from("activities")
+                      .delete({ count: "exact" })
+                      .eq("user_id", user!.id)
+                      .like("source_file", "strava:%");
+                    if (error) throw error;
+                    toast({ title: "Deleted", description: `${count ?? 0} Strava activities removed.` });
+                    setImportResult(null);
+                  } catch (e: any) {
+                    toast({ title: "Error", description: e.message, variant: "destructive" });
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                Delete All Strava Workouts
               </Button>
             </div>
             {importResult && (
