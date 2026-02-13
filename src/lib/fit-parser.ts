@@ -74,6 +74,17 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
         }
       }
 
+      // Compute record-level fallbacks for fields missing from session
+      const recordCadences = records.map((r: any) => r.cadence ?? r.running_cadence).filter(Boolean);
+      const recordPowers = records.map((r: any) => r.power).filter((v: any) => v != null && v > 0);
+      const recordTemps = records.map((r: any) => r.temperature).filter((v: any) => v != null);
+      const recordAltitudes = records.map((r: any) => r.altitude ?? r.enhanced_altitude).filter((v: any) => v != null);
+      let recAscent = 0, recDescent = 0;
+      for (let i = 1; i < recordAltitudes.length; i++) {
+        const diff = recordAltitudes[i] - recordAltitudes[i - 1];
+        if (diff > 0) recAscent += diff; else recDescent += Math.abs(diff);
+      }
+
       // Extract session-level data — try multiple paths
       const sessions = data?.sessions || data?.activity?.sessions || [];
       if (sessions.length > 0) {
@@ -87,13 +98,13 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             max_heart_rate: session.max_heart_rate ?? null,
             avg_speed: session.avg_speed ?? session.enhanced_avg_speed ?? null,
             max_speed: session.max_speed ?? session.enhanced_max_speed ?? null,
-            avg_power: session.avg_power ?? null,
-            max_power: session.max_power ?? null,
-            avg_cadence: session.avg_cadence ?? session.avg_running_cadence ?? null,
-            total_ascent: session.total_ascent != null ? session.total_ascent * 1000 : null,
-            total_descent: session.total_descent != null ? session.total_descent * 1000 : null,
+            avg_power: session.avg_power ?? (recordPowers.length ? recordPowers.reduce((a: number, b: number) => a + b, 0) / recordPowers.length : null),
+            max_power: session.max_power ?? (recordPowers.length ? Math.max(...recordPowers) : null),
+            avg_cadence: session.avg_cadence ?? session.avg_running_cadence ?? (recordCadences.length ? recordCadences.reduce((a: number, b: number) => a + b, 0) / recordCadences.length : null),
+            total_ascent: session.total_ascent != null ? session.total_ascent * 1000 : (recordAltitudes.length > 1 ? recAscent * 1000 : null),
+            total_descent: session.total_descent != null ? session.total_descent * 1000 : (recordAltitudes.length > 1 ? recDescent * 1000 : null),
             calories: session.total_calories ?? null,
-            avg_temperature: session.avg_temperature ?? null,
+            avg_temperature: session.avg_temperature ?? (recordTemps.length ? recordTemps.reduce((a: number, b: number) => a + b, 0) / recordTemps.length : null),
             training_effect: session.total_training_effect ?? null,
             training_load: null,
             source_file: fileName,
