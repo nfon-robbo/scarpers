@@ -5,11 +5,12 @@ import { streamAICoach } from "@/lib/ai-stream";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -134,6 +135,8 @@ const TrainingPlanPage = () => {
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
   const [letAIDecide, setLetAIDecide] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -423,29 +426,44 @@ const TrainingPlanPage = () => {
                 {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
                 {reviewing ? "Reviewing..." : "Review Progress"}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
-                {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-                {syncing ? "Syncing..." : "Sync to intervals.icu"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh on intervals.icu
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDeleteFromIntervals} disabled={syncing}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete from intervals.icu
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportIcs}>
-                <FileDown className="w-4 h-4 mr-2" />
-                Calendar (.ics)
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
+                    <MoreVertical className="w-4 h-4 mr-2" />
+                    Actions
                   </Button>
-                </AlertDialogTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Sync to intervals.icu
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh on intervals.icu
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDeleteFromIntervals} disabled={syncing}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete from intervals.icu
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportIcs}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Export calendar (.ics)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    New Plan
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Plan
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete training plan?</AlertDialogTitle>
@@ -453,17 +471,11 @@ const TrainingPlanPage = () => {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={deletePlan}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={() => { deletePlan(); setShowDeleteDialog(false); }}>Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    New Plan
-                  </Button>
-                </AlertDialogTrigger>
+              <AlertDialog open={showNewPlanDialog} onOpenChange={setShowNewPlanDialog}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Start a new plan?</AlertDialogTitle>
@@ -471,7 +483,7 @@ const TrainingPlanPage = () => {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { setContent(""); setSavedPlanId(null); }}>Continue</AlertDialogAction>
+                    <AlertDialogAction onClick={() => { setContent(""); setSavedPlanId(null); setShowNewPlanDialog(false); }}>Continue</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
