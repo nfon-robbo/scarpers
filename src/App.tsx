@@ -8,6 +8,8 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import Activities from "./pages/Activities";
+import AnalysisPage from "./pages/Analysis";
+import TrainingPlanPage from "./pages/TrainingPlan";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -39,10 +41,9 @@ const App = () => (
           >
             <Route path="/" element={<Dashboard />} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/analysis" element={<PlaceholderPage title="AI Analysis" />} />
-            <Route path="/training-plan" element={<PlaceholderPage title="Training Plan" />} />
             <Route path="/activities" element={<Activities />} />
-            <Route path="/history" element={<PlaceholderPage title="History" />} />
+            <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/training-plan" element={<TrainingPlanPage />} />
             <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
           </Route>
           <Route path="*" element={<NotFound />} />
