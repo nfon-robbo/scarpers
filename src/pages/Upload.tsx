@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import StravaConnect from "@/components/StravaConnect";
 
 type UploadState = "idle" | "extracting" | "parsing" | "saving" | "done" | "error";
 
@@ -243,6 +244,9 @@ const UploadPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Strava Integration */}
+      <StravaConnect />
 
       {/* Upload history */}
       <UploadHistory />
