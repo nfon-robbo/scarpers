@@ -218,7 +218,7 @@ Based on the progress review, decide whether to adjust the remaining plan:
 
 If adjustments are needed, provide a REVISED plan for the remaining weeks. Use the EXACT SAME table format as the original plan:
 
-CRITICAL FORMAT RULE: EVERY adjusted workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Use UK date format (DD/MM/YYYY) for all dates. Only schedule workouts on: ${daysStr}.
+CRITICAL FORMAT RULES: EVERY adjusted workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Use UK date format (DD/MM/YYYY) for all dates. Only schedule workouts on: ${daysStr}. EVERY workout title MUST include the total duration as "(Total: Xmin)".
 
 If NO adjustments are needed, explicitly state "No adjustments needed — continue with the current plan as written."
 
@@ -310,12 +310,14 @@ Create a macro-cycle plan with:
 ## 📋 ${isAIDecide ? 'Complete' : '4-Week'} Training Plan
 ${planLengthInstruction}
 
-CRITICAL FORMAT RULE: EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
+CRITICAL FORMAT RULES:
+1. EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
+2. EVERY workout title line MUST include the total duration in the format "(Total: Xmin)" — calculate this by summing all segment durations including warm-up, main set, and cool-down. This is mandatory for every single workout. For interval sessions, include the recovery time in the total.
 
 For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
 ### Week 1: [Theme]
-**Monday ${planStartUK}** - [Workout Type] (Total: Xmin / Xkm)
+**Monday ${planStartUK}** - [Workout Type] (Total: 40min)
 | Segment | Duration/Distance | Target | HR Zone | Notes |
 |---------|-------------------|--------|---------|-------|
 | Warm-up | 10 min | easy pace | Z1-Z2 | |
