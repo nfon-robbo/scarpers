@@ -1,0 +1,273 @@
+/**
+ * Plan Export Utilities
+ * 
+ * Parses markdown training plans and exports them as:
+ * - FIT workout files (for TrainingPeaks → watch sync)
+ * - ICS calendar files
+ * - Clipboard text (for manual Zepp entry)
+ */
+
+import JSZip from "jszip";
+import {
+  encodeWorkoutFit,
+  WorkoutStep,
+  WKT_STEP_DURATION,
+  WKT_STEP_TARGET,
+  INTENSITY,
+} from "./fit-workout-encoder";
+
+export interface ParsedSegment {
+  segment: string;   // e.g. "Warm-up", "Main", "Cool-down"
+  duration: string;  // e.g. "10 min", "5 km"
+  target: string;    // e.g. "Walk/Easy Jog", "5:30/km"
+  hrZone: string;    // e.g. "Z1", "Z2-Z3"
+  notes?: string;
+}
+
+export interface ParsedWorkout {
+  date: string;       // raw date string e.g. "17/02/2025"
+  dateObj: Date | null;
+  title: string;      // e.g. "Easy Recovery Run (30 min)"
+  segments: ParsedSegment[];
+  rawText: string;    // full markdown text of this workout
+}
+
+/**
+ * Parse a markdown training plan to extract individual workouts.
+ * Looks for bold date + workout title patterns followed by segment tables.
+ */
+export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
+  const lines = markdown.split("\n");
+  const workouts: ParsedWorkout[] = [];
+
+  // Pattern: **Day DD/MM/YYYY** or **Monday DD/MM/YYYY** followed by workout info
+  // Also matches: **DD/MM/YYYY** – Title
+  const datePattern = /\*\*(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\*\*/i;
+  const altDatePattern = /\*\*(\d{1,2}\/\d{1,2}\/\d{4})[^*]*\*\*/i;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const dateMatch = line.match(datePattern) || line.match(altDatePattern);
+
+    if (dateMatch) {
+      const dateStr = dateMatch[1];
+      // Extract title from the rest of the line
+      const titleMatch = line.match(/\*\*[^*]+\*\*\s*[-–:]\s*(.+)/) ||
+                         line.match(/\*\*[^*]+\*\*\s+(.+)/);
+      const title = titleMatch ? titleMatch[1].replace(/\*\*/g, "").trim() : line.replace(/\*\*/g, "").trim();
+
+      // Parse date (DD/MM/YYYY)
+      const dateParts = dateStr.split("/");
+      let dateObj: Date | null = null;
+      if (dateParts.length === 3) {
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1;
+        const year = parseInt(dateParts[2], 10);
+        dateObj = new Date(year, month, day);
+        if (isNaN(dateObj.getTime())) dateObj = null;
+      }
+
+      // Collect lines until next workout or end
+      const startLine = i;
+      i++;
+      const segments: ParsedSegment[] = [];
+
+      // Look for a table with segments
+      while (i < lines.length) {
+        // Check if next workout starts
+        if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern))) {
+          break;
+        }
+
+        // Detect table header row with "Segment" column
+        if (lines[i].includes("|") && /segment/i.test(lines[i])) {
+          const headerCells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
+          i++; // skip header
+          // Skip separator row
+          if (i < lines.length && /^\s*\|?\s*[-:]+/.test(lines[i])) i++;
+
+          // Parse body rows
+          while (i < lines.length && lines[i].includes("|") && !/^\s*\|?\s*[-:]+[-|:\s]+$/.test(lines[i])) {
+            const cells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
+            if (cells.length >= 3) {
+              segments.push({
+                segment: cells[0] || "",
+                duration: cells[1] || "",
+                target: cells[2] || "",
+                hrZone: cells[3] || "",
+                notes: cells[4] || "",
+              });
+            }
+            i++;
+          }
+          continue;
+        }
+        i++;
+      }
+
+      // Capture raw text
+      const rawText = lines.slice(startLine, i).join("\n");
+
+      workouts.push({
+        date: dateStr,
+        dateObj,
+        title,
+        segments,
+        rawText,
+      });
+      continue;
+    }
+    i++;
+  }
+
+  return workouts;
+}
+
+/**
+ * Convert parsed segments into FIT WorkoutStep objects.
+ */
+function segmentsToFitSteps(segments: ParsedSegment[]): WorkoutStep[] {
+  return segments.map((seg): WorkoutStep => {
+    // Determine intensity
+    let intensity = INTENSITY.ACTIVE;
+    const segLower = seg.segment.toLowerCase();
+    if (segLower.includes("warm")) intensity = INTENSITY.WARMUP;
+    else if (segLower.includes("cool")) intensity = INTENSITY.COOLDOWN;
+    else if (segLower.includes("rest") || segLower.includes("recovery")) intensity = INTENSITY.REST;
+
+    // Parse duration
+    let durationType = WKT_STEP_DURATION.OPEN;
+    let durationValue = 0;
+
+    const timeMatch = seg.duration.match(/(\d+)\s*min/i);
+    const secMatch = seg.duration.match(/(\d+)\s*sec/i);
+    const kmMatch = seg.duration.match(/([\d.]+)\s*km/i);
+    const mMatch = seg.duration.match(/(\d+)\s*m\b/i);
+
+    if (timeMatch) {
+      durationType = WKT_STEP_DURATION.TIME;
+      durationValue = parseInt(timeMatch[1], 10) * 60 * 1000; // milliseconds
+    } else if (secMatch) {
+      durationType = WKT_STEP_DURATION.TIME;
+      durationValue = parseInt(secMatch[1], 10) * 1000;
+    } else if (kmMatch) {
+      durationType = WKT_STEP_DURATION.DISTANCE;
+      durationValue = parseFloat(kmMatch[1]) * 100000; // centimeters
+    } else if (mMatch) {
+      durationType = WKT_STEP_DURATION.DISTANCE;
+      durationValue = parseInt(mMatch[1], 10) * 100; // centimeters
+    }
+
+    // Parse HR zone target
+    let targetType = WKT_STEP_TARGET.OPEN;
+    let targetValue = 0;
+
+    const zoneMatch = seg.hrZone.match(/Z(\d)/i);
+    if (zoneMatch) {
+      targetType = WKT_STEP_TARGET.HEART_RATE;
+      targetValue = parseInt(zoneMatch[1], 10);
+    }
+
+    return {
+      intensity,
+      durationType,
+      durationValue,
+      targetType,
+      targetValue,
+    };
+  });
+}
+
+/**
+ * Generate a ZIP file containing one .FIT workout file per workout day.
+ */
+export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blob> {
+  const zip = new JSZip();
+
+  for (const workout of workouts) {
+    if (workout.segments.length === 0) continue;
+    const steps = segmentsToFitSteps(workout.segments);
+    if (steps.length === 0) continue;
+
+    const fitData = encodeWorkoutFit(workout.title || "Workout", steps);
+    const safeName = (workout.date || "workout").replace(/\//g, "-");
+    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.fit`;
+    zip.file(fileName, fitData);
+  }
+
+  return zip.generateAsync({ type: "blob" });
+}
+
+/**
+ * Generate an ICS calendar file from parsed workouts.
+ */
+export function generateIcsCalendar(workouts: ParsedWorkout[]): string {
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//TrainingPlan//EN",
+    "CALSCALE:GREGORIAN",
+  ];
+
+  for (const workout of workouts) {
+    if (!workout.dateObj) continue;
+
+    const y = workout.dateObj.getFullYear();
+    const m = String(workout.dateObj.getMonth() + 1).padStart(2, "0");
+    const d = String(workout.dateObj.getDate()).padStart(2, "0");
+    const dateVal = `${y}${m}${d}`;
+
+    // Build description from segments
+    const descParts = workout.segments.map(
+      (s, i) => `Step ${i + 1}: ${s.segment} | ${s.duration} | ${s.hrZone}${s.target ? ` | ${s.target}` : ""}`
+    );
+    const description = descParts.join("\\n");
+
+    lines.push("BEGIN:VEVENT");
+    lines.push(`DTSTART;VALUE=DATE:${dateVal}`);
+    lines.push(`DTEND;VALUE=DATE:${dateVal}`);
+    lines.push(`SUMMARY:🏃 ${workout.title}`);
+    lines.push(`DESCRIPTION:${description}`);
+    lines.push(`UID:${dateVal}-${Math.random().toString(36).slice(2)}@trainingplan`);
+    lines.push("END:VEVENT");
+  }
+
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+
+/**
+ * Format a single workout for clipboard copy (Zepp manual entry format).
+ */
+export function formatWorkoutForZepp(workout: ParsedWorkout): string {
+  const parts: string[] = [`WORKOUT: ${workout.title}`, ""];
+  workout.segments.forEach((seg, i) => {
+    const hrInfo = seg.hrZone ? ` | ${seg.hrZone}` : "";
+    const targetInfo = seg.target ? ` | ${seg.target}` : "";
+    parts.push(`Step ${i + 1}: ${seg.segment} | ${seg.duration}${hrInfo}${targetInfo}`);
+  });
+  if (workout.segments.length > 0 && workout.segments[0].notes) {
+    parts.push("", `Notes: ${workout.segments[0].notes}`);
+  }
+  return parts.join("\n");
+}
+
+/**
+ * Trigger a file download in the browser.
+ */
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function downloadText(content: string, filename: string, mimeType = "text/plain") {
+  const blob = new Blob([content], { type: mimeType });
+  downloadBlob(blob, filename);
+}

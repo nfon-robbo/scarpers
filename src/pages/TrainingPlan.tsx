@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2 } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Download, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { parseWorkoutsFromPlan, generateWorkoutZip, generateIcsCalendar, downloadBlob, downloadText } from "@/lib/plan-export";
 
 const RACE_DISTANCES = [
   { value: "5k", label: "5K" },
@@ -160,6 +161,30 @@ const TrainingPlanPage = () => {
     });
   };
 
+  const [showSyncInstructions, setShowSyncInstructions] = useState(false);
+
+  const handleExportFit = async () => {
+    const workouts = parseWorkoutsFromPlan(content);
+    if (workouts.length === 0 || workouts.every(w => w.segments.length === 0)) {
+      toast({ title: "No structured workouts found", description: "The plan needs workout tables with Segment/Duration/HR Zone columns.", variant: "destructive" });
+      return;
+    }
+    const blob = await generateWorkoutZip(workouts);
+    downloadBlob(blob, "training-plan-workouts.zip");
+    toast({ title: "Downloaded!", description: `${workouts.filter(w => w.segments.length > 0).length} workout files exported.` });
+  };
+
+  const handleExportIcs = () => {
+    const workouts = parseWorkoutsFromPlan(content);
+    if (workouts.length === 0) {
+      toast({ title: "No workouts found", variant: "destructive" });
+      return;
+    }
+    const ics = generateIcsCalendar(workouts);
+    downloadText(ics, "training-plan.ics", "text/calendar");
+    toast({ title: "Calendar downloaded!" });
+  };
+
   const showConfig = !content && !loading;
 
   if (initialLoading) {
@@ -185,11 +210,19 @@ const TrainingPlanPage = () => {
         <div className="flex gap-2">
           {content && !loading && (
             <>
-              <Button variant="outline" onClick={deletePlan}>
+              <Button variant="outline" size="sm" onClick={handleExportFit}>
+                <Download className="w-4 h-4 mr-2" />
+                Export for TrainingPeaks
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportIcs}>
+                <FileDown className="w-4 h-4 mr-2" />
+                Calendar (.ics)
+              </Button>
+              <Button variant="outline" size="sm" onClick={deletePlan}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </Button>
-              <Button variant="outline" onClick={() => { setContent(""); setSavedPlanId(null); }}>
+              <Button variant="outline" size="sm" onClick={() => { setContent(""); setSavedPlanId(null); }}>
                 <RotateCcw className="w-4 h-4 mr-2" />
                 New Plan
               </Button>
@@ -329,7 +362,7 @@ const TrainingPlanPage = () => {
         </>
       )}
 
-      {(content || loading) && (
+      {(content || loading) && (<>
         <Card>
           <CardContent className="p-6">
             {content ? (
@@ -348,7 +381,31 @@ const TrainingPlanPage = () => {
             )}
           </CardContent>
         </Card>
-      )}
+
+        <Card className="border-dashed">
+          <CardHeader className="p-4 cursor-pointer" onClick={() => setShowSyncInstructions(!showSyncInstructions)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Watch className="w-5 h-5 text-primary" />
+                <CardTitle className="text-sm">How to sync workouts to your watch</CardTitle>
+              </div>
+              {showSyncInstructions ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            </div>
+          </CardHeader>
+          {showSyncInstructions && (
+            <CardContent className="pt-0 px-4 pb-4">
+              <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                <li>Click <strong className="text-foreground">Export for TrainingPeaks</strong> above to download a ZIP of .FIT workout files</li>
+                <li>Open <a href="https://www.trainingpeaks.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">TrainingPeaks</a> and import the .FIT files into your calendar</li>
+                <li>Open the <strong className="text-foreground">Zepp app</strong> on your phone</li>
+                <li>Go to <strong className="text-foreground">Profile → 3rd-Party Account Linking → TrainingPeaks</strong></li>
+                <li>Connect your TrainingPeaks account — workouts will automatically sync to your Amazfit watch</li>
+              </ol>
+              <p className="text-xs text-muted-foreground mt-3">Each workout's segments (warm-up, intervals, cool-down) with HR zone targets will appear as executable structured workouts on your watch.</p>
+            </CardContent>
+          )}
+        </Card>
+      </>)}
     </div>
   );
 };
