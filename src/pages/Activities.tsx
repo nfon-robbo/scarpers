@@ -148,7 +148,7 @@ const Activities = () => {
 
                   {/* Summary metrics (always visible) */}
                   <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 mt-3">
-                    <Metric icon={TrendingUp} label="Distance" value={fmt.distance(a.distance_meters)} />
+                    <Metric icon={TrendingUp} label="Distance" value={fmt.distance(a.distance_meters ?? (a.avg_speed && a.duration_seconds ? (a.avg_speed / 3.6 * a.duration_seconds) : null))} />
                     <Metric icon={Timer} label="Duration" value={fmtDuration(a.duration_seconds)} />
                     <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)}` : null} unit="bpm" />
                     <Metric icon={Heart} label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)}` : null} unit="bpm" />
