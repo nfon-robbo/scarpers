@@ -32,7 +32,7 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type, race_distance, training_days, start_date } = await req.json();
+    const { type, race_distance, training_days, start_date, race_date } = await req.json();
     // type: "analysis" | "training-plan"
 
     // Fetch user profile
@@ -134,9 +134,22 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
       // Convert to UK format for display
       const [y, m, d] = planStart.split("-");
       const planStartUK = `${d}/${m}/${y}`;
+      let raceDateInstruction: string;
+      if (race_date === "ai-recommend") {
+        raceDateInstruction = `The athlete has NOT set a race date. Based on their current fitness level and the ${raceLabel} distance, recommend an ideal race date and explain why. Factor in required training weeks for their experience level.`;
+      } else if (race_date) {
+        const [ry, rm, rd] = (race_date as string).split("-");
+        const raceDateUK = `${rd}/${rm}/${ry}`;
+        raceDateInstruction = `The athlete's target race date is ${raceDateUK}. Plan the training to peak for this date, including appropriate taper.`;
+      } else {
+        raceDateInstruction = `No race date specified. Suggest a realistic timeline.`;
+      }
+
       systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
 
-The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStart}.
+The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStartUK}.
+
+RACE DATE: ${raceDateInstruction}
 
 CRITICAL INSTRUCTIONS:
 - Carefully review the athlete's profile, especially "Additional Context" which may contain injuries, physical limitations, or health conditions. You MUST adapt every workout to account for these. If an injury is mentioned, include modifications, reduced intensity, or alternative exercises.

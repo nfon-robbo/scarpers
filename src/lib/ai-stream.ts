@@ -6,6 +6,7 @@ export async function streamAICoach({
   raceDistance,
   trainingDays,
   startDate,
+  raceDate,
   onDelta,
   onDone,
   onError,
@@ -15,6 +16,7 @@ export async function streamAICoach({
   raceDistance?: string;
   trainingDays?: string[];
   startDate?: string;
+  raceDate?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -24,6 +26,7 @@ export async function streamAICoach({
     if (raceDistance) body.race_distance = raceDistance;
     if (trainingDays) body.training_days = trainingDays;
     if (startDate) body.start_date = startDate;
+    if (raceDate) body.race_date = raceDate;
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",

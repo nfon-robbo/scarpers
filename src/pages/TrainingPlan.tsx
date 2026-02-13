@@ -5,9 +5,13 @@ import { streamAICoach } from "@/lib/ai-stream";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 const RACE_DISTANCES = [
@@ -27,14 +31,15 @@ const TrainingPlanPage = () => {
   const [hasRun, setHasRun] = useState(false);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
-  const [startDate, setStartDate] = useState(() => {
+  const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
-    // Default to next Monday
     const day = d.getDay();
     const diff = day === 0 ? 1 : 8 - day;
     d.setDate(d.getDate() + diff);
-    return d.toISOString().split("T")[0];
+    return d;
   });
+  const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
+  const [letAIDecide, setLetAIDecide] = useState(false);
 
   const toggleDay = (day: string) => {
     setTrainingDays((prev) =>
@@ -46,6 +51,10 @@ const TrainingPlanPage = () => {
     if (!user) return;
     if (trainingDays.length === 0) {
       toast({ title: "Select training days", description: "Pick at least one day to work out.", variant: "destructive" });
+      return;
+    }
+    if (!letAIDecide && !raceDate) {
+      toast({ title: "Set a race date", description: "Pick a race date or let the AI recommend one.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -65,7 +74,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       trainingDays,
-      startDate,
+      startDate: startDate.toISOString().split("T")[0],
+      raceDate: letAIDecide ? "ai-recommend" : raceDate?.toISOString().split("T")[0],
       onDelta: (text) => {
         accumulated += text;
         setContent(accumulated);
@@ -150,15 +160,70 @@ const TrainingPlanPage = () => {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="start-date" className="text-sm font-medium">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-fit"
-                />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(startDate, "dd/MM/yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(d) => d && setStartDate(d)}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Race Date</Label>
+                  {!letAIDecide && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !raceDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {raceDate ? format(raceDate, "dd/MM/yyyy") : "Pick a race date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={raceDate}
+                          onSelect={setRaceDate}
+                          disabled={(date) => date < startDate}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      id="ai-decide"
+                      checked={letAIDecide}
+                      onCheckedChange={(v) => {
+                        setLetAIDecide(!!v);
+                        if (v) setRaceDate(undefined);
+                      }}
+                    />
+                    <Label htmlFor="ai-decide" className="text-sm cursor-pointer text-muted-foreground">
+                      Let the AI recommend a race date based on my fitness
+                    </Label>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
