@@ -3,17 +3,22 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-coach`;
 export async function streamAICoach({
   type,
   token,
+  raceDistance,
   onDelta,
   onDone,
   onError,
 }: {
   type: "analysis" | "training-plan";
   token: string;
+  raceDistance?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }) {
   try {
+    const body: Record<string, unknown> = { type };
+    if (raceDistance) body.race_distance = raceDistance;
+
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -21,7 +26,7 @@ export async function streamAICoach({
         Authorization: `Bearer ${token}`,
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
-      body: JSON.stringify({ type }),
+      body: JSON.stringify(body),
     });
 
     if (!resp.ok) {

@@ -8,12 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Loader2, RotateCcw, Target, Layers, Clock } from "lucide-react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
+const RACE_DISTANCES = [
+  { value: "5k", label: "5K" },
+  { value: "10k", label: "10K" },
+  { value: "half-marathon", label: "Half Marathon" },
+  { value: "marathon", label: "Marathon" },
+] as const;
+
 const TrainingPlanPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [hasRun, setHasRun] = useState(false);
+  const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
 
   const generatePlan = async () => {
     if (!user) return;
@@ -32,6 +40,7 @@ const TrainingPlanPage = () => {
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
+      raceDistance,
       onDelta: (text) => {
         accumulated += text;
         setContent(accumulated);
@@ -56,24 +65,39 @@ const TrainingPlanPage = () => {
             Season strategy + detailed 4-week periodized plan
           </p>
         </div>
-        <Button onClick={generatePlan} disabled={loading} size="lg">
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : hasRun ? (
-            <>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Regenerate
-            </>
-          ) : (
-            <>
-              <Calendar className="w-4 h-4 mr-2" />
-              Generate Plan
-            </>
-          )}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-2">
+            {RACE_DISTANCES.map((d) => (
+              <Button
+                key={d.value}
+                variant={raceDistance === d.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setRaceDistance(d.value)}
+                disabled={loading}
+              >
+                {d.label}
+              </Button>
+            ))}
+          </div>
+          <Button onClick={generatePlan} disabled={loading} size="lg">
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : hasRun ? (
+              <>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Regenerate
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4 mr-2" />
+                Generate Plan
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {!hasRun && !loading && (

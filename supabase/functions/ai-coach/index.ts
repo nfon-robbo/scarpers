@@ -32,7 +32,7 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type } = await req.json();
+    const { type, race_distance } = await req.json();
     // type: "analysis" | "training-plan"
 
     // Fetch user profile
@@ -120,16 +120,22 @@ ${dataContext}
 
 Analyze this training data and provide a comprehensive multi-domain analysis report. Be specific, reference actual data points, and provide actionable coaching insights.`;
     } else {
-      // training-plan
-      systemPrompt = `You are an elite endurance coach AI that generates periodized training plans, modeled after the garmin-ai-coach system.
+      const raceLabel = {
+        "5k": "5K",
+        "10k": "10K",
+        "half-marathon": "Half Marathon",
+        "marathon": "Marathon",
+      }[race_distance as string] || "Half Marathon";
 
-Based on the athlete's data and goals, generate:
+      systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
+
+Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
 
 ## 📅 Season Strategy Overview
 Create a macro-cycle plan (12-24 weeks) with:
-- Phase architecture (base, build, peak, taper, race)
+- Phase architecture (base, build, peak, taper, race) tailored for ${raceLabel}
 - Key training blocks and their focus
-- Volume/intensity progression targets
+- Volume/intensity progression targets appropriate for ${raceLabel} distance
 - Race anchors and key dates
 
 ## 📋 4-Week Training Plan
@@ -147,16 +153,17 @@ Include:
 - Progression across weeks (build weeks + recovery week)
 - Specific intensity zones (Z1-Z5)
 - Session RPE targets
-- Weekly volume targets
+- Weekly volume targets appropriate for ${raceLabel}
+- Key ${raceLabel}-specific workouts (tempo runs, race-pace sessions, long runs)
 - Adaptation goals per week
 
-Be specific with paces, durations, and intensities. Use the athlete's actual performance data to set realistic targets.`;
+Be specific with paces, durations, and intensities. Use the athlete's actual performance data to set realistic ${raceLabel} targets.`;
 
       userPrompt = `${athleteContext}
 
 ${dataContext}
 
-Generate a comprehensive season strategy and detailed 4-week training plan. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate a comprehensive ${raceLabel} season strategy and detailed 4-week training plan. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     }
 
     // Stream from Lovable AI
