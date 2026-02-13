@@ -32,8 +32,8 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type, race_distance, training_days, start_date, race_date } = await req.json();
-    // type: "analysis" | "training-plan"
+    const { type, race_distance, training_days, start_date, race_date, current_plan } = await req.json();
+    // type: "analysis" | "training-plan" | "plan-review"
 
     // Fetch user profile
     const { data: profile } = await supabase
@@ -151,6 +151,65 @@ Use specific numbers from the data. Be direct and actionable. Format with markdo
 ${dataContext}
 
 Analyze this training data and provide a comprehensive multi-domain analysis report. Be specific, reference actual data points, and provide actionable coaching insights.`;
+    } else if (type === "plan-review") {
+      const raceLabel = {
+        "5k": "5K",
+        "10k": "10K",
+        "half-marathon": "Half Marathon",
+        "marathon": "Marathon",
+      }[race_distance as string] || "Half Marathon";
+
+      const daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+
+      systemPrompt = `You are an elite endurance coach AI reviewing an athlete's progress against their training plan for a ${raceLabel} race.
+
+You have been given:
+1. The athlete's CURRENT TRAINING PLAN (what they were supposed to do)
+2. Their ACTUAL ACTIVITY DATA (what they actually did)
+
+Your job is to compare planned vs actual and provide a progress review. Be specific and reference actual dates and numbers.
+
+Your response MUST include these sections:
+
+## 📊 Progress Summary
+- How many planned sessions were completed vs missed
+- Overall adherence percentage
+- Volume comparison (planned vs actual km/time)
+
+## ✅ What Went Well
+- Sessions that were completed on target or exceeded expectations
+- Positive trends in pace, HR efficiency, or consistency
+
+## ⚠️ What Needs Attention
+- Missed sessions and their impact
+- Sessions done but significantly off target (pace, HR, duration)
+- Any concerning patterns (overtraining, undertraining, intensity creep)
+
+## 🔄 Plan Adjustments
+Based on the progress review, decide whether to adjust the remaining plan:
+- If the athlete is ON TRACK: Confirm the plan is working and no changes needed
+- If the athlete is AHEAD: Consider progressing faster or adding quality sessions
+- If the athlete is BEHIND: Scale back, add recovery, or redistribute load
+
+If adjustments are needed, provide a REVISED plan for the remaining weeks. Use the EXACT SAME table format as the original plan:
+
+CRITICAL FORMAT RULE: EVERY adjusted workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Use UK date format (DD/MM/YYYY) for all dates. Only schedule workouts on: ${daysStr}.
+
+If NO adjustments are needed, explicitly state "No adjustments needed — continue with the current plan as written."
+
+## 💡 Coach's Notes
+Personal advice, motivation, or specific technique cues based on what you've observed.`;
+
+      userPrompt = `${athleteContext}
+
+${dataContext}
+
+CURRENT TRAINING PLAN:
+${current_plan || "No plan provided"}
+
+Review this athlete's progress against their training plan. Compare what was planned vs what was actually done. Determine if the plan needs adjusting. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     } else {
       const raceLabel = {
         "5k": "5K",

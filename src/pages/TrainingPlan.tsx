@@ -9,7 +9,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -253,6 +253,52 @@ const TrainingPlanPage = () => {
     });
   };
 
+  const [reviewing, setReviewing] = useState(false);
+
+  const reviewProgress = async () => {
+    if (!user || !content) return;
+    setReviewing(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+      setReviewing(false);
+      return;
+    }
+
+    // Store original plan for reference
+    const originalPlan = content;
+    setContent("");
+    setLoading(true);
+
+    let accumulated = "";
+    streamAICoach({
+      type: "plan-review",
+      token: session.access_token,
+      raceDistance,
+      trainingDays,
+      startDate: startDate.toISOString().split("T")[0],
+      currentPlan: originalPlan,
+      onDelta: (text) => {
+        accumulated += text;
+        setContent(accumulated);
+      },
+      onDone: () => {
+        setLoading(false);
+        setReviewing(false);
+        // Save the review as the new plan content (includes adjustments if any)
+        savePlan(accumulated);
+        toast({ title: "Progress review complete", description: "Your plan has been reviewed and updated." });
+      },
+      onError: (err) => {
+        toast({ title: "Review failed", description: err, variant: "destructive" });
+        setContent(originalPlan); // Restore original on failure
+        setLoading(false);
+        setReviewing(false);
+      },
+    });
+  };
+
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -373,6 +419,10 @@ const TrainingPlanPage = () => {
         <div className="flex gap-2">
           {content && !loading && (
             <>
+              <Button variant="default" size="sm" onClick={reviewProgress} disabled={syncing || reviewing}>
+                {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
+                {reviewing ? "Reviewing..." : "Review Progress"}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
                 {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
                 {syncing ? "Syncing..." : "Sync to intervals.icu"}
