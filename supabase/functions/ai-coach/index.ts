@@ -136,6 +136,15 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
 
 The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStart}.
 
+CRITICAL INSTRUCTIONS:
+- Carefully review the athlete's profile, especially "Additional Context" which may contain injuries, physical limitations, or health conditions. You MUST adapt every workout to account for these. If an injury is mentioned, include modifications, reduced intensity, or alternative exercises.
+- Review ALL activity data to understand the athlete's current fitness level, typical paces, heart rate zones, and recent training load. Base all targets on their ACTUAL performance, not generic estimates.
+- The athlete uses an Amazfit Balance 2 watch with the Zepp app. Structure each workout so it can be manually created as a custom workout in the Zepp app:
+  - Break workouts into clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
+  - For each segment specify: duration OR distance, target HR zone (Z1-Z5) or target pace range
+  - For interval sessions, clearly state: number of reps, work duration/distance, recovery duration/distance, target pace/HR for each
+  - Use the Zepp-compatible HR zones: Z1 (50-60% max HR), Z2 (60-70%), Z3 (70-80%), Z4 (80-90%), Z5 (90-100%)
+
 Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
 
 ## 📅 Season Strategy Overview
@@ -143,27 +152,29 @@ Create a macro-cycle plan (12-24 weeks) with:
 - Phase architecture (base, build, peak, taper, race) tailored for ${raceLabel}
 - Key training blocks and their focus
 - Volume/intensity progression targets appropriate for ${raceLabel} distance
-- Race anchors and key dates
+- Any modifications needed based on the athlete's injuries or limitations
 
 ## 📋 4-Week Training Plan
 Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.
 
-For each day use this format:
+For each workout day, use this Zepp-compatible format:
 
 ### Week 1: [Theme]
-**Monday ${planStart}** - [Rest/Active Recovery/Workout Type]
-- Description of the session
-- Target zones/paces/power
-- Duration and key metrics to hit
+**Monday ${planStart}** - [Workout Type] (Total: Xmin / Xkm)
+| Segment | Duration/Distance | Target | HR Zone | Notes |
+|---------|-------------------|--------|---------|-------|
+| Warm-up | 10 min | easy pace | Z1-Z2 | |
+| Main | 3 x 1km | 5:30/km | Z4 | 90s jog recovery |
+| Cool-down | 10 min | easy pace | Z1 | |
 
 Continue for all 28 days across 4 weeks with actual dates.
 
 Include:
 - Progression across weeks (build weeks + recovery week)
-- Specific intensity zones (Z1-Z5)
 - Session RPE targets
 - Weekly volume targets appropriate for ${raceLabel}
 - Key ${raceLabel}-specific workouts (tempo runs, race-pace sessions, long runs)
+- Injury/limitation accommodations noted where relevant
 - Adaptation goals per week
 
 Be specific with paces, durations, and intensities. Use the athlete's actual performance data to set realistic ${raceLabel} targets.`;
