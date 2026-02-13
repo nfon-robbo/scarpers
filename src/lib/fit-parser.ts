@@ -108,6 +108,29 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
           const last = records[records.length - 1];
           const hrs = records.map((r: any) => r.heart_rate).filter(Boolean);
           const speeds = records.map((r: any) => r.speed || r.enhanced_speed).filter(Boolean);
+          const powers = records.map((r: any) => r.power).filter((v: any) => v != null && v > 0);
+          const cadences = records.map((r: any) => r.cadence ?? r.running_cadence).filter(Boolean);
+          const temps = records.map((r: any) => r.temperature).filter((v: any) => v != null);
+
+          // Compute elevation gain/loss from altitude data
+          const altitudes = records.map((r: any) => r.altitude ?? r.enhanced_altitude).filter((v: any) => v != null);
+          let totalAscent = 0;
+          let totalDescent = 0;
+          for (let i = 1; i < altitudes.length; i++) {
+            const diff = altitudes[i] - altitudes[i - 1];
+            if (diff > 0) totalAscent += diff;
+            else totalDescent += Math.abs(diff);
+          }
+
+          // Compute distance from GPS track if not available
+          let distanceMeters: number | null = last.distance ? last.distance * 1000 : null;
+          if (!distanceMeters && gpsTrack.length >= 2) {
+            let d = 0;
+            for (let i = 1; i < gpsTrack.length; i++) {
+              d += haversineDistance(gpsTrack[i - 1].lat, gpsTrack[i - 1].lng, gpsTrack[i].lat, gpsTrack[i].lng);
+            }
+            distanceMeters = Math.round(d);
+          }
 
           activities.push({
             activity_type: data?.sport?.sport || null,
@@ -115,18 +138,18 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             duration_seconds: first.timestamp && last.timestamp
               ? (new Date(last.timestamp).getTime() - new Date(first.timestamp).getTime()) / 1000
               : null,
-            distance_meters: last.distance ? last.distance * 1000 : null,
+            distance_meters: distanceMeters,
             avg_heart_rate: hrs.length ? hrs.reduce((a: number, b: number) => a + b, 0) / hrs.length : null,
             max_heart_rate: hrs.length ? Math.max(...hrs) : null,
             avg_speed: speeds.length ? speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length : null,
             max_speed: speeds.length ? Math.max(...speeds) : null,
-            avg_power: null,
-            max_power: null,
-            avg_cadence: null,
-            total_ascent: null,
-            total_descent: null,
+            avg_power: powers.length ? powers.reduce((a: number, b: number) => a + b, 0) / powers.length : null,
+            max_power: powers.length ? Math.max(...powers) : null,
+            avg_cadence: cadences.length ? cadences.reduce((a: number, b: number) => a + b, 0) / cadences.length : null,
+            total_ascent: altitudes.length > 1 ? totalAscent : null,
+            total_descent: altitudes.length > 1 ? totalDescent : null,
             calories: null,
-            avg_temperature: null,
+            avg_temperature: temps.length ? temps.reduce((a: number, b: number) => a + b, 0) / temps.length : null,
             training_effect: null,
             training_load: null,
             source_file: fileName,
@@ -139,6 +162,16 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
       resolve(activities);
     });
   });
+}
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function parseZipFile(file: File): Promise<ParseResult> {
