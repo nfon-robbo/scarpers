@@ -4,7 +4,8 @@ import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
   lat: number;
-  lng: number;
+  lng?: number;
+  lon?: number;
   altitude?: number;
   heart_rate?: number;
   speed?: number;
@@ -41,7 +42,9 @@ const ActivityMap = ({ track, className = "" }: Props) => {
       maxZoom: 19,
     }).addTo(map);
 
-    const latlngs: L.LatLngExpression[] = track.map((p) => [p.lat, p.lng]);
+    const latlngs: L.LatLngExpression[] = track
+      .filter((p) => p.lat != null && (p.lng != null || p.lon != null))
+      .map((p) => [p.lat, (p.lng ?? p.lon)!] as [number, number]);
 
     // Draw route polyline
     const polyline = L.polyline(latlngs, {

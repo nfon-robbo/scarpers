@@ -10,8 +10,10 @@ import { useUnits } from "@/hooks/useUnits";
 
 interface GpsPoint {
   lat: number;
-  lng: number;
+  lng?: number;
+  lon?: number;
   time?: string;
+  elapsed_time?: number;
   altitude?: number;
   heart_rate?: number;
   speed?: number;
@@ -44,7 +46,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const timeSeriesData = track
       .filter((_, i) => i % step === 0)
       .map((p, idx) => {
-        const elapsedSec = p.time ? (new Date(p.time).getTime() - startTime) / 1000 : idx * step;
+        const elapsedSec = p.time ? (new Date(p.time).getTime() - startTime) / 1000 : (p.elapsed_time ?? idx * step);
         const elapsedMin = Math.round(elapsedSec / 60 * 10) / 10;
         // speed from FIT parser is already in km/h (speedUnit: "km/h" in parser config)
         const rawSpeedKmh = p.speed ?? 0;
@@ -93,7 +95,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     for (let i = 1; i < track.length; i++) {
       const prev = track[i - 1];
       const curr = track[i];
-      const d = haversine(prev.lat, prev.lng, curr.lat, curr.lng);
+      const d = haversine(prev.lat, prev.lng ?? prev.lon, curr.lat, curr.lng ?? curr.lon);
       dist += d;
       if (curr.heart_rate) splitHRs.push(curr.heart_rate);
       if (curr.speed) splitSpeeds.push(curr.speed);
