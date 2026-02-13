@@ -29,7 +29,7 @@ export interface ParseResult {
   fileCount: number;
 }
 
-function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<ParsedActivity[]> {
+export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<ParsedActivity[]> {
   return new Promise((resolve, reject) => {
     const fitParser = new FitParser({
       force: true,
