@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
+import UploadPage from "./pages/Upload";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -36,7 +37,7 @@ const App = () => (
             }
           >
             <Route path="/" element={<Dashboard />} />
-            <Route path="/upload" element={<PlaceholderPage title="Import Data" />} />
+            <Route path="/upload" element={<UploadPage />} />
             <Route path="/analysis" element={<PlaceholderPage title="AI Analysis" />} />
             <Route path="/training-plan" element={<PlaceholderPage title="Training Plan" />} />
             <Route path="/history" element={<PlaceholderPage title="History" />} />

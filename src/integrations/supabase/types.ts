@@ -14,6 +14,157 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          activity_type: string | null
+          avg_cadence: number | null
+          avg_heart_rate: number | null
+          avg_power: number | null
+          avg_speed: number | null
+          avg_temperature: number | null
+          calories: number | null
+          created_at: string
+          distance_meters: number | null
+          duration_seconds: number | null
+          id: string
+          max_heart_rate: number | null
+          max_power: number | null
+          max_speed: number | null
+          raw_data: Json | null
+          source_file: string | null
+          start_time: string | null
+          total_ascent: number | null
+          total_descent: number | null
+          training_effect: number | null
+          training_load: number | null
+          upload_id: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          avg_cadence?: number | null
+          avg_heart_rate?: number | null
+          avg_power?: number | null
+          avg_speed?: number | null
+          avg_temperature?: number | null
+          calories?: number | null
+          created_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          id?: string
+          max_heart_rate?: number | null
+          max_power?: number | null
+          max_speed?: number | null
+          raw_data?: Json | null
+          source_file?: string | null
+          start_time?: string | null
+          total_ascent?: number | null
+          total_descent?: number | null
+          training_effect?: number | null
+          training_load?: number | null
+          upload_id?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          avg_cadence?: number | null
+          avg_heart_rate?: number | null
+          avg_power?: number | null
+          avg_speed?: number | null
+          avg_temperature?: number | null
+          calories?: number | null
+          created_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          id?: string
+          max_heart_rate?: number | null
+          max_power?: number | null
+          max_speed?: number | null
+          raw_data?: Json | null
+          source_file?: string | null
+          start_time?: string | null
+          total_ascent?: number | null
+          total_descent?: number | null
+          training_effect?: number | null
+          training_load?: number | null
+          upload_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_metrics: {
+        Row: {
+          body_fat_percentage: number | null
+          calories_total: number | null
+          created_at: string
+          date: string
+          hrv: number | null
+          id: string
+          raw_data: Json | null
+          resting_heart_rate: number | null
+          sleep_duration_seconds: number | null
+          sleep_score: number | null
+          source_file: string | null
+          steps: number | null
+          stress_score: number | null
+          upload_id: string | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          body_fat_percentage?: number | null
+          calories_total?: number | null
+          created_at?: string
+          date: string
+          hrv?: number | null
+          id?: string
+          raw_data?: Json | null
+          resting_heart_rate?: number | null
+          sleep_duration_seconds?: number | null
+          sleep_score?: number | null
+          source_file?: string | null
+          steps?: number | null
+          stress_score?: number | null
+          upload_id?: string | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          body_fat_percentage?: number | null
+          calories_total?: number | null
+          created_at?: string
+          date?: string
+          hrv?: number | null
+          id?: string
+          raw_data?: Json | null
+          resting_heart_rate?: number | null
+          sleep_duration_seconds?: number | null
+          sleep_score?: number | null
+          source_file?: string | null
+          steps?: number | null
+          stress_score?: number | null
+          upload_id?: string | null
+          user_id?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_metrics_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           athlete_context: string | null
@@ -49,6 +200,36 @@ export type Database = {
           primary_sport?: string | null
           training_goals?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_type: string
+          id: string
+          record_count: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_type?: string
+          id?: string
+          record_count?: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          record_count?: number
+          status?: string
           user_id?: string
         }
         Relationships: []
