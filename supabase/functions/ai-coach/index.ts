@@ -42,21 +42,53 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // Fetch activities (last 56 days)
-    const since = new Date();
-    since.setDate(since.getDate() - 56);
-    const { data: activities } = await supabase
+    // When AI decides the race date, fetch ALL activities for full fitness picture
+    // Otherwise fetch last 56 days for the 4-week plan
+    const isAIDecide = race_date === "ai-recommend";
+    let activitiesQuery = supabase
       .from("activities")
       .select("*")
       .eq("user_id", user.id)
-      .gte("start_time", since.toISOString())
       .order("start_time", { ascending: false });
+
+    if (!isAIDecide) {
+      const since = new Date();
+      since.setDate(since.getDate() - 56);
+      activitiesQuery = activitiesQuery.gte("start_time", since.toISOString());
+    }
+
+    const { data: activities } = await activitiesQuery;
 
     if (!activities || activities.length === 0) {
       return new Response(
         JSON.stringify({ error: "No activities found. Please upload FIT files first." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Fetch daily metrics for health/readiness context
+    let metricsContext = "";
+    if (isAIDecide) {
+      const { data: metrics } = await supabase
+        .from("daily_metrics")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false })
+        .limit(90);
+
+      if (metrics && metrics.length > 0) {
+        const metricsSummary = metrics.map((m: any) => ({
+          date: m.date,
+          resting_hr: m.resting_heart_rate ? Math.round(m.resting_heart_rate) : null,
+          hrv: m.hrv ? Math.round(m.hrv) : null,
+          sleep_hours: m.sleep_duration_seconds ? (m.sleep_duration_seconds / 3600).toFixed(1) : null,
+          sleep_score: m.sleep_score,
+          stress: m.stress_score,
+          steps: m.steps,
+          weight: m.weight,
+        }));
+        metricsContext = `\nDAILY HEALTH METRICS (last ${metrics.length} days):\n${JSON.stringify(metricsSummary, null, 2)}\n`;
+      }
     }
 
     // Build activity summary for the AI
@@ -84,9 +116,9 @@ Additional Context: ${profile?.athlete_context || "none"}
 `;
 
     const dataContext = `
-TRAINING DATA (last ${activities.length} activities over ~8 weeks):
+TRAINING DATA (${activities.length} activities${isAIDecide ? " - full history" : " over ~8 weeks"}):
 ${JSON.stringify(activitySummary, null, 2)}
-`;
+${metricsContext}`;
 
     let systemPrompt: string;
     let userPrompt: string;
@@ -136,7 +168,11 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
       const planStartUK = `${d}/${m}/${y}`;
       let raceDateInstruction: string;
       if (race_date === "ai-recommend") {
-        raceDateInstruction = `The athlete has NOT set a race date. Based on their current fitness level and the ${raceLabel} distance, recommend an ideal race date and explain why. Factor in required training weeks for their experience level.`;
+        raceDateInstruction = `The athlete has NOT set a race date. You MUST:
+1. Thoroughly analyze ALL their activity history, health metrics, average paces, cadence, heart rate patterns, training consistency, longest runs, and overall fitness level.
+2. Determine how many weeks of training they realistically need before they can race a ${raceLabel} at their best — this could be anywhere from 4 to 24+ weeks depending on their current fitness.
+3. Recommend a specific race date based on your analysis and explain your reasoning clearly.
+4. Generate the COMPLETE training plan from the start date to the race date — NOT just 4 weeks. Every single week must be detailed with daily workouts.`;
       } else if (race_date) {
         const [ry, rm, rd] = (race_date as string).split("-");
         const raceDateUK = `${rd}/${rm}/${ry}`;
@@ -144,6 +180,10 @@ Analyze this training data and provide a comprehensive multi-domain analysis rep
       } else {
         raceDateInstruction = `No race date specified. Suggest a realistic timeline.`;
       }
+
+      const planLengthInstruction = isAIDecide
+        ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed.`
+        : `Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.`;
 
       systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
 
@@ -162,15 +202,31 @@ CRITICAL INSTRUCTIONS:
 
 Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
 
-## 📅 Season Strategy Overview
-Create a macro-cycle plan (12-24 weeks) with:
+${isAIDecide ? `## 🏥 Fitness Assessment
+Before creating the plan, provide a detailed assessment of the athlete's current fitness:
+- Current estimated VO2max / fitness level based on pace and HR data
+- Average run distance, pace, and cadence
+- Longest recent run and how it compares to ${raceLabel} distance
+- Heart rate trends and aerobic base status
+- Training consistency and volume over time
+- Health indicators (sleep, HRV, resting HR, stress) if available
+- Overall readiness assessment for ${raceLabel}
+
+## ⏱️ Recommended Training Duration
+Based on the fitness assessment above:
+- State exactly how many weeks of training are needed and why
+- Recommend a specific race date (DD/MM/YYYY format)
+- Explain the reasoning behind the timeline
+
+` : ''}## 📅 Season Strategy Overview
+Create a macro-cycle plan with:
 - Phase architecture (base, build, peak, taper, race) tailored for ${raceLabel}
 - Key training blocks and their focus
 - Volume/intensity progression targets appropriate for ${raceLabel} distance
 - Any modifications needed based on the athlete's injuries or limitations
 
-## 📋 4-Week Training Plan
-Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.
+## 📋 ${isAIDecide ? 'Complete' : '4-Week'} Training Plan
+${planLengthInstruction}
 
 For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
@@ -182,10 +238,10 @@ For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date fo
 | Main | 3 x 1km | 5:30/km | Z4 | 90s jog recovery |
 | Cool-down | 10 min | easy pace | Z1 | |
 
-Continue for all 28 days across 4 weeks with actual dates.
+Continue for all weeks with actual dates.
 
 Include:
-- Progression across weeks (build weeks + recovery week)
+- Progression across weeks (build weeks + recovery week pattern)
 - Session RPE targets
 - Weekly volume targets appropriate for ${raceLabel}
 - Key ${raceLabel}-specific workouts (tempo runs, race-pace sessions, long runs)
@@ -198,7 +254,7 @@ Be specific with paces, durations, and intensities. Use the athlete's actual per
 
 ${dataContext}
 
-Generate a comprehensive ${raceLabel} season strategy and detailed 4-week training plan starting ${planStart}. Schedule workouts only on ${daysStr}. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate a comprehensive ${raceLabel} ${isAIDecide ? 'fitness assessment, recommended timeline, and complete' : 'season strategy and detailed 4-week'} training plan starting ${planStart}. Schedule workouts only on ${daysStr}. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     }
 
     // Stream from Lovable AI
