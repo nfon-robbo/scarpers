@@ -25,9 +25,9 @@ interface ApiStep {
 }
 
 function parseDurationSeconds(duration: string): number {
-  const hourMatch = duration.match(/([\d.]+)\s*h/i);
-  const minMatch = duration.match(/(\d+)\s*min/i);
-  const secMatch = duration.match(/(\d+)\s*sec/i);
+  const hourMatch = duration.match(/([\d.]+)\s*h(?:r|our)?s?\b/i);
+  const minMatch = duration.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/i);
+  const secMatch = duration.match(/(\d+)\s*s(?:ec(?:ond)?s?)?\b/i);
   let total = 0;
   if (hourMatch) total += parseFloat(hourMatch[1]) * 3600;
   if (minMatch) total += parseInt(minMatch[1], 10) * 60;
@@ -68,8 +68,11 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   else if (/rest/i.test(segName)) stepType = "Rest";
   else if (/recover/i.test(segName)) stepType = "Recovery";
 
-  // Check for repeat/interval pattern in duration: "5 x 2 min run / 1 min walk"
-  const repeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b[^/]*)\s*\/\s*([\d.]+\s*(?:min|sec|h|km|m)\b.*)/i);
+  // Normalize duration: strip parentheses and extra text like "Run", "Walk" etc.
+  const cleanDuration = seg.duration.replace(/[()]/g, "").trim();
+
+  // Check for repeat/interval pattern: "10 x 1m Run / 1m Walk", "5 x 2 min / 1 min", etc.
+  const repeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
   if (repeatMatch) {
     const reps = parseInt(repeatMatch[1], 10);
     const workDuration = parseDurationSeconds(repeatMatch[2]);
@@ -84,8 +87,8 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     return steps;
   }
 
-  // Also check duration field for "5 x 2 min" without rest component
-  const simpleRepeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b)/i);
+  // Also check for "5 x 2 min" without rest component
+  const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
   if (simpleRepeatMatch) {
     const reps = parseInt(simpleRepeatMatch[1], 10);
     const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
