@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.strava-import]
 verify_jwt = false
+
+[functions.intervals-sync]
+verify_jwt = false

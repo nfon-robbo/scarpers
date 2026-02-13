@@ -8,12 +8,41 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Download, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, FileDown, Watch, ChevronDown, ChevronUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { parseWorkoutsFromPlan, generateWorkoutZip, generateIcsCalendar, downloadBlob, downloadText } from "@/lib/plan-export";
+import { parseWorkoutsFromPlan, generateIcsCalendar, downloadText } from "@/lib/plan-export";
+
+function parseDurationForApi(duration: string): number {
+  const hourMatch = duration.match(/([\d.]+)\s*h/i);
+  const minMatch = duration.match(/(\d+)\s*min/i);
+  const secMatch = duration.match(/(\d+)\s*sec/i);
+  let total = 0;
+  if (hourMatch) total += parseFloat(hourMatch[1]) * 3600;
+  if (minMatch) total += parseInt(minMatch[1], 10) * 60;
+  if (secMatch) total += parseInt(secMatch[1], 10);
+  if (total === 0) {
+    const kmMatch = duration.match(/([\d.]+)\s*km/i);
+    if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
+  }
+  return total || 600;
+}
+
+function hrZoneToBpm(hrZone: string): { low: number; high: number } {
+  const match = hrZone.match(/Z(\d)/i);
+  if (!match) return { low: 100, high: 140 };
+  const zone = parseInt(match[1], 10);
+  switch (zone) {
+    case 1: return { low: 100, high: 120 };
+    case 2: return { low: 120, high: 140 };
+    case 3: return { low: 140, high: 160 };
+    case 4: return { low: 160, high: 175 };
+    case 5: return { low: 175, high: 200 };
+    default: return { low: 100, high: 140 };
+  }
+}
 
 const RACE_DISTANCES = [
   { value: "5k", label: "5K" },
@@ -162,16 +191,57 @@ const TrainingPlanPage = () => {
   };
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  const handleExportFit = async () => {
+  const handleSyncToIntervals = async () => {
     const workouts = parseWorkoutsFromPlan(content);
-    if (workouts.length === 0 || workouts.every(w => w.segments.length === 0)) {
+    const withSegments = workouts.filter(w => w.segments.length > 0 && w.dateObj);
+    if (withSegments.length === 0) {
       toast({ title: "No structured workouts found", description: "The plan needs workout tables with Segment/Duration/HR Zone columns.", variant: "destructive" });
       return;
     }
-    const blob = await generateWorkoutZip(workouts);
-    downloadBlob(blob, "training-plan-workouts.zip");
-    toast({ title: "Downloaded!", description: `${workouts.filter(w => w.segments.length > 0).length} workout files exported.` });
+
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Session expired", variant: "destructive" });
+        setSyncing(false);
+        return;
+      }
+
+      // Convert parsed workouts to API format
+      const apiWorkouts = withSegments.map(w => {
+        const dateStr = w.dateObj!.toISOString().split("T")[0];
+        const steps = w.segments.map(seg => {
+          const duration = parseDurationForApi(seg.duration);
+          const { low, high } = hrZoneToBpm(seg.hrZone);
+          const intensity = /rest|recover|cool|warm/i.test(seg.segment) ? "Resting" : "Active";
+          return { duration, hrLow: low, hrHigh: high, intensity };
+        });
+        const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
+        return { date: dateStr, name: w.title, description, steps };
+      });
+
+      const resp = await supabase.functions.invoke("intervals-sync", {
+        body: { workouts: apiWorkouts },
+      });
+
+      if (resp.error) {
+        toast({ title: "Sync failed", description: resp.error.message, variant: "destructive" });
+      } else {
+        const { succeeded, failed } = resp.data;
+        if (failed > 0) {
+          toast({ title: `Synced ${succeeded} workouts`, description: `${failed} failed. Check intervals.icu for details.` });
+        } else {
+          toast({ title: `Synced ${succeeded} workouts to intervals.icu!` });
+        }
+      }
+    } catch (e) {
+      toast({ title: "Sync error", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleExportIcs = () => {
@@ -210,9 +280,9 @@ const TrainingPlanPage = () => {
         <div className="flex gap-2">
           {content && !loading && (
             <>
-              <Button variant="outline" size="sm" onClick={handleExportFit}>
-                <Download className="w-4 h-4 mr-2" />
-                Export for intervals.icu (.tcx)
+              <Button variant="outline" size="sm" onClick={handleSyncToIntervals} disabled={syncing}>
+                {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                {syncing ? "Syncing..." : "Sync to intervals.icu"}
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />
@@ -395,10 +465,8 @@ const TrainingPlanPage = () => {
           {showSyncInstructions && (
             <CardContent className="pt-0 px-4 pb-4">
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Click <strong className="text-foreground">Export Workouts (.zwo)</strong> above to download a ZIP of workout files</li>
-                <li>Open <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer" className="text-primary underline">intervals.icu</a> → go to your <strong className="text-foreground">Calendar</strong></li>
-                <li>Click on a day → <strong className="text-foreground">Add Workout</strong> → use the workout editor to import or manually enter the workout</li>
-                <li>Alternatively, use the <strong className="text-foreground">Workout Library</strong> to organize and import workout files</li>
+                <li>Click <strong className="text-foreground">Sync to intervals.icu</strong> above to push all workouts directly to your intervals.icu calendar</li>
+                <li>Open <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer" className="text-primary underline">intervals.icu</a> → check your <strong className="text-foreground">Calendar</strong> to see the planned workouts</li>
                 <li>Connect your <strong className="text-foreground">Garmin/Amazfit</strong> account in intervals.icu settings to sync planned workouts to your watch</li>
               </ol>
               <p className="text-xs text-muted-foreground mt-3">intervals.icu is free and supports direct sync to Garmin, Wahoo, and other devices. For Amazfit, you can also use the "Copy for Zepp" buttons to manually enter workouts in the Zepp app.</p>
