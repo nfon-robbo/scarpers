@@ -1,6 +1,15 @@
 import JSZip from "jszip";
 import FitParser from "fit-file-parser";
 
+export interface GpsPoint {
+  lat: number;
+  lng: number;
+  time?: string;
+  altitude?: number;
+  heart_rate?: number;
+  speed?: number;
+}
+
 export interface ParsedActivity {
   activity_type: string | null;
   start_time: string | null;
@@ -20,6 +29,7 @@ export interface ParsedActivity {
   training_effect: number | null;
   training_load: number | null;
   source_file: string;
+  gps_track: GpsPoint[];
   raw_data: Record<string, unknown>;
 }
 
@@ -46,6 +56,24 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
 
       const activities: ParsedActivity[] = [];
 
+      // Extract GPS track from records
+      const records = data?.records || [];
+      const gpsTrack: GpsPoint[] = [];
+      for (const r of records) {
+        const lat = r.position_lat;
+        const lng = r.position_long;
+        if (lat != null && lng != null && typeof lat === "number" && typeof lng === "number") {
+          gpsTrack.push({
+            lat,
+            lng,
+            time: r.timestamp ? new Date(r.timestamp).toISOString() : undefined,
+            altitude: r.altitude ?? r.enhanced_altitude ?? undefined,
+            heart_rate: r.heart_rate ?? undefined,
+            speed: r.speed ?? r.enhanced_speed ?? undefined,
+          });
+        }
+      }
+
       // Extract session-level data
       const sessions = data?.activity?.sessions || [];
       if (sessions.length > 0) {
@@ -69,12 +97,12 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             training_effect: session.total_training_effect ?? null,
             training_load: null,
             source_file: fileName,
+            gps_track: gpsTrack,
             raw_data: session,
           });
         }
       } else {
         // Fallback: try to extract from records
-        const records = data?.records || [];
         if (records.length > 0) {
           const first = records[0];
           const last = records[records.length - 1];
@@ -102,6 +130,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             training_effect: null,
             training_load: null,
             source_file: fileName,
+            gps_track: gpsTrack,
             raw_data: { records_count: records.length },
           });
         }
