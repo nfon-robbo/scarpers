@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits } from "@/hooks/useUnits";
@@ -111,17 +111,15 @@ const Activities = () => {
                           <Badge variant="secondary" className="capitalize text-xs">{a.activity_type}</Badge>
                         )}
                         {a.training_effect && (
-                          <TooltipProvider delayDuration={200}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge variant="outline" className="text-xs cursor-help">TE {Number(a.training_effect).toFixed(1)}</Badge>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
-                                <p>{getTrainingEffectDescription(Number(a.training_effect))}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs cursor-help">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs text-xs">
+                              <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
+                              <p>{getTrainingEffectDescription(Number(a.training_effect))}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                         {isExpanded ? (
                           <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -263,19 +261,17 @@ const DetailField = ({ label, value, tooltip }: { label: string; value: string |
   if (!value) return null;
   if (tooltip) {
     return (
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="cursor-help">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-sm font-semibold">{value}</p>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs text-xs">
-            <p>{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="cursor-help">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-sm font-semibold">{value}</p>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-xs text-xs">
+          <p>{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
   return (
