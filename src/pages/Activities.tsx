@@ -221,7 +221,7 @@ const Activities = () => {
 };
 
 const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string; value: string | null; unit?: string }) => {
-  if (!value) return <div />;
+  if (!value) return null;
   return (
     <div className="flex items-center gap-1.5">
       {Icon && <Icon className="w-3 h-3 text-muted-foreground shrink-0" />}
