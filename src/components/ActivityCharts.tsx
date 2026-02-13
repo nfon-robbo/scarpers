@@ -46,7 +46,8 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       .map((p, idx) => {
         const elapsedSec = p.time ? (new Date(p.time).getTime() - startTime) / 1000 : idx * step;
         const elapsedMin = Math.round(elapsedSec / 60 * 10) / 10;
-        const rawSpeedKmh = p.speed ? p.speed * 3.6 : 0;
+        // speed from FIT parser is already in km/h (speedUnit: "km/h" in parser config)
+        const rawSpeedKmh = p.speed ?? 0;
         const displaySpeed = units.speed === "mph" ? rawSpeedKmh * KM_TO_MI :
           (units.speed === "min/km" || units.speed === "min/mi") ? (rawSpeedKmh > 1.5 ? 60 / (units.speed === "min/mi" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh) : null) :
           rawSpeedKmh;
@@ -101,7 +102,8 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
         const elapsed = curr.time && track[kmStart].time
           ? (new Date(curr.time).getTime() - new Date(track[kmStart].time).getTime()) / 1000
           : 0;
-        const rawAvgSpd = splitSpeeds.length ? splitSpeeds.reduce((a, b) => a + b, 0) / splitSpeeds.length * 3.6 : 0;
+        // speeds are already in km/h
+        const rawAvgSpd = splitSpeeds.length ? splitSpeeds.reduce((a, b) => a + b, 0) / splitSpeeds.length : 0;
         const displayAvgSpd = units.speed === "mph" ? rawAvgSpd * KM_TO_MI : rawAvgSpd;
         splits.push({
           km: splits.length + 1,
@@ -122,10 +124,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const elevLossRaw = altitudes.reduce((sum, alt, i) => i > 0 && alt < altitudes[i - 1] ? sum + (altitudes[i - 1] - alt) : sum, 0);
     const elevMult = units.elevation === "ft" ? M_TO_FT : 1;
 
-    // Speed stats
+    // Speed stats — already in km/h from parser
     const speeds = track.filter((p) => p.speed && p.speed > 0.5).map((p) => p.speed!);
-    const avgSpeedRaw = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length * 3.6 : 0;
-    const maxSpeedRaw = speeds.length ? Math.max(...speeds) * 3.6 : 0;
+    const avgSpeedRaw = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+    const maxSpeedRaw = speeds.length ? Math.max(...speeds) : 0;
     const speedMult = units.speed === "mph" ? KM_TO_MI : 1;
 
     return {
