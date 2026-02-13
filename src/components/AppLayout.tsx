@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/upload", icon: Upload, label: "Import Data" },
+  { to: "/activities", icon: Activity, label: "Activities" },
   { to: "/analysis", icon: Brain, label: "AI Analysis" },
   { to: "/training-plan", icon: Calendar, label: "Training Plan" },
   { to: "/history", icon: History, label: "History" },

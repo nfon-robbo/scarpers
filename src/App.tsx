@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
+import Activities from "./pages/Activities";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/analysis" element={<PlaceholderPage title="AI Analysis" />} />
             <Route path="/training-plan" element={<PlaceholderPage title="Training Plan" />} />
+            <Route path="/activities" element={<Activities />} />
             <Route path="/history" element={<PlaceholderPage title="History" />} />
             <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
           </Route>
