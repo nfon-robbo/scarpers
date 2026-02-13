@@ -56,8 +56,19 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
 
       const activities: ParsedActivity[] = [];
 
-      // Extract GPS track from records
-      const records = data?.records || [];
+      // Extract records — in cascade mode they may be nested in sessions/laps
+      let records = data?.records || [];
+      if (records.length === 0) {
+        const allSessions = data?.sessions || data?.activity?.sessions || [];
+        for (const s of allSessions) {
+          if (s.laps) {
+            for (const lap of s.laps) {
+              if (lap.records) records = records.concat(lap.records);
+            }
+          }
+          if (s.records) records = records.concat(s.records);
+        }
+      }
       const gpsTrack: GpsPoint[] = [];
       for (const r of records) {
         const lat = r.position_lat;
