@@ -124,14 +124,21 @@ serve(async (req) => {
 
     for (const workout of workouts) {
       const steps = workout.steps.map((s: { duration: number; hrLow: number; hrHigh: number; intensity: string }) => {
-        const step: Record<string, unknown> = {
+        let stepType = "Active";
+        switch (s.intensity) {
+          case "Warmup": stepType = "Warmup"; break;
+          case "Cooldown": stepType = "Cooldown"; break;
+          case "Interval": stepType = "Interval"; break;
+          case "Rest": stepType = "Rest"; break;
+          case "Recovery": stepType = "Recovery"; break;
+          case "Resting": stepType = "Recovery"; break;
+          default: stepType = "Active"; break;
+        }
+        return {
+          type: stepType,
           duration: s.duration,
           hr: { units: "bpm", start: s.hrLow, end: s.hrHigh },
         };
-        if (s.intensity === "Resting") {
-          step.resting = true;
-        }
-        return step;
       });
 
       const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);

@@ -57,7 +57,14 @@ function hrZoneToBpm(hrZone: string): { low: number; high: number } {
  */
 function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   const { low, high } = hrZoneToBpm(seg.hrZone);
-  const isRest = /rest|recover|cool|warm/i.test(seg.segment);
+
+  // Determine step type from segment name
+  const segName = seg.segment.toLowerCase();
+  let stepType = "Active";
+  if (/warm/i.test(segName)) stepType = "Warmup";
+  else if (/cool/i.test(segName)) stepType = "Cooldown";
+  else if (/rest/i.test(segName)) stepType = "Rest";
+  else if (/recover/i.test(segName)) stepType = "Recovery";
 
   // Check for repeat/interval pattern in duration: "5 x 2 min run / 1 min walk"
   const repeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b[^/]*)\s*\/\s*([\d.]+\s*(?:min|sec|h|km|m)\b.*)/i);
@@ -65,32 +72,30 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     const reps = parseInt(repeatMatch[1], 10);
     const workDuration = parseDurationSeconds(repeatMatch[2]);
     const restDuration = parseDurationSeconds(repeatMatch[3]);
-    // Rest zone is 1 zone lower
     const restHr = hrZoneToBpm(`Z${Math.max(1, (parseInt(seg.hrZone.match(/Z(\d)/i)?.[1] || "2", 10)) - 1)}`);
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Active" });
-      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Resting" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Interval" });
+      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Recovery" });
     }
     return steps;
   }
 
-  // Also check duration field for "5 x 2 min" without rest component (rest might be in target)
+  // Also check duration field for "5 x 2 min" without rest component
   const simpleRepeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b)/i);
   if (simpleRepeatMatch) {
     const reps = parseInt(simpleRepeatMatch[1], 10);
     const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
-    // Check target for rest info
     const restMatch = seg.target?.match(/([\d.]+)\s*(?:min|sec)/i);
-    const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60; // default 1 min rest
+    const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60;
     const restHr = hrZoneToBpm("Z1");
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Active" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Interval" });
       if (i < reps - 1 || restMatch) {
-        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Resting" });
+        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Recovery" });
       }
     }
     return steps;
@@ -98,7 +103,7 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
 
   // Simple single step
   const duration = parseDurationSeconds(seg.duration);
-  return [{ duration, hrLow: low, hrHigh: high, intensity: isRest ? "Resting" : "Active" }];
+  return [{ duration, hrLow: low, hrHigh: high, intensity: stepType }];
 }
 
 const RACE_DISTANCES = [
