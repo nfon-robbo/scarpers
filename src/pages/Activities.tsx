@@ -15,6 +15,7 @@ import {
   Trash2, ChevronDown, ChevronUp, MapPin,
 } from "lucide-react";
 import ActivityMap from "@/components/ActivityMap";
+import ActivityCharts from "@/components/ActivityCharts";
 
 const Activities = () => {
   const { user } = useAuth();
@@ -165,6 +166,16 @@ const Activities = () => {
                           <ActivityMap track={a.raw_data.gps_track} />
                         </div>
                       )}
+
+                      {/* Performance Charts */}
+                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 10 && (
+                        <ActivityCharts
+                          track={a.raw_data.gps_track}
+                          avgHR={a.avg_heart_rate}
+                          maxHR={a.max_heart_rate}
+                        />
+                      )}
+
                       {/* All parsed fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <DetailField label="Distance" value={a.distance_meters ? `${(a.distance_meters / 1000).toFixed(2)} km` : null} />
