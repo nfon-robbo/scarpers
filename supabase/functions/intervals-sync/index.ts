@@ -22,18 +22,19 @@ serve(async (req) => {
       );
     }
 
-    const { workouts } = await req.json() as {
+    const { workouts, clearRange } = await req.json() as {
       workouts: Array<{
-        date: string; // YYYY-MM-DD
+        date: string;
         name: string;
         description: string;
         steps: Array<{
-          duration: number; // seconds
+          duration: number;
           hrLow: number;
           hrHigh: number;
-          intensity: string; // "Active" | "Resting"
+          intensity: string;
         }>;
       }>;
+      clearRange?: { oldest: string; newest: string };
     };
 
     if (!workouts || workouts.length === 0) {
@@ -43,19 +44,49 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using athlete ID: ${INTERVALS_ATHLETE_ID}, key length: ${INTERVALS_API_KEY.length}`);
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
+    const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
+    const authHeaders = {
+      Authorization: `Basic ${basicAuth}`,
+      "Content-Type": "application/json",
+    };
+
+    // Step 1: Delete existing planned workouts in range if requested
+    if (clearRange) {
+      try {
+        const eventsResp = await fetch(
+          `${baseUrl}/events?oldest=${clearRange.oldest}&newest=${clearRange.newest}`,
+          { headers: authHeaders }
+        );
+        if (eventsResp.ok) {
+          const events = await eventsResp.json();
+          const workoutEvents = events.filter(
+            (e: { category: string }) => e.category === "WORKOUT"
+          );
+          console.log(`Deleting ${workoutEvents.length} existing workouts in range`);
+          for (const evt of workoutEvents) {
+            await fetch(`${baseUrl}/events/${evt.id}`, {
+              method: "DELETE",
+              headers: authHeaders,
+            });
+          }
+        } else {
+          console.error("Failed to fetch existing events:", eventsResp.status);
+        }
+      } catch (e) {
+        console.error("Error clearing existing workouts:", e);
+      }
+    }
+
+    // Step 2: Create new workouts
     const results: Array<{ date: string; name: string; success: boolean; error?: string }> = [];
 
     for (const workout of workouts) {
-      // Build workout_doc steps for intervals.icu
-      // Each step uses HR targets with low/high BPM range
       const steps = workout.steps.map((s: { duration: number; hrLow: number; hrHigh: number; intensity: string }) => {
         const step: Record<string, unknown> = {
           duration: s.duration,
           hr: { units: "bpm", start: s.hrLow, end: s.hrHigh },
         };
-        // Mark resting steps
         if (s.intensity === "Resting") {
           step.resting = true;
         }
@@ -78,17 +109,11 @@ serve(async (req) => {
       };
 
       try {
-        const resp = await fetch(
-          `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}/events`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Basic ${basicAuth}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          }
-        );
+        const resp = await fetch(`${baseUrl}/events`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify(payload),
+        });
 
         if (resp.ok) {
           results.push({ date: workout.date, name: workout.name, success: true });
