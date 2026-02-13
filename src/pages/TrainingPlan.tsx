@@ -212,7 +212,7 @@ const TrainingPlanPage = () => {
             <>
               <Button variant="outline" size="sm" onClick={handleExportFit}>
                 <Download className="w-4 h-4 mr-2" />
-                Export Workouts (.zwo)
+                Export for intervals.icu (.tcx)
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />

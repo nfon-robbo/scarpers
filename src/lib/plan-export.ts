@@ -2,13 +2,13 @@
  * Plan Export Utilities
  * 
  * Parses markdown training plans and exports them as:
- * - FIT workout files (for TrainingPeaks → watch sync)
+ * - TCX workout files (for intervals.icu → watch sync)
  * - ICS calendar files
  * - Clipboard text (for manual Zepp entry)
  */
 
 import JSZip from "jszip";
-import { encodeZwoWorkout } from "./zwo-workout-encoder";
+import { encodeTcxWorkout } from "./tcx-workout-encoder";
 
 export interface ParsedSegment {
   segment: string;   // e.g. "Warm-up", "Main", "Cool-down"
@@ -120,8 +120,8 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
 
 
 /**
- * Generate a ZIP file containing one .ZWO workout file per workout day.
- * ZWO is the ONLY format TrainingPeaks accepts for planned workout imports.
+ * Generate a ZIP file containing one .tcx workout file per workout day.
+ * TCX is accepted by intervals.icu, Garmin Connect, and most training platforms.
  */
 export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blob> {
   const zip = new JSZip();
@@ -129,13 +129,10 @@ export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blo
   for (const workout of workouts) {
     if (workout.segments.length === 0) continue;
 
-    const description = workout.segments
-      .map(s => `${s.segment}: ${s.duration} ${s.hrZone}`)
-      .join(" | ");
-    const zwoContent = encodeZwoWorkout(workout.title || "Workout", workout.segments, description);
+    const tcxContent = encodeTcxWorkout(workout.title || "Workout", workout.segments);
     const safeName = (workout.date || "workout").replace(/\//g, "-");
-    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.zwo`;
-    zip.file(fileName, zwoContent);
+    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
+    zip.file(fileName, tcxContent);
   }
 
   return zip.generateAsync({ type: "blob" });
