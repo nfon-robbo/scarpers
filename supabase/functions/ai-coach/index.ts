@@ -32,8 +32,8 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type, race_distance, training_days, start_date, race_date, current_plan } = await req.json();
-    // type: "analysis" | "training-plan" | "plan-review"
+    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text } = await req.json();
+    // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust"
 
     // Fetch user profile
     const { data: profile } = await supabase
@@ -146,6 +146,8 @@ ${metricsContext}`;
     let systemPrompt: string;
     let userPrompt: string;
 
+    const isPlanAdjust = type === "plan-adjust";
+
     if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
@@ -194,6 +196,8 @@ You have been given:
 
 Your job is to compare planned vs actual and provide a progress review. Be specific and reference actual dates and numbers.
 
+IMPORTANT: Do NOT generate a revised plan. Only analyse and recommend. The athlete will decide whether to apply changes.
+
 Your response MUST include these sections:
 
 ## 📊 Progress Summary
@@ -210,17 +214,13 @@ Your response MUST include these sections:
 - Sessions done but significantly off target (pace, HR, duration)
 - Any concerning patterns (overtraining, undertraining, intensity creep)
 
-## 🔄 Plan Adjustments
-Based on the progress review, decide whether to adjust the remaining plan:
-- If the athlete is ON TRACK: Confirm the plan is working and no changes needed
-- If the athlete is AHEAD: Consider progressing faster or adding quality sessions
-- If the athlete is BEHIND: Scale back, add recovery, or redistribute load
+## 🔄 Recommended Adjustments
+Based on the progress review, clearly state one of these verdicts:
+- **ON TRACK**: The plan is working well. No changes needed — continue as written.
+- **MAKE EASIER**: The athlete is struggling. Explain specifically what should be scaled back (reduced volume, lower intensity, more recovery days) and why.
+- **MAKE HARDER**: The athlete is ahead of schedule. Explain what should be progressed (increased volume, higher intensity, additional quality sessions) and why.
 
-If adjustments are needed, provide a REVISED plan for the remaining weeks. Use the EXACT SAME table format as the original plan:
-
-CRITICAL FORMAT RULES: EVERY adjusted workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Use UK date format (DD/MM/YYYY) for all dates. Only schedule workouts on: ${daysStr}. EVERY workout title MUST include the total duration as "(Total: Xmin)".
-
-If NO adjustments are needed, explicitly state "No adjustments needed — continue with the current plan as written."
+Be specific about WHAT would change and WHY, but do NOT output the revised plan yet.
 
 ## 💡 Coach's Notes
 Personal advice, motivation, or specific technique cues based on what you've observed.`;
@@ -232,7 +232,59 @@ ${dataContext}
 CURRENT TRAINING PLAN:
 ${current_plan || "No plan provided"}
 
-Review this athlete's progress against their training plan. Compare what was planned vs what was actually done. Determine if the plan needs adjusting. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Review this athlete's progress against their training plan. Compare what was planned vs what was actually done. Determine if the plan needs adjusting but do NOT generate a revised plan. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+    } else if (isPlanAdjust) {
+      const raceLabel = {
+        "5k": "5K",
+        "10k": "10K",
+        "half-marathon": "Half Marathon",
+        "marathon": "Marathon",
+      }[race_distance as string] || "Half Marathon";
+
+      const daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+
+      const adjustmentDirection = (adjustment as string) || "apply";
+      let adjustInstruction = "";
+      if (adjustmentDirection === "easier") {
+        adjustInstruction = "The athlete has requested the plan be made EASIER. Reduce volume, lower intensity, add more recovery days, and scale back ambitious targets. Be conservative.";
+      } else if (adjustmentDirection === "harder") {
+        adjustInstruction = "The athlete has requested the plan be made HARDER. Increase volume, raise intensity, add quality sessions, and push targets up. The athlete is ready for more.";
+      } else {
+        adjustInstruction = "Apply the recommended adjustments from the review as-is.";
+      }
+
+      systemPrompt = `You are an elite endurance coach AI adjusting a ${raceLabel} training plan based on a progress review.
+
+${adjustInstruction}
+
+You have been given:
+1. The ORIGINAL TRAINING PLAN
+2. The PROGRESS REVIEW with analysis
+3. The athlete's ACTIVITY DATA
+
+Generate a COMPLETE REVISED training plan for the remaining weeks. 
+
+CRITICAL FORMAT RULES: 
+1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns.
+2. Use UK date format (DD/MM/YYYY) for all dates.
+3. Only schedule workouts on: ${daysStr}.
+4. EVERY workout title MUST include the total duration as "(Total: Xmin)".
+5. Include the Season Strategy Overview section before the weekly plan.
+6. Start from the next upcoming week based on today's date.`;
+
+      userPrompt = `${athleteContext}
+
+${dataContext}
+
+ORIGINAL TRAINING PLAN:
+${current_plan || "No plan provided"}
+
+PROGRESS REVIEW:
+${review_text || "No review provided"}
+
+Generate the complete revised ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     } else {
       const raceLabel = {
         "5k": "5K",

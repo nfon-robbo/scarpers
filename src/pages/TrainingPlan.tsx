@@ -10,7 +10,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -260,6 +260,8 @@ const TrainingPlanPage = () => {
   };
 
   const [reviewing, setReviewing] = useState(false);
+  const [reviewResult, setReviewResult] = useState<string | null>(null);
+  const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
 
   const reviewProgress = async () => {
     if (!user || !content) return;
@@ -274,6 +276,7 @@ const TrainingPlanPage = () => {
 
     // Store original plan for reference
     const originalPlan = content;
+    setOriginalPlanBeforeReview(originalPlan);
     setContent("");
     setLoading(true);
 
@@ -292,17 +295,67 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setLoading(false);
         setReviewing(false);
-        // Save the review as the new plan content (includes adjustments if any)
-        savePlan(accumulated);
-        toast({ title: "Progress review complete", description: "Your plan has been reviewed and updated." });
+        setReviewResult(accumulated);
+        // Don't auto-save — let user decide
       },
       onError: (err) => {
         toast({ title: "Review failed", description: err, variant: "destructive" });
         setContent(originalPlan); // Restore original on failure
+        setOriginalPlanBeforeReview(null);
         setLoading(false);
         setReviewing(false);
       },
     });
+  };
+
+  const applyAdjustment = async (adjustment: "apply" | "easier" | "harder") => {
+    if (!user || !reviewResult || !originalPlanBeforeReview) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    setContent("");
+
+    let accumulated = "";
+    streamAICoach({
+      type: "plan-adjust",
+      token: session.access_token,
+      raceDistance,
+      trainingDays,
+      startDate: startDate.toISOString().split("T")[0],
+      currentPlan: originalPlanBeforeReview,
+      adjustment,
+      reviewText: reviewResult,
+      onDelta: (text) => {
+        accumulated += text;
+        setContent(accumulated);
+      },
+      onDone: () => {
+        setLoading(false);
+        setReviewResult(null);
+        setOriginalPlanBeforeReview(null);
+        savePlan(accumulated);
+        toast({ title: "Plan updated", description: "Your adjusted training plan has been saved." });
+      },
+      onError: (err) => {
+        toast({ title: "Adjustment failed", description: err, variant: "destructive" });
+        setContent(originalPlanBeforeReview);
+        setLoading(false);
+      },
+    });
+  };
+
+  const keepCurrentPlan = () => {
+    if (originalPlanBeforeReview) {
+      setContent(originalPlanBeforeReview);
+    }
+    setReviewResult(null);
+    setOriginalPlanBeforeReview(null);
+    toast({ title: "Keeping current plan" });
   };
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
@@ -645,6 +698,32 @@ const TrainingPlanPage = () => {
             )}
           </CardContent>
         </Card>
+
+        {reviewResult && !loading && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <p className="text-sm font-medium mb-3">What would you like to do?</p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => applyAdjustment("apply")}>
+                  <Check className="w-4 h-4 mr-2" />
+                  Apply Suggestions
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => applyAdjustment("easier")}>
+                  <ThumbsDown className="w-4 h-4 mr-2" />
+                  Make Easier
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => applyAdjustment("harder")}>
+                  <ThumbsUp className="w-4 h-4 mr-2" />
+                  Make Harder
+                </Button>
+                <Button size="sm" variant="ghost" onClick={keepCurrentPlan}>
+                  <X className="w-4 h-4 mr-2" />
+                  Keep Current Plan
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-dashed">
           <CardHeader className="p-4 cursor-pointer" onClick={() => setShowSyncInstructions(!showSyncInstructions)}>
