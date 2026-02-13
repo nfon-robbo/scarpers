@@ -212,7 +212,7 @@ const TrainingPlanPage = () => {
             <>
               <Button variant="outline" size="sm" onClick={handleExportFit}>
                 <Download className="w-4 h-4 mr-2" />
-                Export for TrainingPeaks (.zwo)
+                Export Workouts (.zwo)
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />
@@ -395,13 +395,13 @@ const TrainingPlanPage = () => {
           {showSyncInstructions && (
             <CardContent className="pt-0 px-4 pb-4">
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Click <strong className="text-foreground">Export for TrainingPeaks (.zwo)</strong> above to download a ZIP of .ZWO workout files</li>
-                <li>Open <a href="https://www.trainingpeaks.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">TrainingPeaks</a> → <strong className="text-foreground">Workout Library</strong> (left sidebar)</li>
-                <li>Click the <strong className="text-foreground">⋮</strong> menu next to a folder → <strong className="text-foreground">Import Workout</strong> → select the .ZWO files</li>
-                <li>Drag imported workouts from the library onto your <strong className="text-foreground">Calendar</strong></li>
-                <li>Open the <strong className="text-foreground">Zepp app</strong> → <strong className="text-foreground">Profile → 3rd-Party Account Linking → TrainingPeaks</strong> to sync to your Amazfit watch</li>
+                <li>Click <strong className="text-foreground">Export Workouts (.zwo)</strong> above to download a ZIP of workout files</li>
+                <li>Open <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer" className="text-primary underline">intervals.icu</a> → go to your <strong className="text-foreground">Calendar</strong></li>
+                <li>Click on a day → <strong className="text-foreground">Add Workout</strong> → use the workout editor to import or manually enter the workout</li>
+                <li>Alternatively, use the <strong className="text-foreground">Workout Library</strong> to organize and import workout files</li>
+                <li>Connect your <strong className="text-foreground">Garmin/Amazfit</strong> account in intervals.icu settings to sync planned workouts to your watch</li>
               </ol>
-              <p className="text-xs text-muted-foreground mt-3">.ZWO is the only format TrainingPeaks accepts for planned workout imports. Workouts will sync as structured sessions to your watch.</p>
+              <p className="text-xs text-muted-foreground mt-3">intervals.icu is free and supports direct sync to Garmin, Wahoo, and other devices. For Amazfit, you can also use the "Copy for Zepp" buttons to manually enter workouts in the Zepp app.</p>
             </CardContent>
           )}
         </Card>
