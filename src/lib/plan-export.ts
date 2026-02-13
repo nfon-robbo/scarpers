@@ -8,13 +8,7 @@
  */
 
 import JSZip from "jszip";
-import {
-  encodeWorkoutFit,
-  WorkoutStep,
-  WKT_STEP_DURATION,
-  WKT_STEP_TARGET,
-  INTENSITY,
-} from "./fit-workout-encoder";
+import { encodeTcxWorkout } from "./tcx-workout-encoder";
 
 export interface ParsedSegment {
   segment: string;   // e.g. "Warm-up", "Main", "Cool-down"
@@ -124,76 +118,20 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
   return workouts;
 }
 
-/**
- * Convert parsed segments into FIT WorkoutStep objects.
- */
-function segmentsToFitSteps(segments: ParsedSegment[]): WorkoutStep[] {
-  return segments.map((seg): WorkoutStep => {
-    // Determine intensity
-    let intensity = INTENSITY.ACTIVE;
-    const segLower = seg.segment.toLowerCase();
-    if (segLower.includes("warm")) intensity = INTENSITY.WARMUP;
-    else if (segLower.includes("cool")) intensity = INTENSITY.COOLDOWN;
-    else if (segLower.includes("rest") || segLower.includes("recovery")) intensity = INTENSITY.REST;
-
-    // Parse duration
-    let durationType = WKT_STEP_DURATION.OPEN;
-    let durationValue = 0;
-
-    const timeMatch = seg.duration.match(/(\d+)\s*min/i);
-    const secMatch = seg.duration.match(/(\d+)\s*sec/i);
-    const kmMatch = seg.duration.match(/([\d.]+)\s*km/i);
-    const mMatch = seg.duration.match(/(\d+)\s*m\b/i);
-
-    if (timeMatch) {
-      durationType = WKT_STEP_DURATION.TIME;
-      durationValue = parseInt(timeMatch[1], 10) * 60 * 1000; // milliseconds
-    } else if (secMatch) {
-      durationType = WKT_STEP_DURATION.TIME;
-      durationValue = parseInt(secMatch[1], 10) * 1000;
-    } else if (kmMatch) {
-      durationType = WKT_STEP_DURATION.DISTANCE;
-      durationValue = parseFloat(kmMatch[1]) * 100000; // centimeters
-    } else if (mMatch) {
-      durationType = WKT_STEP_DURATION.DISTANCE;
-      durationValue = parseInt(mMatch[1], 10) * 100; // centimeters
-    }
-
-    // Parse HR zone target
-    let targetType = WKT_STEP_TARGET.OPEN;
-    let targetValue = 0;
-
-    const zoneMatch = seg.hrZone.match(/Z(\d)/i);
-    if (zoneMatch) {
-      targetType = WKT_STEP_TARGET.HEART_RATE;
-      targetValue = parseInt(zoneMatch[1], 10);
-    }
-
-    return {
-      intensity,
-      durationType,
-      durationValue,
-      targetType,
-      targetValue,
-    };
-  });
-}
 
 /**
- * Generate a ZIP file containing one .FIT workout file per workout day.
+ * Generate a ZIP file containing one .TCX workout file per workout day.
  */
 export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blob> {
   const zip = new JSZip();
 
   for (const workout of workouts) {
     if (workout.segments.length === 0) continue;
-    const steps = segmentsToFitSteps(workout.segments);
-    if (steps.length === 0) continue;
 
-    const fitData = encodeWorkoutFit(workout.title || "Workout", steps);
+    const tcxContent = encodeTcxWorkout(workout.title || "Workout", workout.segments);
     const safeName = (workout.date || "workout").replace(/\//g, "-");
-    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.fit`;
-    zip.file(fileName, fitData);
+    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
+    zip.file(fileName, tcxContent);
   }
 
   return zip.generateAsync({ type: "blob" });
