@@ -74,8 +74,8 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
         }
       }
 
-      // Extract session-level data
-      const sessions = data?.activity?.sessions || [];
+      // Extract session-level data — try multiple paths
+      const sessions = data?.sessions || data?.activity?.sessions || [];
       if (sessions.length > 0) {
         for (const session of sessions) {
           activities.push({
@@ -90,8 +90,8 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             avg_power: session.avg_power ?? null,
             max_power: session.max_power ?? null,
             avg_cadence: session.avg_cadence ?? session.avg_running_cadence ?? null,
-            total_ascent: session.total_ascent ?? null,
-            total_descent: session.total_descent ?? null,
+            total_ascent: session.total_ascent != null ? session.total_ascent * 1000 : null,
+            total_descent: session.total_descent != null ? session.total_descent * 1000 : null,
             calories: session.total_calories ?? null,
             avg_temperature: session.avg_temperature ?? null,
             training_effect: session.total_training_effect ?? null,
@@ -146,8 +146,8 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             avg_power: powers.length ? powers.reduce((a: number, b: number) => a + b, 0) / powers.length : null,
             max_power: powers.length ? Math.max(...powers) : null,
             avg_cadence: cadences.length ? cadences.reduce((a: number, b: number) => a + b, 0) / cadences.length : null,
-            total_ascent: altitudes.length > 1 ? totalAscent : null,
-            total_descent: altitudes.length > 1 ? totalDescent : null,
+            total_ascent: altitudes.length > 1 ? totalAscent * 1000 : null,
+            total_descent: altitudes.length > 1 ? totalDescent * 1000 : null,
             calories: null,
             avg_temperature: temps.length ? temps.reduce((a: number, b: number) => a + b, 0) / temps.length : null,
             training_effect: null,
