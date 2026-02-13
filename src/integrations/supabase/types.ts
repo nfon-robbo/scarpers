@@ -37,6 +37,7 @@ export type Database = {
           total_descent: number | null
           training_effect: number | null
           training_load: number | null
+          training_plan_id: string | null
           upload_id: string | null
           user_id: string
         }
@@ -62,6 +63,7 @@ export type Database = {
           total_descent?: number | null
           training_effect?: number | null
           training_load?: number | null
+          training_plan_id?: string | null
           upload_id?: string | null
           user_id: string
         }
@@ -87,10 +89,18 @@ export type Database = {
           total_descent?: number | null
           training_effect?: number | null
           training_load?: number | null
+          training_plan_id?: string | null
           upload_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "activities_training_plan_id_fkey"
+            columns: ["training_plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "activities_upload_id_fkey"
             columns: ["upload_id"]

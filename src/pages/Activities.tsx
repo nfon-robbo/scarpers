@@ -1,5 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits } from "@/hooks/useUnits";
@@ -27,19 +28,48 @@ const Activities = () => {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
+  const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("activities")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("start_time", { ascending: false })
-      .then(({ data }) => {
-        setActivities(data || []);
-        setLoading(false);
-      });
+    // Fetch activities and current plan in parallel
+    Promise.all([
+      supabase
+        .from("activities")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("start_time", { ascending: false }),
+      supabase
+        .from("training_plans")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]).then(([activitiesRes, planRes]) => {
+      setActivities(activitiesRes.data || []);
+      setCurrentPlanId(planRes.data?.id || null);
+      setLoading(false);
+    });
   }, [user]);
+
+  const togglePlanAllocation = async (activityId: string, currentlyAllocated: boolean) => {
+    setTogglingPlan(activityId);
+    const newValue = currentlyAllocated ? null : currentPlanId;
+    const { error } = await supabase
+      .from("activities")
+      .update({ training_plan_id: newValue } as any)
+      .eq("id", activityId);
+    if (error) {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    } else {
+      setActivities((prev) =>
+        prev.map((a) => a.id === activityId ? { ...a, training_plan_id: newValue } : a)
+      );
+    }
+    setTogglingPlan(null);
+  };
 
   const deleteActivity = async (id: string) => {
     setDeleting(id);
@@ -133,6 +163,25 @@ const Activities = () => {
                     </button>
 
                     <div className="flex items-center gap-2">
+                      {currentPlanId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                checked={a.training_plan_id === currentPlanId}
+                                disabled={togglingPlan === a.id}
+                                onCheckedChange={() => togglePlanAllocation(a.id, a.training_plan_id === currentPlanId)}
+                              />
+                              <span className="text-xs text-muted-foreground">Plan</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            {a.training_plan_id === currentPlanId
+                              ? "This activity is linked to your current training plan"
+                              : "Link this activity to your current training plan for progress review"}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {a.start_time && new Date(a.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
