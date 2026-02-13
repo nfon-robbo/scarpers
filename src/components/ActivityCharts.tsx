@@ -95,8 +95,12 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     for (let i = 1; i < track.length; i++) {
       const prev = track[i - 1];
       const curr = track[i];
-      const d = haversine(prev.lat, prev.lng ?? prev.lon, curr.lat, curr.lng ?? curr.lon);
-      dist += d;
+      const prevLon = prev.lng ?? prev.lon;
+      const currLon = curr.lng ?? curr.lon;
+      if (prev.lat != null && prevLon != null && curr.lat != null && currLon != null) {
+        const d = haversine(prev.lat, prevLon, curr.lat, currLon);
+        if (!isNaN(d)) dist += d;
+      }
       if (curr.heart_rate) splitHRs.push(curr.heart_rate);
       if (curr.speed) splitSpeeds.push(curr.speed);
 
