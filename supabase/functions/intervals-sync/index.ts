@@ -125,6 +125,15 @@ serve(async (req) => {
     for (const workout of workouts) {
       const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);
 
+      // Convert bpm to HR zone — needed for intervals.icu to create structured steps
+      function bpmToZone(hrLow: number): string {
+        if (hrLow >= 175) return "Z5 HR";
+        if (hrLow >= 160) return "Z4 HR";
+        if (hrLow >= 140) return "Z3 HR";
+        if (hrLow >= 120) return "Z2 HR";
+        return "Z1 HR";
+      }
+
       // Format duration for intervals.icu
       function fmtDur(secs: number): string {
         const m = Math.floor(secs / 60);
@@ -134,34 +143,38 @@ serve(async (req) => {
         return `${s}s`;
       }
 
-      // Build workout text — pure time-based, no HR targets
+      // Build workout text with HR zones (required for structured chart/watch alerts)
       const steps = workout.steps;
       const lines: string[] = [];
       let i = 0;
 
       while (i < steps.length) {
         const s = steps[i];
+        const zone = bpmToZone(s.hrLow);
 
         if (s.intensity === "Warmup") {
           lines.push("Warmup");
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         } else if (s.intensity === "Cooldown") {
           lines.push("Cooldown");
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         } else if (s.intensity === "Interval") {
           // Count consecutive Interval/Recovery pairs for repeat syntax
           let reps = 0;
           let j = i;
           const workDur = s.duration;
+          const workZone = bpmToZone(s.hrLow);
           let restDur = 0;
+          let restZone = "Z1 HR";
 
           while (j < steps.length && steps[j].intensity === "Interval" &&
                  steps[j].duration === workDur) {
             reps++;
             if (j + 1 < steps.length && (steps[j + 1].intensity === "Recovery" || steps[j + 1].intensity === "Rest")) {
               restDur = steps[j + 1].duration;
+              restZone = bpmToZone(steps[j + 1].hrLow);
               j += 2;
             } else {
               j++;
@@ -171,15 +184,15 @@ serve(async (req) => {
 
           if (reps > 1) {
             lines.push(`${reps}x`);
-            lines.push(`- ${fmtDur(workDur)}`);
-            if (restDur > 0) lines.push(`- ${fmtDur(restDur)}`);
+            lines.push(`- ${fmtDur(workDur)} ${workZone}`);
+            if (restDur > 0) lines.push(`- ${fmtDur(restDur)} ${restZone}`);
             i = j;
           } else {
-            lines.push(`- ${fmtDur(s.duration)}`);
+            lines.push(`- ${fmtDur(s.duration)} ${zone}`);
             i++;
           }
         } else {
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         }
       }
