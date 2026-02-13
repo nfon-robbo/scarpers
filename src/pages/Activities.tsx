@@ -1,4 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits } from "@/hooks/useUnits";
@@ -110,7 +111,17 @@ const Activities = () => {
                           <Badge variant="secondary" className="capitalize text-xs">{a.activity_type}</Badge>
                         )}
                         {a.training_effect && (
-                          <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                          <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs cursor-help">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs text-xs">
+                                <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
+                                <p>{getTrainingEffectDescription(Number(a.training_effect))}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         {isExpanded ? (
                           <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -206,7 +217,7 @@ const Activities = () => {
                         <DetailField label="Total Descent" value={fmt.elevation(a.total_descent)} />
                         <DetailField label="Calories" value={a.calories ? `${Math.round(a.calories)} kcal` : null} />
                         <DetailField label="Avg Temperature" value={fmt.temperature(a.avg_temperature)} />
-                        <DetailField label="Training Effect" value={a.training_effect ? `${Number(a.training_effect).toFixed(1)}` : null} />
+                        <DetailField label="Training Effect" value={a.training_effect ? `${Number(a.training_effect).toFixed(1)}` : null} tooltip={a.training_effect ? getTrainingEffectDescription(Number(a.training_effect)) : undefined} />
                         <DetailField label="Training Load" value={a.training_load ? `${Math.round(a.training_load)}` : null} />
                         <DetailField label="Activity Type" value={a.activity_type || null} />
                       </div>
@@ -248,8 +259,25 @@ const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string;
   );
 };
 
-const DetailField = ({ label, value }: { label: string; value: string | null }) => {
+const DetailField = ({ label, value, tooltip }: { label: string; value: string | null; tooltip?: string }) => {
   if (!value) return null;
+  if (tooltip) {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="cursor-help">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-sm font-semibold">{value}</p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs text-xs">
+            <p>{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -257,6 +285,14 @@ const DetailField = ({ label, value }: { label: string; value: string | null }) 
     </div>
   );
 };
+
+function getTrainingEffectDescription(te: number): string {
+  if (te < 2.0) return "Minor impact — helps recovery without significantly improving fitness.";
+  if (te < 3.0) return "Maintaining your current aerobic fitness level.";
+  if (te < 4.0) return "Improving your aerobic fitness — a solid, effective training session.";
+  if (te < 5.0) return "Highly improving your fitness — a hard workout pushing your limits.";
+  return "Overreaching — extreme effort, ensure adequate recovery.";
+}
 
 const RawDataDisplay = ({ data }: { data: any }) => {
   if (typeof data !== "object" || data === null) {
