@@ -13,9 +13,16 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { parseWorkoutsFromPlan, generateIcsCalendar, downloadText } from "@/lib/plan-export";
+import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 
-function parseDurationForApi(duration: string): number {
+interface ApiStep {
+  duration: number;
+  hrLow: number;
+  hrHigh: number;
+  intensity: string;
+}
+
+function parseDurationSeconds(duration: string): number {
   const hourMatch = duration.match(/([\d.]+)\s*h/i);
   const minMatch = duration.match(/(\d+)\s*min/i);
   const secMatch = duration.match(/(\d+)\s*sec/i);
@@ -42,6 +49,56 @@ function hrZoneToBpm(hrZone: string): { low: number; high: number } {
     case 5: return { low: 175, high: 200 };
     default: return { low: 100, high: 140 };
   }
+}
+
+/**
+ * Expand a segment into API steps.
+ * Handles repeat patterns like "5 x 2 min run / 1 min walk"
+ */
+function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
+  const { low, high } = hrZoneToBpm(seg.hrZone);
+  const isRest = /rest|recover|cool|warm/i.test(seg.segment);
+
+  // Check for repeat/interval pattern in duration: "5 x 2 min run / 1 min walk"
+  const repeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b[^/]*)\s*\/\s*([\d.]+\s*(?:min|sec|h|km|m)\b.*)/i);
+  if (repeatMatch) {
+    const reps = parseInt(repeatMatch[1], 10);
+    const workDuration = parseDurationSeconds(repeatMatch[2]);
+    const restDuration = parseDurationSeconds(repeatMatch[3]);
+    // Rest zone is 1 zone lower
+    const restHr = hrZoneToBpm(`Z${Math.max(1, (parseInt(seg.hrZone.match(/Z(\d)/i)?.[1] || "2", 10)) - 1)}`);
+    
+    const steps: ApiStep[] = [];
+    for (let i = 0; i < reps; i++) {
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Active" });
+      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Resting" });
+    }
+    return steps;
+  }
+
+  // Also check duration field for "5 x 2 min" without rest component (rest might be in target)
+  const simpleRepeatMatch = seg.duration.match(/(\d+)\s*x\s*([\d.]+\s*(?:min|sec|h|km|m)\b)/i);
+  if (simpleRepeatMatch) {
+    const reps = parseInt(simpleRepeatMatch[1], 10);
+    const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
+    // Check target for rest info
+    const restMatch = seg.target?.match(/([\d.]+)\s*(?:min|sec)/i);
+    const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60; // default 1 min rest
+    const restHr = hrZoneToBpm("Z1");
+    
+    const steps: ApiStep[] = [];
+    for (let i = 0; i < reps; i++) {
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Active" });
+      if (i < reps - 1 || restMatch) {
+        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Resting" });
+      }
+    }
+    return steps;
+  }
+
+  // Simple single step
+  const duration = parseDurationSeconds(seg.duration);
+  return [{ duration, hrLow: low, hrHigh: high, intensity: isRest ? "Resting" : "Active" }];
 }
 
 const RACE_DISTANCES = [
@@ -210,15 +267,10 @@ const TrainingPlanPage = () => {
         return;
       }
 
-      // Convert parsed workouts to API format
+      // Convert parsed workouts to API format, expanding intervals
       const apiWorkouts = withSegments.map(w => {
         const dateStr = w.dateObj!.toISOString().split("T")[0];
-        const steps = w.segments.map(seg => {
-          const duration = parseDurationForApi(seg.duration);
-          const { low, high } = hrZoneToBpm(seg.hrZone);
-          const intensity = /rest|recover|cool|warm/i.test(seg.segment) ? "Resting" : "Active";
-          return { duration, hrLow: low, hrHigh: high, intensity };
-        });
+        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
         return { date: dateStr, name: w.title, description, steps };
       });
