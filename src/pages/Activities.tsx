@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useUnits } from "@/hooks/useUnits";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import ActivityCharts from "@/components/ActivityCharts";
 const Activities = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { fmt, label } = useUnits();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -50,7 +52,7 @@ const Activities = () => {
     setDeleting(null);
   };
 
-  const fmt = (seconds: number | null) => {
+  const fmtDuration = (seconds: number | null) => {
     if (!seconds) return "—";
     const m = Math.floor(seconds / 60);
     return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
@@ -146,12 +148,12 @@ const Activities = () => {
 
                   {/* Summary metrics (always visible) */}
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-3">
-                    <Metric icon={Timer} label="Duration" value={fmt(a.duration_seconds)} />
+                    <Metric icon={Timer} label="Duration" value={fmtDuration(a.duration_seconds)} />
                     <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)}` : null} unit="bpm" />
                     <Metric icon={Heart} label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)}` : null} unit="bpm" />
-                    <Metric icon={TrendingUp} label="Speed" value={a.avg_speed ? `${Number(a.avg_speed).toFixed(1)}` : null} unit="km/h" />
+                    <Metric icon={TrendingUp} label="Speed" value={fmt.speed(a.avg_speed)} />
                     <Metric icon={Zap} label="Power" value={a.avg_power ? `${Math.round(a.avg_power)}` : null} unit="W" />
-                    <Metric icon={Mountain} label="Ascent" value={a.total_ascent ? `${Math.round(a.total_ascent)}` : null} unit="m" />
+                    <Metric icon={Mountain} label="Ascent" value={fmt.elevation(a.total_ascent)} />
                   </div>
 
                   {/* Expanded detail view */}
@@ -178,19 +180,19 @@ const Activities = () => {
 
                       {/* All parsed fields */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <DetailField label="Distance" value={a.distance_meters ? `${(a.distance_meters / 1000).toFixed(2)} km` : null} />
+                        <DetailField label="Distance" value={fmt.distance(a.distance_meters)} />
                         <DetailField label="Duration" value={a.duration_seconds ? `${Math.floor(a.duration_seconds / 60)}m ${Math.round(a.duration_seconds % 60)}s` : null} />
                         <DetailField label="Avg Heart Rate" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm` : null} />
                         <DetailField label="Max Heart Rate" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)} bpm` : null} />
-                        <DetailField label="Avg Speed" value={a.avg_speed ? `${Number(a.avg_speed).toFixed(2)} km/h` : null} />
-                        <DetailField label="Max Speed" value={a.max_speed ? `${Number(a.max_speed).toFixed(2)} km/h` : null} />
+                        <DetailField label="Avg Speed" value={fmt.speed(a.avg_speed)} />
+                        <DetailField label="Max Speed" value={fmt.speed(a.max_speed)} />
                         <DetailField label="Avg Power" value={a.avg_power ? `${Math.round(a.avg_power)} W` : null} />
                         <DetailField label="Max Power" value={a.max_power ? `${Math.round(a.max_power)} W` : null} />
                         <DetailField label="Avg Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)} rpm` : null} />
-                        <DetailField label="Total Ascent" value={a.total_ascent ? `${Math.round(a.total_ascent)} m` : null} />
-                        <DetailField label="Total Descent" value={a.total_descent ? `${Math.round(a.total_descent)} m` : null} />
+                        <DetailField label="Total Ascent" value={fmt.elevation(a.total_ascent)} />
+                        <DetailField label="Total Descent" value={fmt.elevation(a.total_descent)} />
                         <DetailField label="Calories" value={a.calories ? `${Math.round(a.calories)} kcal` : null} />
-                        <DetailField label="Avg Temperature" value={a.avg_temperature ? `${a.avg_temperature}°C` : null} />
+                        <DetailField label="Avg Temperature" value={fmt.temperature(a.avg_temperature)} />
                         <DetailField label="Training Effect" value={a.training_effect ? `${Number(a.training_effect).toFixed(1)}` : null} />
                         <DetailField label="Training Load" value={a.training_load ? `${Math.round(a.training_load)}` : null} />
                         <DetailField label="Activity Type" value={a.activity_type || null} />

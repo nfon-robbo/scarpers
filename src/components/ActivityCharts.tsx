@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Heart, TrendingUp, Mountain, Gauge, Timer, Zap } from "lucide-react";
+import { useUnits } from "@/hooks/useUnits";
 
 interface GpsPoint {
   lat: number;
@@ -30,6 +31,9 @@ const tooltipStyle = {
 };
 
 const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
+  const { fmt, label, units } = useUnits();
+  const KM_TO_MI = 0.621371;
+  const M_TO_FT = 3.28084;
   const analysis = useMemo(() => {
     if (!track || track.length < 10) return null;
 
@@ -42,14 +46,17 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       .map((p, idx) => {
         const elapsedSec = p.time ? (new Date(p.time).getTime() - startTime) / 1000 : idx * step;
         const elapsedMin = Math.round(elapsedSec / 60 * 10) / 10;
-        const paceMinKm = p.speed && p.speed > 0.5 ? 60 / (p.speed * 3.6) : null;
+        const rawSpeedKmh = p.speed ? p.speed * 3.6 : 0;
+        const displaySpeed = units.speed === "mph" ? rawSpeedKmh * KM_TO_MI :
+          (units.speed === "min/km" || units.speed === "min/mi") ? (rawSpeedKmh > 1.5 ? 60 / (units.speed === "min/mi" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh) : null) :
+          rawSpeedKmh;
+        const displayAlt = p.altitude != null ? (units.elevation === "ft" ? p.altitude * M_TO_FT : p.altitude) : null;
         return {
           min: elapsedMin,
           label: formatMinSec(elapsedSec),
           hr: p.heart_rate ?? null,
-          speed: p.speed ? Math.round(p.speed * 3.6 * 10) / 10 : null, // km/h
-          pace: paceMinKm ? Math.round(paceMinKm * 100) / 100 : null,
-          altitude: p.altitude != null ? Math.round(p.altitude * 10) / 10 : null,
+          speed: displaySpeed ? Math.round(displaySpeed * 10) / 10 : null,
+          altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
         };
       });
 
@@ -94,11 +101,13 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
         const elapsed = curr.time && track[kmStart].time
           ? (new Date(curr.time).getTime() - new Date(track[kmStart].time).getTime()) / 1000
           : 0;
+        const rawAvgSpd = splitSpeeds.length ? splitSpeeds.reduce((a, b) => a + b, 0) / splitSpeeds.length * 3.6 : 0;
+        const displayAvgSpd = units.speed === "mph" ? rawAvgSpd * KM_TO_MI : rawAvgSpd;
         splits.push({
           km: splits.length + 1,
           time: Math.round(elapsed),
           avgHR: splitHRs.length ? Math.round(splitHRs.reduce((a, b) => a + b, 0) / splitHRs.length) : 0,
-          avgSpeed: splitSpeeds.length ? Math.round(splitSpeeds.reduce((a, b) => a + b, 0) / splitSpeeds.length * 3.6 * 10) / 10 : 0,
+          avgSpeed: Math.round(displayAvgSpd * 10) / 10,
         });
         dist -= 1000;
         kmStart = i;
@@ -109,25 +118,28 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
 
     // Elevation stats
     const altitudes = track.filter((p) => p.altitude != null).map((p) => p.altitude!);
-    const elevGain = altitudes.reduce((sum, alt, i) => i > 0 && alt > altitudes[i - 1] ? sum + (alt - altitudes[i - 1]) : sum, 0);
-    const elevLoss = altitudes.reduce((sum, alt, i) => i > 0 && alt < altitudes[i - 1] ? sum + (altitudes[i - 1] - alt) : sum, 0);
+    const elevGainRaw = altitudes.reduce((sum, alt, i) => i > 0 && alt > altitudes[i - 1] ? sum + (alt - altitudes[i - 1]) : sum, 0);
+    const elevLossRaw = altitudes.reduce((sum, alt, i) => i > 0 && alt < altitudes[i - 1] ? sum + (altitudes[i - 1] - alt) : sum, 0);
+    const elevMult = units.elevation === "ft" ? M_TO_FT : 1;
 
     // Speed stats
     const speeds = track.filter((p) => p.speed && p.speed > 0.5).map((p) => p.speed!);
-    const avgSpeed = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+    const avgSpeedRaw = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length * 3.6 : 0;
+    const maxSpeedRaw = speeds.length ? Math.max(...speeds) * 3.6 : 0;
+    const speedMult = units.speed === "mph" ? KM_TO_MI : 1;
 
     return {
       timeSeriesData,
       zoneData,
       splits,
-      elevGain: Math.round(elevGain),
-      elevLoss: Math.round(elevLoss),
-      minAlt: altitudes.length ? Math.round(Math.min(...altitudes)) : null,
-      maxAlt: altitudes.length ? Math.round(Math.max(...altitudes)) : null,
-      avgSpeed: Math.round(avgSpeed * 3.6 * 10) / 10,
-      maxSpeed: speeds.length ? Math.round(Math.max(...speeds) * 3.6 * 10) / 10 : null,
+      elevGain: Math.round(elevGainRaw * elevMult),
+      elevLoss: Math.round(elevLossRaw * elevMult),
+      minAlt: altitudes.length ? Math.round(Math.min(...altitudes) * elevMult) : null,
+      maxAlt: altitudes.length ? Math.round(Math.max(...altitudes) * elevMult) : null,
+      avgSpeed: Math.round(avgSpeedRaw * speedMult * 10) / 10,
+      maxSpeed: speeds.length ? Math.round(maxSpeedRaw * speedMult * 10) / 10 : null,
     };
-  }, [track, maxHR]);
+  }, [track, maxHR, units]);
 
   if (!analysis) {
     return (
@@ -139,10 +151,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     <div className="space-y-4">
       {/* Stats summary row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={Mountain} label="Elevation Gain" value={`${analysis.elevGain}m`} />
-        <StatCard icon={Mountain} label="Elevation Loss" value={`${analysis.elevLoss}m`} />
-        <StatCard icon={Gauge} label="Avg Speed" value={`${analysis.avgSpeed} km/h`} />
-        {analysis.maxSpeed && <StatCard icon={Zap} label="Max Speed" value={`${analysis.maxSpeed} km/h`} />}
+        <StatCard icon={Mountain} label="Elevation Gain" value={`${analysis.elevGain} ${label.elevation}`} />
+        <StatCard icon={Mountain} label="Elevation Loss" value={`${analysis.elevLoss} ${label.elevation}`} />
+        <StatCard icon={Gauge} label="Avg Speed" value={`${analysis.avgSpeed} ${label.speed}`} />
+        {analysis.maxSpeed && <StatCard icon={Zap} label="Max Speed" value={`${analysis.maxSpeed} ${label.speed}`} />}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -174,7 +186,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
             <CardTitle className="text-sm flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-primary" /> Speed
             </CardTitle>
-            <CardDescription className="text-xs">km/h over time</CardDescription>
+            <CardDescription className="text-xs">{label.speed} over time</CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
             <ResponsiveContainer width="100%" height={180}>
@@ -183,7 +195,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
                 <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Line type="monotone" dataKey="speed" stroke="hsl(var(--primary))" strokeWidth={1.5} name="Speed (km/h)" dot={false} />
+                <Line type="monotone" dataKey="speed" stroke="hsl(var(--primary))" strokeWidth={1.5} name={`Speed (${label.speed})`} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -196,7 +208,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
               <Mountain className="w-4 h-4 text-chart-3" /> Elevation Profile
             </CardTitle>
             <CardDescription className="text-xs">
-              {analysis.minAlt}m – {analysis.maxAlt}m · ↑{analysis.elevGain}m ↓{analysis.elevLoss}m
+              {analysis.minAlt}{label.elevation} – {analysis.maxAlt}{label.elevation} · ↑{analysis.elevGain}{label.elevation} ↓{analysis.elevLoss}{label.elevation}
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
@@ -206,7 +218,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
                 <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                 <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="altitude" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.2} strokeWidth={1.5} name="Altitude (m)" dot={false} />
+                <Area type="monotone" dataKey="altitude" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.2} strokeWidth={1.5} name={`Altitude (${label.elevation})`} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -244,15 +256,15 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
-              <Timer className="w-4 h-4 text-accent" /> Kilometer Splits
+              <Timer className="w-4 h-4 text-accent" /> {units.distance === "mi" ? "Mile" : "Kilometer"} Splits
             </CardTitle>
-            <CardDescription className="text-xs">Pace and HR per kilometer</CardDescription>
+            <CardDescription className="text-xs">Pace and HR per {units.distance === "mi" ? "mile" : "kilometer"}</CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={analysis.splits}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="km" tick={{ fontSize: 10 }} className="fill-muted-foreground" label={{ value: "km", position: "insideBottomRight", offset: -5, fontSize: 10 }} />
+                <XAxis dataKey="km" tick={{ fontSize: 10 }} className="fill-muted-foreground" label={{ value: units.distance === "mi" ? "mi" : "km", position: "insideBottomRight", offset: -5, fontSize: 10 }} />
                 <YAxis yAxisId="time" tick={{ fontSize: 10 }} className="fill-muted-foreground" label={{ value: "sec", angle: -90, position: "insideLeft", fontSize: 10 }} />
                 <YAxis yAxisId="hr" orientation="right" tick={{ fontSize: 10 }} className="fill-muted-foreground" label={{ value: "bpm", angle: 90, position: "insideRight", fontSize: 10 }} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value: number, name: string) => {
@@ -267,23 +279,23 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
             {/* Splits table */}
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Km</th>
-                    <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Time</th>
-                    <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Pace</th>
-                    <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Avg HR</th>
-                    <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Speed</th>
-                  </tr>
-                </thead>
+                 <thead>
+                   <tr className="border-b border-border">
+                     <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">{units.distance === "mi" ? "Mi" : "Km"}</th>
+                     <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Time</th>
+                     <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Pace</th>
+                     <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Avg HR</th>
+                     <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Speed</th>
+                   </tr>
+                 </thead>
                 <tbody>
                   {analysis.splits.map((s) => (
                     <tr key={s.km} className="border-b border-border/50">
                       <td className="py-1.5 px-2 font-medium">{s.km}</td>
                       <td className="py-1.5 px-2 text-right font-mono">{formatMinSec(s.time)}</td>
-                      <td className="py-1.5 px-2 text-right font-mono">{formatMinSec(s.time)}/km</td>
+                      <td className="py-1.5 px-2 text-right font-mono">{formatMinSec(s.time)}/{units.distance === "mi" ? "mi" : "km"}</td>
                       <td className="py-1.5 px-2 text-right">{s.avgHR || "—"} bpm</td>
-                      <td className="py-1.5 px-2 text-right">{s.avgSpeed} km/h</td>
+                      <td className="py-1.5 px-2 text-right">{s.avgSpeed} {label.speed}</td>
                     </tr>
                   ))}
                 </tbody>
