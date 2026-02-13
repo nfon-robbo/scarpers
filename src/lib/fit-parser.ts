@@ -8,6 +8,8 @@ export interface GpsPoint {
   altitude?: number;
   heart_rate?: number;
   speed?: number;
+  cadence?: number;
+  power?: number;
 }
 
 export interface ParsedActivity {
@@ -81,11 +83,14 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             altitude: r.altitude ?? r.enhanced_altitude ?? undefined,
             heart_rate: r.heart_rate ?? undefined,
             speed: r.speed ?? r.enhanced_speed ?? undefined,
+            cadence: r.cadence ?? r.running_cadence ?? undefined,
+            power: r.power ?? undefined,
           });
         }
       }
 
       // Compute record-level fallbacks for fields missing from session
+      const recordSpeeds = records.map((r: any) => r.speed || r.enhanced_speed).filter(Boolean);
       const recordCadences = records.map((r: any) => r.cadence ?? r.running_cadence).filter(Boolean);
       const recordPowers = records.map((r: any) => r.power).filter((v: any) => v != null && v > 0);
       const recordTemps = records.map((r: any) => r.temperature).filter((v: any) => v != null);
@@ -107,8 +112,8 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             distance_meters: session.total_distance ? session.total_distance * 1000 : null,
             avg_heart_rate: session.avg_heart_rate ?? null,
             max_heart_rate: session.max_heart_rate ?? null,
-            avg_speed: session.avg_speed ?? session.enhanced_avg_speed ?? null,
-            max_speed: session.max_speed ?? session.enhanced_max_speed ?? null,
+            avg_speed: session.avg_speed ?? session.enhanced_avg_speed ?? (recordSpeeds.length ? recordSpeeds.reduce((a: number, b: number) => a + b, 0) / recordSpeeds.length : null),
+            max_speed: session.max_speed ?? session.enhanced_max_speed ?? (recordSpeeds.length ? Math.max(...recordSpeeds) : null),
             avg_power: session.avg_power ?? (recordPowers.length ? recordPowers.reduce((a: number, b: number) => a + b, 0) / recordPowers.length : null),
             max_power: session.max_power ?? (recordPowers.length ? Math.max(...recordPowers) : null),
             avg_cadence: session.avg_cadence ?? session.avg_running_cadence ?? (recordCadences.length ? recordCadences.reduce((a: number, b: number) => a + b, 0) / recordCadences.length : null),
