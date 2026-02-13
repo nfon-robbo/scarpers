@@ -1,1 +1,7 @@
 project_id = "datdwxsugeobqigtopnz"
+
+[functions.strava-auth]
+verify_jwt = false
+
+[functions.strava-import]
+verify_jwt = false
