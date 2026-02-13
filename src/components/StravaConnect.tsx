@@ -17,12 +17,6 @@ const StravaConnect = () => {
   const checkStatus = useCallback(async () => {
     if (!session?.access_token) return;
     try {
-      const { data, error } = await supabase.functions.invoke("strava-auth", {
-        body: null,
-        method: "GET",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      // Use fetch directly because invoke doesn't support query params well
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-auth?action=status`,
         { headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
