@@ -196,6 +196,12 @@ const Activities = () => {
                         <DetailField label="Avg Power" value={a.avg_power ? `${Math.round(a.avg_power)} W` : null} />
                         <DetailField label="Max Power" value={a.max_power ? `${Math.round(a.max_power)} W` : null} />
                         <DetailField label="Avg Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)} rpm` : null} />
+                        <DetailField label="Steps" value={(() => {
+                          const stepLen = a.raw_data?.avg_step_length;
+                          if (stepLen && a.distance_meters) return `${Math.round(a.distance_meters / (stepLen / 1000))}`;
+                          if (a.avg_cadence && a.duration_seconds) return `${Math.round(a.avg_cadence * (a.duration_seconds / 60))}`;
+                          return null;
+                        })()} />
                         <DetailField label="Total Ascent" value={fmt.elevation(a.total_ascent)} />
                         <DetailField label="Total Descent" value={fmt.elevation(a.total_descent)} />
                         <DetailField label="Calories" value={a.calories ? `${Math.round(a.calories)} kcal` : null} />
