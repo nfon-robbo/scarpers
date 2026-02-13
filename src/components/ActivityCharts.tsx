@@ -17,6 +17,8 @@ interface GpsPoint {
   altitude?: number;
   heart_rate?: number;
   speed?: number;
+  cadence?: number;
+  power?: number;
 }
 
 interface Props {
@@ -60,6 +62,8 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           hr: p.heart_rate ?? null,
           speed: displaySpeed ? Math.round(displaySpeed * 10) / 10 : null,
           altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
+          cadence: p.cadence ?? null,
+          power: p.power ?? null,
         };
       });
 
@@ -139,6 +143,15 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const maxSpeedRaw = speeds.length ? Math.max(...speeds) : 0;
     const speedMult = units.speed === "mph" ? KM_TO_MI : 1;
 
+    // Cadence & power stats
+    const cadencePoints = track.filter((p) => p.cadence && p.cadence > 0).map((p) => p.cadence!);
+    const hasCadence = cadencePoints.length > 10;
+    const avgCadence = cadencePoints.length ? Math.round(cadencePoints.reduce((a, b) => a + b, 0) / cadencePoints.length) : null;
+
+    const powerPoints = track.filter((p) => p.power && p.power > 0).map((p) => p.power!);
+    const hasPower = powerPoints.length > 10;
+    const avgPower = powerPoints.length ? Math.round(powerPoints.reduce((a, b) => a + b, 0) / powerPoints.length) : null;
+
     return {
       timeSeriesData,
       zoneData,
@@ -149,6 +162,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       maxAlt: altitudes.length ? Math.round(Math.max(...altitudes) * elevMult) : null,
       avgSpeed: Math.round(avgSpeedRaw * speedMult * 10) / 10,
       maxSpeed: speeds.length ? Math.round(maxSpeedRaw * speedMult * 10) / 10 : null,
+      hasCadence,
+      avgCadence,
+      hasPower,
+      avgPower,
     };
   }, [track, maxHR, units]);
 
@@ -235,7 +252,58 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           </CardContent>
         </Card>
 
-        {/* HR Zones */}
+        {/* Cadence Over Time */}
+        {analysis.hasCadence && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-chart-4" /> Cadence
+              </CardTitle>
+              <CardDescription className="text-xs">
+                RPM over time{analysis.avgCadence ? ` · Avg ${analysis.avgCadence} rpm` : ""}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  {analysis.avgCadence && <ReferenceLine y={analysis.avgCadence} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Avg ${analysis.avgCadence}`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />}
+                  <Area type="monotone" dataKey="cadence" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={1.5} name="Cadence (rpm)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Power Over Time */}
+        {analysis.hasPower && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-chart-5" /> Power
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Watts over time{analysis.avgPower ? ` · Avg ${analysis.avgPower} W` : ""}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  {analysis.avgPower && <ReferenceLine y={analysis.avgPower} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Avg ${analysis.avgPower}W`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />}
+                  <Area type="monotone" dataKey="power" stroke="hsl(var(--chart-5))" fill="hsl(var(--chart-5))" fillOpacity={0.15} strokeWidth={1.5} name="Power (W)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
