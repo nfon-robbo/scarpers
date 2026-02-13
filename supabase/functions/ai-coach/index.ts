@@ -42,22 +42,45 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // When AI decides the race date, fetch ALL activities for full fitness picture
-    // Otherwise fetch last 56 days for the 4-week plan
+    // For plan-review: fetch the current plan's ID and only use linked activities
+    // For AI-decide: fetch ALL activities for full fitness picture
+    // Otherwise: fetch last 56 days for the 4-week plan
     const isAIDecide = race_date === "ai-recommend";
+    const isPlanReview = type === "plan-review";
+
     let activitiesQuery = supabase
       .from("activities")
       .select("*")
       .eq("user_id", user.id)
       .order("start_time", { ascending: false });
 
-    if (!isAIDecide) {
+    if (isPlanReview) {
+      // Get the user's current plan ID to filter linked activities
+      const { data: currentPlanData } = await supabase
+        .from("training_plans")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (currentPlanData) {
+        activitiesQuery = activitiesQuery.eq("training_plan_id", currentPlanData.id);
+      }
+    } else if (!isAIDecide) {
       const since = new Date();
       since.setDate(since.getDate() - 56);
       activitiesQuery = activitiesQuery.gte("start_time", since.toISOString());
     }
 
     const { data: activities } = await activitiesQuery;
+
+    if (isPlanReview && (!activities || activities.length === 0)) {
+      return new Response(
+        JSON.stringify({ error: "No activities linked to your plan. Go to Activities and tick the 'Plan' checkbox on workouts you've completed for this plan." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!activities || activities.length === 0) {
       return new Response(
