@@ -43,6 +43,7 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Using athlete ID: ${INTERVALS_ATHLETE_ID}, key length: ${INTERVALS_API_KEY.length}`);
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
     const results: Array<{ date: string; name: string; success: boolean; error?: string }> = [];
 
