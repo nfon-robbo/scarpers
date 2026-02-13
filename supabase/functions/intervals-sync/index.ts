@@ -157,6 +157,7 @@ serve(async (req) => {
           lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         } else if (s.intensity === "Cooldown") {
+          lines.push("");  // blank line before new section
           lines.push("Cooldown");
           lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
@@ -183,6 +184,7 @@ serve(async (req) => {
           }
 
           if (reps > 1) {
+            lines.push("");  // blank line before repeat block
             lines.push(`${reps}x`);
             lines.push(`- ${fmtDur(workDur)} ${workZone}`);
             if (restDur > 0) lines.push(`- ${fmtDur(restDur)} ${restZone}`);
