@@ -462,106 +462,106 @@ const TrainingPlanPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-primary" />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
             Training Plan
           </h1>
-          <p className="text-muted-foreground mt-1">
-            {letAIDecide
-              ? "Full fitness assessment + complete plan to race day"
-              : "Season strategy + detailed 4-week periodized plan"
-            }
-          </p>
-        </div>
-        <div className="flex gap-2">
           {content && !loading && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Sync to intervals.icu
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh on intervals.icu
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDeleteFromIntervals} disabled={syncing}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete from intervals.icu
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExportIcs}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export calendar (.ics)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  New Plan
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Plan
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {letAIDecide
+            ? "Full fitness assessment + complete plan to race day"
+            : "Season strategy + detailed 4-week periodized plan"
+          }
+        </p>
+        {content && !loading && (
+          <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing}>
+            {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
+            {reviewing ? "Reviewing..." : "Review Progress"}
+          </Button>
+        )}
+      </div>
+      {content && !loading && (
+        <>
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete training plan?</AlertDialogTitle>
+                <AlertDialogDescription>This will permanently delete your current training plan. This action cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { deletePlan(); setShowDeleteDialog(false); }}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog open={showNewPlanDialog} onOpenChange={setShowNewPlanDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Start a new plan?</AlertDialogTitle>
+                <AlertDialogDescription>This will discard your current plan and take you back to the configuration screen. Your saved plan will still be in the database until you generate a new one.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { setContent(""); setSavedPlanId(null); setShowNewPlanDialog(false); }}>Continue</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
+      {(showConfig || loading) && (
+        <Button onClick={generatePlan} disabled={loading} size="lg" className="w-full sm:w-auto">
+          {loading ? (
             <>
-              <Button variant="default" size="sm" onClick={reviewProgress} disabled={syncing || reviewing}>
-                {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
-                {reviewing ? "Reviewing..." : "Review Progress"}
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <MoreVertical className="w-4 h-4 mr-2" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Sync to intervals.icu
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleSyncToIntervals(true)} disabled={syncing}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Refresh on intervals.icu
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDeleteFromIntervals} disabled={syncing}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete from intervals.icu
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportIcs}>
-                    <FileDown className="w-4 h-4 mr-2" />
-                    Export calendar (.ics)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    New Plan
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Plan
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete training plan?</AlertDialogTitle>
-                    <AlertDialogDescription>This will permanently delete your current training plan. This action cannot be undone.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { deletePlan(); setShowDeleteDialog(false); }}>Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              <AlertDialog open={showNewPlanDialog} onOpenChange={setShowNewPlanDialog}>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Start a new plan?</AlertDialogTitle>
-                    <AlertDialogDescription>This will discard your current plan and take you back to the configuration screen. Your saved plan will still be in the database until you generate a new one.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => { setContent(""); setSavedPlanId(null); setShowNewPlanDialog(false); }}>Continue</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <Calendar className="w-4 h-4 mr-2" />
+              Generate Plan
             </>
           )}
-          {(showConfig || loading) && (
-            <Button onClick={generatePlan} disabled={loading} size="lg">
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Generate Plan
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
+        </Button>
+      )}
 
       {showConfig && (
         <>
@@ -681,7 +681,7 @@ const TrainingPlanPage = () => {
 
       {(content || loading) && (<>
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {content ? (
               <MarkdownRenderer content={content} />
             ) : (
