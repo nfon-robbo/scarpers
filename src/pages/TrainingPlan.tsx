@@ -363,7 +363,10 @@ const TrainingPlanPage = () => {
             Training Plan
           </h1>
           <p className="text-muted-foreground mt-1">
-            Season strategy + detailed 4-week periodized plan
+            {letAIDecide
+              ? "Full fitness assessment + complete plan to race day"
+              : "Season strategy + detailed 4-week periodized plan"
+            }
           </p>
         </div>
         <div className="flex gap-2">
