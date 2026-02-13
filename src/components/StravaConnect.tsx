@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2, Unlink, Trash2 } from "lucide-react";
 
 const StravaConnect = () => {
@@ -14,6 +16,13 @@ const StravaConnect = () => {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [importTypes, setImportTypes] = useState<Record<string, boolean>>({
+    Run: true,
+    Walk: true,
+    Ride: false,
+    Swim: false,
+    Hike: false,
+  });
 
   const checkStatus = useCallback(async () => {
     if (!session?.access_token) return;
@@ -96,7 +105,7 @@ const StravaConnect = () => {
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ page, per_page: 50 }),
+            body: JSON.stringify({ page, per_page: 50, activity_types: Object.keys(importTypes).filter(k => importTypes[k]) }),
           }
         );
 
@@ -152,8 +161,20 @@ const StravaConnect = () => {
       <CardContent className="space-y-4">
         {connected ? (
           <>
-            <div className="flex gap-3">
-              <Button onClick={handleImport} disabled={importing}>
+            <div className="flex flex-wrap gap-4">
+              {Object.entries(importTypes).map(([type, checked]) => (
+                <div key={type} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`strava-${type}`}
+                    checked={checked}
+                    onCheckedChange={(v) => setImportTypes(prev => ({ ...prev, [type]: !!v }))}
+                  />
+                  <Label htmlFor={`strava-${type}`} className="text-sm cursor-pointer">{type}s</Label>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleImport} disabled={importing || !Object.values(importTypes).some(Boolean)}>
                 {importing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {importing ? "Importing..." : "Import Activities"}
               </Button>
