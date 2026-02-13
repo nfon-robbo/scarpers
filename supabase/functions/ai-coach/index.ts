@@ -228,6 +228,8 @@ Create a macro-cycle plan with:
 ## 📋 ${isAIDecide ? 'Complete' : '4-Week'} Training Plan
 ${planLengthInstruction}
 
+CRITICAL FORMAT RULE: EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
+
 For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
 ### Week 1: [Theme]
@@ -238,7 +240,7 @@ For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date fo
 | Main | 3 x 1km | 5:30/km | Z4 | 90s jog recovery |
 | Cool-down | 10 min | easy pace | Z1 | |
 
-Continue for all weeks with actual dates.
+EVERY workout in EVERY week must follow this exact table format. Continue for all weeks with actual dates.
 
 Include:
 - Progression across weeks (build weeks + recovery week pattern)

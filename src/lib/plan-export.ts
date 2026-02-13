@@ -73,6 +73,10 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
         if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern))) {
           break;
         }
+        // Also break on week headers
+        if (i > startLine + 1 && /^###\s+Week\s+\d/i.test(lines[i])) {
+          break;
+        }
 
         // Detect table header row with "Segment" column
         if (lines[i].includes("|") && /segment/i.test(lines[i])) {
@@ -98,6 +102,28 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
           continue;
         }
         i++;
+      }
+
+      // Fallback: if no table segments found, try to parse compact format from the title line
+      // e.g. "Easy Run (30 min) @ Z2" or "Intervals: 6 x 400m @ 7:15/km (Z4). 90s walk recovery."
+      if (segments.length === 0 && title) {
+        const durationMatch = title.match(/\((\d+\s*min)\)/i) || title.match(/(\d+\s*min)/i);
+        const zoneMatch = title.match(/Z(\d)/i);
+        if (durationMatch) {
+          const dur = durationMatch[1];
+          const zone = zoneMatch ? `Z${zoneMatch[1]}` : "Z2";
+          // Check for interval pattern
+          const intervalMatch = title.match(/(\d+)\s*x\s*([\d.]+\s*(?:m|km|min|sec)\b)/i);
+          if (intervalMatch) {
+            segments.push({ segment: "Warm-up", duration: "10 min", target: "easy", hrZone: "Z1", notes: "" });
+            segments.push({ segment: "Main", duration: `${intervalMatch[1]} x ${intervalMatch[2]}`, target: "", hrZone: zone, notes: "" });
+            segments.push({ segment: "Cool-down", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
+          } else {
+            segments.push({ segment: "Warm-up", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
+            segments.push({ segment: "Main", duration: dur, target: "", hrZone: zone, notes: "" });
+            segments.push({ segment: "Cool-down", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
+          }
+        }
       }
 
       // Capture raw text
