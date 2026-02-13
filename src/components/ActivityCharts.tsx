@@ -263,7 +263,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       </div>
 
       {/* Km Splits */}
-      {analysis.splits.length > 0 && (
+      {analysis.splits.length >= 2 ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
@@ -314,7 +314,13 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : analysis.splits.length > 0 ? (
+        <Card>
+          <CardContent className="py-6 text-center text-sm text-muted-foreground">
+            Full {units.distance === "mi" ? "mile" : "kilometer"} wasn't completed — no split data to show.
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 };
