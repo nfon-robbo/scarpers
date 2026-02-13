@@ -212,7 +212,7 @@ const TrainingPlanPage = () => {
             <>
               <Button variant="outline" size="sm" onClick={handleExportFit}>
                 <Download className="w-4 h-4 mr-2" />
-                Export for TrainingPeaks
+                Export for TrainingPeaks (.tcx)
               </Button>
               <Button variant="outline" size="sm" onClick={handleExportIcs}>
                 <FileDown className="w-4 h-4 mr-2" />
@@ -395,8 +395,8 @@ const TrainingPlanPage = () => {
           {showSyncInstructions && (
             <CardContent className="pt-0 px-4 pb-4">
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                <li>Click <strong className="text-foreground">Export for TrainingPeaks</strong> above to download a ZIP of .FIT workout files</li>
-                <li>Open <a href="https://www.trainingpeaks.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">TrainingPeaks</a> and import the .FIT files into your calendar</li>
+                <li>Click <strong className="text-foreground">Export for TrainingPeaks (.tcx)</strong> above to download a ZIP of .TCX workout files</li>
+                <li>Open <a href="https://www.trainingpeaks.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">TrainingPeaks</a> and import the .TCX files into your calendar</li>
                 <li>Open the <strong className="text-foreground">Zepp app</strong> on your phone</li>
                 <li>Go to <strong className="text-foreground">Profile → 3rd-Party Account Linking → TrainingPeaks</strong></li>
                 <li>Connect your TrainingPeaks account — workouts will automatically sync to your Amazfit watch</li>
