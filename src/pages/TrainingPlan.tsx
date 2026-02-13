@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,8 @@ const TrainingPlanPage = () => {
   const { toast } = useToast();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hasRun, setHasRun] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
@@ -40,6 +41,74 @@ const TrainingPlanPage = () => {
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
   const [letAIDecide, setLetAIDecide] = useState(false);
+
+  // Load existing plan on mount
+  const loadSavedPlan = useCallback(async () => {
+    if (!user) { setInitialLoading(false); return; }
+    try {
+      const { data } = await supabase
+        .from("training_plans")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        setContent(data.content);
+        setSavedPlanId(data.id);
+        setRaceDistance(data.race_distance);
+        setTrainingDays(data.training_days);
+        setStartDate(new Date(data.start_date));
+        if (data.race_date && data.race_date !== "ai-recommend") {
+          setRaceDate(new Date(data.race_date));
+        } else if (data.race_date === "ai-recommend") {
+          setLetAIDecide(true);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load plan:", e);
+    } finally {
+      setInitialLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => { loadSavedPlan(); }, [loadSavedPlan]);
+
+  const savePlan = async (planContent: string) => {
+    if (!user) return;
+    const raceDateValue = letAIDecide ? "ai-recommend" : raceDate?.toISOString().split("T")[0] || null;
+
+    // Delete old plan, insert new one
+    if (savedPlanId) {
+      await supabase.from("training_plans").delete().eq("id", savedPlanId);
+    }
+
+    const { data, error } = await supabase
+      .from("training_plans")
+      .insert({
+        user_id: user.id,
+        race_distance: raceDistance,
+        training_days: trainingDays,
+        start_date: startDate.toISOString().split("T")[0],
+        race_date: raceDateValue,
+        content: planContent,
+      })
+      .select("id")
+      .single();
+
+    if (!error && data) {
+      setSavedPlanId(data.id);
+    }
+  };
+
+  const deletePlan = async () => {
+    if (!savedPlanId) return;
+    await supabase.from("training_plans").delete().eq("id", savedPlanId);
+    setSavedPlanId(null);
+    setContent("");
+    toast({ title: "Plan deleted" });
+  };
 
   const toggleDay = (day: string) => {
     setTrainingDays((prev) =>
@@ -59,7 +128,6 @@ const TrainingPlanPage = () => {
     }
     setLoading(true);
     setContent("");
-    setHasRun(true);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -80,13 +148,27 @@ const TrainingPlanPage = () => {
         accumulated += text;
         setContent(accumulated);
       },
-      onDone: () => setLoading(false),
+      onDone: () => {
+        setLoading(false);
+        savePlan(accumulated);
+        toast({ title: "Plan saved", description: "Your training plan has been saved." });
+      },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
         setLoading(false);
       },
     });
   };
+
+  const showConfig = !content && !loading;
+
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -100,27 +182,38 @@ const TrainingPlanPage = () => {
             Season strategy + detailed 4-week periodized plan
           </p>
         </div>
-        <Button onClick={generatePlan} disabled={loading} size="lg">
-          {loading ? (
+        <div className="flex gap-2">
+          {content && !loading && (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : hasRun ? (
-            <>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Regenerate
-            </>
-          ) : (
-            <>
-              <Calendar className="w-4 h-4 mr-2" />
-              Generate Plan
+              <Button variant="outline" onClick={deletePlan}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+              <Button variant="outline" onClick={() => { setContent(""); setSavedPlanId(null); }}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                New Plan
+              </Button>
             </>
           )}
-        </Button>
+          {(showConfig || loading) && (
+            <Button onClick={generatePlan} disabled={loading} size="lg">
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Generate Plan
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {!hasRun && !loading && (
+      {showConfig && (
         <>
           <Card>
             <CardContent className="p-5 space-y-5">

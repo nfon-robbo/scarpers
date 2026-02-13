@@ -237,6 +237,39 @@ export type Database = {
         }
         Relationships: []
       }
+      training_plans: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          race_date: string | null
+          race_distance: string
+          start_date: string
+          training_days: string[]
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          race_date?: string | null
+          race_distance: string
+          start_date: string
+          training_days: string[]
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          race_date?: string | null
+          race_distance?: string
+          start_date?: string
+          training_days?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       uploads: {
         Row: {
           created_at: string
