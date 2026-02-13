@@ -47,7 +47,72 @@ async function refreshTokenIfNeeded(
   return data.access_token;
 }
 
-function mapStravaActivity(sa: any) {
+async function fetchStreams(activityId: number, accessToken: string) {
+  const streamTypes = "time,latlng,heartrate,altitude,velocity_smooth,watts,cadence,temp";
+  const url = `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=${streamTypes}&key_type=time`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    // 404 means no streams available (e.g. manual activity)
+    if (res.status === 404) return null;
+    // Rate limited — wait and retry once
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "15", 10);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      const retry = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!retry.ok) return null;
+      return await retry.json();
+    }
+    console.error(`Streams fetch failed for ${activityId}: ${res.status}`);
+    return null;
+  }
+
+  return await res.json();
+}
+
+function buildGpsTrack(streams: any[]) {
+  const timeStream = streams.find((s: any) => s.type === "time");
+  const latlngStream = streams.find((s: any) => s.type === "latlng");
+  const hrStream = streams.find((s: any) => s.type === "heartrate");
+  const altStream = streams.find((s: any) => s.type === "altitude");
+  const speedStream = streams.find((s: any) => s.type === "velocity_smooth");
+  const powerStream = streams.find((s: any) => s.type === "watts");
+  const cadenceStream = streams.find((s: any) => s.type === "cadence");
+  const tempStream = streams.find((s: any) => s.type === "temp");
+
+  if (!timeStream) return null;
+
+  const len = timeStream.data.length;
+  const track: any[] = [];
+
+  for (let i = 0; i < len; i++) {
+    const point: any = {
+      elapsed_time: timeStream.data[i],
+    };
+
+    if (latlngStream?.data[i]) {
+      point.lat = latlngStream.data[i][0];
+      point.lon = latlngStream.data[i][1];
+    }
+    if (hrStream?.data[i] != null) point.heart_rate = hrStream.data[i];
+    if (altStream?.data[i] != null) point.altitude = altStream.data[i];
+    if (speedStream?.data[i] != null) point.speed = speedStream.data[i] * 3.6; // m/s → km/h
+    if (powerStream?.data[i] != null) point.power = powerStream.data[i];
+    if (cadenceStream?.data[i] != null) point.cadence = cadenceStream.data[i];
+    if (tempStream?.data[i] != null) point.temperature = tempStream.data[i];
+
+    track.push(point);
+  }
+
+  return track;
+}
+
+function mapStravaActivity(sa: any, gpsTrack: any[] | null) {
   const sportMap: Record<string, string> = {
     Run: "running",
     Ride: "cycling",
@@ -66,7 +131,7 @@ function mapStravaActivity(sa: any) {
     distance_meters: sa.distance,
     avg_heart_rate: sa.average_heartrate || null,
     max_heart_rate: sa.max_heartrate || null,
-    avg_speed: sa.average_speed ? sa.average_speed * 3.6 : null, // m/s → km/h
+    avg_speed: sa.average_speed ? sa.average_speed * 3.6 : null,
     max_speed: sa.max_speed ? sa.max_speed * 3.6 : null,
     avg_power: sa.average_watts || null,
     max_power: sa.max_watts || null,
@@ -86,6 +151,7 @@ function mapStravaActivity(sa: any) {
       start_latlng: sa.start_latlng,
       end_latlng: sa.end_latlng,
       map_polyline: sa.map?.summary_polyline || null,
+      gps_track: gpsTrack,
     },
   };
 }
@@ -132,13 +198,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const accessToken = await refreshTokenIfNeeded(supabase, user.id, tokens);
+    let accessToken = await refreshTokenIfNeeded(supabase, user.id, tokens);
 
     // Get request params
     const body = await req.json().catch(() => ({}));
     const page = body.page || 1;
-    const perPage = body.per_page || 50;
-    const after = body.after; // unix timestamp
+    const perPage = body.per_page || 30; // Reduced to allow time for stream fetches
+    const after = body.after;
 
     // Fetch activities from Strava
     let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
@@ -162,7 +228,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check for duplicates by source_file
+    // Check for duplicates
     const stravaIds = stravaActivities.map((a: any) => `strava:${a.id}`);
     const { data: existing } = await supabase
       .from("activities")
@@ -175,7 +241,7 @@ Deno.serve(async (req) => {
       (a: any) => !existingSet.has(`strava:${a.id}`)
     );
 
-    // Create upload record
+    // Create upload record and fetch streams + insert one by one
     let uploadId: string | null = null;
     if (newActivities.length > 0) {
       const { data: upload } = await supabase
@@ -192,19 +258,31 @@ Deno.serve(async (req) => {
 
       uploadId = upload?.id;
 
-      // Insert in batches
-      const batchSize = 50;
-      for (let i = 0; i < newActivities.length; i += batchSize) {
-        const batch = newActivities.slice(i, i + batchSize).map((a: any) => ({
+      // Process each activity: fetch streams then insert
+      for (const sa of newActivities) {
+        let gpsTrack: any[] | null = null;
+        try {
+          const streams = await fetchStreams(sa.id, accessToken);
+          if (streams && Array.isArray(streams)) {
+            gpsTrack = buildGpsTrack(streams);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch streams for ${sa.id}:`, e);
+        }
+
+        const mapped = mapStravaActivity(sa, gpsTrack);
+        const { error: insertErr } = await supabase.from("activities").insert({
           user_id: user.id,
           upload_id: uploadId,
-          ...mapStravaActivity(a),
-        }));
-        const { error: insertErr } = await supabase.from("activities").insert(batch);
+          ...mapped,
+        });
+
         if (insertErr) {
-          console.error("Insert error:", insertErr);
-          throw new Error(`Failed to insert activities: ${insertErr.message}`);
+          console.error(`Insert error for ${sa.id}:`, insertErr);
         }
+
+        // Small delay to respect Strava rate limits (100 requests per 15 min)
+        await new Promise((r) => setTimeout(r, 200));
       }
     }
 
