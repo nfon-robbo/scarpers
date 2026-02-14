@@ -206,6 +206,11 @@ export type Database = {
           onboarding_completed: boolean
           primary_sport: string | null
           training_goals: string | null
+          unit_distance: string
+          unit_elevation: string
+          unit_speed: string
+          unit_temperature: string
+          unit_weight: string
           updated_at: string
           user_id: string
         }
@@ -218,6 +223,11 @@ export type Database = {
           onboarding_completed?: boolean
           primary_sport?: string | null
           training_goals?: string | null
+          unit_distance?: string
+          unit_elevation?: string
+          unit_speed?: string
+          unit_temperature?: string
+          unit_weight?: string
           updated_at?: string
           user_id: string
         }
@@ -230,6 +240,11 @@ export type Database = {
           onboarding_completed?: boolean
           primary_sport?: string | null
           training_goals?: string | null
+          unit_distance?: string
+          unit_elevation?: string
+          unit_speed?: string
+          unit_temperature?: string
+          unit_weight?: string
           updated_at?: string
           user_id?: string
         }
