@@ -119,13 +119,10 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Create new workouts
-    const results: Array<{ date: string; name: string; success: boolean; error?: string }> = [];
-
-    for (const workout of workouts) {
-      const totalDuration = workout.steps.reduce((sum: number, s: { duration: number }) => sum + s.duration, 0);
-
-      // Convert bpm to HR zone — needed for intervals.icu to create structured steps
+    // Step 2: Build bulk events using the recommended bulk upsert endpoint
+    // The "description" field accepts native Intervals.icu workout text
+    const bulkEvents = workouts.map((workout, idx) => {
+      // Convert bpm to HR zone
       function bpmToZone(hrLow: number): string {
         if (hrLow >= 175) return "Z5 HR";
         if (hrLow >= 160) return "Z4 HR";
@@ -134,7 +131,6 @@ serve(async (req) => {
         return "Z1 HR";
       }
 
-      // Format duration for intervals.icu
       function fmtDur(secs: number): string {
         const m = Math.floor(secs / 60);
         const s = secs % 60;
@@ -143,7 +139,7 @@ serve(async (req) => {
         return `${s}s`;
       }
 
-      // Build workout text with HR zones (required for structured chart/watch alerts)
+      // Build workout text with HR zones for structured parsing
       const steps = workout.steps;
       const lines: string[] = [];
       let i = 0;
@@ -157,12 +153,11 @@ serve(async (req) => {
           lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         } else if (s.intensity === "Cooldown") {
-          lines.push("");  // blank line before new section
+          lines.push("");
           lines.push("Cooldown");
           lines.push(`- ${fmtDur(s.duration)} ${zone}`);
           i++;
         } else if (s.intensity === "Interval") {
-          // Count consecutive Interval/Recovery pairs for repeat syntax
           let reps = 0;
           let j = i;
           const workDur = s.duration;
@@ -184,7 +179,7 @@ serve(async (req) => {
           }
 
           if (reps > 1) {
-            lines.push("");  // blank line before repeat block
+            lines.push("");
             lines.push(`${reps}x`);
             lines.push(`- ${fmtDur(workDur)} ${workZone}`);
             if (restDur > 0) lines.push(`- ${fmtDur(restDur)} ${restZone}`);
@@ -200,42 +195,41 @@ serve(async (req) => {
       }
 
       const workoutText = lines.join("\n");
+      const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
 
-      const payload = {
-        start_date_local: `${workout.date}T00:00:00`,
+      return {
         category: "WORKOUT",
+        start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
-        description: workout.description || workout.name,
         type: "Run",
         moving_time: totalDuration,
-        workout_definition: workoutText,
+        description: workoutText,
+        external_id: `lovable-${workout.date}-${idx}`,
       };
+    });
 
-      try {
-        const resp = await fetch(`${baseUrl}/events`, {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
+    // Use bulk upsert endpoint for reliability
+    console.log(`Syncing ${bulkEvents.length} workouts via bulk endpoint`);
+    const resp = await fetch(`${baseUrl}/events/bulk?upsert=true`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify(bulkEvents),
+    });
 
-        if (resp.ok) {
-          results.push({ date: workout.date, name: workout.name, success: true });
-        } else {
-          const errText = await resp.text();
-          console.error(`intervals.icu error for ${workout.date}:`, resp.status, errText);
-          results.push({ date: workout.date, name: workout.name, success: false, error: `${resp.status}: ${errText}` });
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Unknown error";
-        results.push({ date: workout.date, name: workout.name, success: false, error: msg });
-      }
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Bulk sync error:", resp.status, errText);
+      return new Response(
+        JSON.stringify({ error: `Intervals.icu API error: ${resp.status} ${errText}`, succeeded: 0, failed: bulkEvents.length }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const succeeded = results.filter((r) => r.success).length;
-    const failed = results.filter((r) => !r.success).length;
+    const result = await resp.json();
+    console.log(`Bulk sync result: ${result.length} events created/updated`);
 
     return new Response(
-      JSON.stringify({ succeeded, failed, results }),
+      JSON.stringify({ succeeded: result.length, failed: 0, results: result.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
