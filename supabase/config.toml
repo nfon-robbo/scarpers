@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.google-fit-sleep]
 verify_jwt = false
+
+[functions.sleep-insight]
+verify_jwt = false

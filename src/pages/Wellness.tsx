@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import SleepStagesChart from "@/components/SleepStagesChart";
+import SleepCalendar from "@/components/SleepCalendar";
 interface MetricsRow {
   date: string;
   sleep_score: number | null;
@@ -171,7 +172,8 @@ const WellnessPage = () => {
             </div>
           )}
 
-          {/* Sleep Stages from Google Fit */}
+          {/* Sleep Score Calendar & Stages */}
+          <SleepCalendar />
           <SleepStagesChart />
 
 
