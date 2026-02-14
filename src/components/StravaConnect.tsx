@@ -105,7 +105,7 @@ const StravaConnect = () => {
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ page, per_page: 50, after: 1735689600, activity_types: Object.keys(importTypes).filter(k => importTypes[k]) }),
+            body: JSON.stringify({ page, per_page: 50, after: 1735689600 }),
           }
         );
 
