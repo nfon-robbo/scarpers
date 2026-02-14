@@ -1,86 +1,58 @@
 
 
-# TrainingPeaks Export for Amazfit Balance 2
+# Auto-Sync Settings with Custom Schedule Times
 
 ## Overview
+Add an "Auto-Sync" configuration card to the Settings page where users can enable/disable automatic syncing for each data source (Strava, Intervals.icu, Google Fit) and customize the schedule times.
 
-The Amazfit Balance 2 / Zepp app supports syncing structured workouts FROM TrainingPeaks. The flow is:
+## What You'll See
 
-1. Your app generates the training plan
-2. You export individual workouts as `.FIT` workout files
-3. Import the `.FIT` files into TrainingPeaks (via their calendar)
-4. TrainingPeaks syncs the structured workouts to your Zepp app, which pushes them to your Balance 2
-
-This means each workout's segments (warm-up, intervals, cool-down) with HR zones and durations will appear as executable structured workouts on your watch.
-
-## What You'll Get
-
-- **"Export for TrainingPeaks" button** -- downloads a ZIP of `.FIT` workout files (one per workout day)
-- **"Download Calendar (.ics)" button** -- for calendar reminders with workout details
-- **"Copy for Zepp" button** per workout -- for manual entry fallback
-- **Setup instructions** card explaining how to link TrainingPeaks to Zepp
-
-## How It Works
-
-```text
-+------------------+     +----------------+     +----------+     +-------------+
-| Training Plan    | --> | .FIT Workout   | --> | Training | --> | Zepp App /  |
-| (AI Generated)   |     | Files (ZIP)    |     | Peaks    |     | Balance 2   |
-+------------------+     +----------------+     +----------+     +-------------+
-```
-
-The AI-generated plan already outputs workouts in a structured table format (Segment, Duration, Target, HR Zone). A parser will extract these tables and convert each workout into a FIT workout file with proper workout steps.
+A new **"Auto-Sync Schedule"** card on the Settings page with:
+- Toggle switches to enable/disable auto-sync per source
+- Time/frequency pickers for each source:
+  - **Strava Activities**: frequency selector (every 1h, 2h, 4h, 6h)
+  - **Intervals.icu Wellness**: frequency selector (every 4h, 6h, 12h, 24h)
+  - **Google Fit Sleep**: time-of-day picker (e.g., 7:00 AM, 8:00 AM, 9:00 AM)
+- A "Save & Apply" button to persist the schedule
+- Status indicators showing each source's connection state
 
 ## Technical Details
 
-### New Files
+### 1. Database Migration
+Create a `sync_schedules` table to store per-user preferences:
+- `user_id` (text, references user)
+- `strava_enabled` (boolean, default false)
+- `strava_interval_hours` (integer, default 2)
+- `intervals_enabled` (boolean, default false)
+- `intervals_interval_hours` (integer, default 6)
+- `google_fit_enabled` (boolean, default false)
+- `google_fit_hour_utc` (integer, default 8)
+- RLS policies so users can only read/write their own row
 
-**`src/lib/fit-workout-encoder.ts`**
-- Custom FIT file encoder that builds valid `.FIT` workout files in the browser (no external SDK needed -- the FIT binary format for workouts is simple enough to encode manually)
-- Converts parsed workout segments into FIT workout_step messages with:
-  - Duration targets (time or distance)
-  - HR zone targets (Z1-Z5 mapped to percentage ranges)
-  - Step types (warmup, active, cooldown, rest)
-- Outputs a `Uint8Array` per workout
+### 2. New Edge Function: `auto-sync`
+- A single function that accepts a `type` parameter (`strava`, `intervals-wellness`, `google-fit-sleep`)
+- Queries `sync_schedules` to find users who have that source enabled
+- For each enabled user, runs the appropriate sync logic using the service role key
+- Registered in `config.toml` with `verify_jwt = false` (called by cron, not users)
 
-**`src/lib/plan-export.ts`**
-- Parses the markdown plan content to extract individual workouts
-- Detects workout headings (bold date + workout type pattern)
-- Extracts segment tables (Duration, Target, HR Zone)
-- Generates:
-  - Individual `.FIT` workout files via the encoder
-  - A `.zip` bundle of all workout FIT files (using existing JSZip dependency)
-  - An `.ics` calendar file with workout descriptions
-  - Clipboard-friendly text for manual Zepp entry
+### 3. Database Cron Jobs (pg_cron + pg_net)
+- Enable `pg_cron` and `pg_net` extensions via migration
+- Create three cron entries that call the `auto-sync` function on a fixed base schedule (e.g., hourly)
+- The edge function itself checks each user's configured frequency/time preferences to decide whether to actually sync
 
-### Modified Files
+### 4. Settings Page Updates (`src/pages/Settings.tsx`)
+- New card: "Auto-Sync Schedule" with:
+  - Three rows (Strava, Intervals.icu, Google Fit), each with a Switch toggle and a Select dropdown for frequency/time
+  - Checks connection status (whether tokens exist in `strava_tokens`, `google_fit_tokens`, or Intervals.icu secrets are set) and shows "Not connected" badge if unavailable
+  - Save button that upserts the user's row in `sync_schedules`
+  - Info text explaining syncs happen automatically in the background
 
-**`src/pages/TrainingPlan.tsx`**
-- Add export buttons in the action bar when a plan is displayed:
-  - "Export for TrainingPeaks" (downloads ZIP of .FIT files)
-  - "Download Calendar" (downloads .ics file)
-- Add a collapsible "How to sync to your watch" instructions card
-
-**`src/components/MarkdownRenderer.tsx`**
-- Add a small "Copy for Zepp" clipboard button next to each detected workout heading
-- When clicked, formats that workout's segments for easy manual entry
-
-### FIT Workout File Structure
-
-Each `.FIT` workout file will contain:
-- File ID message (type: workout)
-- Workout message (name, number of steps)
-- Workout Step messages for each segment:
-  - Warm-up: duration in seconds, HR zone target
-  - Main intervals: duration/distance, pace/HR target, with repeat steps
-  - Cool-down: duration in seconds, HR zone target
-
-### TrainingPeaks Sync Instructions
-
-A help card will explain:
-1. Open the Zepp app on your phone
-2. Go to Profile > 3rd-Party Account Linking > TrainingPeaks (via Terra)
-3. Connect your TrainingPeaks account
-4. Import the downloaded `.FIT` workout files into TrainingPeaks calendar
-5. Workouts will automatically sync to your Balance 2
+### 5. File Changes Summary
+| File | Change |
+|------|--------|
+| Migration SQL | Create `sync_schedules` table with RLS |
+| Migration SQL | Enable `pg_cron`, `pg_net`, create 3 cron jobs |
+| `supabase/functions/auto-sync/index.ts` | New edge function orchestrating syncs per user |
+| `supabase/config.toml` | Add `[functions.auto-sync]` with `verify_jwt = false` |
+| `src/pages/Settings.tsx` | Add Auto-Sync Schedule card with toggles and time pickers |
 
