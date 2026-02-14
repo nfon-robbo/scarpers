@@ -32,7 +32,8 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text } = await req.json();
+    const reqBody = await req.json();
+    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages } = reqBody;
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust"
 
     // Fetch user profile
@@ -148,7 +149,26 @@ ${metricsContext}`;
 
     const isPlanAdjust = type === "plan-adjust";
 
-    if (type === "analysis") {
+    if (type === "chat") {
+      // chatMessages already parsed above from the original req.json(), so re-read from body params
+      systemPrompt = `You are an elite endurance coach AI assistant. You have deep knowledge of training science, nutrition, recovery, and race preparation.
+
+You have access to the athlete's complete training data. Use it to give personalized, data-driven answers.
+
+When answering:
+- Reference specific data points from their activities (dates, distances, paces, heart rates)
+- Be practical and actionable
+- If asked about nutrition, hydration, or recovery, tailor advice to their training load and upcoming sessions
+- If asked about their plan, reference their actual performance trends
+- Keep answers concise but thorough
+- Use markdown formatting with emoji headers for readability
+
+${athleteContext}
+
+${dataContext}`;
+
+      userPrompt = chatMessages || "Hello, I'd like some coaching advice.";
+    } else if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
 Your analysis must cover these domains in separate sections:
