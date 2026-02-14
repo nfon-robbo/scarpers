@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Sunrise, Moon, Activity, Heart, Brain, BatteryCharging, AlertTriangle, CheckCircle } from "lucide-react";
+import { Zap, Activity, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare } from "lucide-react";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
 
 interface ReadinessData {
@@ -16,7 +16,7 @@ interface ReadinessData {
   rhrBaseline: number | null;
   hrv: number | null;
   hrvBaseline: number | null;
-  yesterdayLoad: number | null; // minutes
+  yesterdayLoad: number | null;
   stressScore: number | null;
 }
 
@@ -25,7 +25,6 @@ function computeReadiness(d: ReadinessData): { score: number; factors: { label: 
   let total = 0;
   let count = 0;
 
-  // Sleep score (0-100 maps directly)
   if (d.sleepScore != null) {
     const s = d.sleepScore;
     total += s;
@@ -38,7 +37,6 @@ function computeReadiness(d: ReadinessData): { score: number; factors: { label: 
     });
   }
 
-  // RHR vs baseline
   if (d.rhr != null && d.rhrBaseline != null) {
     const diff = d.rhr - d.rhrBaseline;
     const rhrScore = diff <= 2 ? 90 : diff <= 5 ? 70 : diff <= 10 ? 50 : 30;
@@ -53,7 +51,6 @@ function computeReadiness(d: ReadinessData): { score: number; factors: { label: 
     factors.push({ label: "Resting HR", status: "good", detail: `${Math.round(d.rhr)} bpm` });
   }
 
-  // HRV vs baseline
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
@@ -67,7 +64,6 @@ function computeReadiness(d: ReadinessData): { score: number; factors: { label: 
     });
   }
 
-  // Yesterday's training load
   if (d.yesterdayLoad != null) {
     const loadScore = d.yesterdayLoad <= 30 ? 90 : d.yesterdayLoad <= 60 ? 75 : d.yesterdayLoad <= 120 ? 55 : 35;
     total += loadScore;
@@ -79,7 +75,6 @@ function computeReadiness(d: ReadinessData): { score: number; factors: { label: 
     });
   }
 
-  // Stress
   if (d.stressScore != null) {
     const stressVal = d.stressScore;
     const stressScore = stressVal <= 25 ? 90 : stressVal <= 50 ? 70 : stressVal <= 75 ? 45 : 25;
@@ -106,6 +101,8 @@ const ReadinessWidget = () => {
   const { user } = useAuth();
   const [data, setData] = useState<ReadinessData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -114,14 +111,12 @@ const ReadinessWidget = () => {
     const baselineStart = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
 
     Promise.all([
-      // Last night's sleep stages
       supabase
         .from("sleep_stages")
         .select("stage, duration_seconds")
         .eq("user_id", user.id)
         .in("date", [today, yesterday])
         .then(({ data }) => data || []),
-      // Today + yesterday metrics
       supabase
         .from("daily_metrics")
         .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds")
@@ -129,7 +124,6 @@ const ReadinessWidget = () => {
         .gte("date", baselineStart)
         .order("date", { ascending: true })
         .then(({ data }) => data || []),
-      // Yesterday's activities
       supabase
         .from("activities")
         .select("duration_seconds, start_time")
@@ -138,7 +132,6 @@ const ReadinessWidget = () => {
         .lt("start_time", today + "T00:00:00Z")
         .then(({ data }) => data || []),
     ]).then(([sleepStages, allMetrics, yesterdayActs]) => {
-      // Calculate sleep score from stages
       const stages: SleepStageData = { deep: 0, light: 0, rem: 0, awake: 0 };
       sleepStages.forEach((s: any) => {
         const key = s.stage?.toLowerCase();
@@ -151,19 +144,16 @@ const ReadinessWidget = () => {
       const hasSleepStages = totalSleep > 0;
       const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
 
-      // Today's metrics (or most recent)
       const todayMetrics = allMetrics.find((m: any) => m.date === today);
       const yesterdayMetrics = allMetrics.find((m: any) => m.date === yesterday);
       const latestMetrics = todayMetrics || yesterdayMetrics;
 
-      // Baselines (30-day avg excluding today)
       const baseline = allMetrics.filter((m: any) => m.date < today);
       const rhrVals = baseline.filter((m: any) => m.resting_heart_rate).map((m: any) => m.resting_heart_rate);
       const hrvVals = baseline.filter((m: any) => m.hrv).map((m: any) => m.hrv);
       const rhrBaseline = rhrVals.length ? rhrVals.reduce((a: number, b: number) => a + b, 0) / rhrVals.length : null;
       const hrvBaseline = hrvVals.length ? hrvVals.reduce((a: number, b: number) => a + b, 0) / hrvVals.length : null;
 
-      // Fallback sleep score from daily_metrics
       const finalSleepScore = sleepScore ?? (latestMetrics as any)?.sleep_score ?? null;
       const sleepDuration = hasSleepStages ? totalSleep : (latestMetrics as any)?.sleep_duration_seconds ?? null;
 
@@ -187,9 +177,51 @@ const ReadinessWidget = () => {
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
+  // Fetch AI advice once we have the readiness result
+  useEffect(() => {
+    if (!result || result.factors.length === 0 || aiAdvice !== null) return;
+    const fetchAdvice = async () => {
+      setAiLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              readiness_score: result.score,
+              factors: result.factors,
+              current_hour_local: new Date().getHours(),
+            }),
+          }
+        );
+
+        if (resp.ok) {
+          const data = await resp.json();
+          setAiAdvice(data.advice);
+        } else {
+          // Silently fail - the widget still works without AI
+          setAiAdvice("");
+        }
+      } catch {
+        setAiAdvice("");
+      } finally {
+        setAiLoading(false);
+      }
+    };
+    fetchAdvice();
+  }, [result]);
+
   if (loading || !result || result.factors.length === 0) return null;
 
-  const readinessLabel = result.score >= 80 ? "Ready to Train" : result.score >= 60 ? "Moderate" : result.score >= 40 ? "Consider Recovery" : "Rest Day Advised";
+  const readinessLabel = result.score >= 80 ? "Locked In" : result.score >= 60 ? "Decent" : result.score >= 40 ? "Rough Day" : "Train Wreck";
   const readinessColor = result.score >= 80 ? "text-primary" : result.score >= 60 ? "text-yellow-500" : "text-destructive";
   const badgeVariant = result.score >= 80 ? "default" : result.score >= 60 ? "secondary" : "destructive";
 
@@ -198,8 +230,8 @@ const ReadinessWidget = () => {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Sunrise className="w-4 h-4 text-primary" />
-            Morning Readiness
+            <Zap className="w-4 h-4 text-primary" />
+            Readiness Now
           </CardTitle>
           <Badge variant={badgeVariant as any}>{readinessLabel}</Badge>
         </div>
@@ -227,18 +259,30 @@ const ReadinessWidget = () => {
           ))}
         </div>
 
-        {/* Recommendation */}
+        {/* AI Coach Advice */}
         <div className="rounded-md bg-muted/50 p-3 text-sm">
-          <p className="font-medium flex items-center gap-1.5">
-            <BatteryCharging className="w-3.5 h-3.5" />
-            {result.score >= 80
-              ? "You're well recovered — go for your planned workout."
-              : result.score >= 60
-              ? "Recovery is moderate — consider reducing intensity by 10-15%."
-              : result.score >= 40
-              ? "Recovery is low — swap for an easy session or active recovery."
-              : "Your body needs rest — take a full rest day or very light movement."}
-          </p>
+          {aiLoading ? (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Coach is thinking of something mean to say...
+            </p>
+          ) : aiAdvice ? (
+            <p className="flex items-start gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+              <span>{aiAdvice}</span>
+            </p>
+          ) : (
+            <p className="font-medium flex items-center gap-1.5">
+              <BatteryCharging className="w-3.5 h-3.5" />
+              {result.score >= 80
+                ? "You're well recovered — go crush it, you beautiful bastard."
+                : result.score >= 60
+                ? "Not your best, not your worst — don't be a hero today."
+                : result.score >= 40
+                ? "Your body is begging for mercy — take it easy, champ."
+                : "For the love of all that is holy, rest. Just rest."}
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

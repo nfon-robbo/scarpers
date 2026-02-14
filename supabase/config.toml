@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.auto-sync]
 verify_jwt = false
+
+[functions.readiness-advice]
+verify_jwt = false
