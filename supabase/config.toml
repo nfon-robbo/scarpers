@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.intervals-sync]
 verify_jwt = false
+
+[functions.google-fit-auth]
+verify_jwt = false
+
+[functions.google-fit-callback]
+verify_jwt = false
+
+[functions.google-fit-sleep]
+verify_jwt = false

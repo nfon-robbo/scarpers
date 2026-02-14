@@ -196,6 +196,36 @@ export type Database = {
           },
         ]
       }
+      google_fit_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: number
+          id: string
+          refresh_token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: number
+          id?: string
+          refresh_token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: number
+          id?: string
+          refresh_token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           athlete_context: string | null
@@ -246,6 +276,42 @@ export type Database = {
           unit_temperature?: string
           unit_weight?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sleep_stages: {
+        Row: {
+          created_at: string
+          date: string
+          duration_seconds: number
+          end_time: string | null
+          id: string
+          source: string | null
+          stage: string
+          start_time: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          duration_seconds?: number
+          end_time?: string | null
+          id?: string
+          source?: string | null
+          stage: string
+          start_time?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          duration_seconds?: number
+          end_time?: string | null
+          id?: string
+          source?: string | null
+          stage?: string
+          start_time?: string | null
           user_id?: string
         }
         Relationships: []

@@ -13,7 +13,8 @@ import {
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
-
+import GoogleFitConnect from "@/components/GoogleFitConnect";
+import SleepStagesChart from "@/components/SleepStagesChart";
 interface MetricsRow {
   date: string;
   sleep_score: number | null;
@@ -406,20 +407,11 @@ const WellnessPage = () => {
             </CardContent>
           </Card>
 
-          {/* Sleep Stages Note */}
-          <Card className="border-dashed">
-            <CardContent className="p-4 flex items-start gap-3">
-              <Brain className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground mb-1">Sleep Stages</p>
-                <p>
-                  Detailed sleep stage breakdown (Deep, Light, REM, Awake) is available when you upload 
-                  FIT monitoring files from your Amazfit/Garmin watch. Intervals.icu syncs overall sleep 
-                  score and duration but not individual sleep stages.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Sleep Stages from Google Fit */}
+          <SleepStagesChart />
+
+          {/* Google Fit Connection */}
+          <GoogleFitConnect />
         </>
       )}
     </div>
