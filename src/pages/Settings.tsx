@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUnits, UnitPreferences } from "@/hooks/useUnits";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnitOption<K extends keyof UnitPreferences> {
@@ -71,11 +73,82 @@ const unitSettings: UnitOption<keyof UnitPreferences>[] = [
   },
 ];
 
+interface SyncSchedule {
+  strava_enabled: boolean;
+  strava_interval_hours: number;
+  intervals_enabled: boolean;
+  intervals_interval_hours: number;
+  google_fit_enabled: boolean;
+  google_fit_hour_utc: number;
+}
+
+const defaultSchedule: SyncSchedule = {
+  strava_enabled: false,
+  strava_interval_hours: 2,
+  intervals_enabled: false,
+  intervals_interval_hours: 6,
+  google_fit_enabled: false,
+  google_fit_hour_utc: 8,
+};
+
 const Settings = () => {
   const { units, setUnit } = useUnits();
   const { user } = useAuth();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+
+  // Auto-sync state
+  const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [stravaConnected, setStravaConnected] = useState(false);
+  const [googleFitConnected, setGoogleFitConnected] = useState(false);
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    // Load schedule and connection status in parallel
+    const load = async () => {
+      const [schedRes, stravaRes, gfRes] = await Promise.all([
+        supabase.from("sync_schedules").select("*").eq("user_id", user.id).maybeSingle(),
+        supabase.from("strava_tokens").select("id").eq("user_id", user.id).maybeSingle(),
+        supabase.from("google_fit_tokens").select("id").eq("user_id", user.id).maybeSingle(),
+      ]);
+      if (schedRes.data) {
+        setSchedule({
+          strava_enabled: schedRes.data.strava_enabled,
+          strava_interval_hours: schedRes.data.strava_interval_hours,
+          intervals_enabled: schedRes.data.intervals_enabled,
+          intervals_interval_hours: schedRes.data.intervals_interval_hours,
+          google_fit_enabled: schedRes.data.google_fit_enabled,
+          google_fit_hour_utc: schedRes.data.google_fit_hour_utc,
+        });
+      }
+      setStravaConnected(!!stravaRes.data);
+      setGoogleFitConnected(!!gfRes.data);
+      setScheduleLoaded(true);
+    };
+    load();
+  }, [user]);
+
+  const saveSchedule = async () => {
+    if (!user) return;
+    setSavingSchedule(true);
+    try {
+      const { data: existing } = await supabase
+        .from("sync_schedules").select("id").eq("user_id", user.id).maybeSingle();
+
+      if (existing) {
+        await supabase.from("sync_schedules").update(schedule).eq("user_id", user.id);
+      } else {
+        await supabase.from("sync_schedules").insert({ user_id: user.id, ...schedule });
+      }
+      toast({ title: "Auto-sync schedule saved" });
+    } catch (e: any) {
+      toast({ title: "Failed to save schedule", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
 
   const syncWellness = async () => {
     if (!user) return;
@@ -119,6 +192,12 @@ const Settings = () => {
     }
   };
 
+  const formatHourUtc = (hour: number) => {
+    const date = new Date();
+    date.setUTCHours(hour, 0, 0, 0);
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -158,6 +237,142 @@ const Settings = () => {
               </Select>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Auto-Sync Schedule Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Timer className="w-5 h-5" />
+            Auto-Sync Schedule
+          </CardTitle>
+          <CardDescription>
+            Enable automatic background syncing for your connected data sources
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Strava */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="mt-0.5">
+                <Switch
+                  checked={schedule.strava_enabled}
+                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, strava_enabled: v }))}
+                  disabled={!stravaConnected}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Strava Activities</p>
+                  {!stravaConnected && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <AlertCircle className="w-3 h-3" /> Not connected
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Import new activities automatically</p>
+              </div>
+            </div>
+            <Select
+              value={String(schedule.strava_interval_hours)}
+              onValueChange={(v) => setSchedule((s) => ({ ...s, strava_interval_hours: Number(v) }))}
+              disabled={!schedule.strava_enabled}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Every 1 hour</SelectItem>
+                <SelectItem value="2">Every 2 hours</SelectItem>
+                <SelectItem value="4">Every 4 hours</SelectItem>
+                <SelectItem value="6">Every 6 hours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Intervals.icu */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="mt-0.5">
+                <Switch
+                  checked={schedule.intervals_enabled}
+                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, intervals_enabled: v }))}
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Intervals.icu Wellness</p>
+                <p className="text-xs text-muted-foreground">Sync HRV, resting HR, steps, weight & more</p>
+              </div>
+            </div>
+            <Select
+              value={String(schedule.intervals_interval_hours)}
+              onValueChange={(v) => setSchedule((s) => ({ ...s, intervals_interval_hours: Number(v) }))}
+              disabled={!schedule.intervals_enabled}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="4">Every 4 hours</SelectItem>
+                <SelectItem value="6">Every 6 hours</SelectItem>
+                <SelectItem value="12">Every 12 hours</SelectItem>
+                <SelectItem value="24">Every 24 hours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Google Fit */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="mt-0.5">
+                <Switch
+                  checked={schedule.google_fit_enabled}
+                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
+                  disabled={!googleFitConnected}
+                />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Google Fit Sleep</p>
+                  {!googleFitConnected && (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <AlertCircle className="w-3 h-3" /> Not connected
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
+              </div>
+            </div>
+            <Select
+              value={String(schedule.google_fit_hour_utc)}
+              onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
+              disabled={!schedule.google_fit_enabled}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Time">
+                  {formatHourUtc(schedule.google_fit_hour_utc)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                  <SelectItem key={h} value={String(h)}>
+                    {formatHourUtc(h)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="pt-2 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Syncs run automatically in the background. You can still trigger manual syncs anytime.
+            </p>
+            <Button onClick={saveSchedule} disabled={savingSchedule} size="sm">
+              {savingSchedule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              {savingSchedule ? "Saving..." : "Save & Apply"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

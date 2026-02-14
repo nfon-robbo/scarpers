@@ -349,6 +349,54 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_schedules: {
+        Row: {
+          created_at: string
+          google_fit_enabled: boolean
+          google_fit_hour_utc: number
+          id: string
+          intervals_enabled: boolean
+          intervals_interval_hours: number
+          last_google_fit_sync: string | null
+          last_intervals_sync: string | null
+          last_strava_sync: string | null
+          strava_enabled: boolean
+          strava_interval_hours: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          google_fit_enabled?: boolean
+          google_fit_hour_utc?: number
+          id?: string
+          intervals_enabled?: boolean
+          intervals_interval_hours?: number
+          last_google_fit_sync?: string | null
+          last_intervals_sync?: string | null
+          last_strava_sync?: string | null
+          strava_enabled?: boolean
+          strava_interval_hours?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          google_fit_enabled?: boolean
+          google_fit_hour_utc?: number
+          id?: string
+          intervals_enabled?: boolean
+          intervals_interval_hours?: number
+          last_google_fit_sync?: string | null
+          last_intervals_sync?: string | null
+          last_strava_sync?: string | null
+          strava_enabled?: boolean
+          strava_interval_hours?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       training_plans: {
         Row: {
           content: string
