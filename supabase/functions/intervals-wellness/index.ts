@@ -75,13 +75,14 @@ serve(async (req) => {
         source_file: "intervals.icu",
       };
 
-      // Sleep: Intervals.icu provides sleepTime in seconds and sleepScore
-      if (w.sleepTime != null) record.sleep_duration_seconds = w.sleepTime;
+      // Sleep: Intervals.icu uses sleepSecs (not sleepTime) and sleepScore
+      if (w.sleepSecs != null) record.sleep_duration_seconds = w.sleepSecs;
       if (w.sleepScore != null) record.sleep_score = w.sleepScore;
       if (w.sleepQuality != null && record.sleep_score == null) record.sleep_score = w.sleepQuality;
 
-      // HRV
+      // HRV: try hrv first, then hrvSDNN as fallback
       if (w.hrv != null) record.hrv = w.hrv;
+      else if (w.hrvSDNN != null) record.hrv = w.hrvSDNN;
 
       // Resting HR
       if (w.restingHR != null) record.resting_heart_rate = w.restingHR;
