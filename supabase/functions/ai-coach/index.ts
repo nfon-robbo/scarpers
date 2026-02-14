@@ -33,8 +33,8 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages } = reqBody;
-    // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust"
+    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout } = reqBody;
+    // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust"
 
     // Fetch user profile
     const { data: profile } = await supabase
@@ -210,7 +210,98 @@ ${sleepContext}`;
 
     const isPlanAdjust = type === "plan-adjust";
 
-    if (type === "chat") {
+    if (type === "day-adjust") {
+      // Fetch last night's sleep for the target date
+      const targetDateStr = target_date || new Date().toISOString().split("T")[0];
+
+      // Get yesterday's activity (fatigue indicator)
+      const yesterday = new Date(targetDateStr);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      
+      const { data: yesterdayActivities } = await supabase
+        .from("activities")
+        .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, training_load")
+        .eq("user_id", user.id)
+        .gte("start_time", yesterdayStr + "T00:00:00")
+        .lt("start_time", targetDateStr + "T00:00:00");
+
+      let yesterdayContext = "";
+      if (yesterdayActivities && yesterdayActivities.length > 0) {
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\n`;
+      }
+
+      // Get today's daily metrics (RHR, HRV, stress)
+      const { data: todayMetrics } = await supabase
+        .from("daily_metrics")
+        .select("resting_heart_rate, hrv, stress_score, steps")
+        .eq("user_id", user.id)
+        .eq("date", targetDateStr)
+        .maybeSingle();
+
+      let metricsToday = "";
+      if (todayMetrics) {
+        metricsToday = `\nTODAY'S METRICS:\nResting HR: ${todayMetrics.resting_heart_rate ? Math.round(todayMetrics.resting_heart_rate) + " bpm" : "N/A"}\nHRV: ${todayMetrics.hrv ? Math.round(todayMetrics.hrv) + " ms" : "N/A"}\nStress: ${todayMetrics.stress_score ?? "N/A"}\n`;
+      }
+
+      systemPrompt = `You are an elite endurance coach making a real-time daily adjustment decision for an athlete's workout.
+
+You have:
+1. The athlete's PLANNED WORKOUT for today
+2. Their LAST NIGHT'S SLEEP data (stages, score, quality)
+3. Yesterday's training (fatigue carry-over)
+4. Today's biometrics (resting HR, HRV, stress)
+
+Based on sleep science (National Sleep Foundation, Matthew Walker's research):
+- Sleep score ≥ 70 with good deep/REM: athlete is well-recovered → keep workout as planned or push slightly harder
+- Sleep score 50-69: moderate recovery → consider reducing intensity by 1 zone or cutting volume by 10-20%
+- Sleep score < 50: poor recovery → significantly reduce intensity, shorten workout, or convert to easy recovery session
+- Deep sleep < 15% of sleep time: impaired physical recovery → reduce high-intensity work
+- REM < 20% of sleep time: impaired cognitive/motor recovery → avoid complex drills, keep it simple
+- High awake time (>10%): fragmented sleep → reduce overall volume
+
+Also consider:
+- If yesterday had a hard session + poor sleep → extra caution
+- If HRV is significantly below their baseline → reduce intensity
+- If resting HR is elevated → flag potential illness/overtraining
+
+Your response MUST follow this exact format:
+
+## 🌙 Sleep & Recovery Assessment
+Brief summary of last night's sleep quality and what it means for today.
+
+## 📋 Today's Planned Workout
+Show the original planned workout.
+
+## ✅ Decision: [KEEP AS-IS / ADJUSTED]
+State clearly whether you're modifying the workout or not, and why.
+
+## 📝 Workout for Today
+If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration | Target | HR Zone | Notes). Include the workout title with "(Total: Xmin)".
+If kept as-is, restate the original workout.
+
+## 💡 Coach's Note
+One practical tip for the athlete today (hydration, warm-up emphasis, mental approach, etc.).
+
+## 🔄 Sync Reminder
+Remind the athlete: "If the workout was adjusted, sync your updated plan to intervals.icu to get the changes on your watch."
+
+${athleteContext}`;
+
+      userPrompt = `Date: ${targetDateStr}
+
+LAST NIGHT'S SLEEP DATA:
+${sleepContext || "No sleep data available for last night."}
+
+${metricsToday}
+${yesterdayContext}
+
+TODAY'S PLANNED WORKOUT:
+${today_workout || "No workout found for today."}
+
+Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven.`;
+
+    } else if (type === "chat") {
       // chatMessages already parsed above from the original req.json(), so re-read from body params
       systemPrompt = `You are an elite endurance coach AI assistant. You have deep knowledge of training science, nutrition, recovery, and race preparation.
 

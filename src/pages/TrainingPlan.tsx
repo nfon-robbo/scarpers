@@ -10,7 +10,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -262,6 +262,8 @@ const TrainingPlanPage = () => {
   const [reviewing, setReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<string | null>(null);
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
+  const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
+  const [dayAdjusting, setDayAdjusting] = useState(false);
 
   const reviewProgress = async () => {
     if (!user || !content) return;
@@ -356,6 +358,67 @@ const TrainingPlanPage = () => {
     setReviewResult(null);
     setOriginalPlanBeforeReview(null);
     toast({ title: "Keeping current plan" });
+  };
+
+  const extractTodayWorkout = (): string | null => {
+    if (!content) return null;
+    const today = new Date();
+    const workouts = parseWorkoutsFromPlan(content);
+    const todayStr = format(today, "yyyy-MM-dd");
+    const todayWorkout = workouts.find(w => {
+      if (!w.dateObj) return false;
+      return format(w.dateObj, "yyyy-MM-dd") === todayStr;
+    });
+    if (!todayWorkout) return null;
+    // Reconstruct the workout text from title + segments
+    let text = `**${todayWorkout.title}**\n`;
+    if (todayWorkout.segments.length > 0) {
+      text += "| Segment | Duration | Target | HR Zone | Notes |\n";
+      text += "|---------|----------|--------|---------|-------|\n";
+      for (const s of todayWorkout.segments) {
+        text += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
+      }
+    }
+    return text;
+  };
+
+  const assessDayAhead = async () => {
+    if (!user || !content) return;
+    const todayWorkout = extractTodayWorkout();
+    if (!todayWorkout) {
+      toast({ title: "No workout today", description: "There's no planned workout for today in your training plan.", variant: "destructive" });
+      return;
+    }
+
+    setDayAdjusting(true);
+    setDayAdjustResult(null);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", variant: "destructive" });
+      setDayAdjusting(false);
+      return;
+    }
+
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    let accumulated = "";
+    streamAICoach({
+      type: "day-adjust",
+      token: session.access_token,
+      targetDate: todayStr,
+      todayWorkout,
+      onDelta: (text) => {
+        accumulated += text;
+        setDayAdjustResult(accumulated);
+      },
+      onDone: () => {
+        setDayAdjusting(false);
+      },
+      onError: (err) => {
+        toast({ title: "Day assessment failed", description: err, variant: "destructive" });
+        setDayAdjusting(false);
+      },
+    });
   };
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
@@ -517,10 +580,16 @@ const TrainingPlanPage = () => {
           }
         </p>
         {content && !loading && (
-          <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing}>
-            {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
-            {reviewing ? "Reviewing..." : "Review Progress"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing || dayAdjusting}>
+              {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
+              {reviewing ? "Reviewing..." : "Review Progress"}
+            </Button>
+            <Button className="w-full sm:w-auto" variant="secondary" onClick={assessDayAhead} disabled={syncing || reviewing || dayAdjusting}>
+              {dayAdjusting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sun className="w-4 h-4 mr-2" />}
+              {dayAdjusting ? "Assessing..." : "Assess Day Ahead"}
+            </Button>
+          </div>
         )}
       </div>
       {content && !loading && (
@@ -725,6 +794,34 @@ const TrainingPlanPage = () => {
                   Keep Current Plan
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Day Ahead Assessment Result */}
+        {(dayAdjustResult || dayAdjusting) && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sun className="w-4 h-4 text-primary" />
+                Day Ahead Assessment
+                {dayAdjusting && <Loader2 className="w-3 h-3 animate-spin" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {dayAdjustResult ? (
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <MarkdownRenderer content={dayAdjustResult} />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Analyzing your sleep, recovery, and readiness…</p>
+              )}
+              {!dayAdjusting && dayAdjustResult && (
+                <Button size="sm" variant="ghost" className="mt-3" onClick={() => setDayAdjustResult(null)}>
+                  <X className="w-4 h-4 mr-2" />
+                  Dismiss
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
