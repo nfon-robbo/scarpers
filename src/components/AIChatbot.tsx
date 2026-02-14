@@ -144,13 +144,26 @@ const AIChatbot = () => {
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm py-8 space-y-2">
+            <div className="text-center text-muted-foreground text-sm py-6 space-y-3">
               <MessageCircle className="w-8 h-8 mx-auto opacity-40" />
               <p>Ask me anything about your training!</p>
-              <div className="space-y-1 text-xs">
-                <p className="text-muted-foreground/70">"What should I eat before my long run?"</p>
-                <p className="text-muted-foreground/70">"Is my training plan working?"</p>
-                <p className="text-muted-foreground/70">"Should I run today?"</p>
+              <div className="flex flex-wrap justify-center gap-2 px-2">
+                {[
+                  "What should I eat before my long run?",
+                  "Is my training plan working?",
+                  "Should I run today?",
+                  "Do I need to drink water before a run?",
+                  "When is the best time for me to run?",
+                  "How is my recovery looking?",
+                ].map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => { setInput(q); }}
+                    className="text-xs bg-muted hover:bg-accent rounded-full px-3 py-1.5 transition-colors text-left"
+                  >
+                    {q}
+                  </button>
+                ))}
               </div>
             </div>
           )}
