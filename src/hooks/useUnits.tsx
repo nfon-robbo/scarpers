@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface UnitPreferences {
   distance: "km" | "mi";
@@ -56,10 +57,60 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
       return defaultUnits;
     }
   });
+  const [dbLoaded, setDbLoaded] = useState(false);
+
+  // Load from database on mount
+  useEffect(() => {
+    const loadFromDb = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("unit_distance, unit_speed, unit_elevation, unit_temperature, unit_weight")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      if (profile) {
+        const dbUnits: UnitPreferences = {
+          distance: (profile.unit_distance as UnitPreferences["distance"]) || defaultUnits.distance,
+          speed: (profile.unit_speed as UnitPreferences["speed"]) || defaultUnits.speed,
+          elevation: (profile.unit_elevation as UnitPreferences["elevation"]) || defaultUnits.elevation,
+          temperature: (profile.unit_temperature as UnitPreferences["temperature"]) || defaultUnits.temperature,
+          weight: (profile.unit_weight as UnitPreferences["weight"]) || defaultUnits.weight,
+        };
+        setUnits(dbUnits);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dbUnits));
+      }
+      setDbLoaded(true);
+    };
+
+    loadFromDb();
+  }, []);
+
+  // Save to both localStorage and database
+  const saveToDb = useCallback(async (newUnits: UnitPreferences) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+
+    await supabase
+      .from("profiles")
+      .update({
+        unit_distance: newUnits.distance,
+        unit_speed: newUnits.speed,
+        unit_elevation: newUnits.elevation,
+        unit_temperature: newUnits.temperature,
+        unit_weight: newUnits.weight,
+      })
+      .eq("user_id", session.user.id);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(units));
-  }, [units]);
+    if (dbLoaded) {
+      saveToDb(units);
+    }
+  }, [units, dbLoaded, saveToDb]);
 
   const setUnit = <K extends keyof UnitPreferences>(key: K, value: UnitPreferences[K]) => {
     setUnits((prev) => ({ ...prev, [key]: value }));
