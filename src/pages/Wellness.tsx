@@ -155,13 +155,6 @@ const WellnessPage = () => {
           {summary && (
             <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
               <KPICard
-                icon={Moon}
-                label="Sleep Score"
-                value={summary.todaySleep != null ? `${summary.todaySleep}` : "—"}
-                sub={summary.avgSleep7d != null ? `7d avg: ${summary.avgSleep7d}` : "No data"}
-                color={summary.todaySleep != null && summary.todaySleep >= 70 ? "text-primary" : "text-destructive"}
-              />
-              <KPICard
                 icon={Footprints}
                 label="Steps"
                 value={summary.todaySteps != null ? summary.todaySteps.toLocaleString() : "—"}
@@ -178,69 +171,10 @@ const WellnessPage = () => {
             </div>
           )}
 
-          {/* Sleep Score Chart */}
-          {metrics.some(m => m.sleep_score != null) && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-primary" />
-                  Sleep Score
-                </CardTitle>
-                <CardDescription>Daily sleep quality score (0-100)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <ComposedChart data={metrics.filter(m => m.sleep_score != null).map(m => ({
-                    date: fmtDate(m.date),
-                    score: m.sleep_score,
-                  }))}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" interval="preserveStartEnd" />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Bar dataKey="score" fill="hsl(var(--primary))" fillOpacity={0.3} radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="score" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
+          {/* Sleep Stages from Google Fit */}
+          <SleepStagesChart />
 
-          {/* Sleep Duration Chart */}
-          {metrics.some(m => m.sleep_duration_seconds != null) && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-primary" />
-                  Sleep Duration
-                </CardTitle>
-                <CardDescription>Hours of sleep per night</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={metrics.filter(m => m.sleep_duration_seconds != null).map(m => ({
-                    date: fmtDate(m.date),
-                    hours: Number((m.sleep_duration_seconds! / 3600).toFixed(1)),
-                  }))}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
-                      formatter={(v: number) => [`${v}h`, "Sleep"]}
-                    />
-                    <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Steps Chart */}
           {metrics.some(m => m.steps != null) && (
             <Card>
               <CardHeader className="pb-2">
