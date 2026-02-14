@@ -40,6 +40,10 @@
     --chart-4: 262 52% 47%;
     --chart-5: 0 72% 51%;
 
+    --glow-primary: 152 60% 36%;
+    --gradient-start: 152 60% 36%;
+    --gradient-end: 199 89% 48%;
+
     --sidebar-background: 210 20% 97%;
     --sidebar-foreground: 220 25% 10%;
     --sidebar-primary: 152 60% 36%;
@@ -84,6 +88,10 @@
     --chart-3: 38 85% 55%;
     --chart-4: 262 45% 55%;
     --chart-5: 0 62% 50%;
+
+    --glow-primary: 152 55% 45%;
+    --gradient-start: 152 55% 45%;
+    --gradient-end: 199 80% 55%;
 
     --sidebar-background: 220 25% 8%;
     --sidebar-foreground: 210 20% 95%;
