@@ -205,10 +205,10 @@ serve(async (req) => {
         start_date_local: `${workout.date}T00:00:00`,
         category: "WORKOUT",
         name: workout.name,
-        description: workoutText,
+        description: workout.description || workout.name,
         type: "Run",
         moving_time: totalDuration,
-        workout_doc: {},
+        workout_definition: workoutText,
       };
 
       try {
