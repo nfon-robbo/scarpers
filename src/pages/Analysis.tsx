@@ -9,6 +9,7 @@ import { Brain, Loader2, RotateCcw, BarChart3, HeartPulse, Lightbulb, Activity, 
 import { format } from "date-fns";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import AIChatbot from "@/components/AIChatbot";
 
 interface SavedAnalysis {
   id: string;
@@ -227,6 +228,7 @@ const AnalysisPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AIChatbot />
     </div>
   );
 };
