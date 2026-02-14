@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Upload, Brain, Calendar, Activity, TrendingUp, Heart,
   Timer, Zap, Flame, ArrowUpRight, ArrowDownRight, Minus,
-  Moon, Footprints,
+  Moon, Footprints, ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,8 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 import ReadinessWidget from "@/components/ReadinessWidget";
+
+// ── Types ──
 
 interface ActivityRow {
   id: string;
@@ -39,6 +41,18 @@ interface MetricsRow {
   hrv: number | null;
 }
 
+// ── Shared tooltip style ──
+
+const tooltipStyle = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: 12,
+  fontSize: 12,
+  boxShadow: "0 8px 32px -8px hsl(var(--foreground) / 0.1)",
+};
+
+// ── Dashboard ──
+
 const Dashboard = () => {
   const { profile } = useProfile();
   const { user } = useAuth();
@@ -52,18 +66,14 @@ const Dashboard = () => {
     const since = new Date();
     since.setDate(since.getDate() - 56);
 
-    // Fetch activities
     supabase
       .from("activities")
       .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
       .eq("user_id", user.id)
       .gte("start_time", since.toISOString())
       .order("start_time", { ascending: true })
-      .then(({ data }) => {
-        setActivities((data as ActivityRow[]) || []);
-      });
+      .then(({ data }) => setActivities((data as ActivityRow[]) || []));
 
-    // Fetch daily metrics
     supabase
       .from("daily_metrics")
       .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
@@ -84,7 +94,6 @@ const Dashboard = () => {
     const hrs = activities.filter((a) => a.avg_heart_rate).map((a) => a.avg_heart_rate!);
     const avgHR = hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null;
 
-    // Weekly load (duration in minutes per week)
     const weekMap = new Map<string, number>();
     activities.forEach((a) => {
       if (!a.start_time) return;
@@ -102,7 +111,6 @@ const Dashboard = () => {
         load: Math.round(mins),
       }));
 
-    // Acute (7d) vs Chronic (28d) load
     const now = new Date();
     const acute = activities
       .filter((a) => a.start_time && new Date(a.start_time) >= new Date(now.getTime() - 7 * 86400000))
@@ -113,7 +121,6 @@ const Dashboard = () => {
 
     const acwr = chronic > 0 ? acute / chronic : null;
 
-    // HR trend per activity
     const hrTrend = activities
       .filter((a) => a.avg_heart_rate && a.start_time)
       .map((a) => ({
@@ -136,43 +143,82 @@ const Dashboard = () => {
 
   const hasData = stats && stats.count > 0;
 
+  // Greeting based on time of day
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 5) return "Late night";
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    if (h < 21) return "Good evening";
+    return "Late night";
+  }, []);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Welcome{profile?.name ? `, ${profile.name}` : ""}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Your AI-powered endurance training dashboard
-        </p>
+    <div className="space-y-8 pb-8">
+      {/* ── Hero Header ── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-card to-accent/5 border border-primary/10 p-6 sm:p-8">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        <div className="relative">
+          <p className="text-sm font-medium text-primary tracking-wide uppercase mb-1">{greeting}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+            {profile?.name || "Athlete"}
+          </h1>
+          <p className="text-muted-foreground mt-2 max-w-md">
+            Your AI-powered endurance training command centre
+          </p>
+        </div>
       </div>
 
-      {/* Morning Readiness */}
+      {/* ── Readiness — untouched ── */}
       <ReadinessWidget />
 
-      {/* Quick actions */}
+      {/* ── Quick Actions ── */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <ActionCard icon={Upload} title="Import Data" desc="Upload FIT files" to="/upload" navigate={navigate} />
-        <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/analysis" navigate={navigate} />
-        <ActionCard icon={Calendar} title="Training Plan" desc="Generate your plan" to="/training-plan" navigate={navigate} />
+        <ActionCard icon={Upload} title="Import Data" desc="Upload FIT files" to="/upload" navigate={navigate} accent="primary" />
+        <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/analysis" navigate={navigate} accent="chart-2" />
+        <ActionCard icon={Calendar} title="Training Plan" desc="Generate your plan" to="/training-plan" navigate={navigate} accent="accent" />
       </div>
 
       {!hasData ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Upload className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-lg font-medium">No data yet</p>
-            <p className="text-sm">Upload your first FIT file to get started</p>
-            <Button className="mt-4" onClick={() => navigate("/upload")}>Import Data</Button>
+        <Card className="border-dashed border-2 border-muted-foreground/20">
+          <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <div className="rounded-full bg-muted p-6 mb-6">
+              <Upload className="w-10 h-10 opacity-40" />
+            </div>
+            <p className="text-xl font-semibold text-foreground">No data yet</p>
+            <p className="text-sm mt-1 mb-6">Upload your first FIT file to unlock your dashboard</p>
+            <Button size="lg" className="gap-2 shadow-lg shadow-primary/20" onClick={() => navigate("/upload")}>
+              <Upload className="w-4 h-4" />
+              Import Data
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* KPI Cards */}
+          {/* ── KPI Strip ── */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            <KPICard icon={Activity} label="Activities" value={`${stats.count}`} sub="Last 8 weeks" />
-            <KPICard icon={Timer} label="Total Time" value={`${stats.totalHours}h`} sub="Training volume" />
-            <KPICard icon={Heart} label="Avg HR" value={stats.avgHR ? `${stats.avgHR} bpm` : "—"} sub="Across sessions" />
+            <KPICard
+              icon={Activity}
+              label="Activities"
+              value={`${stats.count}`}
+              sub="Last 8 weeks"
+              color="primary"
+            />
+            <KPICard
+              icon={Timer}
+              label="Total Time"
+              value={`${stats.totalHours}h`}
+              sub="Training volume"
+              color="chart-2"
+            />
+            <KPICard
+              icon={Heart}
+              label="Avg HR"
+              value={stats.avgHR ? `${stats.avgHR}` : "—"}
+              unit={stats.avgHR ? "bpm" : ""}
+              sub="Across sessions"
+              color="destructive"
+            />
             <KPICard
               icon={TrendingUp}
               label="ACWR"
@@ -180,11 +226,18 @@ const Dashboard = () => {
               sub={
                 stats.acwr !== null
                   ? stats.acwr >= 0.8 && stats.acwr <= 1.3
-                    ? "✅ Sweet spot"
+                    ? "Sweet spot"
                     : stats.acwr > 1.5
-                    ? "⚠️ High risk"
-                    : "📉 Under-training"
+                    ? "High risk"
+                    : "Under-training"
                   : "Need more data"
+              }
+              color={
+                stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
+                  ? "primary"
+                  : stats.acwr !== null && stats.acwr > 1.3
+                  ? "destructive"
+                  : "accent"
               }
               trend={
                 stats.acwr !== null
@@ -198,183 +251,177 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Training Load Chart */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-primary" />
-                  Weekly Training Load
-                </CardTitle>
-                <CardDescription>Minutes per week</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={stats.weeks}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="week" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Bar dataKey="load" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-destructive" />
-                  Heart Rate Trend
-                </CardTitle>
-                <CardDescription>Average HR per session</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={stats.hrTrend}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                    <Tooltip
-                      contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                      labelStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Area type="monotone" dataKey="hr" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive))" fillOpacity={0.1} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Load Balance */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Flame className="w-4 h-4 text-accent" />
-                Load Balance
-              </CardTitle>
-              <CardDescription>Acute (7d) vs Chronic (28d) training load</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{stats.acuteLoad}</p>
-                  <p className="text-xs text-muted-foreground">Acute Load (min)</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold">{stats.chronicLoad}</p>
-                  <p className="text-xs text-muted-foreground">Chronic Load (min/wk)</p>
-                </div>
-                <div className="text-center">
-                  <p className={`text-2xl font-bold ${
-                    stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
-                      ? "text-primary"
-                      : stats.acwr !== null && stats.acwr > 1.5
-                      ? "text-destructive"
-                      : "text-accent"
-                  }`}>
-                    {stats.acwr ?? "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">ACWR Ratio</p>
+          {/* ── Load Balance Highlight ── */}
+          <Card className="overflow-hidden">
+            <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+              <LoadStat label="Acute Load" value={stats.acuteLoad} unit="min" sub="Last 7 days" />
+              <LoadStat label="Chronic Load" value={stats.chronicLoad} unit="min/wk" sub="Last 28 days" />
+              <div className="p-6 flex flex-col items-center justify-center text-center">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">ACWR Ratio</p>
+                <p className={`text-4xl font-black tracking-tight ${
+                  stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
+                    ? "text-primary"
+                    : stats.acwr !== null && stats.acwr > 1.5
+                    ? "text-destructive"
+                    : "text-accent"
+                }`}>
+                  {stats.acwr ?? "—"}
+                </p>
+                <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+                  stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
+                    ? "bg-primary/10 text-primary"
+                    : stats.acwr !== null && stats.acwr > 1.5
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-accent/10 text-accent"
+                }`}>
+                  {stats.acwr !== null
+                    ? stats.acwr >= 0.8 && stats.acwr <= 1.3
+                      ? "✅ Optimal zone"
+                      : stats.acwr > 1.5
+                      ? "⚠️ Injury risk"
+                      : "📉 Build more"
+                    : "Insufficient data"}
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
 
-          {/* Wellness Charts */}
+          {/* ── Charts Grid ── */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartCard
+              icon={<Zap className="w-4 h-4" />}
+              title="Weekly Training Load"
+              description="Minutes per week"
+              iconColor="text-primary"
+            >
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats.weeks} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted))" }} />
+                  <defs>
+                    <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    </linearGradient>
+                  </defs>
+                  <Bar dataKey="load" fill="url(#loadGrad)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard
+              icon={<Heart className="w-4 h-4" />}
+              title="Heart Rate Trend"
+              description="Average HR per session"
+              iconColor="text-destructive"
+            >
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={stats.hrTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
+                  <defs>
+                    <linearGradient id="hrGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="hr" stroke="hsl(var(--destructive))" fill="url(#hrGrad)" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+
+          {/* ── Wellness Charts ── */}
           {metrics.length > 0 && (
-            <>
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                <Moon className="w-4 h-4 text-primary" />
+                Wellness Trends
+              </h2>
+
               <div className="grid gap-4 lg:grid-cols-2">
                 {/* Sleep Score */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Moon className="w-4 h-4 text-primary" />
-                      Sleep Score
-                    </CardTitle>
-                    <CardDescription>Daily sleep quality</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={metrics.filter(m => m.sleep_score != null).map(m => ({
-                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-                        score: m.sleep_score,
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <Tooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
-                        />
-                        <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                <ChartCard
+                  icon={<Moon className="w-4 h-4" />}
+                  title="Sleep Score"
+                  description="Daily sleep quality"
+                  iconColor="text-primary"
+                >
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={metrics.filter(m => m.sleep_score != null).map(m => ({
+                      date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                      score: m.sleep_score,
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
+                      <defs>
+                        <linearGradient id="sleepGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--chart-4))" stopOpacity={0.25} />
+                          <stop offset="100%" stopColor="hsl(var(--chart-4))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="score" stroke="hsl(var(--chart-4))" fill="url(#sleepGrad)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
 
                 {/* Steps */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Footprints className="w-4 h-4 text-primary" />
-                      Daily Steps
-                    </CardTitle>
-                    <CardDescription>Step count trend</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={metrics.filter(m => m.steps != null).map(m => ({
-                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-                        steps: m.steps,
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <Tooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
-                        />
-                        <Bar dataKey="steps" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                <ChartCard
+                  icon={<Footprints className="w-4 h-4" />}
+                  title="Daily Steps"
+                  description="Step count trend"
+                  iconColor="text-primary"
+                >
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={metrics.filter(m => m.steps != null).map(m => ({
+                      date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                      steps: m.steps,
+                    }))} barCategoryGap="15%">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
+                      <defs>
+                        <linearGradient id="stepsGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8} />
+                          <stop offset="100%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3} />
+                        </linearGradient>
+                      </defs>
+                      <Bar dataKey="steps" fill="url(#stepsGrad)" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
               </div>
 
               {/* Resting HR */}
               {metrics.some(m => m.resting_heart_rate != null) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Heart className="w-4 h-4 text-destructive" />
-                      Resting Heart Rate
-                    </CardTitle>
-                    <CardDescription>Daily resting HR trend</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={180}>
-                      <LineChart data={metrics.filter(m => m.resting_heart_rate != null).map(m => ({
-                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-                        rhr: Math.round(m.resting_heart_rate!),
-                      }))}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                        <Tooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
-                        />
-                        <Line type="monotone" dataKey="rhr" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                <ChartCard
+                  icon={<Heart className="w-4 h-4" />}
+                  title="Resting Heart Rate"
+                  description="Daily resting HR trend"
+                  iconColor="text-destructive"
+                >
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={metrics.filter(m => m.resting_heart_rate != null).map(m => ({
+                      date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                      rhr: Math.round(m.resting_heart_rate!),
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
+                      <Line type="monotone" dataKey="rhr" stroke="hsl(var(--destructive))" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--destructive))" }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartCard>
               )}
-            </>
+            </div>
           )}
         </>
       )}
@@ -382,56 +429,82 @@ const Dashboard = () => {
   );
 };
 
+// ── Sub-components ──
+
 const ActionCard = ({
-  icon: Icon,
-  title,
-  desc,
-  to,
-  navigate,
+  icon: Icon, title, desc, to, navigate, accent,
 }: {
-  icon: any;
-  title: string;
-  desc: string;
-  to: string;
-  navigate: (to: string) => void;
+  icon: any; title: string; desc: string; to: string; navigate: (to: string) => void; accent: string;
 }) => (
-  <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(to)}>
+  <Card
+    className="group cursor-pointer border-transparent bg-gradient-to-br from-card to-muted/30 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+    onClick={() => navigate(to)}
+  >
     <CardHeader className="flex flex-row items-center gap-3 p-4">
-      <div className="rounded-lg bg-primary/10 p-2">
-        <Icon className="w-4 h-4 text-primary" />
+      <div className="rounded-xl bg-primary/10 p-2.5 group-hover:bg-primary/15 transition-colors">
+        <Icon className="w-5 h-5 text-primary" />
       </div>
-      <div>
-        <CardTitle className="text-sm">{title}</CardTitle>
+      <div className="flex-1 min-w-0">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         <CardDescription className="text-xs">{desc}</CardDescription>
       </div>
+      <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
     </CardHeader>
   </Card>
 );
 
 const KPICard = ({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  trend,
+  icon: Icon, label, value, unit, sub, color, trend,
 }: {
-  icon: any;
-  label: string;
-  value: string;
-  sub: string;
-  trend?: "up" | "down" | "neutral";
+  icon: any; label: string; value: string; unit?: string; sub: string; color: string; trend?: "up" | "down" | "neutral";
 }) => (
-  <Card>
-    <CardContent className="p-4">
-      <div className="flex items-center justify-between mb-2">
-        <Icon className="w-4 h-4 text-muted-foreground" />
+  <Card className="group hover:shadow-md transition-shadow duration-200 overflow-hidden relative">
+    <div className={`absolute inset-x-0 top-0 h-1 bg-${color}`} />
+    <CardContent className="p-4 pt-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`rounded-lg bg-${color}/10 p-1.5`}>
+          <Icon className={`w-3.5 h-3.5 text-${color}`} />
+        </div>
         {trend === "up" && <ArrowUpRight className="w-4 h-4 text-destructive" />}
         {trend === "down" && <ArrowDownRight className="w-4 h-4 text-accent" />}
         {trend === "neutral" && <Minus className="w-4 h-4 text-primary" />}
       </div>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+      <div className="flex items-baseline gap-1">
+        <p className="text-2xl font-black tracking-tight">{value}</p>
+        {unit && <span className="text-sm font-medium text-muted-foreground">{unit}</span>}
+      </div>
+      <p className="text-xs font-medium text-muted-foreground mt-0.5">{label}</p>
+      <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
+    </CardContent>
+  </Card>
+);
+
+const LoadStat = ({ label, value, unit, sub }: { label: string; value: number; unit: string; sub: string }) => (
+  <div className="p-6 text-center">
+    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
+    <div className="flex items-baseline justify-center gap-1">
+      <p className="text-3xl font-black tracking-tight">{value}</p>
+      <span className="text-sm font-medium text-muted-foreground">{unit}</span>
+    </div>
+    <p className="text-xs text-muted-foreground/70 mt-1">{sub}</p>
+  </div>
+);
+
+const ChartCard = ({
+  icon, title, description, iconColor, children,
+}: {
+  icon: React.ReactNode; title: string; description: string; iconColor: string; children: React.ReactNode;
+}) => (
+  <Card className="overflow-hidden">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+        <span className={iconColor}>{icon}</span>
+        {title}
+      </CardTitle>
+      <CardDescription className="text-xs">{description}</CardDescription>
+    </CardHeader>
+    <CardContent className="pr-2">
+      {children}
     </CardContent>
   </Card>
 );
