@@ -4,92 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Zap, Activity, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare } from "lucide-react";
-import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
-
-interface ReadinessData {
-  sleepScore: number | null;
-  sleepHours: number | null;
-  deepPct: number | null;
-  remPct: number | null;
-  rhr: number | null;
-  rhrBaseline: number | null;
-  hrv: number | null;
-  hrvBaseline: number | null;
-  yesterdayLoad: number | null;
-  stressScore: number | null;
-}
-
-function computeReadiness(d: ReadinessData): { score: number; factors: { label: string; status: "good" | "warning" | "poor"; detail: string }[] } {
-  const factors: { label: string; status: "good" | "warning" | "poor"; detail: string }[] = [];
-  let total = 0;
-  let count = 0;
-
-  if (d.sleepScore != null) {
-    const s = d.sleepScore;
-    total += s;
-    count++;
-    const sl = scoreLabel(s);
-    factors.push({
-      label: "Sleep Quality",
-      status: s >= 70 ? "good" : s >= 50 ? "warning" : "poor",
-      detail: `${s}/100 (${sl.label}) · ${d.sleepHours != null ? d.sleepHours.toFixed(1) + "h" : "—"}`,
-    });
-  }
-
-  if (d.rhr != null && d.rhrBaseline != null) {
-    const diff = d.rhr - d.rhrBaseline;
-    const rhrScore = diff <= 2 ? 90 : diff <= 5 ? 70 : diff <= 10 ? 50 : 30;
-    total += rhrScore;
-    count++;
-    factors.push({
-      label: "Resting HR",
-      status: diff <= 3 ? "good" : diff <= 7 ? "warning" : "poor",
-      detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
-    });
-  } else if (d.rhr != null) {
-    factors.push({ label: "Resting HR", status: "good", detail: `${Math.round(d.rhr)} bpm` });
-  }
-
-  if (d.hrv != null && d.hrvBaseline != null) {
-    const diff = d.hrv - d.hrvBaseline;
-    const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
-    const hrvScore = pct >= -5 ? 90 : pct >= -15 ? 65 : 40;
-    total += hrvScore;
-    count++;
-    factors.push({
-      label: "HRV",
-      status: pct >= -10 ? "good" : pct >= -20 ? "warning" : "poor",
-      detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
-    });
-  }
-
-  if (d.yesterdayLoad != null) {
-    const loadScore = d.yesterdayLoad <= 30 ? 90 : d.yesterdayLoad <= 60 ? 75 : d.yesterdayLoad <= 120 ? 55 : 35;
-    total += loadScore;
-    count++;
-    factors.push({
-      label: "Yesterday's Load",
-      status: d.yesterdayLoad <= 45 ? "good" : d.yesterdayLoad <= 90 ? "warning" : "poor",
-      detail: `${Math.round(d.yesterdayLoad)} min training`,
-    });
-  }
-
-  if (d.stressScore != null) {
-    const stressVal = d.stressScore;
-    const stressScore = stressVal <= 25 ? 90 : stressVal <= 50 ? 70 : stressVal <= 75 ? 45 : 25;
-    total += stressScore;
-    count++;
-    factors.push({
-      label: "Stress",
-      status: stressVal <= 30 ? "good" : stressVal <= 60 ? "warning" : "poor",
-      detail: `${Math.round(stressVal)}/100`,
-    });
-  }
-
-  const score = count > 0 ? Math.round(total / count) : 0;
-  return { score, factors };
-}
+import { Zap, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare } from "lucide-react";
+import { calculateSleepScore } from "@/lib/sleep-score";
+import {
+  type ReadinessData,
+  computeReadiness,
+  groupSleepByDate,
+  activityIntensityLoad,
+  workoutIntensity,
+} from "@/lib/readiness";
 
 const statusIcon = (s: "good" | "warning" | "poor") => {
   if (s === "good") return <CheckCircle className="w-3.5 h-3.5 text-primary" />;
@@ -106,44 +29,47 @@ const ReadinessWidget = () => {
 
   useEffect(() => {
     if (!user) return;
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-    const baselineStart = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+    const twentyEightDaysAgo = new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0];
 
     Promise.all([
+      // Sleep stages — fetch with date so we can group and pick most recent night
       supabase
         .from("sleep_stages")
-        .select("stage, duration_seconds")
+        .select("stage, duration_seconds, date")
         .eq("user_id", user.id)
         .in("date", [today, yesterday])
         .then(({ data }) => data || []),
+
+      // Daily metrics — 30 days for baselines
       supabase
         .from("daily_metrics")
         .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds")
         .eq("user_id", user.id)
-        .gte("date", baselineStart)
+        .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
         .then(({ data }) => data || []),
+
+      // Activities — 28 days for monotony + recovery + today's load
       supabase
         .from("activities")
-        .select("duration_seconds, start_time")
+        .select("duration_seconds, start_time, avg_heart_rate, training_load, training_effect")
         .eq("user_id", user.id)
-        .gte("start_time", yesterday + "T00:00:00Z")
-        .lt("start_time", today + "T00:00:00Z")
+        .gte("start_time", twentyEightDaysAgo + "T00:00:00Z")
+        .order("start_time", { ascending: false })
         .then(({ data }) => data || []),
-    ]).then(([sleepStages, allMetrics, yesterdayActs]) => {
-      const stages: SleepStageData = { deep: 0, light: 0, rem: 0, awake: 0 };
-      sleepStages.forEach((s: any) => {
-        const key = s.stage?.toLowerCase();
-        if (key === "deep") stages.deep += s.duration_seconds || 0;
-        else if (key === "light") stages.light += s.duration_seconds || 0;
-        else if (key === "rem") stages.rem += s.duration_seconds || 0;
-        else if (key === "awake") stages.awake += s.duration_seconds || 0;
-      });
+    ]).then(([sleepStages, allMetrics, allActivities]) => {
+      // ── Sleep (fix double-count) ──
+      const stages = groupSleepByDate(sleepStages as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
       const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
 
+      // ── Metrics ──
       const todayMetrics = allMetrics.find((m: any) => m.date === today);
       const yesterdayMetrics = allMetrics.find((m: any) => m.date === yesterday);
       const latestMetrics = todayMetrics || yesterdayMetrics;
@@ -157,7 +83,54 @@ const ReadinessWidget = () => {
       const finalSleepScore = sleepScore ?? (latestMetrics as any)?.sleep_score ?? null;
       const sleepDuration = hasSleepStages ? totalSleep : (latestMetrics as any)?.sleep_duration_seconds ?? null;
 
-      const yesterdayLoad = yesterdayActs.reduce((s: number, a: any) => s + ((a.duration_seconds || 0) / 60), 0);
+      // ── 3-day sleep avg vs 30-day avg ──
+      const recentMetrics = allMetrics.filter((m: any) => m.date >= threeDaysAgo && m.date <= today);
+      const recentSleepSecs = recentMetrics.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
+      const recentSleepAvgHours = recentSleepSecs.length ? (recentSleepSecs.reduce((a: number, b: number) => a + b, 0) / recentSleepSecs.length) / 3600 : null;
+
+      const allSleepSecs = baseline.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
+      const baselineSleepAvgHours = allSleepSecs.length ? (allSleepSecs.reduce((a: number, b: number) => a + b, 0) / allSleepSecs.length) / 3600 : null;
+
+      // ── 3-day stress history ──
+      const stressHistory = recentMetrics
+        .filter((m: any) => m.stress_score != null)
+        .map((m: any) => m.stress_score as number);
+
+      // ── Activities breakdown ──
+      const yesterdayActs = allActivities.filter((a: any) => {
+        const d = a.start_time?.split("T")[0];
+        return d === yesterday;
+      });
+      const todayActs = allActivities.filter((a: any) => {
+        const d = a.start_time?.split("T")[0];
+        return d === today;
+      });
+
+      // Yesterday's intensity-weighted load
+      const yesterdayLoad = yesterdayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
+
+      // Today's intensity-weighted load
+      const todayLoad = todayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
+
+      // Recovery: hours since last activity ended
+      let recoveryHours: number | null = null;
+      let lastIntensity: number | null = null;
+      if (allActivities.length > 0) {
+        const last = allActivities[0]; // sorted desc
+        if (last.start_time) {
+          const endMs = new Date(last.start_time).getTime() + ((last.duration_seconds || 0) * 1000);
+          recoveryHours = (Date.now() - endMs) / (1000 * 3600);
+          lastIntensity = workoutIntensity(last);
+        }
+      }
+
+      // Training monotony: 7-day daily avg vs 28-day daily avg
+      const sevenDayActs = allActivities.filter((a: any) => a.start_time && a.start_time >= sevenDaysAgo + "T00:00:00Z");
+      const weeklyTotal = sevenDayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
+      const monthlyTotal = allActivities.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
+
+      const weeklyLoadAvg = weeklyTotal / 7;
+      const monthlyLoadAvg = monthlyTotal / 28;
 
       setData({
         sleepScore: finalSleepScore,
@@ -170,6 +143,15 @@ const ReadinessWidget = () => {
         hrvBaseline,
         yesterdayLoad: yesterdayLoad > 0 ? yesterdayLoad : null,
         stressScore: (latestMetrics as any)?.stress_score ?? null,
+        todayLoad: todayLoad > 0 ? todayLoad : null,
+        recoveryHoursSinceLastHard: recoveryHours,
+        lastWorkoutIntensity: lastIntensity,
+        recentSleepAvgHours,
+        baselineSleepAvgHours,
+        stressHistory,
+        weeklyLoadAvg: weeklyTotal > 0 ? weeklyLoadAvg : null,
+        monthlyLoadAvg: monthlyTotal > 0 ? monthlyLoadAvg : null,
+        currentHour: now.getHours(),
       });
       setLoading(false);
     });
@@ -181,7 +163,6 @@ const ReadinessWidget = () => {
   useEffect(() => {
     if (!result || result.factors.length === 0) return;
 
-    // Check localStorage cache
     const cacheKey = "readiness_advice_cache";
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -189,7 +170,6 @@ const ReadinessWidget = () => {
         const { advice, score, timestamp } = JSON.parse(cached);
         const ageMs = Date.now() - timestamp;
         const oneHour = 60 * 60 * 1000;
-        // Use cache if less than 1 hour old AND score hasn't changed
         if (ageMs < oneHour && score === result.score) {
           setAiAdvice(advice);
           return;
@@ -223,7 +203,6 @@ const ReadinessWidget = () => {
         if (resp.ok) {
           const data = await resp.json();
           setAiAdvice(data.advice);
-          // Cache the result
           localStorage.setItem(cacheKey, JSON.stringify({
             advice: data.advice,
             score: result.score,
