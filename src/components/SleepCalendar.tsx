@@ -234,17 +234,17 @@ const SleepCalendar = () => {
       </Card>
 
       {/* Detail Dialog */}
-      <Dialog open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Moon className="w-5 h-5 text-primary" />
-              {selectedDate && format(parseISO(selectedDate), "EEEE, MMMM d yyyy")}
-            </DialogTitle>
-            <DialogDescription>Sleep analysis & AI insights</DialogDescription>
-          </DialogHeader>
+      {selectedDate && selected && (
+        <Dialog open={true} onOpenChange={(open) => !open && setSelectedDate(null)}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Moon className="w-5 h-5 text-primary" />
+                {format(parseISO(selectedDate), "EEEE, MMMM d yyyy")}
+              </DialogTitle>
+              <DialogDescription>Sleep analysis & AI insights</DialogDescription>
+            </DialogHeader>
 
-          {selected && (
             <div className="space-y-4">
               {/* Score badge */}
               <div className="flex items-center gap-3">
@@ -307,9 +307,9 @@ const SleepCalendar = () => {
                 </p>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };
