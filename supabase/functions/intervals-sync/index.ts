@@ -197,16 +197,12 @@ serve(async (req) => {
       const workoutText = lines.join("\n");
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
 
-      // Try to extract duration from workout name (e.g. "Foundation Run (Total: 30 min)")
-      const nameMinMatch = workout.name.match(/total:\s*(\d+)\s*min/i);
-      const movingTime = nameMinMatch ? parseInt(nameMinMatch[1], 10) * 60 : totalDuration;
-
       return {
         category: "WORKOUT",
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
         type: "Run",
-        moving_time: movingTime,
+        moving_time: totalDuration,
         description: workoutText,
         external_id: `lovable-${workout.date}-${idx}`,
       };
