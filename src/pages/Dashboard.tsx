@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import {
   Upload, Brain, Calendar, Activity, TrendingUp, Heart,
   Timer, Zap, Flame, ArrowUpRight, ArrowDownRight, Minus,
+  Moon, Footprints,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid,
+  ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 
 interface ActivityRow {
@@ -28,17 +29,29 @@ interface ActivityRow {
   training_effect: number | null;
 }
 
+interface MetricsRow {
+  date: string;
+  sleep_score: number | null;
+  sleep_duration_seconds: number | null;
+  steps: number | null;
+  resting_heart_rate: number | null;
+  hrv: number | null;
+}
+
 const Dashboard = () => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [metrics, setMetrics] = useState<MetricsRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const since = new Date();
     since.setDate(since.getDate() - 56);
+
+    // Fetch activities
     supabase
       .from("activities")
       .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
@@ -47,6 +60,17 @@ const Dashboard = () => {
       .order("start_time", { ascending: true })
       .then(({ data }) => {
         setActivities((data as ActivityRow[]) || []);
+      });
+
+    // Fetch daily metrics
+    supabase
+      .from("daily_metrics")
+      .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
+      .eq("user_id", user.id)
+      .gte("date", since.toISOString().split("T")[0])
+      .order("date", { ascending: true })
+      .then(({ data }) => {
+        setMetrics((data as MetricsRow[]) || []);
         setLoading(false);
       });
   }, [user]);
@@ -255,6 +279,99 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Wellness Charts */}
+          {metrics.length > 0 && (
+            <>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* Sleep Score */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Moon className="w-4 h-4 text-primary" />
+                      Sleep Score
+                    </CardTitle>
+                    <CardDescription>Daily sleep quality</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={metrics.filter(m => m.sleep_score != null).map(m => ({
+                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                        score: m.sleep_score,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <Tooltip
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                        />
+                        <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Steps */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Footprints className="w-4 h-4 text-primary" />
+                      Daily Steps
+                    </CardTitle>
+                    <CardDescription>Step count trend</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={metrics.filter(m => m.steps != null).map(m => ({
+                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                        steps: m.steps,
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <Tooltip
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                        />
+                        <Bar dataKey="steps" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Resting HR */}
+              {metrics.some(m => m.resting_heart_rate != null) && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-destructive" />
+                      Resting Heart Rate
+                    </CardTitle>
+                    <CardDescription>Daily resting HR trend</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={metrics.filter(m => m.resting_heart_rate != null).map(m => ({
+                        date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+                        rhr: Math.round(m.resting_heart_rate!),
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                        <Tooltip
+                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                        />
+                        <Line type="monotone" dataKey="rhr" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
         </>
       )}
     </div>
