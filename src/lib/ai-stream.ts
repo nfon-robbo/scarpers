@@ -10,11 +10,13 @@ export async function streamAICoach({
   currentPlan,
   adjustment,
   reviewText,
+  targetDate,
+  todayWorkout,
   onDelta,
   onDone,
   onError,
 }: {
-  type: "analysis" | "training-plan" | "plan-review" | "plan-adjust";
+  type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust";
   token: string;
   raceDistance?: string;
   trainingDays?: string[];
@@ -23,6 +25,8 @@ export async function streamAICoach({
   currentPlan?: string;
   adjustment?: string;
   reviewText?: string;
+  targetDate?: string;
+  todayWorkout?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -36,6 +40,8 @@ export async function streamAICoach({
     if (currentPlan) body.current_plan = currentPlan;
     if (adjustment) body.adjustment = adjustment;
     if (reviewText) body.review_text = reviewText;
+    if (targetDate) body.target_date = targetDate;
+    if (todayWorkout) body.today_workout = todayWorkout;
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
