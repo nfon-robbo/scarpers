@@ -12,6 +12,7 @@ import Activities from "./pages/Activities";
 import AnalysisPage from "./pages/Analysis";
 import TrainingPlanPage from "./pages/TrainingPlan";
 import Settings from "./pages/Settings";
+import WellnessPage from "./pages/Wellness";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/activities" element={<Activities />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/training-plan" element={<TrainingPlanPage />} />
+              <Route path="/wellness" element={<WellnessPage />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -21,6 +22,7 @@ const navItems = [
   { to: "/upload", icon: Upload, label: "Import" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/analysis", icon: Brain, label: "Analysis" },
+  { to: "/wellness", icon: Moon, label: "Wellness" },
   { to: "/training-plan", icon: Calendar, label: "Plan" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
