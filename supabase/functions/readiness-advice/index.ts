@@ -30,12 +30,71 @@ serve(async (req) => {
 
     const { readiness_score, factors, current_hour_local } = await req.json();
 
-    // Fetch profile for name
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("name, primary_sport")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Fetch profile and active training plan in parallel
+    const [profileRes, planRes] = await Promise.all([
+      supabase.from("profiles").select("name, primary_sport").eq("user_id", user.id).maybeSingle(),
+      supabase.from("training_plans").select("content, start_date, race_date, training_days")
+        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    const profile = profileRes.data;
+    const plan = planRes.data;
+
+    // Extract today's and tomorrow's workouts from the plan content
+    let planContext = "";
+    if (plan?.content) {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const todayStr = today.toISOString().split("T")[0];
+      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+      const todayDay = today.toLocaleDateString("en-US", { weekday: "long" });
+      const tomorrowDay = tomorrow.toLocaleDateString("en-US", { weekday: "long" });
+      
+      // Parse the plan content to find workouts for today and tomorrow
+      const lines = plan.content.split("\n");
+      let currentDate = "";
+      let todayWorkout = "";
+      let tomorrowWorkout = "";
+      let capturing = "";
+      
+      for (const line of lines) {
+        // Match date headers like "### Monday, February 17, 2026" or "**Monday 2026-02-17**"
+        const dateMatch = line.match(/(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) {
+          currentDate = dateMatch[1];
+          capturing = currentDate === todayStr ? "today" : currentDate === tomorrowStr ? "tomorrow" : "";
+          if (capturing === "today") todayWorkout += line + "\n";
+          if (capturing === "tomorrow") tomorrowWorkout += line + "\n";
+          continue;
+        }
+        // Also match day names (e.g., "### Monday" within a week block)
+        if (line.match(/^#{1,4}\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i)) {
+          const dayName = line.match(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i)?.[1];
+          if (dayName?.toLowerCase() === todayDay.toLowerCase()) capturing = "today";
+          else if (dayName?.toLowerCase() === tomorrowDay.toLowerCase()) capturing = "tomorrow";
+          else capturing = "";
+        }
+        
+        if (capturing === "today") todayWorkout += line + "\n";
+        if (capturing === "tomorrow") tomorrowWorkout += line + "\n";
+      }
+      
+      const trainingDays = plan.training_days || [];
+      const todayDayShort = today.toLocaleDateString("en-US", { weekday: "short" });
+      const tomorrowDayShort = tomorrow.toLocaleDateString("en-US", { weekday: "short" });
+      const isTodayTraining = trainingDays.some((d: string) => d.toLowerCase().startsWith(todayDayShort.toLowerCase()));
+      const isTomorrowTraining = trainingDays.some((d: string) => d.toLowerCase().startsWith(tomorrowDayShort.toLowerCase()));
+      
+      planContext = `\nTRAINING PLAN CONTEXT:`;
+      planContext += `\nTraining days: ${trainingDays.join(", ")}`;
+      planContext += `\nToday (${todayDay}): ${isTodayTraining ? "TRAINING DAY" : "REST DAY"}`;
+      planContext += `\nTomorrow (${tomorrowDay}): ${isTomorrowTraining ? "TRAINING DAY" : "REST DAY"}`;
+      if (todayWorkout.trim()) planContext += `\nToday's workout:\n${todayWorkout.trim()}`;
+      if (tomorrowWorkout.trim()) planContext += `\nTomorrow's workout:\n${tomorrowWorkout.trim()}`;
+      if (!todayWorkout.trim() && isTodayTraining) planContext += `\nToday's workout: Could not parse from plan`;
+      if (!tomorrowWorkout.trim() && !isTomorrowTraining) planContext += `\nTomorrow: Rest day (no workout scheduled)`;
+    }
 
     // Fetch sleep stages to determine typical bedtime/wake patterns
     const { data: sleepStages } = await supabase
@@ -92,10 +151,12 @@ Rules:
 - If their score is mid (50-79): Give them shit but be encouraging
 - If their score is low (<50): Be sympathetic-ish but still roast them
 - Consider their usual bedtime/wake patterns if provided - call them out if they're up too late or woke up too early
+- CRITICAL: Only reference ACTUAL scheduled workouts from the training plan data provided. If tomorrow is a rest day, DO NOT mention a workout tomorrow. If no plan data is provided, don't mention specific upcoming workouts at all.
 - End with one actionable thing they should do RIGHT NOW
 - Use the user's name if available
 - Keep it to 2-4 sentences. No headers, no bullet points. Just raw, unfiltered coach talk.
-${sleepPatternContext}`;
+${sleepPatternContext}
+${planContext}`;
 
     const factorsText = (factors || []).map((f: any) => `${f.label}: ${f.detail} (${f.status})`).join("\n");
 
