@@ -14,6 +14,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
+import ReadinessWidget from "@/components/ReadinessWidget";
 
 interface ActivityRow {
   id: string;
@@ -145,6 +146,9 @@ const Dashboard = () => {
           Your AI-powered endurance training dashboard
         </p>
       </div>
+
+      {/* Morning Readiness */}
+      <ReadinessWidget />
 
       {/* Quick actions */}
       <div className="grid gap-3 sm:grid-cols-3">
