@@ -104,15 +104,15 @@ function circadianModifier(hour: number): number {
   // 12-14 post-lunch dip
   if (hour >= 12 && hour < 14) return -3;
   // 17-20 early evening wind-down
-  if (hour >= 17 && hour < 20) return -8;
+  if (hour >= 17 && hour < 20) return -10;
   // 20-22 late evening
-  if (hour >= 20 && hour < 22) return -20;
+  if (hour >= 20 && hour < 22) return -30;
   // 22-00 night — you should be asleep
-  if (hour >= 22) return -35;
+  if (hour >= 22) return -50;
   // 00-03 deep night — absolute tank
-  if (hour < 3) return -45;
+  if (hour < 3) return -60;
   // 3-6 pre-dawn
-  if (hour >= 3 && hour < 6) return -30;
+  if (hour >= 3 && hour < 6) return -40;
   return 0;
 }
 
