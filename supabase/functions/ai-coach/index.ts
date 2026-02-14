@@ -90,29 +90,89 @@ serve(async (req) => {
       );
     }
 
-    // Fetch daily metrics for health/readiness context
+    // Fetch daily metrics for health/readiness context (always, not just AI-decide)
     let metricsContext = "";
-    if (isAIDecide) {
-      const { data: metrics } = await supabase
-        .from("daily_metrics")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("date", { ascending: false })
-        .limit(90);
+    const { data: metrics } = await supabase
+      .from("daily_metrics")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(90);
 
-      if (metrics && metrics.length > 0) {
-        const metricsSummary = metrics.map((m: any) => ({
-          date: m.date,
-          resting_hr: m.resting_heart_rate ? Math.round(m.resting_heart_rate) : null,
-          hrv: m.hrv ? Math.round(m.hrv) : null,
-          sleep_hours: m.sleep_duration_seconds ? (m.sleep_duration_seconds / 3600).toFixed(1) : null,
-          sleep_score: m.sleep_score,
-          stress: m.stress_score,
-          steps: m.steps,
-          weight: m.weight,
-        }));
-        metricsContext = `\nDAILY HEALTH METRICS (last ${metrics.length} days):\n${JSON.stringify(metricsSummary, null, 2)}\n`;
+    if (metrics && metrics.length > 0) {
+      const metricsSummary = metrics.map((m: any) => ({
+        date: m.date,
+        resting_hr: m.resting_heart_rate ? Math.round(m.resting_heart_rate) : null,
+        hrv: m.hrv ? Math.round(m.hrv) : null,
+        sleep_hours: m.sleep_duration_seconds ? (m.sleep_duration_seconds / 3600).toFixed(1) : null,
+        stress: m.stress_score,
+        steps: m.steps,
+        weight: m.weight,
+      }));
+      metricsContext = `\nDAILY HEALTH METRICS (last ${metrics.length} days):\n${JSON.stringify(metricsSummary, null, 2)}\n`;
+    }
+
+    // Fetch Google Fit sleep stages and compute sleep scores
+    let sleepContext = "";
+    const { data: sleepStages } = await supabase
+      .from("sleep_stages")
+      .select("date, stage, duration_seconds")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(500);
+
+    if (sleepStages && sleepStages.length > 0) {
+      // Aggregate by date
+      const byDate: Record<string, { deep: number; light: number; rem: number; awake: number }> = {};
+      for (const r of sleepStages) {
+        if (!byDate[r.date]) byDate[r.date] = { deep: 0, light: 0, rem: 0, awake: 0 };
+        const key = r.stage as "deep" | "light" | "rem" | "awake";
+        if (key in byDate[r.date]) byDate[r.date][key] += r.duration_seconds;
       }
+
+      // Compute sleep scores using the same algorithm as the frontend
+      const sleepSummary = Object.entries(byDate)
+        .sort(([a], [b]) => b.localeCompare(a))
+        .slice(0, 30)
+        .map(([date, stages]) => {
+          const total = stages.deep + stages.light + stages.rem + stages.awake;
+          const sleepTime = stages.deep + stages.light + stages.rem;
+          const totalH = total / 3600;
+          const deepPct = sleepTime > 0 ? (stages.deep / sleepTime) * 100 : 0;
+          const remPct = sleepTime > 0 ? (stages.rem / sleepTime) * 100 : 0;
+          const efficiency = total > 0 ? (sleepTime / total) * 100 : 0;
+
+          // Sleep score calculation (same as frontend)
+          let durationScore = totalH >= 7 && totalH <= 9 ? 30
+            : totalH >= 6 ? 30 * ((totalH - 5) / 2)
+            : totalH > 9 && totalH <= 10 ? 30 * (10 - totalH)
+            : Math.max(0, 30 * (totalH / 6) * 0.5);
+          let deepScore = deepPct >= 15 && deepPct <= 25 ? 25
+            : deepPct >= 10 ? 25 * ((deepPct - 5) / 10)
+            : Math.max(0, 25 * (deepPct / 15) * 0.6);
+          let remScore = remPct >= 20 && remPct <= 30 ? 25
+            : remPct >= 10 ? 25 * ((remPct - 5) / 15)
+            : Math.max(0, 25 * (remPct / 20) * 0.5);
+          let effScore = efficiency >= 90 ? 20
+            : efficiency >= 75 ? 20 * ((efficiency - 60) / 30)
+            : Math.max(0, 20 * (efficiency / 90) * 0.5);
+          const score = Math.round(Math.min(100, durationScore + deepScore + remScore + effScore));
+
+          return {
+            date,
+            sleep_score: score,
+            total_hours: (totalH).toFixed(1),
+            deep_hours: (stages.deep / 3600).toFixed(1),
+            rem_hours: (stages.rem / 3600).toFixed(1),
+            light_hours: (stages.light / 3600).toFixed(1),
+            awake_hours: (stages.awake / 3600).toFixed(1),
+            deep_pct: Math.round(deepPct),
+            rem_pct: Math.round(remPct),
+            efficiency: Math.round(efficiency),
+          };
+        });
+
+      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights from Google Fit):\n${JSON.stringify(sleepSummary, null, 2)}\n`;
     }
 
     // Build activity summary for the AI
@@ -142,7 +202,8 @@ Additional Context: ${profile?.athlete_context || "none"}
     const dataContext = `
 TRAINING DATA (${activities.length} activities${isAIDecide ? " - full history" : " over ~8 weeks"}):
 ${JSON.stringify(activitySummary, null, 2)}
-${metricsContext}`;
+${metricsContext}
+${sleepContext}`;
 
     let systemPrompt: string;
     let userPrompt: string;
@@ -157,9 +218,11 @@ You have access to the athlete's complete training data. Use it to give personal
 
 When answering:
 - Reference specific data points from their activities (dates, distances, paces, heart rates)
+- Use their sleep data (sleep scores, deep/REM/light percentages, trends) to inform recovery and readiness advice
+- If sleep scores are declining or sleep quality is poor, flag this and adjust recommendations accordingly
 - Be practical and actionable
-- If asked about nutrition, hydration, or recovery, tailor advice to their training load and upcoming sessions
-- If asked about their plan, reference their actual performance trends
+- If asked about nutrition, hydration, or recovery, tailor advice to their training load, sleep quality, and upcoming sessions
+- If asked about their plan, reference their actual performance trends and recovery status from sleep data
 - Keep answers concise but thorough
 - Use markdown formatting with emoji headers for readability
 
@@ -182,11 +245,20 @@ Analyze: pace/speed progression, heart rate efficiency (aerobic decoupling indic
 ## 🫀 Physiology & Readiness
 Analyze: heart rate trends (resting HR proxy from avg HR patterns), recovery patterns (days between hard sessions), any crash signatures (sudden drops in performance/consistency), fatigue indicators.
 
+## 😴 Sleep & Recovery
+Analyze sleep data if available:
+- Sleep score trends (recent nights, 7-day average)
+- Deep sleep and REM percentages vs recommended ranges (15-20% deep, 20-25% REM)
+- Sleep efficiency trends
+- Correlation between poor sleep nights and next-day training performance
+- Recovery readiness based on sleep quality patterns
+Reference National Sleep Foundation guidelines where relevant.
+
 ## 💡 Actionable Recommendations
 Group into categories:
 - **Load Management**: training volume/intensity adjustments
 - **Running/Cycling**: sport-specific technique and training suggestions  
-- **Recovery**: rest, adaptation, injury prevention
+- **Recovery & Sleep**: rest, adaptation, injury prevention, sleep optimization tips based on their data
 - **Performance**: key workouts to add or modify
 
 Use specific numbers from the data. Be direct and actionable. Format with markdown. Use emoji headers.`;
@@ -348,6 +420,7 @@ RACE DATE: ${raceDateInstruction}
 CRITICAL INSTRUCTIONS:
 - Carefully review the athlete's profile, especially "Additional Context" which may contain injuries, physical limitations, or health conditions. You MUST adapt every workout to account for these. If an injury is mentioned, include modifications, reduced intensity, or alternative exercises.
 - Review ALL activity data to understand the athlete's current fitness level, typical paces, heart rate zones, and recent training load. Base all targets on their ACTUAL performance, not generic estimates.
+- Review sleep data to assess recovery status. If sleep scores are consistently low (<60) or deep/REM percentages are below recommended ranges, factor in extra recovery days or lower intensity sessions. Reference sleep trends when explaining rest day placement.
 - The athlete uses an Amazfit Balance 2 watch with the Zepp app. Structure each workout so it can be manually created as a custom workout in the Zepp app:
   - Break workouts into clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
   - For each segment specify: duration OR distance, target HR zone (Z1-Z5) or target pace range
