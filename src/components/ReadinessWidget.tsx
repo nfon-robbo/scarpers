@@ -177,9 +177,26 @@ const ReadinessWidget = () => {
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
-  // Fetch AI advice once we have the readiness result
+  // Fetch AI advice with 1-hour cache, refresh if score changes
   useEffect(() => {
-    if (!result || result.factors.length === 0 || aiAdvice !== null) return;
+    if (!result || result.factors.length === 0) return;
+
+    // Check localStorage cache
+    const cacheKey = "readiness_advice_cache";
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const { advice, score, timestamp } = JSON.parse(cached);
+        const ageMs = Date.now() - timestamp;
+        const oneHour = 60 * 60 * 1000;
+        // Use cache if less than 1 hour old AND score hasn't changed
+        if (ageMs < oneHour && score === result.score) {
+          setAiAdvice(advice);
+          return;
+        }
+      } catch { /* invalid cache, refetch */ }
+    }
+
     const fetchAdvice = async () => {
       setAiLoading(true);
       try {
@@ -206,8 +223,13 @@ const ReadinessWidget = () => {
         if (resp.ok) {
           const data = await resp.json();
           setAiAdvice(data.advice);
+          // Cache the result
+          localStorage.setItem(cacheKey, JSON.stringify({
+            advice: data.advice,
+            score: result.score,
+            timestamp: Date.now(),
+          }));
         } else {
-          // Silently fail - the widget still works without AI
           setAiAdvice("");
         }
       } catch {
