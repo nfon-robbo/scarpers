@@ -43,8 +43,14 @@ const ActivityMap = ({ track, className = "" }: Props) => {
     }).addTo(map);
 
     const latlngs: L.LatLngExpression[] = track
-      .filter((p) => p.lat != null && (p.lng != null || p.lon != null))
+      .filter((p) => p.lat != null && (p.lng != null || p.lon != null) && isFinite(p.lat) && isFinite((p.lng ?? p.lon)!))
       .map((p) => [p.lat, (p.lng ?? p.lon)!] as [number, number]);
+
+    if (latlngs.length < 2) {
+      map.remove();
+      mapInstance.current = null;
+      return;
+    }
 
     // Draw route polyline
     const polyline = L.polyline(latlngs, {
