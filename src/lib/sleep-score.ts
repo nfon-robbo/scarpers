@@ -1,12 +1,14 @@
 /**
  * Sleep Score Algorithm (0-100)
  * Based on National Sleep Foundation & Matthew Walker's research.
+ * Calibrated to match Zepp/Garmin-style harsh scoring.
  *
  * Components:
- *  - Duration (30 pts): 7-9h optimal
- *  - Deep sleep % (25 pts): 15-20% optimal
- *  - REM sleep % (25 pts): 20-25% optimal
- *  - Sleep efficiency (20 pts): low awake time
+ *  - Duration (25 pts): 7-9h optimal
+ *  - Deep sleep % (30 pts): 15-20% optimal — HEAVIEST, critical for recovery
+ *  - REM sleep % (20 pts): 20-25% optimal
+ *  - Sleep efficiency (15 pts): low awake time
+ *  - Continuity bonus (10 pts): penalises fragmented sleep
  */
 
 export interface SleepStageData {
@@ -22,65 +24,83 @@ export function calculateSleepScore(stages: SleepStageData): number {
 
   const totalHours = total / 3600;
   const sleepTime = stages.deep + stages.light + stages.rem;
-  const deepPct = stages.deep / sleepTime * 100;
-  const remPct = stages.rem / sleepTime * 100;
-  const efficiency = sleepTime / total * 100;
+  if (sleepTime === 0) return 0;
+  const deepPct = (stages.deep / sleepTime) * 100;
+  const remPct = (stages.rem / sleepTime) * 100;
+  const efficiency = (sleepTime / total) * 100;
 
-  // Duration score (30 pts) — bell curve around 7-9h
+  // Duration score (25 pts) — bell curve around 7-9h
   let durationScore: number;
   if (totalHours >= 7 && totalHours <= 9) {
-    durationScore = 30;
+    durationScore = 25;
   } else if (totalHours >= 6 && totalHours < 7) {
-    durationScore = 30 * ((totalHours - 5) / 2);
+    durationScore = 25 * ((totalHours - 5) / 2);
   } else if (totalHours > 9 && totalHours <= 10) {
-    durationScore = 30 * ((10 - totalHours));
+    durationScore = 25 * (10 - totalHours);
   } else if (totalHours < 6) {
-    durationScore = Math.max(0, 30 * (totalHours / 6) * 0.5);
+    // Harsh: under 6h is terrible
+    durationScore = Math.max(0, 25 * (totalHours / 7) * 0.4);
   } else {
-    durationScore = Math.max(0, 30 * 0.3);
+    durationScore = Math.max(0, 25 * 0.25);
   }
 
-  // Deep sleep score (25 pts) — 15-20% ideal, <10% is severely penalised
+  // Deep sleep score (30 pts) — 15-20% ideal, <10% is catastrophic
   let deepScore: number;
   if (deepPct >= 15 && deepPct <= 25) {
-    deepScore = 25;
-  } else if (deepPct >= 10 && deepPct < 15) {
-    deepScore = 25 * ((deepPct - 5) / 10);
-  } else if (deepPct > 25) {
-    deepScore = Math.max(15, 25 - (deepPct - 25));
+    deepScore = 30;
+  } else if (deepPct >= 12 && deepPct < 15) {
+    deepScore = 30 * ((deepPct - 8) / 7); // 8-15 range maps to 0-30
+  } else if (deepPct >= 10 && deepPct < 12) {
+    deepScore = 30 * 0.35; // ~10.5 pts
+  } else if (deepPct > 25 && deepPct <= 35) {
+    deepScore = Math.max(20, 30 - (deepPct - 25) * 0.5);
+  } else if (deepPct < 10) {
+    // CATASTROPHIC — below 10% means almost no physical recovery
+    // 7% → ~2.1pts, 5% → ~1pts, 3% → ~0.4pts
+    deepScore = Math.max(0, 30 * (deepPct / 15) * 0.15);
   } else {
-    // Below 10% — aggressive penalty (critical for recovery)
-    deepScore = Math.max(0, 25 * (deepPct / 15) * 0.3);
+    deepScore = 15;
   }
 
-  // REM score (25 pts) — 20-25% ideal
+  // REM score (20 pts) — 20-25% ideal
   let remScore: number;
   if (remPct >= 20 && remPct <= 30) {
-    remScore = 25;
-  } else if (remPct >= 10 && remPct < 20) {
-    remScore = 25 * ((remPct - 5) / 15);
+    remScore = 20;
+  } else if (remPct >= 12 && remPct < 20) {
+    remScore = 20 * ((remPct - 5) / 15);
   } else if (remPct > 30) {
-    remScore = Math.max(15, 25 - (remPct - 30));
+    remScore = Math.max(12, 20 - (remPct - 30) * 0.5);
   } else {
-    remScore = Math.max(0, 25 * (remPct / 20) * 0.5);
+    remScore = Math.max(0, 20 * (remPct / 20) * 0.4);
   }
 
-  // Efficiency score (20 pts) — >90% is great
+  // Efficiency score (15 pts) — >90% is great
   let effScore: number;
-  if (efficiency >= 90) {
-    effScore = 20;
-  } else if (efficiency >= 75) {
-    effScore = 20 * ((efficiency - 60) / 30);
+  if (efficiency >= 92) {
+    effScore = 15;
+  } else if (efficiency >= 80) {
+    effScore = 15 * ((efficiency - 65) / 27);
+  } else if (efficiency >= 70) {
+    effScore = 15 * 0.3;
   } else {
-    effScore = Math.max(0, 20 * (efficiency / 90) * 0.5);
+    effScore = Math.max(0, 15 * (efficiency / 90) * 0.3);
   }
 
-  return Math.round(Math.min(100, durationScore + deepScore + remScore + effScore));
+  // Light-heavy penalty: if light sleep dominates (>75% of sleep time), extra penalty
+  const lightPct = (stages.light / sleepTime) * 100;
+  let lightPenalty = 0;
+  if (lightPct > 75) {
+    lightPenalty = Math.min(10, (lightPct - 75) * 0.5);
+  }
+
+  const raw = durationScore + deepScore + remScore + effScore - lightPenalty;
+  return Math.round(Math.max(0, Math.min(100, raw)));
 }
 
 export function scoreLabel(score: number): { label: string; color: string } {
   if (score >= 85) return { label: "Excellent", color: "text-primary" };
   if (score >= 70) return { label: "Good", color: "text-primary" };
   if (score >= 50) return { label: "Fair", color: "text-yellow-500" };
-  return { label: "Poor", color: "text-destructive" };
+  if (score >= 30) return { label: "Poor", color: "text-destructive" };
+  return { label: "Very Poor", color: "text-destructive" };
 }

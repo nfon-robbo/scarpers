@@ -90,14 +90,15 @@ export function workoutIntensity(act: {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-/** Circadian modifier: gentle energy curve based on local hour.
- *  Readiness reflects physiological state, not time-of-day penalties. */
+/** Circadian modifier: energy curve based on local hour.
+ *  More aggressive than before — late night is harsh. */
 function circadianModifier(hour: number): number {
-  if (hour >= 8 && hour < 12) return 3;
-  if (hour >= 6 && hour < 8) return 1;
-  if (hour >= 12 && hour < 17) return 0;
-  if (hour >= 17 && hour < 21) return -2;
-  return -5; // night — mild penalty only
+  if (hour >= 9 && hour < 12) return 3;
+  if (hour >= 7 && hour < 9) return 1;
+  if (hour >= 12 && hour < 16) return 0;
+  if (hour >= 16 && hour < 20) return -3;
+  if (hour >= 20 && hour < 23) return -6;
+  return -10; // 11pm-7am — you should be sleeping
 }
 
 // ── Main scoring ───────────────────────────────────────────────────────
@@ -105,25 +106,24 @@ function circadianModifier(hour: number): number {
 export function computeReadiness(d: ReadinessData): ReadinessResult {
   const factors: ReadinessFactor[] = [];
   let weightedSum = 0;
-  // Fixed total weight = 1.0 — missing data scores as 0, dragging the score down
   const TOTAL_WEIGHT = 1.0;
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (35%) — heaviest factor per Zepp BioCharge philosophy
+  // Sleep Quality (30%) — primary recovery indicator
   if (d.sleepScore == null) {
-    // Missing sleep = assume poor
-    weightedSum += 25 * 0.35;
+    // Missing sleep = assume very poor — you can't recover without data
+    weightedSum += 15 * 0.30;
     factors.push({
       label: "Sleep Quality",
-      status: "warning",
+      status: "poor",
       detail: "Not synced",
     });
   } else {
     const s = d.sleepScore;
-    // Apply a curve: scores below 80 get penalised more aggressively
-    const adjustedSleep = s >= 80 ? s : s * 0.85;
-    weightedSum += adjustedSleep * 0.35;
+    // Aggressive curve: scores below 70 get hammered
+    const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s * 0.55;
+    weightedSum += adjustedSleep * 0.30;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -132,66 +132,90 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     });
   }
 
-  // RHR vs baseline (15%)
+  // Deep Sleep (15%) — standalone factor, critical for physical recovery
+  if (d.deepPct != null) {
+    const dp = d.deepPct;
+    let deepReadiness: number;
+    if (dp >= 15) {
+      deepReadiness = 90;
+    } else if (dp >= 12) {
+      deepReadiness = 65;
+    } else if (dp >= 10) {
+      deepReadiness = 45;
+    } else if (dp >= 7) {
+      deepReadiness = 25;
+    } else {
+      deepReadiness = 10; // catastrophic
+    }
+    weightedSum += deepReadiness * 0.15;
+    factors.push({
+      label: "Deep Sleep",
+      status: dp >= 13 ? "good" : dp >= 10 ? "warning" : "poor",
+      detail: `${Math.round(dp)}% of sleep${dp < 10 ? " ⚠️ critically low" : ""}`,
+    });
+  } else {
+    weightedSum += 10 * 0.15; // missing = assume terrible
+  }
+
+  // RHR vs baseline (12%)
   if (d.rhr != null && d.rhrBaseline != null) {
     const diff = d.rhr - d.rhrBaseline;
-    const rhrScore = diff <= 1 ? 85 : diff <= 3 ? 70 : diff <= 6 ? 50 : diff <= 10 ? 35 : 20;
-    weightedSum += rhrScore * 0.15;
+    const rhrScore = diff <= 0 ? 85 : diff <= 2 ? 75 : diff <= 4 ? 55 : diff <= 7 ? 35 : 15;
+    weightedSum += rhrScore * 0.12;
     factors.push({
       label: "Resting HR",
       status: diff <= 3 ? "good" : diff <= 7 ? "warning" : "poor",
       detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
     });
   } else if (d.rhr != null) {
-    weightedSum += 45 * 0.15;
+    weightedSum += 40 * 0.12;
     factors.push({ label: "Resting HR", status: "warning", detail: `${Math.round(d.rhr)} bpm (no baseline)` });
   } else {
-    weightedSum += 25 * 0.15;
+    weightedSum += 15 * 0.12; // missing = bad
   }
 
-  // HRV vs baseline (25%)
+  // HRV vs baseline (20%)
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
-    // Stricter: only score high if HRV is clearly above baseline
-    const hrvScore = pct >= 5 ? 85 : pct >= -5 ? 70 : pct >= -15 ? 50 : pct >= -25 ? 35 : 20;
-    weightedSum += hrvScore * 0.25;
+    const hrvScore = pct >= 10 ? 90 : pct >= 0 ? 75 : pct >= -10 ? 55 : pct >= -20 ? 35 : 15;
+    weightedSum += hrvScore * 0.20;
     factors.push({
       label: "HRV",
       status: pct >= -5 ? "good" : pct >= -15 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 20 * 0.25;
-    factors.push({ label: "HRV", status: "warning", detail: "No data" });
+    weightedSum += 10 * 0.20; // missing HRV = heavy penalty
+    factors.push({ label: "HRV", status: "poor", detail: "No data" });
   }
 
-  // Stress (15%)
+  // Stress (10%)
   if (d.stressScore != null) {
     const v = d.stressScore;
-    const stressScore = v <= 20 ? 85 : v <= 40 ? 65 : v <= 60 ? 45 : v <= 80 ? 30 : 15;
-    weightedSum += stressScore * 0.15;
+    const stressScore = v <= 20 ? 85 : v <= 35 ? 65 : v <= 55 ? 45 : v <= 75 ? 25 : 10;
+    weightedSum += stressScore * 0.10;
     factors.push({
       label: "Stress",
-      status: v <= 30 ? "good" : v <= 60 ? "warning" : "poor",
+      status: v <= 30 ? "good" : v <= 55 ? "warning" : "poor",
       detail: `${Math.round(v)}/100`,
     });
   } else {
-    weightedSum += 35 * 0.15; // missing stress = mild penalty
+    weightedSum += 20 * 0.10; // missing stress = assume moderate-poor
   }
 
-  // Yesterday's Load — intensity-weighted (10%)
+  // Yesterday's Load — intensity-weighted (13%)
   if (d.yesterdayLoad != null) {
     const l = d.yesterdayLoad;
-    const loadScore = l <= 20 ? 85 : l <= 45 ? 70 : l <= 90 ? 50 : l <= 150 ? 35 : 20;
-    weightedSum += loadScore * 0.10;
+    const loadScore = l <= 15 ? 85 : l <= 40 ? 70 : l <= 80 ? 45 : l <= 140 ? 25 : 10;
+    weightedSum += loadScore * 0.13;
     factors.push({
       label: "Yesterday's Load",
-      status: l <= 45 ? "good" : l <= 90 ? "warning" : "poor",
+      status: l <= 40 ? "good" : l <= 80 ? "warning" : "poor",
       detail: `${Math.round(l)} min training`,
     });
   } else {
-    weightedSum += 55 * 0.10;
+    weightedSum += 50 * 0.13; // rest day = decent
   }
 
   // Normalise to 0-100 with fixed denominator
@@ -201,15 +225,14 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   const modifiers: { label: string; adj: number; detail: string }[] = [];
 
-  // Recovery time
+  // Recovery time — more aggressive
   if (d.recoveryHoursSinceLastHard != null && d.lastWorkoutIntensity != null) {
     const hrs = d.recoveryHoursSinceLastHard;
     const intensity = d.lastWorkoutIntensity;
-    // Higher intensity needs more recovery; penalise if within window
-    const neededHrs = 8 + (intensity / 100) * 16; // 8-24h based on intensity
+    const neededHrs = 8 + (intensity / 100) * 16;
     if (hrs < neededHrs) {
       const ratio = hrs / neededHrs;
-      const penalty = -Math.round(5 + (1 - ratio) * 10); // -5 to -15
+      const penalty = -Math.round(6 + (1 - ratio) * 14); // -6 to -20
       modifiers.push({
         label: "Recovery",
         adj: penalty,
@@ -224,11 +247,11 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     }
   }
 
-  // 3-day sleep debt
+  // 3-day sleep debt — harsher
   if (d.recentSleepAvgHours != null && d.baselineSleepAvgHours != null && d.baselineSleepAvgHours > 0) {
     const debt = d.recentSleepAvgHours - d.baselineSleepAvgHours;
-    if (debt < -0.5) {
-      const penalty = Math.round(Math.max(-15, debt * 7)); // -7 per hour deficit, max -15
+    if (debt < -0.3) {
+      const penalty = Math.round(Math.max(-20, debt * 10)); // -10 per hour deficit, max -20
       modifiers.push({
         label: "Sleep Debt",
         adj: penalty,
@@ -240,8 +263,8 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   // 3-day stress trend
   if (d.stressHistory.length >= 2) {
     const avg = d.stressHistory.reduce((a, b) => a + b, 0) / d.stressHistory.length;
-    if (avg > 50) {
-      const penalty = -Math.round(Math.min(10, (avg - 50) / 5)); // -1 to -10
+    if (avg > 45) {
+      const penalty = -Math.round(Math.min(12, (avg - 45) / 4)); // -1 to -12
       modifiers.push({
         label: "Stress Trend",
         adj: penalty,
@@ -253,8 +276,8 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   // Training monotony (7d vs 28d)
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
     const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
-    if (ratio > 1.5) {
-      const penalty = -Math.round(Math.min(10, (ratio - 1.5) * 10)); // -1 to -10
+    if (ratio > 1.4) {
+      const penalty = -Math.round(Math.min(12, (ratio - 1.4) * 12)); // -1 to -12
       modifiers.push({
         label: "Training Ramp",
         adj: penalty,
@@ -271,7 +294,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // Today's load
   if (d.todayLoad != null && d.todayLoad > 0) {
-    const penalty = -Math.round(Math.min(15, (d.todayLoad / 60) * 10)); // -1 to -15
+    const penalty = -Math.round(Math.min(18, (d.todayLoad / 50) * 10)); // -1 to -18
     modifiers.push({
       label: "Today's Effort",
       adj: penalty,
