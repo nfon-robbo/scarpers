@@ -15,6 +15,7 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 import ReadinessWidget from "@/components/ReadinessWidget";
+import ReadinessHistoryChart from "@/components/ReadinessHistoryChart";
 
 // ── Types ──
 
@@ -169,8 +170,9 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ── Readiness — untouched ── */}
+      {/* ── Readiness ── */}
       <ReadinessWidget />
+      <ReadinessHistoryChart />
 
       {/* ── Quick Actions ── */}
       <div className="grid gap-3 sm:grid-cols-3">
