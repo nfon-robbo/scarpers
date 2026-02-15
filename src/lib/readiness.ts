@@ -90,30 +90,14 @@ export function workoutIntensity(act: {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-/** Circadian modifier: energy curve based on local hour.
- *  Late night should aggressively tank readiness — you're not ready to train at midnight. */
+/** Circadian modifier: gentle energy curve based on local hour.
+ *  Readiness reflects physiological state, not time-of-day penalties. */
 function circadianModifier(hour: number): number {
-  // 10-12 peak energy
-  if (hour >= 10 && hour < 12) return 3;
-  // 8-10 warming up
-  if (hour >= 8 && hour < 10) return 2;
-  // 6-8 early morning
-  if (hour >= 6 && hour < 8) return 0;
-  // 14-17 afternoon recovery
-  if (hour >= 14 && hour < 17) return 0;
-  // 12-14 post-lunch dip
-  if (hour >= 12 && hour < 14) return -3;
-  // 17-20 early evening wind-down
-  if (hour >= 17 && hour < 20) return -10;
-  // 20-22 late evening
-  if (hour >= 20 && hour < 22) return -30;
-  // 22-00 night — you should be asleep
-  if (hour >= 22) return -50;
-  // 00-03 deep night — absolute tank
-  if (hour < 3) return -60;
-  // 3-6 pre-dawn
-  if (hour >= 3 && hour < 6) return -40;
-  return 0;
+  if (hour >= 8 && hour < 12) return 3;
+  if (hour >= 6 && hour < 8) return 1;
+  if (hour >= 12 && hour < 17) return 0;
+  if (hour >= 17 && hour < 21) return -2;
+  return -5; // night — mild penalty only
 }
 
 // ── Main scoring ───────────────────────────────────────────────────────
