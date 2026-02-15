@@ -28,7 +28,7 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { readiness_score, factors, current_hour_local } = await req.json();
+    const { readiness_score, factors, current_hour_local, missing_data } = await req.json();
 
     // Fetch profile and active training plan in parallel
     const [profileRes, planRes] = await Promise.all([
@@ -158,7 +158,8 @@ Rules:
 - Use the user's name if available
 - Keep it to 2-4 sentences. No headers, no bullet points. Just raw, unfiltered coach talk.
 ${sleepPatternContext}
-${planContext}`;
+${planContext}
+${missing_data && missing_data.length > 0 ? `\nCRITICAL: The following data has NOT been synced today: ${missing_data.join(', ')}. Do NOT praise, reference, or comment positively on any missing metric. If sleep is missing, say NOTHING about sleep quality — do not even mention sleep.` : ''}`;
 
     const factorsText = (factors || []).map((f: any) => `${f.label}: ${f.detail} (${f.status})`).join("\n");
 
