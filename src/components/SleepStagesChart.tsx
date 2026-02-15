@@ -56,16 +56,16 @@ const SleepStagesChart = () => {
       }
       const key = s.stage as keyof Omit<DailyStages, "date">;
       if (key in byDate[s.date]) {
-        byDate[s.date][key] += s.duration_seconds / 3600;
+        byDate[s.date][key] += s.duration_seconds;
       }
     }
     return Object.values(byDate).map(d => ({
       ...d,
       date: format(parseISO(d.date), "dd MMM"),
-      deep: Number(d.deep.toFixed(1)),
-      light: Number(d.light.toFixed(1)),
-      rem: Number(d.rem.toFixed(1)),
-      awake: Number(d.awake.toFixed(1)),
+      deep: Number((d.deep / 3600).toFixed(1)),
+      light: Number((d.light / 3600).toFixed(1)),
+      rem: Number((d.rem / 3600).toFixed(1)),
+      awake: Number((d.awake / 3600).toFixed(1)),
     }));
   }, [stages]);
 
@@ -74,7 +74,8 @@ const SleepStagesChart = () => {
     if (chartData.length === 0) return null;
     const latest = chartData[chartData.length - 1];
     const total = latest.deep + latest.light + latest.rem + latest.awake;
-    return { ...latest, total: Number(total.toFixed(1)) };
+    const fmtHM = (h: number) => `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
+    return { ...latest, total, fmtTotal: fmtHM(total), fmtDeep: fmtHM(latest.deep), fmtRem: fmtHM(latest.rem), fmtLight: fmtHM(latest.light) };
   }, [chartData]);
 
   if (loading || stages.length === 0) return null;
@@ -90,7 +91,7 @@ const SleepStagesChart = () => {
           Deep, Light, REM & Awake breakdown from Google Fit
           {latestSummary && (
             <span className="ml-2 text-foreground font-medium">
-              — Last night: {latestSummary.total}h (Deep {latestSummary.deep}h, REM {latestSummary.rem}h, Light {latestSummary.light}h)
+              — Last night: {latestSummary.fmtTotal} (Deep {latestSummary.fmtDeep}, REM {latestSummary.fmtRem}, Light {latestSummary.fmtLight})
             </span>
           )}
         </CardDescription>
@@ -104,7 +105,11 @@ const SleepStagesChart = () => {
             <Tooltip
               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: "hsl(var(--foreground))" }}
-              formatter={(v: number, name: string) => [`${v}h`, name.charAt(0).toUpperCase() + name.slice(1)]}
+              formatter={(v: number) => {
+                const h = Math.floor(v);
+                const m = Math.round((v % 1) * 60);
+                return [`${h}h ${m}m`, ""];
+              }}
             />
             <Legend />
             <Bar dataKey="deep" stackId="a" fill="hsl(var(--primary))" name="Deep" radius={[0, 0, 0, 0]} />
