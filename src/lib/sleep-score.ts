@@ -40,7 +40,7 @@ export function calculateSleepScore(stages: SleepStageData): number {
     durationScore = Math.max(0, 30 * 0.3);
   }
 
-  // Deep sleep score (25 pts) — 15-20% ideal
+  // Deep sleep score (25 pts) — 15-20% ideal, <10% is severely penalised
   let deepScore: number;
   if (deepPct >= 15 && deepPct <= 25) {
     deepScore = 25;
@@ -49,7 +49,8 @@ export function calculateSleepScore(stages: SleepStageData): number {
   } else if (deepPct > 25) {
     deepScore = Math.max(15, 25 - (deepPct - 25));
   } else {
-    deepScore = Math.max(0, 25 * (deepPct / 15) * 0.6);
+    // Below 10% — aggressive penalty (critical for recovery)
+    deepScore = Math.max(0, 25 * (deepPct / 15) * 0.3);
   }
 
   // REM score (25 pts) — 20-25% ideal
