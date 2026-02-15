@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Zap, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Zap, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare, RefreshCw } from "lucide-react";
 import { calculateSleepScore } from "@/lib/sleep-score";
 import {
   type ReadinessData,
@@ -163,68 +164,71 @@ const ReadinessWidget = () => {
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
-  // Fetch AI advice with 1-hour cache, refresh if score changes
-  useEffect(() => {
+  const fetchAdvice = async (skipCache = false) => {
     if (!result || result.factors.length === 0) return;
 
     const cacheKey = "readiness_advice_cache";
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        const { advice, score, factorCount, timestamp } = JSON.parse(cached);
-        const ageMs = Date.now() - timestamp;
-        const oneHour = 60 * 60 * 1000;
-        if (ageMs < oneHour && score === result.score && factorCount === result.factors.length) {
-          setAiAdvice(advice);
-          return;
-        }
-      } catch { /* invalid cache, refetch */ }
+    if (!skipCache) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { advice, score, factorCount, timestamp } = JSON.parse(cached);
+          const ageMs = Date.now() - timestamp;
+          const oneHour = 60 * 60 * 1000;
+          if (ageMs < oneHour && score === result.score && factorCount === result.factors.length) {
+            setAiAdvice(advice);
+            return;
+          }
+        } catch { /* invalid cache, refetch */ }
+      }
     }
 
-    const fetchAdvice = async () => {
-      setAiLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+    setAiLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({
-              readiness_score: result.score,
-              factors: result.factors,
-              current_hour_local: new Date().getHours(),
-              missing_data: result.factors
-                .filter(f => f.status === "warning" && f.detail === "Not synced")
-                .map(f => f.label.toLowerCase()),
-            }),
-          }
-        );
-
-        if (resp.ok) {
-          const data = await resp.json();
-          setAiAdvice(data.advice);
-          localStorage.setItem(cacheKey, JSON.stringify({
-            advice: data.advice,
-            score: result.score,
-            factorCount: result.factors.length,
-            timestamp: Date.now(),
-          }));
-        } else {
-          setAiAdvice("");
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            readiness_score: result.score,
+            factors: result.factors,
+            current_hour_local: new Date().getHours(),
+            missing_data: result.factors
+              .filter(f => f.status === "warning" && f.detail === "Not synced")
+              .map(f => f.label.toLowerCase()),
+          }),
         }
-      } catch {
+      );
+
+      if (resp.ok) {
+        const data = await resp.json();
+        setAiAdvice(data.advice);
+        localStorage.setItem(cacheKey, JSON.stringify({
+          advice: data.advice,
+          score: result.score,
+          factorCount: result.factors.length,
+          timestamp: Date.now(),
+        }));
+      } else {
         setAiAdvice("");
-      } finally {
-        setAiLoading(false);
       }
-    };
+    } catch {
+      setAiAdvice("");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Fetch AI advice with 1-hour cache, refresh if score changes
+  useEffect(() => {
     fetchAdvice();
   }, [result]);
 
@@ -269,7 +273,18 @@ const ReadinessWidget = () => {
         </div>
 
         {/* AI Coach Advice */}
-        <div className="rounded-md bg-muted/50 p-3 text-sm">
+        <div className="rounded-md bg-muted/50 p-3 text-sm relative">
+          {!aiLoading && aiAdvice && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-1 right-1 h-6 w-6"
+              onClick={() => fetchAdvice(true)}
+              title="Refresh advice"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </Button>
+          )}
           {aiLoading ? (
             <p className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
