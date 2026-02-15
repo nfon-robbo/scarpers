@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import ReadinessHistoryChart from "@/components/ReadinessHistoryChart";
+import BodyBatteryChart from "@/components/BodyBatteryChart";
 
 // ── Types ──
 
@@ -249,6 +250,7 @@ const Dashboard = () => {
 
       {/* ── Readiness ── */}
       <ReadinessWidget />
+      <BodyBatteryChart />
       <ReadinessHistoryChart />
 
       {/* ── Quick Actions ── */}
