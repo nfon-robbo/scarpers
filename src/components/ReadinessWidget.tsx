@@ -234,13 +234,16 @@ const ReadinessWidget = () => {
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
-  // Save snapshot (throttled: max once per hour)
+  // Save snapshot (throttled: max once per hour, prevent StrictMode duplicates)
   useEffect(() => {
     if (!result || !user) return;
     const cacheKey = `readiness_snapshot_last_${user.id}`;
     const last = localStorage.getItem(cacheKey);
     const now = Date.now();
     if (last && now - Number(last) < 3600000) return; // 1 hour throttle
+
+    // Set immediately to prevent duplicate from StrictMode re-mount
+    localStorage.setItem(cacheKey, String(now));
 
     const hour = new Date().getHours();
     supabase
@@ -253,7 +256,7 @@ const ReadinessWidget = () => {
         recorded_at: new Date().toISOString(),
       })
       .then(({ error }) => {
-        if (!error) localStorage.setItem(cacheKey, String(now));
+        if (error) localStorage.removeItem(cacheKey); // rollback on failure
       });
   }, [result, user]);
 
