@@ -121,21 +121,24 @@ function circadianModifier(hour: number): number {
 export function computeReadiness(d: ReadinessData): ReadinessResult {
   const factors: ReadinessFactor[] = [];
   let weightedSum = 0;
-  let weightSum = 0;
+  // Fixed total weight = 1.0 — missing data scores as 0, dragging the score down
+  const TOTAL_WEIGHT = 1.0;
 
-  // ── Phase 1: Core factors (weighted average) ──
+  // ── Phase 1: Core factors (fixed-weight average) ──
 
   // Sleep Quality (30%)
   if (d.sleepScore == null) {
+    // Missing sleep contributes 0 to the weighted sum (penalty)
+    // Add a small neutral contribution so it's not fully zero
+    weightedSum += 40 * 0.30; // assume "poor" baseline when missing
     factors.push({
       label: "Sleep Quality",
       status: "warning",
       detail: "Not synced",
     });
-  } else if (d.sleepScore != null) {
+  } else {
     const s = d.sleepScore;
     weightedSum += s * 0.30;
-    weightSum += 0.30;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -149,14 +152,16 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const diff = d.rhr - d.rhrBaseline;
     const rhrScore = diff <= 2 ? 90 : diff <= 5 ? 70 : diff <= 10 ? 50 : 30;
     weightedSum += rhrScore * 0.20;
-    weightSum += 0.20;
     factors.push({
       label: "Resting HR",
       status: diff <= 3 ? "good" : diff <= 7 ? "warning" : "poor",
       detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
     });
   } else if (d.rhr != null) {
-    factors.push({ label: "Resting HR", status: "good", detail: `${Math.round(d.rhr)} bpm` });
+    weightedSum += 60 * 0.20; // no baseline to compare, assume moderate
+    factors.push({ label: "Resting HR", status: "warning", detail: `${Math.round(d.rhr)} bpm (no baseline)` });
+  } else {
+    weightedSum += 40 * 0.20; // missing = penalty
   }
 
   // HRV vs baseline (25%)
@@ -165,12 +170,14 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
     const hrvScore = pct >= -5 ? 90 : pct >= -15 ? 65 : 40;
     weightedSum += hrvScore * 0.25;
-    weightSum += 0.25;
     factors.push({
       label: "HRV",
       status: pct >= -10 ? "good" : pct >= -20 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
+  } else {
+    weightedSum += 40 * 0.25; // missing HRV = assume poor
+    factors.push({ label: "HRV", status: "warning", detail: "No data" });
   }
 
   // Stress (15%)
@@ -178,12 +185,13 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const v = d.stressScore;
     const stressScore = v <= 25 ? 90 : v <= 50 ? 70 : v <= 75 ? 45 : 25;
     weightedSum += stressScore * 0.15;
-    weightSum += 0.15;
     factors.push({
       label: "Stress",
       status: v <= 30 ? "good" : v <= 60 ? "warning" : "poor",
       detail: `${Math.round(v)}/100`,
     });
+  } else {
+    weightedSum += 50 * 0.15; // missing stress = neutral
   }
 
   // Yesterday's Load — intensity-weighted (10%)
@@ -191,16 +199,17 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const l = d.yesterdayLoad;
     const loadScore = l <= 30 ? 90 : l <= 60 ? 75 : l <= 120 ? 55 : 35;
     weightedSum += loadScore * 0.10;
-    weightSum += 0.10;
     factors.push({
       label: "Yesterday's Load",
       status: l <= 45 ? "good" : l <= 90 ? "warning" : "poor",
       detail: `${Math.round(l)} min training`,
     });
+  } else {
+    weightedSum += 60 * 0.10; // no activity yesterday = slightly good for recovery
   }
 
-  // Normalise to 0-100
-  let baseScore = weightSum > 0 ? weightedSum / weightSum : 50;
+  // Normalise to 0-100 with fixed denominator
+  let baseScore = weightedSum / TOTAL_WEIGHT;
 
   // ── Phase 2: Modifiers (additive) ──
 
