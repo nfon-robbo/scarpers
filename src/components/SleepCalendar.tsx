@@ -285,9 +285,12 @@ const SleepCalendar = () => {
               </div>
 
               {/* Total */}
-              <p className="text-sm text-muted-foreground">
-                Total: {((selected.stages.deep + selected.stages.light + selected.stages.rem + selected.stages.awake) / 3600).toFixed(1)}h
-              </p>
+              {(() => {
+                const totalSecs = selected.stages.deep + selected.stages.light + selected.stages.rem + selected.stages.awake;
+                const th = Math.floor(totalSecs / 3600);
+                const tm = Math.round((totalSecs % 3600) / 60);
+                return <p className="text-sm text-muted-foreground">Total: {th}h {tm}m</p>;
+              })()}
 
               {/* AI Insight */}
               <div className="border-t pt-3">
