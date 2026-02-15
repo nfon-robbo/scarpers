@@ -1,11 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Zap, AlertTriangle, CheckCircle, BatteryCharging, Loader2, MessageSquare, RefreshCw } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import { calculateSleepScore } from "@/lib/sleep-score";
 import {
   type ReadinessData,
@@ -14,9 +12,97 @@ import {
   activityIntensityLoad,
   workoutIntensity,
 } from "@/lib/readiness";
+import { cn } from "@/lib/utils";
 
+// ── Circular Gauge ──
+function CircularGauge({ score, size = 180 }: { score: number; size?: number }) {
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.max(0, Math.min(100, score)) / 100;
+  const dashOffset = circumference * (1 - progress);
+
+  // Color based on score zones
+  const gaugeColor =
+    score >= 80 ? "hsl(142, 60%, 45%)" : score >= 60 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        {/* Background track */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+        />
+        {/* Progress arc */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={gaugeColor}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      {/* Center text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-5xl font-bold tracking-tight text-foreground">{score}</span>
+        <span className="text-[10px] text-muted-foreground mt-1">
+          Updated {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Zone Bar (0-59 red, 60-79 yellow, 80-100 green) ──
+function ZoneBar({ score }: { score: number }) {
+  const label = score >= 80 ? "HIGH" : score >= 60 ? "MEDIUM" : "LOW";
+  const labelColor = score >= 80 ? "text-emerald-600 dark:text-emerald-400" : score >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400";
+
+  // Position the indicator (0-100 mapped to percentage)
+  const position = `${score}%`;
+
+  return (
+    <div className="w-full space-y-2">
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-bold text-foreground">{score}</span>
+        <span className={cn("text-sm font-semibold", labelColor)}>{label}</span>
+      </div>
+      <div className="relative">
+        {/* Zone bar */}
+        <div className="flex h-2.5 rounded-full overflow-hidden">
+          <div className="flex-[59] bg-red-500/80" />
+          <div className="flex-[20] bg-yellow-500/80" />
+          <div className="flex-[21] bg-emerald-500/80" />
+        </div>
+        {/* Indicator triangle */}
+        <div
+          className="absolute -top-1 w-0 h-0 border-l-[5px] border-r-[5px] border-b-[6px] border-l-transparent border-r-transparent border-b-foreground transition-all duration-700"
+          style={{ left: position, transform: "translateX(-5px)" }}
+        />
+        {/* Zone labels */}
+        <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
+          <span>0–59</span>
+          <span>60–79</span>
+          <span>80–100</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Factor row ──
 const statusIcon = (s: "good" | "warning" | "poor") => {
-  if (s === "good") return <CheckCircle className="w-3.5 h-3.5 text-primary" />;
+  if (s === "good") return <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />;
   if (s === "warning") return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />;
   return <AlertTriangle className="w-3.5 h-3.5 text-destructive" />;
 };
@@ -38,15 +124,12 @@ const ReadinessWidget = () => {
     const twentyEightDaysAgo = new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0];
 
     Promise.all([
-      // Sleep stages — fetch with date so we can group and pick most recent night
       supabase
         .from("sleep_stages")
         .select("stage, duration_seconds, date")
         .eq("user_id", user.id)
         .in("date", [today, yesterday])
         .then(({ data }) => data || []),
-
-      // Daily metrics — 30 days for baselines
       supabase
         .from("daily_metrics")
         .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds")
@@ -54,8 +137,6 @@ const ReadinessWidget = () => {
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
         .then(({ data }) => data || []),
-
-      // Activities — 28 days for monotony + recovery + today's load
       supabase
         .from("activities")
         .select("duration_seconds, start_time, avg_heart_rate, training_load, training_effect")
@@ -64,13 +145,11 @@ const ReadinessWidget = () => {
         .order("start_time", { ascending: false })
         .then(({ data }) => data || []),
     ]).then(([sleepStages, allMetrics, allActivities]) => {
-      // ── Sleep (fix double-count) ──
       const stages = groupSleepByDate(sleepStages as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
       const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
 
-      // ── Metrics ──
       const todayMetrics = allMetrics.find((m: any) => m.date === today);
       const yesterdayMetrics = allMetrics.find((m: any) => m.date === yesterday);
       const latestMetrics = todayMetrics || yesterdayMetrics;
@@ -81,14 +160,12 @@ const ReadinessWidget = () => {
       const rhrBaseline = rhrVals.length ? rhrVals.reduce((a: number, b: number) => a + b, 0) / rhrVals.length : null;
       const hrvBaseline = hrvVals.length ? hrvVals.reduce((a: number, b: number) => a + b, 0) / hrvVals.length : null;
 
-      // Detect stale sleep: if most recent sleep_stages date is older than yesterday, treat as not synced
       const sleepDates = [...new Set((sleepStages as any[]).map((s: any) => s.date))].sort().reverse();
       const mostRecentSleepDate = sleepDates[0] || null;
       const isSleepCurrent = mostRecentSleepDate && (mostRecentSleepDate === today || mostRecentSleepDate === yesterday);
       const finalSleepScore = isSleepCurrent ? (sleepScore ?? (latestMetrics as any)?.sleep_score ?? null) : null;
       const sleepDuration = isSleepCurrent && hasSleepStages ? totalSleep : isSleepCurrent ? ((latestMetrics as any)?.sleep_duration_seconds ?? null) : null;
 
-      // ── 3-day sleep avg vs 30-day avg ──
       const recentMetrics = allMetrics.filter((m: any) => m.date >= threeDaysAgo && m.date <= today);
       const recentSleepSecs = recentMetrics.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
       const recentSleepAvgHours = recentSleepSecs.length ? (recentSleepSecs.reduce((a: number, b: number) => a + b, 0) / recentSleepSecs.length) / 3600 : null;
@@ -96,12 +173,10 @@ const ReadinessWidget = () => {
       const allSleepSecs = baseline.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
       const baselineSleepAvgHours = allSleepSecs.length ? (allSleepSecs.reduce((a: number, b: number) => a + b, 0) / allSleepSecs.length) / 3600 : null;
 
-      // ── 3-day stress history ──
       const stressHistory = recentMetrics
         .filter((m: any) => m.stress_score != null)
         .map((m: any) => m.stress_score as number);
 
-      // ── Activities breakdown ──
       const yesterdayActs = allActivities.filter((a: any) => {
         const d = a.start_time?.split("T")[0];
         return d === yesterday;
@@ -111,17 +186,13 @@ const ReadinessWidget = () => {
         return d === today;
       });
 
-      // Yesterday's intensity-weighted load
       const yesterdayLoad = yesterdayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
-
-      // Today's intensity-weighted load
       const todayLoad = todayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
 
-      // Recovery: hours since last activity ended
       let recoveryHours: number | null = null;
       let lastIntensity: number | null = null;
       if (allActivities.length > 0) {
-        const last = allActivities[0]; // sorted desc
+        const last = allActivities[0];
         if (last.start_time) {
           const endMs = new Date(last.start_time).getTime() + ((last.duration_seconds || 0) * 1000);
           recoveryHours = (Date.now() - endMs) / (1000 * 3600);
@@ -129,7 +200,6 @@ const ReadinessWidget = () => {
         }
       }
 
-      // Training monotony: 7-day daily avg vs 28-day daily avg
       const sevenDayActs = allActivities.filter((a: any) => a.start_time && a.start_time >= sevenDaysAgo + "T00:00:00Z");
       const weeklyTotal = sevenDayActs.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
       const monthlyTotal = allActivities.reduce((s: number, a: any) => s + activityIntensityLoad(a), 0);
@@ -227,89 +297,93 @@ const ReadinessWidget = () => {
     }
   };
 
-  // Fetch AI advice with 1-hour cache, refresh if score changes
   useEffect(() => {
     fetchAdvice();
   }, [result]);
 
   if (loading || !result || result.factors.length === 0) return null;
 
-  const readinessLabel = result.score >= 80 ? "Locked In" : result.score >= 60 ? "Decent" : result.score >= 40 ? "Rough Day" : "Train Wreck";
-  const readinessColor = result.score >= 80 ? "text-primary" : result.score >= 60 ? "text-yellow-500" : "text-destructive";
-  const badgeVariant = result.score >= 80 ? "default" : result.score >= 60 ? "secondary" : "destructive";
-
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="w-4 h-4 text-primary" />
-            Readiness Now
-          </CardTitle>
-          <Badge variant={badgeVariant as any}>{readinessLabel}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Score bar */}
-        <div className="space-y-1">
-          <div className="flex justify-between items-baseline">
-            <span className={`text-3xl font-bold ${readinessColor}`}>{result.score}</span>
-            <span className="text-xs text-muted-foreground">/100</span>
+    <div className="space-y-4">
+      {/* Main Gauge Card */}
+      <Card>
+        <CardContent className="pt-6 pb-4 flex flex-col items-center">
+          <CircularGauge score={result.score} />
+        </CardContent>
+      </Card>
+
+      {/* AI Insight Card */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-foreground">Daily Readiness Insight</h3>
+            {!aiLoading && aiAdvice && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => fetchAdvice(true)}
+                title="Refresh advice"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </Button>
+            )}
           </div>
-          <Progress value={result.score} className="h-2" />
-        </div>
-
-        {/* Factor breakdown */}
-        <div className="space-y-2">
-          {result.factors.map((f) => (
-            <div key={f.label} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                {statusIcon(f.status)}
-                <span className="text-muted-foreground">{f.label}</span>
-              </div>
-              <span className="font-medium">{f.detail}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* AI Coach Advice */}
-        <div className="rounded-md bg-muted/50 p-3 text-sm relative">
-          {!aiLoading && aiAdvice && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 h-6 w-6"
-              onClick={() => fetchAdvice(true)}
-              title="Refresh advice"
-            >
-              <RefreshCw className="w-3 h-3" />
-            </Button>
-          )}
           {aiLoading ? (
-            <p className="flex items-center gap-2 text-muted-foreground">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Coach is thinking of something mean to say...
+              Coach is thinking...
             </p>
           ) : aiAdvice ? (
-            <p className="flex items-start gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
-              <span>{aiAdvice}</span>
-            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{aiAdvice}</p>
           ) : (
-            <p className="font-medium flex items-center gap-1.5">
-              <BatteryCharging className="w-3.5 h-3.5" />
+            <p className="text-sm text-muted-foreground">
               {result.score >= 80
-                ? "You're well recovered — go crush it, you beautiful bastard."
+                ? "You're well recovered — go crush it today."
                 : result.score >= 60
-                ? "Not your best, not your worst — don't be a hero today."
+                ? "Moderate readiness — pace yourself wisely."
                 : result.score >= 40
-                ? "Your body is begging for mercy — take it easy, champ."
-                : "For the love of all that is holy, rest. Just rest."}
+                ? "Your body needs lighter work today."
+                : "Rest is your best workout today."}
             </p>
           )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Wake Readiness Score + Zone Bar */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">Wake Readiness</h3>
+          <ZoneBar score={result.score} />
+
+          {/* Sleep contribution */}
+          {data?.sleepHours != null && (
+            <div className="flex items-center justify-between text-sm rounded-lg bg-muted/50 px-3 py-2">
+              <span className="text-muted-foreground">🌙 Sleep</span>
+              <span className="font-medium">+{Math.round((data.sleepScore || 0) * 0.3)} · {data.sleepHours.toFixed(1)}h</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Readiness Metrics */}
+      <Card>
+        <CardContent className="p-4 space-y-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            Readiness Metrics
+          </h3>
+          {result.factors.map((f) => (
+            <div key={f.label} className="flex items-center justify-between py-1.5 text-sm">
+              <div className="flex items-center gap-2">
+                {statusIcon(f.status)}
+                <span className="text-foreground">{f.label}</span>
+              </div>
+              <span className="text-muted-foreground font-medium">{f.detail}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
