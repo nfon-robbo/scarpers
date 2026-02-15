@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import AIChatbot from "@/components/AIChatbot";
 import {
   Activity,
   LayoutDashboard,
@@ -127,6 +128,8 @@ const AppLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      <AIChatbot />
     </div>
   );
 };
