@@ -1,0 +1,167 @@
+import { useMemo, useState } from "react";
+import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, isToday } from "date-fns";
+import { ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { ParsedWorkout } from "@/lib/plan-export";
+
+interface PlanCalendarViewProps {
+  workouts: ParsedWorkout[];
+  planStartDate?: Date;
+}
+
+export default function PlanCalendarView({ workouts, planStartDate }: PlanCalendarViewProps) {
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    // Default to current week (Monday start)
+    return startOfWeek(new Date(), { weekStartsOn: 1 });
+  });
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  }, [weekStart]);
+
+  // Map workouts by date string for quick lookup
+  const workoutMap = useMemo(() => {
+    const map = new Map<string, ParsedWorkout>();
+    for (const w of workouts) {
+      if (w.dateObj) {
+        map.set(format(w.dateObj, "yyyy-MM-dd"), w);
+      }
+    }
+    return map;
+  }, [workouts]);
+
+  // Compute plan date range for week labels
+  const planWeeks = useMemo(() => {
+    if (!planStartDate || workouts.length === 0) return null;
+    const dates = workouts.filter(w => w.dateObj).map(w => w.dateObj!.getTime());
+    if (dates.length === 0) return null;
+    const earliest = new Date(Math.min(...dates));
+    const latest = new Date(Math.max(...dates));
+    return { start: earliest, end: latest };
+  }, [workouts, planStartDate]);
+
+  // Get current week number within the plan
+  const currentWeekLabel = useMemo(() => {
+    if (!planWeeks) return null;
+    const planStart = startOfWeek(planWeeks.start, { weekStartsOn: 1 });
+    const diff = Math.floor((weekStart.getTime() - planStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    if (diff < 0) return null;
+    return `Week ${diff + 1}`;
+  }, [weekStart, planWeeks]);
+
+  // Extract short workout label from title
+  function shortLabel(title: string): string {
+    // Try to get workout type
+    if (/rest/i.test(title)) return "Rest Day";
+    if (/interval/i.test(title)) return "Intervals";
+    if (/tempo/i.test(title)) return "Tempo";
+    if (/long\s*run/i.test(title)) return "Long Run";
+    if (/easy/i.test(title)) return "Easy Run";
+    if (/recovery/i.test(title)) return "Recovery";
+    if (/fartlek/i.test(title)) return "Fartlek";
+    if (/hill/i.test(title)) return "Hills";
+    if (/race/i.test(title)) return "Race";
+    if (/threshold/i.test(title)) return "Threshold";
+    // Fallback: first few words
+    return title.split(/[(\-–]/)[0].trim().slice(0, 18);
+  }
+
+  // Color based on workout intensity
+  function workoutColor(title: string): string {
+    if (/rest/i.test(title)) return "bg-muted text-muted-foreground";
+    if (/easy|recovery/i.test(title)) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+    if (/long\s*run/i.test(title)) return "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30";
+    if (/tempo|threshold/i.test(title)) return "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30";
+    if (/interval|fartlek|hill|race/i.test(title)) return "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30";
+    return "bg-primary/10 text-primary border-primary/20";
+  }
+
+  // Duration from segments
+  function totalDuration(w: ParsedWorkout): string | null {
+    const match = w.title.match(/(\d+)\s*min/i);
+    if (match) return `${match[1]}m`;
+    const totalMatch = w.title.match(/Total:\s*(\d+)\s*min/i);
+    if (totalMatch) return `${totalMatch[1]}m`;
+    return null;
+  }
+
+  const weekLabel = `${format(weekDays[0], "dd MMM")} – ${format(weekDays[6], "dd MMM ''yy")}`;
+
+  return (
+    <Card className="overflow-hidden">
+      {/* Week Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setWeekStart(s => subWeeks(s, 1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <div className="text-center">
+          <p className="text-sm font-semibold">{weekLabel}</p>
+          {currentWeekLabel && (
+            <p className="text-xs text-muted-foreground">{currentWeekLabel}</p>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setWeekStart(s => addWeeks(s, 1))}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Day Grid */}
+      <div className="grid grid-cols-7 min-h-[140px]">
+        {weekDays.map((day) => {
+          const key = format(day, "yyyy-MM-dd");
+          const workout = workoutMap.get(key);
+          const today = isToday(day);
+
+          return (
+            <div
+              key={key}
+              className={cn(
+                "flex flex-col items-center border-r last:border-r-0 py-2 px-0.5 gap-1.5",
+                today && "bg-primary/5"
+              )}
+            >
+              {/* Day name */}
+              <span className={cn(
+                "text-[10px] sm:text-xs font-medium uppercase tracking-wide",
+                today ? "text-primary" : "text-muted-foreground"
+              )}>
+                {format(day, "EEE")}
+              </span>
+
+              {/* Date circle */}
+              <span className={cn(
+                "flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-semibold",
+                today
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground"
+              )}>
+                {format(day, "d")}
+              </span>
+
+              {/* Workout card */}
+              {workout ? (
+                <div className={cn(
+                  "w-full rounded-md border px-1 py-1.5 text-center cursor-default transition-colors",
+                  workoutColor(workout.title)
+                )}>
+                  <p className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
+                    {shortLabel(workout.title)}
+                  </p>
+                  {totalDuration(workout) && (
+                    <p className="text-[8px] sm:text-[9px] opacity-75 mt-0.5">{totalDuration(workout)}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full flex items-center justify-center flex-1">
+                  <span className="text-[10px] text-muted-foreground/40">—</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
