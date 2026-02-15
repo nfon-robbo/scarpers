@@ -126,6 +126,7 @@ Deno.serve(async (req) => {
 
     const sessionsData = await sessionsRes.json();
     const sessions = sessionsData.session || [];
+    console.log(`Google Fit: found ${sessions.length} sleep sessions in last ${daysBack} days`);
 
     let totalStages = 0;
 
@@ -135,6 +136,7 @@ Deno.serve(async (req) => {
       
       // Determine the date (use the end time's date as the "sleep night" date)
       const sleepDate = new Date(sessionEnd).toISOString().split("T")[0];
+      console.log(`Processing session: ${session.id}, date: ${sleepDate}, start: ${new Date(sessionStart).toISOString()}, end: ${new Date(sessionEnd).toISOString()}`);
 
       // Fetch sleep segment data for this session
       const datasetRes = await fetch(
@@ -205,6 +207,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log(`Google Fit sleep sync complete: ${totalStages} stages from ${sessions.length} sessions`);
     return new Response(
       JSON.stringify({ synced: totalStages, sessions: sessions.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
