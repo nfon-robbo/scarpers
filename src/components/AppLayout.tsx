@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import AIChatbot from "@/components/AIChatbot";
+import { useTheme } from "@/hooks/useTheme";
 import {
   Activity,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Menu,
   X,
   Moon,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -31,6 +33,7 @@ const navItems = [
 const AppLayout = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
+  const { theme, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -62,10 +65,18 @@ const AppLayout = () => {
           ))}
         </nav>
 
-        <div className="border-t border-sidebar-border pt-4 mt-4">
+        <div className="border-t border-sidebar-border pt-4 mt-4 space-y-1">
           {profile?.name && (
             <p className="px-3 mb-2 text-sm text-sidebar-foreground/70 truncate">{profile.name}</p>
           )}
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </Button>
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground"
@@ -110,6 +121,14 @@ const AppLayout = () => {
                 {label}
               </NavLink>
             ))}
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+              onClick={() => { toggleTheme(); setMobileMenuOpen(false); }}
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </Button>
             <Button
               variant="ghost"
               className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
