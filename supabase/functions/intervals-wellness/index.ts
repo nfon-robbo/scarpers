@@ -62,6 +62,16 @@ serve(async (req) => {
     const wellnessData = await resp.json();
     console.log(`Fetched ${wellnessData.length} wellness records from Intervals.icu`);
 
+    // Diagnostic: log first record's keys so we can identify HRV field name
+    if (wellnessData.length > 0) {
+      const sample = wellnessData[0];
+      const hrvRelated = Object.entries(sample).filter(
+        ([k, v]) => v != null && /hrv|rmssd|sdnn/i.test(k)
+      );
+      console.log("Sample wellness record keys:", Object.keys(sample).join(", "));
+      console.log("HRV-related fields:", JSON.stringify(hrvRelated));
+    }
+
     let upserted = 0;
     let skipped = 0;
 
@@ -80,9 +90,9 @@ serve(async (req) => {
       if (w.sleepScore != null) record.sleep_score = w.sleepScore;
       if (w.sleepQuality != null && record.sleep_score == null) record.sleep_score = w.sleepQuality;
 
-      // HRV: try hrv first, then hrvSDNN as fallback
-      if (w.hrv != null) record.hrv = w.hrv;
-      else if (w.hrvSDNN != null) record.hrv = w.hrvSDNN;
+      // HRV: try multiple field names used by Intervals.icu / wearables
+      const hrvValue = w.hrv ?? w.hrvSDNN ?? w.rMSSD ?? w.morningHrv ?? w.avgHrv ?? w.lnRmssd ?? null;
+      if (hrvValue != null) record.hrv = hrvValue;
 
       // Resting HR
       if (w.restingHR != null) record.resting_heart_rate = w.restingHR;
