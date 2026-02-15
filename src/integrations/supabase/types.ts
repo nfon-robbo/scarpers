@@ -280,6 +280,36 @@ export type Database = {
         }
         Relationships: []
       }
+      readiness_snapshots: {
+        Row: {
+          created_at: string
+          factors: Json | null
+          hour: number
+          id: string
+          recorded_at: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          factors?: Json | null
+          hour: number
+          id?: string
+          recorded_at?: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          factors?: Json | null
+          hour?: number
+          id?: string
+          recorded_at?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       sleep_stages: {
         Row: {
           created_at: string

@@ -234,6 +234,29 @@ const ReadinessWidget = () => {
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
+  // Save snapshot (throttled: max once per hour)
+  useEffect(() => {
+    if (!result || !user) return;
+    const cacheKey = `readiness_snapshot_last_${user.id}`;
+    const last = localStorage.getItem(cacheKey);
+    const now = Date.now();
+    if (last && now - Number(last) < 3600000) return; // 1 hour throttle
+
+    const hour = new Date().getHours();
+    supabase
+      .from("readiness_snapshots")
+      .insert({
+        user_id: user.id,
+        score: result.score,
+        hour,
+        factors: result.factors as any,
+        recorded_at: new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (!error) localStorage.setItem(cacheKey, String(now));
+      });
+  }, [result, user]);
+
   const fetchAdvice = async (skipCache = false) => {
     if (!result || result.factors.length === 0) return;
 
