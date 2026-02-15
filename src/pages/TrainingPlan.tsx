@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import PlanCalendarView from "@/components/PlanCalendarView";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 
 interface ApiStep {
@@ -753,6 +754,13 @@ const TrainingPlanPage = () => {
       )}
 
       {(content || loading) && (<>
+        {content && !loading && (
+          <PlanCalendarView
+            workouts={parseWorkoutsFromPlan(content)}
+            planStartDate={startDate}
+          />
+        )}
+
         <Card>
           <CardContent className="p-4 sm:p-6">
             {content ? (
