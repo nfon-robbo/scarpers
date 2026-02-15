@@ -92,48 +92,6 @@ const ReadinessHistoryChart = () => {
 
   return (
     <div className="space-y-4">
-      {/* Time-of-day pattern */}
-      {hourlyAvg.length >= 2 && (
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-primary" />
-              Readiness by Time of Day
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Average score per hour (last 7 days)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pr-2">
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={hourlyAvg}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                <XAxis dataKey="hour" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
-                <ReferenceLine y={60} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.4} />
-                <ReferenceLine y={80} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.4} />
-                <defs>
-                  <linearGradient id="readinessGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey="score"
-                  stroke="hsl(var(--primary))"
-                  fill="url(#readinessGrad)"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: "hsl(var(--primary))" }}
-                  activeDot={{ r: 5, strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Chronological timeline */}
       {timeline.length >= 3 && (
         <Card className="overflow-hidden">
