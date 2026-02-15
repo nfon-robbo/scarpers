@@ -128,9 +128,8 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // Sleep Quality (30%)
   if (d.sleepScore == null) {
-    // Missing sleep contributes 0 to the weighted sum (penalty)
-    // Add a small neutral contribution so it's not fully zero
-    weightedSum += 40 * 0.30; // assume "poor" baseline when missing
+    // Missing sleep = assume poor
+    weightedSum += 30 * 0.30;
     factors.push({
       label: "Sleep Quality",
       status: "warning",
@@ -158,10 +157,10 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
     });
   } else if (d.rhr != null) {
-    weightedSum += 60 * 0.20; // no baseline to compare, assume moderate
+    weightedSum += 50 * 0.20; // no baseline to compare, assume moderate
     factors.push({ label: "Resting HR", status: "warning", detail: `${Math.round(d.rhr)} bpm (no baseline)` });
   } else {
-    weightedSum += 40 * 0.20; // missing = penalty
+    weightedSum += 30 * 0.20; // missing = penalty
   }
 
   // HRV vs baseline (25%)
@@ -176,7 +175,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 40 * 0.25; // missing HRV = assume poor
+    weightedSum += 25 * 0.25; // missing HRV = significant penalty
     factors.push({ label: "HRV", status: "warning", detail: "No data" });
   }
 
