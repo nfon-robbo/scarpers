@@ -80,8 +80,12 @@ const ReadinessWidget = () => {
       const rhrBaseline = rhrVals.length ? rhrVals.reduce((a: number, b: number) => a + b, 0) / rhrVals.length : null;
       const hrvBaseline = hrvVals.length ? hrvVals.reduce((a: number, b: number) => a + b, 0) / hrvVals.length : null;
 
-      const finalSleepScore = sleepScore ?? (latestMetrics as any)?.sleep_score ?? null;
-      const sleepDuration = hasSleepStages ? totalSleep : (latestMetrics as any)?.sleep_duration_seconds ?? null;
+      // Detect stale sleep: if most recent sleep_stages date is older than yesterday, treat as not synced
+      const sleepDates = [...new Set((sleepStages as any[]).map((s: any) => s.date))].sort().reverse();
+      const mostRecentSleepDate = sleepDates[0] || null;
+      const isSleepCurrent = mostRecentSleepDate && (mostRecentSleepDate === today || mostRecentSleepDate === yesterday);
+      const finalSleepScore = isSleepCurrent ? (sleepScore ?? (latestMetrics as any)?.sleep_score ?? null) : null;
+      const sleepDuration = isSleepCurrent && hasSleepStages ? totalSleep : isSleepCurrent ? ((latestMetrics as any)?.sleep_duration_seconds ?? null) : null;
 
       // ── 3-day sleep avg vs 30-day avg ──
       const recentMetrics = allMetrics.filter((m: any) => m.date >= threeDaysAgo && m.date <= today);
@@ -167,10 +171,10 @@ const ReadinessWidget = () => {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        const { advice, score, timestamp } = JSON.parse(cached);
+        const { advice, score, factorCount, timestamp } = JSON.parse(cached);
         const ageMs = Date.now() - timestamp;
         const oneHour = 60 * 60 * 1000;
-        if (ageMs < oneHour && score === result.score) {
+        if (ageMs < oneHour && score === result.score && factorCount === result.factors.length) {
           setAiAdvice(advice);
           return;
         }
@@ -196,6 +200,9 @@ const ReadinessWidget = () => {
               readiness_score: result.score,
               factors: result.factors,
               current_hour_local: new Date().getHours(),
+              missing_data: result.factors
+                .filter(f => f.status === "warning" && f.detail === "Not synced")
+                .map(f => f.label.toLowerCase()),
             }),
           }
         );
@@ -206,6 +213,7 @@ const ReadinessWidget = () => {
           localStorage.setItem(cacheKey, JSON.stringify({
             advice: data.advice,
             score: result.score,
+            factorCount: result.factors.length,
             timestamp: Date.now(),
           }));
         } else {

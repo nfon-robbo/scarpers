@@ -126,7 +126,13 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   // ── Phase 1: Core factors (weighted average) ──
 
   // Sleep Quality (30%)
-  if (d.sleepScore != null) {
+  if (d.sleepScore == null) {
+    factors.push({
+      label: "Sleep Quality",
+      status: "warning",
+      detail: "Not synced",
+    });
+  } else if (d.sleepScore != null) {
     const s = d.sleepScore;
     weightedSum += s * 0.30;
     weightSum += 0.30;
