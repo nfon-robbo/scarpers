@@ -1,115 +1,74 @@
 
 
-# Comprehensive Readiness Score Overhaul
+# Fix: Stale Sleep Data + AI Hallucination About Unsynced Sleep
 
-## What Changes
+## Problem
 
-The readiness score currently takes a morning snapshot and never moves. This update makes it a **living score** that shifts throughout the day using all available user data, matching (and exceeding) what Garmin does with Training Readiness.
+You haven't synced last night's sleep yet, but the widget is using the **previous night's** data (Feb 13-14) and presenting it as current. The AI coach then praises your "top-tier sleep" based on data that's a full day old. Two issues to fix:
 
----
+1. **Widget shows stale sleep as current** -- no indication the data is old
+2. **AI coach comments on sleep it hasn't actually seen** -- needs to be told explicitly when sleep data is missing/stale
 
-## New Factors Added
+## Changes
 
-| Factor | Data Source | What It Does |
-|--------|-----------|--------------|
-| **Recovery Time** | `activities` table (last workout's intensity + elapsed hours) | Estimates hours until fully recovered; penalises score if still within recovery window |
-| **3-Day Sleep History** | `daily_metrics` (last 3 nights sleep duration vs 30-day avg) | Detects sleep debt across multiple nights, not just last night |
-| **3-Day Stress Trend** | `daily_metrics` (last 3 days stress_score) | Sustained high stress penalises more than a single bad day |
-| **Training Monotony** | `activities` (7-day load vs 28-day avg) | Flags sudden ramp-ups or staleness in training volume |
-| **Workout Intensity** | `activities` (avg_heart_rate, training_load, training_effect) | Weights sessions by actual effort, not just raw minutes |
-| **Today's Load** | `activities` (today's sessions) | Real-time penalty as you train during the day |
-| **Circadian Modifier** | Client clock (current hour) | Small energy curve adjustments: boost mid-morning, dip post-lunch, wind-down evening |
+### 1. `src/components/ReadinessWidget.tsx` -- Detect stale/missing sleep
 
----
+- After fetching sleep stages, check if the most recent date is actually "last night" (today or yesterday). If the latest sleep date is older than yesterday, treat sleep as **not synced**.
+- Build a `missingData` array (e.g., `["sleep"]`) and pass it in the POST body to the readiness-advice function.
+- Update the cache key to include `factors.length` so stale advice (from when sleep WAS available) gets evicted when data context changes.
 
-## Bug Fix Included
+### 2. `src/lib/readiness.ts` -- Show "No data synced" factor
 
-**Sleep double-counting**: The current query fetches sleep stages for both today and yesterday and sums them all. This fix groups by date and picks only the most recent night.
+- When `sleepScore` is `null`, instead of silently omitting the Sleep Quality factor, **push a visible warning row**:
+  ```
+  Sleep Quality    Not synced    [warning]
+  ```
+- This ensures the user sees it, AND the AI coach receives it as a factor with status "warning".
 
----
+### 3. `supabase/functions/readiness-advice/index.ts` -- Guard against hallucination
 
-## How Scoring Works
-
-The base score is the weighted average of the core factors (Sleep Quality, RHR, HRV, Stress). Then **modifiers** are applied on top:
-
-- **Recovery Time**: If last hard workout was < 12h ago, apply -5 to -15 penalty based on intensity
-- **3-Day Sleep Debt**: Compare 3-night avg sleep hours to 30-day avg. If consistently under, -5 to -15
-- **3-Day Stress Trend**: Average last 3 days of stress. If elevated (>50 avg), -5 to -10
-- **Training Monotony**: 7-day avg daily load / 28-day avg. If ratio > 1.5, penalise -5 to -10 (overreaching). If < 0.5, small boost (freshness)
-- **Today's Load**: If already trained today, -5 to -15 based on intensity-weighted minutes
-- **Circadian**: -3 to +3 based on time of day
-
-Final score is clamped to 0-100.
-
----
+- Accept `missing_data` from the request body.
+- Add an explicit rule to the system prompt: "MISSING DATA: [list]. Do NOT praise, comment on, or reference any metric listed as missing. If sleep is missing, do NOT mention sleep quality."
+- Append the missing data to the user prompt so the AI has no excuse.
 
 ## Technical Details
 
-### File: `src/components/ReadinessWidget.tsx`
+### ReadinessWidget.tsx
 
-**1. Expand `ReadinessData` interface** with new fields:
-- `todayLoad` (intensity-weighted minutes today)
-- `recoveryHoursSinceLastHard` (hours since last high-intensity session)
-- `lastWorkoutIntensity` (0-100 based on HR/training_effect)
-- `recentSleepAvgHours` (3-night average)
-- `baselineSleepAvgHours` (30-day average)
-- `stressHistory` (array of last 3 days' stress scores)
-- `weeklyLoadAvg` (7-day daily average training minutes)
-- `monthlyLoadAvg` (28-day daily average training minutes)
-- `currentHour` (local hour for circadian)
-
-**2. Expand data fetching** in the `useEffect`:
-- Add `date` to sleep_stages select, group by date, pick most recent night only (fixes double-count bug)
-- Fetch today's activities (not just yesterday's) with `avg_heart_rate, training_load, training_effect, duration_seconds`
-- Expand activities query window to 28 days back for monotony calculation
-- Compute intensity-weighted load: if `training_load` exists use it, else estimate from `avg_heart_rate` and duration
-- Compute recovery time from last activity's `start_time + duration` vs now
-- Compute 3-night sleep average from `daily_metrics.sleep_duration_seconds`
-- Compute 3-day stress average from `daily_metrics.stress_score`
-
-**3. Rewrite `computeReadiness`** to use a two-phase approach:
-- **Phase 1 -- Core factors** (weighted average, same as now but with intensity-aware load):
-  - Sleep Quality (weight 30%)
-  - RHR vs baseline (weight 20%)
-  - HRV vs baseline (weight 25%)
-  - Stress (weight 15%)
-  - Yesterday's Load using intensity (weight 10%)
-- **Phase 2 -- Modifiers** (additive adjustments to the weighted score):
-  - Recovery time modifier
-  - 3-day sleep debt modifier
-  - 3-day stress trend modifier
-  - Training monotony modifier
-  - Today's load modifier
-  - Circadian modifier
-- Clamp final score 0-100
-
-**4. Display new factors** in the widget:
-- Show modifiers as additional rows only when they meaningfully impact the score (absolute adjustment >= 3 points)
-- Labels like "Recovery", "Sleep Debt", "Training Ramp", "Today's Effort"
-- Circadian modifier is applied silently (no row shown -- it's just background feel)
-
-### File: `supabase/functions/readiness-advice/index.ts`
-
-No structural changes needed -- it already receives `result.score` and `result.factors`, so it will automatically see the new factor rows and adjusted score.
-
----
-
-## Factor Display Examples
-
-When everything is good:
-```text
-Sleep Quality     82/100 (Good) - 7.4h        [green]
-Resting HR        52 bpm (-1 vs avg)           [green]
-HRV               48 ms (+8% vs avg)           [green]
-Stress            22/100                        [green]
-Recovery          18h since last session        [green]
+After computing `finalSleepScore`:
+```
+const missingData: string[] = [];
+if (finalSleepScore == null) missingData.push("sleep");
+if (!latestMetrics?.hrv) missingData.push("HRV");
+if (!latestMetrics?.resting_heart_rate) missingData.push("resting heart rate");
 ```
 
-When things are rough:
-```text
-Sleep Quality     41/100 (Poor) - 5.2h         [red]
-HRV               31 ms (-22% vs avg)          [red]
-Sleep Debt        -1.4h vs avg (3 nights)      [yellow]
-Today's Effort    65 min (intense)             [yellow]
-Training Ramp     1.7x vs monthly avg          [red]
+In the POST body to readiness-advice, add:
 ```
+missing_data: missingData
+```
+
+Update cache key comparison to include `result.factors.length` so changing data availability busts the cache.
+
+### readiness.ts
+
+In `computeReadiness`, at the start of the Sleep Quality section:
+```typescript
+if (d.sleepScore == null) {
+  factors.push({
+    label: "Sleep Quality",
+    status: "warning",
+    detail: "Not synced",
+  });
+}
+```
+
+### readiness-advice/index.ts
+
+Read `missing_data` from the request JSON. Add to system prompt:
+```
+CRITICAL: The following data has NOT been synced today: ${missing_data.join(', ')}.
+Do NOT praise, reference, or comment on any missing metric.
+If sleep is missing, say NOTHING about sleep quality.
+```
+
