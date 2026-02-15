@@ -56,6 +56,12 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let daysBack = 7; // default
+  try {
+    const body = await req.clone().json();
+    if (body?.days) daysBack = Math.min(body.days, 30);
+  } catch { /* no body, use default */ }
+
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -98,9 +104,9 @@ Deno.serve(async (req) => {
       accessToken = await refreshAccessToken(supabase, user.id, tokenRow.refresh_token);
     }
 
-    // Fetch sleep sessions for the last 30 days
+    // Fetch sleep sessions
     const endTimeMillis = Date.now();
-    const startTimeMillis = endTimeMillis - 30 * 24 * 60 * 60 * 1000;
+    const startTimeMillis = endTimeMillis - daysBack * 24 * 60 * 60 * 1000;
 
     const sessionsRes = await fetch(
       `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startTimeMillis).toISOString()}&endTime=${new Date(endTimeMillis).toISOString()}&activityType=72`,
