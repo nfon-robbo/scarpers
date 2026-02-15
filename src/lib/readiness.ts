@@ -355,17 +355,19 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     totalAdj += m.adj;
   }
 
-  // Add body battery drain as a visible factor
+  // Add body battery drain as a visible factor (Charged & Drained framing)
   if (battery.hoursAwake > 0.5) {
     const drainTotal = battery.passiveDrain + battery.activeDrain;
+    const charged = Math.round(baseScore); // sleep/recovery charge
     factors.push({
       label: "Body Battery",
       status: drainTotal <= 15 ? "good" : drainTotal <= 30 ? "warning" : "poor",
-      detail: `${battery.hoursAwake}h awake · -${drainTotal} drain${battery.activeDrain > 0 ? ` (${battery.activeDrain} from activity)` : ""}`,
+      detail: `⚡${charged} charged · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
     });
   }
 
-  const finalScore = Math.round(Math.max(0, Math.min(100, baseScore + totalAdj)));
+  // Overdrawn state: floor at 5 (Zepp BioCharge philosophy — never fully zero)
+  const finalScore = Math.round(Math.max(5, Math.min(100, baseScore + totalAdj)));
 
   // Add visible modifiers to factors (only if |adj| >= 3)
   for (const m of modifiers) {
