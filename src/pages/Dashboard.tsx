@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import {
   Upload, Brain, Calendar, Activity, TrendingUp, Heart,
   Timer, Zap, Flame, ArrowUpRight, ArrowDownRight, Minus,
-  Moon, Footprints, ChevronRight,
+  Moon, Footprints, ChevronRight, RefreshCw,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -56,11 +57,77 @@ const tooltipStyle = {
 
 const Dashboard = () => {
   const { profile } = useProfile();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [metrics, setMetrics] = useState<MetricsRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncAll = async () => {
+    if (!session?.access_token || syncing) return;
+    setSyncing(true);
+    const results: string[] = [];
+    const headers = {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      "Content-Type": "application/json",
+    };
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+    try {
+      // Strava
+      const stravaRes = await fetch(`${baseUrl}/functions/v1/strava-import`, {
+        method: "POST", headers, body: JSON.stringify({ mode: "recent" }),
+      }).catch(() => null);
+      if (stravaRes?.ok) {
+        const d = await stravaRes.json();
+        if (d.imported > 0) results.push(`${d.imported} Strava activities`);
+      }
+
+      // Intervals.icu wellness
+      const intRes = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
+        method: "POST", headers,
+      }).catch(() => null);
+      if (intRes?.ok) {
+        const d = await intRes.json();
+        if (d.upserted > 0) results.push(`${d.upserted} wellness records`);
+      }
+
+      // Google Fit sleep
+      const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
+        method: "POST", headers, body: JSON.stringify({ days: 3 }),
+      }).catch(() => null);
+      if (gfRes?.ok) {
+        const d = await gfRes.json();
+        if (d.synced > 0) results.push(`${d.synced} sleep segments`);
+      }
+
+      toast({
+        title: results.length > 0 ? "Sync complete" : "Everything up to date",
+        description: results.length > 0 ? results.join(", ") : "No new data found from any source",
+      });
+
+      // Refresh dashboard data
+      if (results.length > 0 && user) {
+        const since = new Date();
+        since.setDate(since.getDate() - 56);
+        supabase.from("activities")
+          .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
+          .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
+          .then(({ data }) => setActivities((data as ActivityRow[]) || []));
+        supabase.from("daily_metrics")
+          .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
+          .eq("user_id", user.id).gte("date", since.toISOString().split("T")[0]).order("date", { ascending: true })
+          .then(({ data }) => setMetrics((data as MetricsRow[]) || []));
+      }
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -167,6 +234,16 @@ const Dashboard = () => {
           <p className="text-muted-foreground mt-2 max-w-md">
             Your AI-powered endurance training command centre
           </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-4 gap-2"
+            onClick={handleSyncAll}
+            disabled={syncing}
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync All Sources"}
+          </Button>
         </div>
       </div>
 
