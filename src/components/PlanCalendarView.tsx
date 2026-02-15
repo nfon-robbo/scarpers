@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, isToday } from "date-fns";
-import { ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 
 interface PlanCalendarViewProps {
   workouts: ParsedWorkout[];
@@ -13,9 +16,9 @@ interface PlanCalendarViewProps {
 
 export default function PlanCalendarView({ workouts, planStartDate }: PlanCalendarViewProps) {
   const [weekStart, setWeekStart] = useState<Date>(() => {
-    // Default to current week (Monday start)
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
+  const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -142,10 +145,13 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
 
               {/* Workout card */}
               {workout ? (
-                <div className={cn(
-                  "w-full rounded-md border px-1 py-1.5 text-center cursor-default transition-colors",
-                  workoutColor(workout.title)
-                )}>
+                <div
+                  className={cn(
+                    "w-full rounded-md border px-1 py-1.5 text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/40",
+                    workoutColor(workout.title)
+                  )}
+                  onClick={() => setSelectedWorkout(workout)}
+                >
                   <p className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
                     {shortLabel(workout.title)}
                   </p>
@@ -162,6 +168,57 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
           );
         })}
       </div>
+
+      {/* Workout Detail Dialog */}
+      <Dialog open={!!selectedWorkout} onOpenChange={(open) => !open && setSelectedWorkout(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          {selectedWorkout && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Dumbbell className="w-5 h-5 text-primary" />
+                  {selectedWorkout.title}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedWorkout.segments.length > 0 ? (
+                <div className="space-y-2 mt-2">
+                  {selectedWorkout.segments.map((seg, i) => (
+                    <div key={i} className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">{seg.segment}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {seg.duration}
+                        </span>
+                      </div>
+                      {seg.target && (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Target:</span> {seg.target}
+                        </p>
+                      )}
+                      {seg.hrZone && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Activity className="w-3 h-3" /> {seg.hrZone}
+                        </p>
+                      )}
+                      {seg.notes && (
+                        <p className="text-xs text-muted-foreground italic">{seg.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">
+                  {selectedWorkout.rawText}
+                </p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
