@@ -110,10 +110,10 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (30%)
+  // Sleep Quality (35%) — heaviest factor per Zepp BioCharge philosophy
   if (d.sleepScore == null) {
     // Missing sleep = assume poor
-    weightedSum += 30 * 0.30;
+    weightedSum += 25 * 0.35;
     factors.push({
       label: "Sleep Quality",
       status: "warning",
@@ -121,52 +121,55 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     });
   } else {
     const s = d.sleepScore;
-    weightedSum += s * 0.30;
+    // Apply a curve: scores below 80 get penalised more aggressively
+    const adjustedSleep = s >= 80 ? s : s * 0.85;
+    weightedSum += adjustedSleep * 0.35;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
-      status: s >= 70 ? "good" : s >= 50 ? "warning" : "poor",
+      status: s >= 75 ? "good" : s >= 55 ? "warning" : "poor",
       detail: `${s}/100 (${sl.label})${d.sleepHours != null ? ` · ${d.sleepHours.toFixed(1)}h` : ""}`,
     });
   }
 
-  // RHR vs baseline (20%)
+  // RHR vs baseline (15%)
   if (d.rhr != null && d.rhrBaseline != null) {
     const diff = d.rhr - d.rhrBaseline;
-    const rhrScore = diff <= 2 ? 90 : diff <= 5 ? 70 : diff <= 10 ? 50 : 30;
-    weightedSum += rhrScore * 0.20;
+    const rhrScore = diff <= 1 ? 85 : diff <= 3 ? 70 : diff <= 6 ? 50 : diff <= 10 ? 35 : 20;
+    weightedSum += rhrScore * 0.15;
     factors.push({
       label: "Resting HR",
       status: diff <= 3 ? "good" : diff <= 7 ? "warning" : "poor",
       detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
     });
   } else if (d.rhr != null) {
-    weightedSum += 50 * 0.20; // no baseline to compare, assume moderate
+    weightedSum += 45 * 0.15;
     factors.push({ label: "Resting HR", status: "warning", detail: `${Math.round(d.rhr)} bpm (no baseline)` });
   } else {
-    weightedSum += 30 * 0.20; // missing = penalty
+    weightedSum += 25 * 0.15;
   }
 
   // HRV vs baseline (25%)
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
-    const hrvScore = pct >= -5 ? 90 : pct >= -15 ? 65 : 40;
+    // Stricter: only score high if HRV is clearly above baseline
+    const hrvScore = pct >= 5 ? 85 : pct >= -5 ? 70 : pct >= -15 ? 50 : pct >= -25 ? 35 : 20;
     weightedSum += hrvScore * 0.25;
     factors.push({
       label: "HRV",
-      status: pct >= -10 ? "good" : pct >= -20 ? "warning" : "poor",
+      status: pct >= -5 ? "good" : pct >= -15 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 25 * 0.25; // missing HRV = significant penalty
+    weightedSum += 20 * 0.25;
     factors.push({ label: "HRV", status: "warning", detail: "No data" });
   }
 
   // Stress (15%)
   if (d.stressScore != null) {
     const v = d.stressScore;
-    const stressScore = v <= 25 ? 90 : v <= 50 ? 70 : v <= 75 ? 45 : 25;
+    const stressScore = v <= 20 ? 85 : v <= 40 ? 65 : v <= 60 ? 45 : v <= 80 ? 30 : 15;
     weightedSum += stressScore * 0.15;
     factors.push({
       label: "Stress",
@@ -174,13 +177,13 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(v)}/100`,
     });
   } else {
-    weightedSum += 50 * 0.15; // missing stress = neutral
+    weightedSum += 35 * 0.15; // missing stress = mild penalty
   }
 
   // Yesterday's Load — intensity-weighted (10%)
   if (d.yesterdayLoad != null) {
     const l = d.yesterdayLoad;
-    const loadScore = l <= 30 ? 90 : l <= 60 ? 75 : l <= 120 ? 55 : 35;
+    const loadScore = l <= 20 ? 85 : l <= 45 ? 70 : l <= 90 ? 50 : l <= 150 ? 35 : 20;
     weightedSum += loadScore * 0.10;
     factors.push({
       label: "Yesterday's Load",
@@ -188,7 +191,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(l)} min training`,
     });
   } else {
-    weightedSum += 60 * 0.10; // no activity yesterday = slightly good for recovery
+    weightedSum += 55 * 0.10;
   }
 
   // Normalise to 0-100 with fixed denominator
