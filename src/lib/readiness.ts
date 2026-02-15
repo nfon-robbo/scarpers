@@ -25,6 +25,10 @@ export interface ReadinessData {
   weeklyLoadAvg: number | null; // 7-day daily avg minutes
   monthlyLoadAvg: number | null; // 28-day daily avg minutes
   currentHour: number;
+
+  // Body battery drain
+  wakeTimeIso: string | null; // ISO timestamp of when user woke up
+  todayActivities: { startIso: string; durationSec: number; intensityLoad: number }[];
 }
 
 export interface ReadinessFactor {
@@ -90,15 +94,55 @@ export function workoutIntensity(act: {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-/** Circadian modifier: energy curve based on local hour.
- *  More aggressive than before — late night is harsh. */
-function circadianModifier(hour: number): number {
-  if (hour >= 9 && hour < 12) return 3;
-  if (hour >= 7 && hour < 9) return 1;
-  if (hour >= 12 && hour < 16) return 0;
-  if (hour >= 16 && hour < 20) return -3;
-  if (hour >= 20 && hour < 23) return -6;
-  return -10; // 11pm-7am — you should be sleeping
+/** Body-battery drain: passive drain from hours awake + active drain from activities.
+ *  Returns a negative modifier (0 to ~-50). */
+function bodyBatteryDrain(d: ReadinessData): { drain: number; hoursAwake: number; passiveDrain: number; activeDrain: number } {
+  const now = Date.now();
+
+  // Determine hours awake
+  let hoursAwake: number;
+  if (d.wakeTimeIso) {
+    hoursAwake = Math.max(0, (now - new Date(d.wakeTimeIso).getTime()) / 3600000);
+  } else {
+    // Fallback: assume woke up at 7am local
+    const today7am = new Date();
+    today7am.setHours(7, 0, 0, 0);
+    hoursAwake = Math.max(0, (now - today7am.getTime()) / 3600000);
+  }
+
+  // Cap at 20 hours (after that you're in a bad state anyway)
+  hoursAwake = Math.min(20, hoursAwake);
+
+  // Passive drain: gentle accelerating curve
+  // Target: ~25-30 pts total after 16h awake
+  // 0-4h: ~1pt/hr, 4-8h: ~1.5pts/hr, 8-12h: ~2pts/hr, 12-16h: ~2.5pts/hr, 16+: ~3pts/hr
+  let passiveDrain = 0;
+  if (hoursAwake <= 4) {
+    passiveDrain = hoursAwake * 1;
+  } else if (hoursAwake <= 8) {
+    passiveDrain = 4 + (hoursAwake - 4) * 1.5;
+  } else if (hoursAwake <= 12) {
+    passiveDrain = 10 + (hoursAwake - 8) * 2;
+  } else if (hoursAwake <= 16) {
+    passiveDrain = 18 + (hoursAwake - 12) * 2.5;
+  } else {
+    passiveDrain = 28 + (hoursAwake - 16) * 3;
+  }
+
+  // Active drain: each activity drains based on intensity-weighted load
+  // ~0.2 pts per intensity-weighted minute
+  let activeDrain = 0;
+  for (const act of d.todayActivities) {
+    activeDrain += act.intensityLoad * 0.2;
+  }
+  activeDrain = Math.min(20, activeDrain); // cap active drain
+
+  return {
+    drain: -(passiveDrain + activeDrain),
+    hoursAwake: Math.round(hoursAwake * 10) / 10,
+    passiveDrain: Math.round(passiveDrain),
+    activeDrain: Math.round(activeDrain),
+  };
 }
 
 // ── Main scoring ───────────────────────────────────────────────────────
@@ -302,13 +346,23 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     });
   }
 
-  // Circadian (silent — not shown as a factor row)
-  const circAdj = circadianModifier(d.currentHour);
+  // Body battery drain (replaces old circadian modifier)
+  const battery = bodyBatteryDrain(d);
 
   // Apply modifiers
-  let totalAdj = circAdj;
+  let totalAdj = battery.drain;
   for (const m of modifiers) {
     totalAdj += m.adj;
+  }
+
+  // Add body battery drain as a visible factor
+  if (battery.hoursAwake > 0.5) {
+    const drainTotal = battery.passiveDrain + battery.activeDrain;
+    factors.push({
+      label: "Body Battery",
+      status: drainTotal <= 15 ? "good" : drainTotal <= 30 ? "warning" : "poor",
+      detail: `${battery.hoursAwake}h awake · -${drainTotal} drain${battery.activeDrain > 0 ? ` (${battery.activeDrain} from activity)` : ""}`,
+    });
   }
 
   const finalScore = Math.round(Math.max(0, Math.min(100, baseScore + totalAdj)));

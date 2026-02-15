@@ -126,7 +126,7 @@ const ReadinessWidget = () => {
     Promise.all([
       supabase
         .from("sleep_stages")
-        .select("stage, duration_seconds, date")
+        .select("stage, duration_seconds, date, end_time")
         .eq("user_id", user.id)
         .in("date", [today, yesterday])
         .then(({ data }) => data || []),
@@ -207,6 +207,21 @@ const ReadinessWidget = () => {
       const weeklyLoadAvg = weeklyTotal / 7;
       const monthlyLoadAvg = monthlyTotal / 28;
 
+      // Determine wake time from sleep stages (latest end_time on most recent date)
+      const todaySleepStages = (sleepStages as any[]).filter((s: any) => s.date === today || s.date === yesterday);
+      const endTimes = todaySleepStages
+        .filter((s: any) => s.end_time)
+        .map((s: any) => new Date(s.end_time).getTime())
+        .sort((a: number, b: number) => b - a);
+      const wakeTimeIso = endTimes.length > 0 ? new Date(endTimes[0]).toISOString() : null;
+
+      // Build today's activity list with timestamps for drain model
+      const todayActivityList = todayActs.map((a: any) => ({
+        startIso: a.start_time as string,
+        durationSec: a.duration_seconds || 0,
+        intensityLoad: activityIntensityLoad(a),
+      }));
+
       setData({
         sleepScore: finalSleepScore,
         sleepHours: sleepDuration ? sleepDuration / 3600 : null,
@@ -227,6 +242,8 @@ const ReadinessWidget = () => {
         weeklyLoadAvg: weeklyTotal > 0 ? weeklyLoadAvg : null,
         monthlyLoadAvg: monthlyTotal > 0 ? monthlyLoadAvg : null,
         currentHour: now.getHours(),
+        wakeTimeIso,
+        todayActivities: todayActivityList,
       });
       setLoading(false);
     });
