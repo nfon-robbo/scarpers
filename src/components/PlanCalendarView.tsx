@@ -90,6 +90,21 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
     return null;
   }
 
+  // HR zone to BPM range
+  function hrZoneBpm(zone: string): string | null {
+    const m = zone.match(/Z(\d)/i);
+    if (!m) return null;
+    const z = parseInt(m[1], 10);
+    switch (z) {
+      case 1: return "100–120 bpm";
+      case 2: return "120–140 bpm";
+      case 3: return "140–160 bpm";
+      case 4: return "160–175 bpm";
+      case 5: return "175–200 bpm";
+      default: return null;
+    }
+  }
+
   const weekLabel = `${format(weekDays[0], "dd MMM")} – ${format(weekDays[6], "dd MMM ''yy")}`;
 
   return (
@@ -201,7 +216,7 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
                       )}
                       {seg.hrZone && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Activity className="w-3 h-3" /> {seg.hrZone}
+                          <Activity className="w-3 h-3" /> {seg.hrZone}{hrZoneBpm(seg.hrZone) && ` (${hrZoneBpm(seg.hrZone)})`}
                         </p>
                       )}
                       {seg.notes && (
