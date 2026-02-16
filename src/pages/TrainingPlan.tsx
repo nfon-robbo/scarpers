@@ -143,6 +143,7 @@ const TrainingPlanPage = () => {
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -176,6 +177,27 @@ const TrainingPlanPage = () => {
   }, [user]);
 
   useEffect(() => { loadSavedPlan(); }, [loadSavedPlan]);
+
+  // Fetch activities linked to this plan to track completion
+  useEffect(() => {
+    if (!savedPlanId || !user) { setCompletedDates(new Set()); return; }
+    const fetchLinkedActivities = async () => {
+      const { data } = await supabase
+        .from("activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .eq("training_plan_id", savedPlanId);
+      if (data) {
+        const dates = new Set(
+          data
+            .filter(a => a.start_time)
+            .map(a => format(new Date(a.start_time!), "yyyy-MM-dd"))
+        );
+        setCompletedDates(dates);
+      }
+    };
+    fetchLinkedActivities();
+  }, [savedPlanId, user]);
 
   const savePlan = async (planContent: string) => {
     if (!user) return;
@@ -848,10 +870,12 @@ const TrainingPlanPage = () => {
               planStartDate={startDate}
               raceDistance={raceDistance}
               raceDate={raceDate}
+              completedDates={completedDates}
             />
             <PlanCalendarView
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
+              completedDates={completedDates}
             />
           </>
         )}

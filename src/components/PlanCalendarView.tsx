@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, isToday } from "date-fns";
-import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -12,9 +12,10 @@ import {
 interface PlanCalendarViewProps {
   workouts: ParsedWorkout[];
   planStartDate?: Date;
+  completedDates?: Set<string>;
 }
 
-export default function PlanCalendarView({ workouts, planStartDate }: PlanCalendarViewProps) {
+export default function PlanCalendarView({ workouts, planStartDate, completedDates = new Set() }: PlanCalendarViewProps) {
   const [weekStart, setWeekStart] = useState<Date>(() => {
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
@@ -154,6 +155,7 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
           const key = format(day, "yyyy-MM-dd");
           const workout = workoutMap.get(key);
           const today = isToday(day);
+          const isCompleted = completedDates.has(key);
 
           return (
             <div
@@ -185,11 +187,16 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
               {workout ? (
                 <div
                   className={cn(
-                    "w-full rounded-md border px-1 py-1.5 text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/40",
-                    workoutColor(workout.title)
+                    "w-full rounded-md border px-1 py-1.5 text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/40 relative",
+                    isCompleted
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : workoutColor(workout.title)
                   )}
                   onClick={() => setSelectedWorkout(workout)}
                 >
+                  {isCompleted && (
+                    <CheckCircle2 className="w-3 h-3 text-primary absolute top-0.5 right-0.5" />
+                  )}
                   <p className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
                     {shortLabel(workout.title)}
                   </p>
