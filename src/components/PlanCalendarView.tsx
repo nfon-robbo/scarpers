@@ -56,7 +56,6 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
 
   // Extract short workout label from title
   function shortLabel(title: string): string {
-    // Try to get workout type
     if (/rest/i.test(title)) return "Rest Day";
     if (/interval/i.test(title)) return "Intervals";
     if (/tempo/i.test(title)) return "Tempo";
@@ -67,8 +66,21 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
     if (/hill/i.test(title)) return "Hills";
     if (/race/i.test(title)) return "Race";
     if (/threshold/i.test(title)) return "Threshold";
-    // Fallback: first few words
+    if (/cadence/i.test(title)) return "Cadence";
+    if (/steady/i.test(title)) return "Steady";
+    if (/aerobic/i.test(title)) return "Aerobic";
     return title.split(/[(\-–]/)[0].trim().slice(0, 18);
+  }
+
+  // Extract music BPM from workout segments notes
+  function musicBpm(w: ParsedWorkout): string | null {
+    for (const seg of w.segments) {
+      if (seg.notes) {
+        const match = seg.notes.match(/(\d{3})\s*BPM/i);
+        if (match) return `🎵 ${match[1]}`;
+      }
+    }
+    return null;
   }
 
   // Color based on workout intensity
@@ -170,8 +182,10 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
                   <p className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
                     {shortLabel(workout.title)}
                   </p>
-                  {totalDuration(workout) && (
-                    <p className="text-[8px] sm:text-[9px] opacity-75 mt-0.5">{totalDuration(workout)}</p>
+                  {(totalDuration(workout) || musicBpm(workout)) && (
+                    <p className="text-[8px] sm:text-[9px] opacity-75 mt-0.5 truncate">
+                      {[totalDuration(workout), musicBpm(workout)].filter(Boolean).join(" ")}
+                    </p>
                   )}
                 </div>
               ) : (
