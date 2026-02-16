@@ -244,6 +244,29 @@ ${sleepContext}`;
         metricsToday = `\nTODAY'S METRICS:\nResting HR: ${todayMetrics.resting_heart_rate ? Math.round(todayMetrics.resting_heart_rate) + " bpm" : "N/A"}\nHRV: ${todayMetrics.hrv ? Math.round(todayMetrics.hrv) + " ms" : "N/A"}\nStress: ${todayMetrics.stress_score ?? "N/A"}\n`;
       }
 
+      // Fetch recent cadence data from running activities (last 30 days)
+      const cadenceSince = new Date(targetDateStr);
+      cadenceSince.setDate(cadenceSince.getDate() - 30);
+      const { data: recentRuns } = await supabase
+        .from("activities")
+        .select("start_time, avg_cadence, avg_speed, distance_meters, duration_seconds")
+        .eq("user_id", user.id)
+        .gte("start_time", cadenceSince.toISOString())
+        .not("avg_cadence", "is", null)
+        .order("start_time", { ascending: false })
+        .limit(20);
+
+      let cadenceContext = "";
+      if (recentRuns && recentRuns.length > 0) {
+        const cadences = recentRuns.map(r => r.avg_cadence!);
+        const avgCadence = Math.round(cadences.reduce((a, b) => a + b, 0) / cadences.length);
+        const latestCadence = Math.round(cadences[0]);
+        const trend = cadences.length >= 3 
+          ? (cadences[0] > cadences[cadences.length - 1] ? "improving" : cadences[0] < cadences[cadences.length - 1] ? "declining" : "stable")
+          : "insufficient data";
+        cadenceContext = `\nCADENCE DATA (last ${recentRuns.length} runs):\nAverage cadence: ${avgCadence} spm\nMost recent: ${latestCadence} spm\nTrend: ${trend}\nTarget range: 170-180 spm for joint protection\n${avgCadence < 160 ? "⚠️ Cadence is LOW — prioritize quick, light steps to reduce impact on knee/ankle.\n" : avgCadence >= 170 ? "✅ Cadence is in target range — great for joint health.\n" : "Cadence improving but still below target — continue cueing 'quick feet'.\n"}`;
+      }
+
       systemPrompt = `You are an elite endurance coach making a real-time daily adjustment decision for an athlete's workout.
 
 You have:
@@ -264,6 +287,7 @@ Also consider:
 - If yesterday had a hard session + poor sleep → extra caution
 - If HRV is significantly below their baseline → reduce intensity
 - If resting HR is elevated → flag potential illness/overtraining
+- CADENCE is critical for joint health: target 170-180 spm. If the athlete's recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
 
 Your response MUST follow this exact format:
 
@@ -295,11 +319,12 @@ ${sleepContext || "No sleep data available for last night."}
 
 ${metricsToday}
 ${yesterdayContext}
+${cadenceContext}
 
 TODAY'S PLANNED WORKOUT:
 ${today_workout || "No workout found for today."}
 
-Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven.`;
+Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
 
     } else if (type === "chat") {
       // chatMessages already parsed above from the original req.json(), so re-read from body params
