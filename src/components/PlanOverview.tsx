@@ -1,16 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, differenceInDays, startOfWeek, isToday, isBefore, differenceInWeeks } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { ParsedWorkout } from "@/lib/plan-export";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Calendar, Trophy } from "lucide-react";
+import { ChevronRight, Calendar, Trophy, CheckCircle2, Loader2, Activity, Clock, Heart, Zap } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { streamAICoach } from "@/lib/ai-stream";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface PlanOverviewProps {
   workouts: ParsedWorkout[];
   planStartDate: Date;
   raceDistance: string;
   raceDate?: Date;
-  completedDates?: Set<string>; // ISO date strings of completed workouts
+  completedDates?: Set<string>;
+  linkedActivities?: Record<string, any>;
 }
 
 /** Circular progress gauge (SVG) */
@@ -80,8 +85,12 @@ export default function PlanOverview({
   raceDistance,
   raceDate,
   completedDates = new Set(),
+  linkedActivities = {},
 }: PlanOverviewProps) {
   const today = new Date();
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewContent, setReviewContent] = useState<string>("");
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   // Plan date boundaries
   const planDates = useMemo(() => {
@@ -159,6 +168,48 @@ export default function PlanOverview({
   }, [currentWeek, totalWeeks]);
 
   const weekProgressPct = totalWeeks > 0 ? (currentWeek / totalWeeks) * 100 : 0;
+
+  const todayKey = format(today, "yyyy-MM-dd");
+  const todayIsCompleted = completedDates.has(todayKey);
+  const todayActivity = linkedActivities[todayKey];
+
+  const openWorkoutReview = async () => {
+    if (!todayWorkout || !todayActivity) return;
+    setReviewDialogOpen(true);
+    setReviewContent("");
+    setReviewLoading(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setReviewLoading(false); return; }
+
+    // Build activity summary
+    const distKm = todayActivity.distance_meters ? (todayActivity.distance_meters / 1000).toFixed(2) : "N/A";
+    const durMin = todayActivity.duration_seconds ? Math.round(todayActivity.duration_seconds / 60) : "N/A";
+    const avgHr = todayActivity.avg_heart_rate || "N/A";
+    const maxHr = todayActivity.max_heart_rate || "N/A";
+    const avgCad = todayActivity.avg_cadence || "N/A";
+    const cals = todayActivity.calories || "N/A";
+    const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
+
+    // Build planned workout summary
+    let plannedWorkout = todayWorkout.title + "\n";
+    if (todayWorkout.segments.length > 0) {
+      for (const s of todayWorkout.segments) {
+        plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
+      }
+    }
+
+    let accumulated = "";
+    streamAICoach({
+      type: "workout-review",
+      token: session.access_token,
+      activitySummary,
+      plannedWorkout,
+      onDelta: (text) => { accumulated += text; setReviewContent(accumulated); },
+      onDone: () => { setReviewLoading(false); },
+      onError: () => { setReviewLoading(false); setReviewContent("Unable to generate review. Please try again."); },
+    });
+  };
 
   if (!planDates) return null;
 
@@ -279,18 +330,42 @@ export default function PlanOverview({
 
         {/* Today's workout preview */}
         {todayWorkout && !/rest/i.test(todayWorkout.title) && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 mt-1">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Calendar className="w-5 h-5 text-primary" />
+          <div
+            className={cn(
+              "flex items-center gap-3 p-3 rounded-lg mt-1 cursor-pointer transition-colors",
+              todayIsCompleted
+                ? "bg-primary/10 hover:bg-primary/15"
+                : "bg-muted/50 hover:bg-muted/70"
+            )}
+            onClick={todayIsCompleted ? openWorkoutReview : undefined}
+          >
+            <div className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+              todayIsCompleted ? "bg-primary/20" : "bg-primary/10"
+            )}>
+              {todayIsCompleted
+                ? <CheckCircle2 className="w-5 h-5 text-primary" />
+                : <Calendar className="w-5 h-5 text-primary" />
+              }
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">
-                {todayWorkout.title.replace(/\s*\(Total:.*?\)/, "")}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold truncate">
+                  {todayWorkout.title.replace(/\s*\(Total:.*?\)/, "")}
+                </p>
+                {todayIsCompleted && (
+                  <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
+                    Completed ✓
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {todayWorkout.segments.length > 0
-                  ? `${todayWorkout.segments.length} segments`
-                  : "Today's workout"}
+                {todayIsCompleted && todayActivity
+                  ? `${todayActivity.distance_meters ? (todayActivity.distance_meters / 1000).toFixed(1) + " km" : ""} · ${todayActivity.duration_seconds ? Math.round(todayActivity.duration_seconds / 60) + " min" : ""} · Tap for review`
+                  : todayWorkout.segments.length > 0
+                    ? `${todayWorkout.segments.length} segments`
+                    : "Today's workout"
+                }
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -327,6 +402,84 @@ export default function PlanOverview({
           </div>
         </div>
       </Card>
+
+      {/* Workout Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              Workout Review
+            </DialogTitle>
+            <DialogDescription>
+              {todayWorkout?.title.replace(/\s*\(Total:.*?\)/, "")} — {format(today, "d MMMM yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Activity Stats Grid */}
+          {todayActivity && (
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              {todayActivity.distance_meters && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+                  <Activity className="w-4 h-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">{(todayActivity.distance_meters / 1000).toFixed(2)} km</p>
+                    <p className="text-[10px] text-muted-foreground">Distance</p>
+                  </div>
+                </div>
+              )}
+              {todayActivity.duration_seconds && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+                  <Clock className="w-4 h-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">{Math.round(todayActivity.duration_seconds / 60)} min</p>
+                    <p className="text-[10px] text-muted-foreground">Duration</p>
+                  </div>
+                </div>
+              )}
+              {todayActivity.avg_heart_rate && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+                  <Heart className="w-4 h-4 text-red-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">{todayActivity.avg_heart_rate} bpm</p>
+                    <p className="text-[10px] text-muted-foreground">Avg HR</p>
+                  </div>
+                </div>
+              )}
+              {todayActivity.avg_cadence && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
+                  <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold">{Math.round(todayActivity.avg_cadence * 2)} spm</p>
+                    <p className="text-[10px] text-muted-foreground">Cadence</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI Review */}
+          <div className="mt-3">
+            {reviewLoading && !reviewContent && (
+              <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Analyzing your workout...</span>
+              </div>
+            )}
+            {reviewContent && (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <MarkdownRenderer content={reviewContent} />
+              </div>
+            )}
+            {reviewLoading && reviewContent && (
+              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Still writing...</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

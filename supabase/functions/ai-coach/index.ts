@@ -33,8 +33,8 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout } = reqBody;
-    // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust"
+    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
     const { data: profile } = await supabase
@@ -494,7 +494,7 @@ PROGRESS REVIEW:
 ${review_text || "No review provided"}
 
 Generate the complete revised ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
-    } else {
+    } else if (type === "training-plan") {
       const raceLabel = {
         "5k": "5K",
         "10k": "10K",
@@ -610,6 +610,22 @@ Be specific with paces, durations, and intensities. Use the athlete's actual per
 ${dataContext}
 
 Generate a comprehensive ${raceLabel} ${isAIDecide ? 'fitness assessment, recommended timeline, and complete' : 'season strategy and detailed 4-week'} training plan starting ${planStart}. Schedule workouts only on ${daysStr}. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+    } else if (type === "workout-review") {
+      const reviewSystemPrompt = [
+        "You are an incredibly supportive and encouraging running coach reviewing an athlete's completed workout vs their plan. Be warm, positive, celebratory. Keep it concise (150-200 words). Use emojis sparingly.",
+        "",
+        "Format:",
+        "## Workout Review",
+        "**Performance Summary**: Brief planned vs actual comparison",
+        "**What Went Well**: 2-3 specific positives",
+        "**Areas to Build On**: 1-2 gentle suggestions (only if relevant)",
+        "**Coach's Note**: Encouraging closing message",
+      ].join("\n");
+      systemPrompt = reviewSystemPrompt;
+
+      const pw = planned_workout || "N/A";
+      const as = activity_summary || "N/A";
+      userPrompt = "## Planned Workout\n" + pw + "\n\n## Actual Activity\n" + as + "\n\nReview this workout with encouraging, supportive feedback.";
     }
 
     // Stream from Lovable AI
