@@ -179,25 +179,31 @@ const TrainingPlanPage = () => {
   useEffect(() => { loadSavedPlan(); }, [loadSavedPlan]);
 
   // Fetch activities linked to this plan to track completion
-  useEffect(() => {
+  const fetchLinkedActivities = useCallback(async () => {
     if (!savedPlanId || !user) { setCompletedDates(new Set()); return; }
-    const fetchLinkedActivities = async () => {
-      const { data } = await supabase
-        .from("activities")
-        .select("start_time")
-        .eq("user_id", user.id)
-        .eq("training_plan_id", savedPlanId);
-      if (data) {
-        const dates = new Set(
-          data
-            .filter(a => a.start_time)
-            .map(a => format(new Date(a.start_time!), "yyyy-MM-dd"))
-        );
-        setCompletedDates(dates);
-      }
-    };
-    fetchLinkedActivities();
+    const { data } = await supabase
+      .from("activities")
+      .select("start_time")
+      .eq("user_id", user.id)
+      .eq("training_plan_id", savedPlanId);
+    if (data) {
+      const dates = new Set(
+        data
+          .filter(a => a.start_time)
+          .map(a => format(new Date(a.start_time!), "yyyy-MM-dd"))
+      );
+      setCompletedDates(dates);
+    }
   }, [savedPlanId, user]);
+
+  useEffect(() => { fetchLinkedActivities(); }, [fetchLinkedActivities]);
+
+  // Re-fetch when window regains focus (e.g. after linking activity on another page)
+  useEffect(() => {
+    const onFocus = () => { fetchLinkedActivities(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchLinkedActivities]);
 
   const savePlan = async (planContent: string) => {
     if (!user) return;
