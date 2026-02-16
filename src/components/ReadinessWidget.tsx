@@ -24,7 +24,7 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
 
   // Color based on score zones
   const gaugeColor =
-    score >= 80 ? "hsl(142, 60%, 45%)" : score >= 60 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+    score >= 80 ? "hsl(142, 60%, 45%)" : score > 30 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
@@ -63,10 +63,10 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
   );
 }
 
-// ── Zone Bar (0-59 red, 60-79 yellow, 80-100 green) ──
+// ── Zone Bar (0-30 red, 31-79 yellow, 80-100 green) ──
 function ZoneBar({ score }: { score: number }) {
-  const label = score >= 80 ? "HIGH" : score >= 60 ? "MEDIUM" : "LOW";
-  const labelColor = score >= 80 ? "text-emerald-600 dark:text-emerald-400" : score >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400";
+  const label = score >= 80 ? "HIGH" : score > 30 ? "MEDIUM" : "LOW";
+  const labelColor = score >= 80 ? "text-emerald-600 dark:text-emerald-400" : score > 30 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400";
 
   // Position the indicator (0-100 mapped to percentage)
   const position = `${score}%`;
@@ -80,8 +80,8 @@ function ZoneBar({ score }: { score: number }) {
       <div className="relative">
         {/* Zone bar */}
         <div className="flex h-2.5 rounded-full overflow-hidden">
-          <div className="flex-[59] bg-red-500/80" />
-          <div className="flex-[20] bg-yellow-500/80" />
+          <div className="flex-[30] bg-red-500/80" />
+          <div className="flex-[49] bg-yellow-500/80" />
           <div className="flex-[21] bg-emerald-500/80" />
         </div>
         {/* Indicator triangle */}
@@ -91,8 +91,8 @@ function ZoneBar({ score }: { score: number }) {
         />
         {/* Zone labels */}
         <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground">
-          <span>0–59</span>
-          <span>60–79</span>
+          <span>0–30</span>
+          <span>31–79</span>
           <span>80–100</span>
         </div>
       </div>
@@ -383,10 +383,8 @@ const ReadinessWidget = () => {
             <p className="text-sm text-muted-foreground">
               {result.score >= 80
                 ? "You're well recovered — go crush it today."
-                : result.score >= 60
+                : result.score > 30
                 ? "Moderate readiness — pace yourself wisely."
-                : result.score >= 40
-                ? "Your body needs lighter work today."
                 : "Rest is your best workout today."}
             </p>
           )}
