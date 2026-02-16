@@ -119,18 +119,18 @@ serve(async (req) => {
       }
       const dates = Object.keys(byDate).sort().reverse().slice(0, 14);
       if (dates.length >= 3) {
-        const bedtimes = dates.map(d => new Date(byDate[d].earliest).getUTCHours() + new Date(byDate[d].earliest).getUTCMinutes() / 60);
-        const wakeups = dates.map(d => new Date(byDate[d].latest).getUTCHours() + new Date(byDate[d].latest).getUTCMinutes() / 60);
-        const avgBedtime = bedtimes.reduce((a, b) => a + b, 0) / bedtimes.length;
-        const avgWakeup = wakeups.reduce((a, b) => a + b, 0) / wakeups.length;
+        // Collect actual recent bedtimes and wake times as readable strings
+        const recentNights = dates.slice(0, 7).map(d => {
+          const bedDt = new Date(byDate[d].earliest);
+          const wakeDt = new Date(byDate[d].latest);
+          const fmtTime = (dt: Date) => dt.toISOString().slice(11, 16) + " UTC";
+          const durationMs = wakeDt.getTime() - bedDt.getTime();
+          const durationH = (durationMs / 3600000).toFixed(1);
+          return `${d}: bed ${fmtTime(bedDt)}, wake ${fmtTime(wakeDt)}, ~${durationH}h`;
+        });
         
-        const formatHour = (h: number) => {
-          const hours = Math.floor(h);
-          const mins = Math.round((h - hours) * 60);
-          return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')} UTC`;
-        };
-        
-        sleepPatternContext = `\nThe user's typical bedtime is around ${formatHour(avgBedtime)} and they usually wake around ${formatHour(avgWakeup)} (based on ${dates.length} recent nights).`;
+        sleepPatternContext = `\nRECENT SLEEP DATA (last ${recentNights.length} nights, times in UTC — convert to local using current_hour_local vs current UTC hour to infer offset):\n${recentNights.join("\n")}`;
+        sleepPatternContext += `\nIMPORTANT: Convert all times to the user's local timezone before mentioning them. Use the difference between current_hour_local and the current UTC hour to determine the offset. Never show UTC times to the user.`;
       }
     }
 
