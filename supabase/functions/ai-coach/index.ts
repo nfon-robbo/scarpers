@@ -479,8 +479,9 @@ CRITICAL FORMAT RULES:
 2. Use UK date format (DD/MM/YYYY) for all dates.
 3. Only schedule workouts on: ${daysStr}.
 4. EVERY workout title MUST include the total duration as "(Total: Xmin)".
-5. Include the Season Strategy Overview section before the weekly plan.
-6. Start from the next upcoming week based on today's date.`;
+5. EVERY running segment MUST include a music BPM target in the Notes column (🎵 150=Z1, 155=Z2, 165=Z3, 170=Z4, 175=Z5) for cadence matching.
+6. Include the Season Strategy Overview section before the weekly plan.
+7. Start from the next upcoming week based on today's date.`;
 
       userPrompt = `${athleteContext}
 
@@ -574,6 +575,13 @@ ${planLengthInstruction}
 CRITICAL FORMAT RULES:
 1. EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
 2. EVERY workout title line MUST include the total duration in the format "(Total: Xmin)" — calculate this by summing all segment durations including warm-up, main set, and cool-down. This is mandatory for every single workout. For interval sessions, include the recovery time in the total.
+3. EVERY running segment in the Notes column MUST include a music BPM target aligned with the target cadence for that segment. Use the format "🎵 XXX BPM (target cadence)". Use these mappings:
+   - Z1 (walking/easy): 🎵 150 BPM
+   - Z2 (easy run): 🎵 155 BPM
+   - Z3 (steady/intervals): 🎵 165 BPM
+   - Z4 (tempo/threshold): 🎵 170 BPM
+   - Z5 (race pace/VO2max): 🎵 175 BPM
+   This is critical for the athlete to match their running cadence to music tempo for joint protection. NEVER omit the music BPM from the Notes column on any running segment.
 
 For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
@@ -581,9 +589,9 @@ For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date fo
 **Monday ${planStartUK}** - [Workout Type] (Total: 40min)
 | Segment | Duration/Distance | Target | HR Zone | Notes |
 |---------|-------------------|--------|---------|-------|
-| Warm-up | 10 min | easy pace | Z1-Z2 | |
-| Main | 3 x 1km | 5:30/km | Z4 | 90s jog recovery |
-| Cool-down | 10 min | easy pace | Z1 | |
+| Warm-up | 10 min | easy pace | Z1-Z2 | 🎵 150 BPM (target cadence) |
+| Main | 3 x 1km | 5:30/km | Z4 | 🎵 170 BPM (target cadence); 90s jog recovery |
+| Cool-down | 10 min | easy pace | Z1 | 🎵 150 BPM (target cadence) |
 
 EVERY workout in EVERY week must follow this exact table format. Continue for all weeks with actual dates.
 

@@ -72,12 +72,23 @@ export default function PlanCalendarView({ workouts, planStartDate }: PlanCalend
     return title.split(/[(\-–]/)[0].trim().slice(0, 18);
   }
 
-  // Extract music BPM from workout segments notes
+  // Extract music BPM from workout segments notes, with fallback based on HR zone
   function musicBpm(w: ParsedWorkout): string | null {
+    // First check for explicit BPM in notes
     for (const seg of w.segments) {
       if (seg.notes) {
         const match = seg.notes.match(/(\d{3})\s*BPM/i);
         if (match) return `🎵 ${match[1]}`;
+      }
+    }
+    // Fallback: derive from the main segment's HR zone
+    const mainSeg = w.segments.find(s => /main|interval/i.test(s.segment));
+    if (mainSeg?.hrZone) {
+      const m = mainSeg.hrZone.match(/Z(\d)/i);
+      if (m) {
+        const z = parseInt(m[1], 10);
+        const bpmMap: Record<number, number> = { 1: 150, 2: 155, 3: 165, 4: 170, 5: 175 };
+        if (bpmMap[z]) return `🎵 ${bpmMap[z]}`;
       }
     }
     return null;
