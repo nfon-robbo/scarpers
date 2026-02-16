@@ -130,12 +130,12 @@ function bodyBatteryDrain(d: ReadinessData): { drain: number; hoursAwake: number
   }
 
   // Active drain: each activity drains based on intensity-weighted load
-  // ~0.2 pts per intensity-weighted minute
+  // Reduced to ~0.1 pts per minute since Today's Effort modifier handles the main penalty
   let activeDrain = 0;
   for (const act of d.todayActivities) {
-    activeDrain += act.intensityLoad * 0.2;
+    activeDrain += act.intensityLoad * 0.1;
   }
-  activeDrain = Math.min(20, activeDrain); // cap active drain
+  activeDrain = Math.min(10, activeDrain); // reduced cap
 
   return {
     drain: -(passiveDrain + activeDrain),
@@ -156,8 +156,8 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // Sleep Quality (30%) — primary recovery indicator
   if (d.sleepScore == null) {
-    // Missing sleep = assume very poor — you can't recover without data
-    weightedSum += 15 * 0.30;
+    // Missing sleep = assume moderate-poor
+    weightedSum += 30 * 0.30;
     factors.push({
       label: "Sleep Quality",
       status: "poor",
@@ -198,7 +198,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(dp)}% of sleep${dp < 10 ? " ⚠️ critically low" : ""}`,
     });
   } else {
-    weightedSum += 10 * 0.15; // missing = assume terrible
+    weightedSum += 25 * 0.15; // missing = assume poor but not catastrophic
   }
 
   // RHR vs baseline (12%)
@@ -230,7 +230,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 10 * 0.20; // missing HRV = heavy penalty
+    weightedSum += 25 * 0.20; // missing HRV = moderate penalty
     factors.push({ label: "HRV", status: "poor", detail: "No data" });
   }
 
@@ -269,14 +269,18 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   const modifiers: { label: string; adj: number; detail: string }[] = [];
 
-  // Recovery time — more aggressive
-  if (d.recoveryHoursSinceLastHard != null && d.lastWorkoutIntensity != null) {
+  // Determine if the last workout was TODAY (to avoid double-counting)
+  const lastWorkoutWasToday = d.todayLoad != null && d.todayLoad > 0;
+
+  // Recovery time — only penalise if last hard session was YESTERDAY or earlier
+  // If you trained today, recovery is already captured by Today's Effort
+  if (d.recoveryHoursSinceLastHard != null && d.lastWorkoutIntensity != null && !lastWorkoutWasToday) {
     const hrs = d.recoveryHoursSinceLastHard;
     const intensity = d.lastWorkoutIntensity;
     const neededHrs = 8 + (intensity / 100) * 16;
     if (hrs < neededHrs) {
       const ratio = hrs / neededHrs;
-      const penalty = -Math.round(6 + (1 - ratio) * 14); // -6 to -20
+      const penalty = -Math.round(4 + (1 - ratio) * 10); // -4 to -14 (softened)
       modifiers.push({
         label: "Recovery",
         adj: penalty,
@@ -289,13 +293,19 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
         detail: `${Math.round(hrs)}h since last session`,
       });
     }
+  } else if (!lastWorkoutWasToday && d.recoveryHoursSinceLastHard != null) {
+    modifiers.push({
+      label: "Recovery",
+      adj: 0,
+      detail: `${Math.round(d.recoveryHoursSinceLastHard)}h since last session`,
+    });
   }
 
   // 3-day sleep debt — harsher
   if (d.recentSleepAvgHours != null && d.baselineSleepAvgHours != null && d.baselineSleepAvgHours > 0) {
     const debt = d.recentSleepAvgHours - d.baselineSleepAvgHours;
     if (debt < -0.3) {
-      const penalty = Math.round(Math.max(-20, debt * 10)); // -10 per hour deficit, max -20
+      const penalty = Math.round(Math.max(-15, debt * 8)); // softened: -8 per hour deficit, max -15
       modifiers.push({
         label: "Sleep Debt",
         adj: penalty,
@@ -308,7 +318,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   if (d.stressHistory.length >= 2) {
     const avg = d.stressHistory.reduce((a, b) => a + b, 0) / d.stressHistory.length;
     if (avg > 45) {
-      const penalty = -Math.round(Math.min(12, (avg - 45) / 4)); // -1 to -12
+      const penalty = -Math.round(Math.min(10, (avg - 45) / 5)); // softened
       modifiers.push({
         label: "Stress Trend",
         adj: penalty,
@@ -321,7 +331,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
     const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
     if (ratio > 1.4) {
-      const penalty = -Math.round(Math.min(12, (ratio - 1.4) * 12)); // -1 to -12
+      const penalty = -Math.round(Math.min(10, (ratio - 1.4) * 10)); // softened
       modifiers.push({
         label: "Training Ramp",
         adj: penalty,
@@ -336,9 +346,9 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     }
   }
 
-  // Today's load
+  // Today's load — moderate penalty, this is the ONLY penalty for today's workout
   if (d.todayLoad != null && d.todayLoad > 0) {
-    const penalty = -Math.round(Math.min(18, (d.todayLoad / 50) * 10)); // -1 to -18
+    const penalty = -Math.round(Math.min(12, (d.todayLoad / 60) * 8)); // -1 to -12 (softened)
     modifiers.push({
       label: "Today's Effort",
       adj: penalty,
