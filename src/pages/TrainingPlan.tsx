@@ -383,6 +383,8 @@ const TrainingPlanPage = () => {
     return text;
   };
 
+  const [dayAdjustIsModified, setDayAdjustIsModified] = useState(false);
+
   const assessDayAhead = async () => {
     if (!user || !content) return;
     const todayWorkout = extractTodayWorkout();
@@ -393,6 +395,7 @@ const TrainingPlanPage = () => {
 
     setDayAdjusting(true);
     setDayAdjustResult(null);
+    setDayAdjustIsModified(false);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -414,12 +417,87 @@ const TrainingPlanPage = () => {
       },
       onDone: () => {
         setDayAdjusting(false);
+        // Check if the AI recommended an adjustment vs keeping as-is
+        const isAdjusted = /Decision:\s*ADJUSTED/i.test(accumulated);
+        setDayAdjustIsModified(isAdjusted);
       },
       onError: (err) => {
         toast({ title: "Day assessment failed", description: err, variant: "destructive" });
         setDayAdjusting(false);
       },
     });
+  };
+
+  /**
+   * Extract the adjusted workout table from the AI's day-ahead result
+   * and replace only today's workout section in the full plan content.
+   */
+  const applyDayAdjustment = () => {
+    if (!dayAdjustResult || !content) return;
+
+    // Find the "Workout for Today" section and extract the table
+    const workoutSectionMatch = dayAdjustResult.match(/##\s*📝\s*Workout for Today[\s\S]*?\n(\*\*[^\n]+\*\*[\s\S]*?\|[^\n]+\|(?:\n\|[^\n]+\|)*)/i);
+    if (!workoutSectionMatch) {
+      toast({ title: "Could not extract adjusted workout", description: "The AI response format was unexpected. Please try again.", variant: "destructive" });
+      return;
+    }
+
+    const adjustedWorkoutBlock = workoutSectionMatch[1].trim();
+
+    // Find today's date and locate the corresponding workout in the plan
+    const today = new Date();
+    const todayStr = format(today, "yyyy-MM-dd");
+    const workouts = parseWorkoutsFromPlan(content);
+    const todayWorkout = workouts.find(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") === todayStr);
+
+    if (!todayWorkout) {
+      toast({ title: "Could not find today's workout in plan", variant: "destructive" });
+      return;
+    }
+
+    // Build the original workout block pattern to find in the content
+    // Match the workout title line and its table
+    const titleEscaped = todayWorkout.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match: **Title** followed by a markdown table (with optional whitespace)
+    const workoutPattern = new RegExp(
+      `(\\*\\*${titleEscaped}\\*\\*[\\s\\S]*?)(\\|[^\\n]*Segment[^\\n]*\\|\\n\\|[-| ]+\\|\\n(?:\\|[^\\n]+\\|\\n?)*)`,
+      'i'
+    );
+
+    let updatedContent: string;
+    const match = content.match(workoutPattern);
+    if (match) {
+      updatedContent = content.replace(workoutPattern, adjustedWorkoutBlock);
+    } else {
+      // Fallback: try to find just by title and replace the next table
+      const titleIdx = content.indexOf(`**${todayWorkout.title}**`);
+      if (titleIdx === -1) {
+        toast({ title: "Could not locate workout in plan to replace", variant: "destructive" });
+        return;
+      }
+      // Find the table after this title
+      const afterTitle = content.slice(titleIdx);
+      const tableMatch = afterTitle.match(/(\*\*[^\n]+\*\*[\s\S]*?\|[^\n]*Segment[^\n]*\|\n\|[-| ]+\|\n(?:\|[^\n]+\|\n?)*)/i);
+      if (tableMatch) {
+        updatedContent = content.slice(0, titleIdx) + adjustedWorkoutBlock + content.slice(titleIdx + tableMatch[0].length);
+      } else {
+        toast({ title: "Could not locate workout table in plan", variant: "destructive" });
+        return;
+      }
+    }
+
+    setContent(updatedContent);
+    savePlan(updatedContent);
+    setDayAdjustIsModified(false);
+    toast({
+      title: "Workout updated!",
+      description: "Today's workout has been adjusted. Remember to re-sync to intervals.icu to push the change to your watch.",
+    });
+  };
+
+  const dismissDayAdjust = () => {
+    setDayAdjustResult(null);
+    setDayAdjustIsModified(false);
   };
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
@@ -825,10 +903,25 @@ const TrainingPlanPage = () => {
                 <p className="text-sm text-muted-foreground">Analyzing your sleep, recovery, and readiness…</p>
               )}
               {!dayAdjusting && dayAdjustResult && (
-                <Button size="sm" variant="ghost" className="mt-3" onClick={() => setDayAdjustResult(null)}>
-                  <X className="w-4 h-4 mr-2" />
-                  Dismiss
-                </Button>
+                <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
+                  {dayAdjustIsModified ? (
+                    <>
+                      <Button size="sm" onClick={applyDayAdjustment}>
+                        <Check className="w-4 h-4 mr-2" />
+                        Apply Adjusted Workout
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
+                        <X className="w-4 h-4 mr-2" />
+                        Keep Original
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={dismissDayAdjust}>
+                      <X className="w-4 h-4 mr-2" />
+                      Dismiss
+                    </Button>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
