@@ -380,13 +380,25 @@ const ReadinessWidget = () => {
           ) : aiAdvice ? (
             <p className="text-sm text-muted-foreground leading-relaxed">{aiAdvice}</p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {result.score >= 80
-                ? "You're well recovered — go crush it today."
-                : result.score > 30
-                ? "Moderate readiness — pace yourself wisely."
-                : "Rest is your best workout today."}
-            </p>
+            <div className="text-sm text-muted-foreground space-y-2">
+              {result.score <= 20 ? (
+                <p>Mate, your body is absolutely cooked. Put the trainers down and go lie on the sofa. 🛋️</p>
+              ) : (
+                <>
+                  <p className="font-medium text-foreground">
+                    Score: {result.score}/100 — {result.score >= 80 ? "Well recovered" : result.score > 50 ? "Moderate readiness" : result.score > 30 ? "Below average" : "Low readiness"}
+                  </p>
+                  <div className="space-y-0.5 text-xs">
+                    {result.factors.map((f) => (
+                      <div key={f.label} className="flex justify-between">
+                        <span>{f.label}</span>
+                        <span className="font-mono">{f.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
