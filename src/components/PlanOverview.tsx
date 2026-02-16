@@ -117,7 +117,7 @@ export default function PlanOverview({
   // Workout-level stats
   const stats = useMemo(() => {
     const total = workouts.filter(w => w.dateObj && !/rest/i.test(w.title)).length;
-    const pastWorkouts = workouts.filter(w => w.dateObj && isBefore(w.dateObj, today) && !isToday(w.dateObj) && !/rest/i.test(w.title));
+    const pastWorkouts = workouts.filter(w => w.dateObj && (isBefore(w.dateObj, today) || isToday(w.dateObj)) && !/rest/i.test(w.title));
     const completed = pastWorkouts.filter(w => completedDates.has(format(w.dateObj!, "yyyy-MM-dd"))).length;
     const skipped = pastWorkouts.length - completed;
     const remaining = total - pastWorkouts.length;
