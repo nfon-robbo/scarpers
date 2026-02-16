@@ -15,8 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 
 // ── Circular Gauge ──
-function CircularGauge({ score, size = 180 }: { score: number; size?: number }) {
-  const strokeWidth = 10;
+function CircularGauge({ score, size = 200 }: { score: number; size?: number }) {
+  const strokeWidth = 12;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.max(0, Math.min(100, score)) / 100;
@@ -26,8 +26,11 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
   const gaugeColor =
     score >= 80 ? "hsl(142, 60%, 45%)" : score > 30 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
 
+  const glowColor =
+    score >= 80 ? "0 0 30px -5px hsla(142, 60%, 45%, 0.4)" : score > 30 ? "0 0 30px -5px hsla(45, 90%, 50%, 0.4)" : "0 0 30px -5px hsla(0, 72%, 51%, 0.4)";
+
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size, filter: `drop-shadow(${glowColor})` }}>
       <svg width={size} height={size} className="-rotate-90">
         {/* Background track */}
         <circle
@@ -37,6 +40,7 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
           fill="none"
           stroke="hsl(var(--muted))"
           strokeWidth={strokeWidth}
+          strokeLinecap="round"
         />
         {/* Progress arc */}
         <circle
@@ -54,8 +58,8 @@ function CircularGauge({ score, size = 180 }: { score: number; size?: number }) 
       </svg>
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-bold tracking-tight text-foreground">{score}</span>
-        <span className="text-[10px] text-muted-foreground mt-1">
+        <span className="text-5xl font-black tracking-tight text-foreground">{score}</span>
+        <span className="text-[10px] text-muted-foreground mt-1 font-medium">
           Updated {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
@@ -347,10 +351,11 @@ const ReadinessWidget = () => {
   if (loading || !result || result.factors.length === 0) return null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
       {/* Main Gauge Card */}
-      <Card>
-        <CardContent className="pt-6 pb-4 flex flex-col items-center">
+      <Card className="glass border-border/30 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+        <CardContent className="pt-8 pb-6 flex flex-col items-center relative z-10">
           <CircularGauge score={result.score} />
         </CardContent>
       </Card>

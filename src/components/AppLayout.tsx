@@ -39,70 +39,99 @@ const AppLayout = () => {
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col border-r border-border bg-sidebar p-4">
-        <div className="flex items-center gap-2.5 px-2 mb-8">
-          <Activity className="w-7 h-7 text-primary" />
-          <span className="text-lg font-bold text-sidebar-foreground">AI Coach</span>
+      <aside className="hidden md:flex w-[260px] flex-col glass-strong fixed inset-y-0 left-0 z-40">
+        {/* Brand */}
+        <div className="flex items-center gap-3 px-5 py-6 border-b border-border/50">
+          <div className="relative">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-sm">
+              <Activity className="w-5 h-5 text-primary-foreground" />
+            </div>
+          </div>
+          <div>
+            <span className="text-base font-bold tracking-tight gradient-text">AI Coach</span>
+            <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Endurance</p>
+          </div>
         </div>
 
-        <nav className="flex-1 space-y-1">
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    ? "bg-primary/10 text-primary glow-sm"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 }`
               }
             >
-              <Icon className="w-4 h-4" />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                    isActive
+                      ? "bg-primary/15"
+                      : "bg-transparent group-hover:bg-muted"
+                  }`}>
+                    <Icon className="w-[18px] h-[18px]" />
+                  </div>
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="border-t border-sidebar-border pt-4 mt-4 space-y-1">
+        {/* Footer */}
+        <div className="border-t border-border/50 p-3 space-y-0.5">
           {profile?.name && (
-            <p className="px-3 mb-2 text-sm text-sidebar-foreground/70 truncate">{profile.name}</p>
+            <div className="px-3 py-2 mb-1">
+              <p className="text-xs text-muted-foreground truncate">Signed in as</p>
+              <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+            </div>
           )}
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 h-10"
             onClick={toggleTheme}
           >
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            </div>
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </Button>
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-10"
             onClick={signOut}
           >
-            <LogOut className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+              <LogOut className="w-[18px] h-[18px]" />
+            </div>
             Sign out
           </Button>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b border-border">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
         <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2">
-            <Activity className="w-6 h-6 text-primary" />
-            <span className="font-bold text-foreground">AI Coach</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <Activity className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-sm gradient-text">AI Coach</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-xl">
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
         </div>
 
         {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
-          <div className="bg-background border-b border-border px-4 pb-4 space-y-1">
+          <div className="glass-strong border-t border-border/50 px-3 pb-4 pt-2 space-y-0.5 animate-fade-in">
             {navItems.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
@@ -110,40 +139,48 @@ const AppLayout = () => {
                 end={to === "/"}
                 onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                     isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   }`
                 }
               >
-                <Icon className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                  <Icon className="w-[18px] h-[18px]" />
+                </div>
                 {label}
               </NavLink>
             ))}
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-              onClick={() => { toggleTheme(); setMobileMenuOpen(false); }}
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              {theme === "dark" ? "Light Mode" : "Dark Mode"}
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-              onClick={() => { signOut(); setMobileMenuOpen(false); }}
-            >
-              <LogOut className="w-4 h-4" />
-              Sign out
-            </Button>
+            <div className="border-t border-border/50 mt-2 pt-2 space-y-0.5">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-foreground h-10"
+                onClick={() => { toggleTheme(); setMobileMenuOpen(false); }}
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                  {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+                </div>
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-destructive h-10"
+                onClick={() => { signOut(); setMobileMenuOpen(false); }}
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                  <LogOut className="w-[18px] h-[18px]" />
+                </div>
+                Sign out
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:pt-0 pt-14">
-        <div className="container max-w-6xl py-8 px-4">
+      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14">
+        <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </main>
