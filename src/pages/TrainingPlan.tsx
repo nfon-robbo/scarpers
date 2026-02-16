@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanCalendarView from "@/components/PlanCalendarView";
+import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 
 interface ApiStep {
@@ -841,10 +842,18 @@ const TrainingPlanPage = () => {
 
       {(content || loading) && (<>
         {content && !loading && (
-          <PlanCalendarView
-            workouts={parseWorkoutsFromPlan(content)}
-            planStartDate={startDate}
-          />
+          <>
+            <PlanOverview
+              workouts={parseWorkoutsFromPlan(content)}
+              planStartDate={startDate}
+              raceDistance={raceDistance}
+              raceDate={raceDate}
+            />
+            <PlanCalendarView
+              workouts={parseWorkoutsFromPlan(content)}
+              planStartDate={startDate}
+            />
+          </>
         )}
 
         <Card>
