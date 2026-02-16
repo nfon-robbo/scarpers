@@ -170,10 +170,8 @@ const BodyBatteryChart = () => {
   const gaugeColor =
     currentScore >= 80
       ? "hsl(142, 60%, 45%)"
-      : currentScore >= 60
+      : currentScore > 30
       ? "hsl(45, 90%, 50%)"
-      : currentScore >= 40
-      ? "hsl(20, 90%, 50%)"
       : "hsl(0, 72%, 51%)";
 
   return (
