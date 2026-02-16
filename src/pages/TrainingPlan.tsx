@@ -488,8 +488,13 @@ const TrainingPlanPage = () => {
     setDayAdjustDialogOpen(false);
     toast({
       title: "Workout updated!",
-      description: "Today's workout has been adjusted. Remember to re-sync to intervals.icu to push the change to your watch.",
+      description: "Syncing adjusted workout to Intervals.icu...",
     });
+
+    // Auto-sync to Intervals.icu after applying adjustment
+    setTimeout(() => {
+      handleSyncToIntervals(true);
+    }, 500);
   };
 
   const dismissDayAdjust = () => {
