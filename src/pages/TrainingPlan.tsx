@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,7 +11,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -384,6 +385,8 @@ const TrainingPlanPage = () => {
   };
 
   const [dayAdjustIsModified, setDayAdjustIsModified] = useState(false);
+  const [dayAdjustDialogOpen, setDayAdjustDialogOpen] = useState(false);
+  const [dayAdjustPhase, setDayAdjustPhase] = useState<"sleep" | "metrics" | "analyzing" | "done">("sleep");
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
@@ -393,16 +396,24 @@ const TrainingPlanPage = () => {
       return;
     }
 
+    // Open dialog immediately with progress
+    setDayAdjustDialogOpen(true);
     setDayAdjusting(true);
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustPhase("sleep");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast({ title: "Session expired", variant: "destructive" });
       setDayAdjusting(false);
+      setDayAdjustDialogOpen(false);
       return;
     }
+
+    // Simulate progress phases as the AI processes
+    setTimeout(() => setDayAdjustPhase("metrics"), 1500);
+    setTimeout(() => setDayAdjustPhase("analyzing"), 3500);
 
     const todayStr = format(new Date(), "yyyy-MM-dd");
     let accumulated = "";
@@ -414,29 +425,25 @@ const TrainingPlanPage = () => {
       onDelta: (text) => {
         accumulated += text;
         setDayAdjustResult(accumulated);
+        if (dayAdjustPhase !== "done") setDayAdjustPhase("analyzing");
       },
       onDone: () => {
         setDayAdjusting(false);
-        // Check if the AI recommended an adjustment vs keeping as-is
+        setDayAdjustPhase("done");
         const isAdjusted = /Decision:\s*ADJUSTED/i.test(accumulated);
         setDayAdjustIsModified(isAdjusted);
       },
       onError: (err) => {
         toast({ title: "Day assessment failed", description: err, variant: "destructive" });
         setDayAdjusting(false);
+        setDayAdjustDialogOpen(false);
       },
     });
   };
 
-  /**
-   * Extract the adjusted workout table from the AI's day-ahead result
-   * and replace only today's workout section in the full plan content.
-   */
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
 
-    // Find today's workout using the parser — it has `rawText` which is the exact
-    // slice from the plan markdown, so we can use it for direct string replacement.
     const today = new Date();
     const todayStr = format(today, "yyyy-MM-dd");
     const workouts = parseWorkoutsFromPlan(content);
@@ -447,40 +454,25 @@ const TrainingPlanPage = () => {
       return;
     }
 
-    // Extract the adjusted workout block from the AI response.
-    // Look for the "Workout for Today" section which contains a title + table.
     const workoutSection = dayAdjustResult.match(/##\s*📝\s*Workout for Today\s*\n([\s\S]*?)(?=\n##\s|$)/i);
     if (!workoutSection) {
       toast({ title: "Could not extract adjusted workout", description: "The AI response format was unexpected. Please try again.", variant: "destructive" });
       return;
     }
 
-    // Build the replacement block: keep the original date line, replace the title + table
-    // The rawText starts with the date line (e.g. **Monday 16/02/2026** – Title)
-    // We want to keep the date prefix and replace the workout content after it.
     const rawLines = todayWorkout.rawText.split("\n");
-    const dateLine = rawLines[0]; // e.g. **Monday 16/02/2026** – Foundation Run (Total: 30 min)
-
-    // Extract the new title + table from the AI's adjusted section
+    const dateLine = rawLines[0];
     const adjustedContent = workoutSection[1].trim();
 
-    // The AI outputs something like:
-    // **Adjusted Foundation Run (Total: 30 min)**
-    // | Segment | Duration | ... |
-    // We need to reconstruct the date line with the new title
     const newTitleMatch = adjustedContent.match(/\*\*([^*]+)\*\*/);
     const newTitle = newTitleMatch ? newTitleMatch[1] : todayWorkout.title;
 
-    // Reconstruct: keep original date prefix, swap in new title + table
     const datePrefix = dateLine.match(/(\*\*[^*]*\d{1,2}\/\d{1,2}\/\d{4}\*\*\s*[-–:]\s*)/);
     const newDateLine = datePrefix ? `${datePrefix[1]}${newTitle}` : dateLine;
 
-    // Build the full replacement: date line + everything after (table etc.)
-    // Remove the title line from adjusted content since we put it in the date line
     const adjustedWithoutTitle = adjustedContent.replace(/^\*\*[^*]+\*\*\s*\n?/, "").trim();
     const replacement = `${newDateLine}\n\n${adjustedWithoutTitle}`;
 
-    // Replace the original rawText block in the plan
     const idx = content.indexOf(todayWorkout.rawText);
     if (idx === -1) {
       toast({ title: "Could not locate workout in plan to replace", variant: "destructive" });
@@ -493,6 +485,7 @@ const TrainingPlanPage = () => {
     savePlan(updatedContent);
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
+    setDayAdjustDialogOpen(false);
     toast({
       title: "Workout updated!",
       description: "Today's workout has been adjusted. Remember to re-sync to intervals.icu to push the change to your watch.",
@@ -502,6 +495,7 @@ const TrainingPlanPage = () => {
   const dismissDayAdjust = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustDialogOpen(false);
   };
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
@@ -888,48 +882,79 @@ const TrainingPlanPage = () => {
           </Card>
         )}
 
-        {/* Day Ahead Assessment Result */}
-        {(dayAdjustResult || dayAdjusting) && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sun className="w-4 h-4 text-primary" />
+        {/* Day Ahead Assessment Dialog */}
+        <Dialog open={dayAdjustDialogOpen} onOpenChange={(open) => { if (!open && !dayAdjusting) dismissDayAdjust(); }}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sun className="w-5 h-5 text-primary" />
                 Day Ahead Assessment
-                {dayAdjusting && <Loader2 className="w-3 h-3 animate-spin" />}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {dayAdjustResult ? (
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <MarkdownRenderer content={dayAdjustResult} />
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Analyzing your sleep, recovery, and readiness…</p>
-              )}
-              {!dayAdjusting && dayAdjustResult && (
-                <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
-                  {dayAdjustIsModified ? (
-                    <>
-                      <Button size="sm" onClick={applyDayAdjustment}>
-                        <Check className="w-4 h-4 mr-2" />
-                        Apply Adjusted Workout
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
-                        <X className="w-4 h-4 mr-2" />
-                        Keep Original
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="sm" variant="ghost" onClick={dismissDayAdjust}>
-                      <X className="w-4 h-4 mr-2" />
-                      Dismiss
+              </DialogTitle>
+              <DialogDescription>
+                Analyzing your readiness for today's workout
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Progress Steps */}
+            {dayAdjusting && (
+              <div className="space-y-3 py-2">
+                {([
+                  { phase: "sleep", icon: Moon, label: "Checking last night's sleep..." },
+                  { phase: "metrics", icon: Activity, label: "Reading HRV, resting HR & stress..." },
+                  { phase: "analyzing", icon: Brain, label: "Analyzing workout suitability..." },
+                ] as const).map(({ phase, icon: Icon, label }) => {
+                  const phases = ["sleep", "metrics", "analyzing", "done"] as const;
+                  const currentIdx = phases.indexOf(dayAdjustPhase);
+                  const stepIdx = phases.indexOf(phase);
+                  const isDone = currentIdx > stepIdx;
+                  const isActive = currentIdx === stepIdx;
+                  return (
+                    <div key={phase} className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                        isDone ? "bg-primary text-primary-foreground" : isActive ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {isDone ? <Check className="w-4 h-4" /> : isActive ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
+                      </div>
+                      <span className={`text-sm ${isDone ? "text-foreground" : isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                        {isDone ? label.replace("...", " ✓") : label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* AI Result */}
+            {dayAdjustResult && (
+              <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
+                <MarkdownRenderer content={dayAdjustResult} />
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            {!dayAdjusting && dayAdjustResult && (
+              <div className="flex flex-wrap gap-2 pt-3 border-t">
+                {dayAdjustIsModified ? (
+                  <>
+                    <Button size="sm" onClick={applyDayAdjustment}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Apply Adjusted Workout
                     </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                    <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
+                      <Dumbbell className="w-4 h-4 mr-2" />
+                      Keep Original
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
+                    <Check className="w-4 h-4 mr-2" />
+                    Got it, let's go!
+                  </Button>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Card className="border-dashed">
           <CardHeader className="p-4 cursor-pointer" onClick={() => setShowSyncInstructions(!showSyncInstructions)}>
