@@ -435,60 +435,64 @@ const TrainingPlanPage = () => {
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
 
-    // Find the "Workout for Today" section and extract the table
-    const workoutSectionMatch = dayAdjustResult.match(/##\s*📝\s*Workout for Today[\s\S]*?\n(\*\*[^\n]+\*\*[\s\S]*?\|[^\n]+\|(?:\n\|[^\n]+\|)*)/i);
-    if (!workoutSectionMatch) {
-      toast({ title: "Could not extract adjusted workout", description: "The AI response format was unexpected. Please try again.", variant: "destructive" });
-      return;
-    }
-
-    const adjustedWorkoutBlock = workoutSectionMatch[1].trim();
-
-    // Find today's date and locate the corresponding workout in the plan
+    // Find today's workout using the parser — it has `rawText` which is the exact
+    // slice from the plan markdown, so we can use it for direct string replacement.
     const today = new Date();
     const todayStr = format(today, "yyyy-MM-dd");
     const workouts = parseWorkoutsFromPlan(content);
     const todayWorkout = workouts.find(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") === todayStr);
 
-    if (!todayWorkout) {
+    if (!todayWorkout || !todayWorkout.rawText) {
       toast({ title: "Could not find today's workout in plan", variant: "destructive" });
       return;
     }
 
-    // Build the original workout block pattern to find in the content
-    // Match the workout title line and its table
-    const titleEscaped = todayWorkout.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Match: **Title** followed by a markdown table (with optional whitespace)
-    const workoutPattern = new RegExp(
-      `(\\*\\*${titleEscaped}\\*\\*[\\s\\S]*?)(\\|[^\\n]*Segment[^\\n]*\\|\\n\\|[-| ]+\\|\\n(?:\\|[^\\n]+\\|\\n?)*)`,
-      'i'
-    );
-
-    let updatedContent: string;
-    const match = content.match(workoutPattern);
-    if (match) {
-      updatedContent = content.replace(workoutPattern, adjustedWorkoutBlock);
-    } else {
-      // Fallback: try to find just by title and replace the next table
-      const titleIdx = content.indexOf(`**${todayWorkout.title}**`);
-      if (titleIdx === -1) {
-        toast({ title: "Could not locate workout in plan to replace", variant: "destructive" });
-        return;
-      }
-      // Find the table after this title
-      const afterTitle = content.slice(titleIdx);
-      const tableMatch = afterTitle.match(/(\*\*[^\n]+\*\*[\s\S]*?\|[^\n]*Segment[^\n]*\|\n\|[-| ]+\|\n(?:\|[^\n]+\|\n?)*)/i);
-      if (tableMatch) {
-        updatedContent = content.slice(0, titleIdx) + adjustedWorkoutBlock + content.slice(titleIdx + tableMatch[0].length);
-      } else {
-        toast({ title: "Could not locate workout table in plan", variant: "destructive" });
-        return;
-      }
+    // Extract the adjusted workout block from the AI response.
+    // Look for the "Workout for Today" section which contains a title + table.
+    const workoutSection = dayAdjustResult.match(/##\s*📝\s*Workout for Today\s*\n([\s\S]*?)(?=\n##\s|$)/i);
+    if (!workoutSection) {
+      toast({ title: "Could not extract adjusted workout", description: "The AI response format was unexpected. Please try again.", variant: "destructive" });
+      return;
     }
+
+    // Build the replacement block: keep the original date line, replace the title + table
+    // The rawText starts with the date line (e.g. **Monday 16/02/2026** – Title)
+    // We want to keep the date prefix and replace the workout content after it.
+    const rawLines = todayWorkout.rawText.split("\n");
+    const dateLine = rawLines[0]; // e.g. **Monday 16/02/2026** – Foundation Run (Total: 30 min)
+
+    // Extract the new title + table from the AI's adjusted section
+    const adjustedContent = workoutSection[1].trim();
+
+    // The AI outputs something like:
+    // **Adjusted Foundation Run (Total: 30 min)**
+    // | Segment | Duration | ... |
+    // We need to reconstruct the date line with the new title
+    const newTitleMatch = adjustedContent.match(/\*\*([^*]+)\*\*/);
+    const newTitle = newTitleMatch ? newTitleMatch[1] : todayWorkout.title;
+
+    // Reconstruct: keep original date prefix, swap in new title + table
+    const datePrefix = dateLine.match(/(\*\*[^*]*\d{1,2}\/\d{1,2}\/\d{4}\*\*\s*[-–:]\s*)/);
+    const newDateLine = datePrefix ? `${datePrefix[1]}${newTitle}` : dateLine;
+
+    // Build the full replacement: date line + everything after (table etc.)
+    // Remove the title line from adjusted content since we put it in the date line
+    const adjustedWithoutTitle = adjustedContent.replace(/^\*\*[^*]+\*\*\s*\n?/, "").trim();
+    const replacement = `${newDateLine}\n\n${adjustedWithoutTitle}`;
+
+    // Replace the original rawText block in the plan
+    const idx = content.indexOf(todayWorkout.rawText);
+    if (idx === -1) {
+      toast({ title: "Could not locate workout in plan to replace", variant: "destructive" });
+      return;
+    }
+
+    const updatedContent = content.slice(0, idx) + replacement + content.slice(idx + todayWorkout.rawText.length);
 
     setContent(updatedContent);
     savePlan(updatedContent);
     setDayAdjustIsModified(false);
+    setDayAdjustResult(null);
     toast({
       title: "Workout updated!",
       description: "Today's workout has been adjusted. Remember to re-sync to intervals.icu to push the change to your watch.",
