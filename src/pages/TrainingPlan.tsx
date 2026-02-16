@@ -144,6 +144,7 @@ const TrainingPlanPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
+  const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -180,19 +181,24 @@ const TrainingPlanPage = () => {
 
   // Fetch activities linked to this plan to track completion
   const fetchLinkedActivities = useCallback(async () => {
-    if (!savedPlanId || !user) { setCompletedDates(new Set()); return; }
+    if (!savedPlanId || !user) { setCompletedDates(new Set()); setLinkedActivities({}); return; }
     const { data } = await supabase
       .from("activities")
-      .select("start_time")
+      .select("start_time, distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_speed, avg_cadence, calories, activity_type")
       .eq("user_id", user.id)
       .eq("training_plan_id", savedPlanId);
     if (data) {
-      const dates = new Set(
-        data
-          .filter(a => a.start_time)
-          .map(a => format(new Date(a.start_time!), "yyyy-MM-dd"))
-      );
+      const dates = new Set<string>();
+      const actMap: Record<string, any> = {};
+      for (const a of data) {
+        if (a.start_time) {
+          const key = format(new Date(a.start_time), "yyyy-MM-dd");
+          dates.add(key);
+          actMap[key] = a;
+        }
+      }
       setCompletedDates(dates);
+      setLinkedActivities(actMap);
     }
   }, [savedPlanId, user]);
 
@@ -877,6 +883,7 @@ const TrainingPlanPage = () => {
               raceDistance={raceDistance}
               raceDate={raceDate}
               completedDates={completedDates}
+              linkedActivities={linkedActivities}
             />
             <PlanCalendarView
               workouts={parseWorkoutsFromPlan(content)}
