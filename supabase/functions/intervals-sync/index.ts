@@ -28,6 +28,7 @@ serve(async (req) => {
         date: string;
         name: string;
         description: string;
+        notes?: string;
         steps: Array<{
           duration: number;
           hrLow: number;
@@ -195,6 +196,10 @@ serve(async (req) => {
       }
 
       const workoutText = lines.join("\n");
+      // Append notes (e.g. music BPM targets) if provided
+      const fullDescription = workout.notes
+        ? `${workoutText}\n\n${workout.notes}`
+        : workoutText;
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
 
       return {
@@ -203,7 +208,7 @@ serve(async (req) => {
         name: workout.name,
         type: "Run",
         moving_time: totalDuration,
-        description: workoutText,
+        description: fullDescription,
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });

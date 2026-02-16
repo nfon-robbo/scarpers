@@ -528,11 +528,16 @@ const TrainingPlanPage = () => {
         const dateStr = w.dateObj!.toISOString().split("T")[0];
         const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
+        // Collect notes (including music BPM) from segments
+        const notes = w.segments
+          .map(s => s.notes?.trim())
+          .filter(Boolean)
+          .join("\n");
         // Compute actual total duration and fix the title to match
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
-        return { date: dateStr, name: correctedName, description, steps };
+        return { date: dateStr, name: correctedName, description, steps, notes };
       });
 
       // Calculate date range for clearing
