@@ -223,22 +223,24 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 pb-8 animate-fade-in">
       {/* ── Hero Header ── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-card to-accent/5 border border-primary/10 p-6 sm:p-8">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-primary/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-        <div className="relative">
-          <p className="text-sm font-medium text-primary tracking-wide uppercase mb-1">{greeting}</p>
+      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 gradient-border">
+        {/* Ambient glow orbs */}
+        <div className="absolute -top-20 -right-20 w-60 h-60 bg-primary/10 rounded-full blur-3xl animate-float" />
+        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-accent/8 rounded-full blur-3xl animate-float" style={{ animationDelay: '3s' }} />
+        
+        <div className="relative z-10">
+          <p className="text-xs font-semibold text-primary tracking-[0.2em] uppercase mb-2">{greeting}</p>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
             {profile?.name || "Athlete"}
           </h1>
-          <p className="text-muted-foreground mt-2 max-w-md">
+          <p className="text-muted-foreground mt-2 max-w-md text-sm">
             Your AI-powered endurance training command centre
           </p>
           <Button
             size="sm"
-            variant="outline"
-            className="mt-4 gap-2"
+            className="mt-5 gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 transition-opacity glow-sm"
             onClick={handleSyncAll}
             disabled={syncing}
           >
@@ -518,18 +520,18 @@ const ActionCard = ({
   icon: any; title: string; desc: string; to: string; navigate: (to: string) => void; accent: string;
 }) => (
   <Card
-    className="group cursor-pointer border-transparent bg-gradient-to-br from-card to-muted/30 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+    className="group cursor-pointer glass card-hover border-border/30 hover:border-primary/30"
     onClick={() => navigate(to)}
   >
     <CardHeader className="flex flex-row items-center gap-3 p-4">
-      <div className="rounded-xl bg-primary/10 p-2.5 group-hover:bg-primary/15 transition-colors">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center group-hover:from-primary/25 group-hover:to-accent/15 transition-all duration-300">
         <Icon className="w-5 h-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         <CardDescription className="text-xs">{desc}</CardDescription>
       </div>
-      <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+      <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
     </CardHeader>
   </Card>
 );
@@ -539,12 +541,12 @@ const KPICard = ({
 }: {
   icon: any; label: string; value: string; unit?: string; sub: string; color: string; trend?: "up" | "down" | "neutral";
 }) => (
-  <Card className="group hover:shadow-md transition-shadow duration-200 overflow-hidden relative">
-    <div className={`absolute inset-x-0 top-0 h-1 bg-${color}`} />
+  <Card className="group glass card-hover overflow-hidden relative border-border/30">
+    <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-${color} to-${color}/50`} />
     <CardContent className="p-4 pt-5">
       <div className="flex items-center justify-between mb-3">
-        <div className={`rounded-lg bg-${color}/10 p-1.5`}>
-          <Icon className={`w-3.5 h-3.5 text-${color}`} />
+        <div className={`w-8 h-8 rounded-lg bg-${color}/10 flex items-center justify-center`}>
+          <Icon className={`w-4 h-4 text-${color}`} />
         </div>
         {trend === "up" && <ArrowUpRight className="w-4 h-4 text-destructive" />}
         {trend === "down" && <ArrowDownRight className="w-4 h-4 text-accent" />}
@@ -554,8 +556,8 @@ const KPICard = ({
         <p className="text-2xl font-black tracking-tight">{value}</p>
         {unit && <span className="text-sm font-medium text-muted-foreground">{unit}</span>}
       </div>
-      <p className="text-xs font-medium text-muted-foreground mt-0.5">{label}</p>
-      <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
+      <p className="text-xs font-semibold text-muted-foreground mt-1">{label}</p>
+      <p className="text-[11px] text-muted-foreground/60 mt-0.5">{sub}</p>
     </CardContent>
   </Card>
 );
@@ -576,7 +578,7 @@ const ChartCard = ({
 }: {
   icon: React.ReactNode; title: string; description: string; iconColor: string; children: React.ReactNode;
 }) => (
-  <Card className="overflow-hidden">
+  <Card className="overflow-hidden glass border-border/30 card-hover">
     <CardHeader className="pb-2">
       <CardTitle className="text-sm font-semibold flex items-center gap-2">
         <span className={iconColor}>{icon}</span>

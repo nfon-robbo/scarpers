@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Activity, Mountain, Bike } from "lucide-react";
+import { Activity, Mountain, Bike, Zap } from "lucide-react";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -57,80 +57,118 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left: Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 animate-pulse"><Mountain className="w-24 h-24 text-primary-foreground" /></div>
-          <div className="absolute bottom-32 right-16 animate-pulse delay-300"><Bike className="w-20 h-20 text-primary-foreground" /></div>
-          <div className="absolute top-1/2 left-1/3 animate-pulse delay-700"><Activity className="w-16 h-16 text-primary-foreground" /></div>
+    <div className="flex min-h-screen bg-background">
+      {/* Left: Premium Branding */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-accent">
+        {/* Animated orbs */}
+        <div className="absolute inset-0">
+          <div className="absolute top-[15%] left-[10%] w-72 h-72 bg-accent/20 rounded-full blur-3xl animate-float" />
+          <div className="absolute bottom-[20%] right-[5%] w-96 h-96 bg-primary-foreground/5 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
+          <div className="absolute top-[50%] left-[50%] w-48 h-48 bg-accent/15 rounded-full blur-2xl animate-float" style={{ animationDelay: '4s' }} />
         </div>
-        <div className="relative z-10 text-center">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Activity className="w-12 h-12 text-primary-foreground" />
-            <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Garmin AI Coach</h1>
+
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px',
+        }} />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/10 backdrop-blur-sm flex items-center justify-center border border-primary-foreground/20">
+              <Activity className="w-7 h-7 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">AI Coach</h1>
+              <p className="text-primary-foreground/60 text-xs tracking-[0.3em] uppercase font-medium">Endurance Training</p>
+            </div>
           </div>
-          <p className="text-primary-foreground/80 text-lg max-w-md leading-relaxed">
+          <p className="text-primary-foreground/70 text-lg max-w-md leading-relaxed text-center">
             AI-powered training analysis and coaching for endurance athletes. Upload your data, get insights, and train smarter.
           </p>
+
+          {/* Feature pills */}
+          <div className="flex flex-wrap gap-3 mt-10 justify-center max-w-md">
+            {["FIT File Analysis", "AI Coaching", "Training Plans", "Sleep Tracking", "Readiness Score"].map((f) => (
+              <span
+                key={f}
+                className="px-4 py-1.5 rounded-full text-xs font-medium bg-primary-foreground/10 text-primary-foreground/80 border border-primary-foreground/10 backdrop-blur-sm"
+              >
+                {f}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Right: Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <Card className="w-full max-w-md border-0 shadow-none lg:shadow-lg lg:border">
-          <CardHeader className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-2 lg:hidden">
-              <Activity className="w-8 h-8 text-primary" />
-              <span className="text-2xl font-bold text-foreground">Garmin AI Coach</span>
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-8">
+        <div className="w-full max-w-md animate-fade-in">
+          {/* Mobile brand */}
+          <div className="flex items-center justify-center gap-3 mb-8 lg:hidden">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-sm">
+              <Activity className="w-5 h-5 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl">{isLogin ? "Welcome back" : "Create account"}</CardTitle>
-            <CardDescription>
-              {isLogin
-                ? "Sign in to access your training dashboard"
-                : "Start your AI-powered coaching journey"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="athlete@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+            <span className="text-2xl font-bold gradient-text">AI Coach</span>
+          </div>
+
+          <Card className="glass border-border/30">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-2xl font-bold">{isLogin ? "Welcome back" : "Create account"}</CardTitle>
+              <CardDescription className="text-sm">
+                {isLogin
+                  ? "Sign in to access your training dashboard"
+                  : "Start your AI-powered coaching journey"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="athlete@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-11 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50 transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-11 rounded-xl bg-muted/50 border-border/50 focus:border-primary/50 transition-colors"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-11 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 transition-opacity font-semibold glow-sm"
+                  disabled={loading}
+                >
+                  {loading ? "Loading..." : isLogin ? "Sign in" : "Create account"}
+                </Button>
+              </form>
+              <div className="mt-6 text-center text-sm text-muted-foreground">
+                {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+                <button
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-primary font-semibold hover:underline"
+                >
+                  {isLogin ? "Sign up" : "Sign in"}
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Loading..." : isLogin ? "Sign in" : "Create account"}
-              </Button>
-            </form>
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-              <button
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-primary font-medium hover:underline"
-              >
-                {isLogin ? "Sign up" : "Sign in"}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
