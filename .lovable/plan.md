@@ -1,33 +1,37 @@
 
+# Make AI Responses Concise and Cost-Effective
 
-## Fix: Capture HRV Data from Intervals.icu
+## Problem
+The AI coach responses are too long and verbose, wasting credits and making it harder to quickly digest advice.
 
-**The Problem**
-The wellness sync function only checks two field names for HRV (`hrv` and `hrvSDNN`), but Intervals.icu likely sends it under a different key. This means your watch IS recording HRV but the sync is silently ignoring it.
+## Changes
 
-**The Fix**
+### 1. Chat prompt (`supabase/functions/ai-coach/index.ts`, ~line 331)
+Add strict brevity rules to the chat system prompt:
+- Maximum 3-5 bullet points per answer
+- No long paragraphs — bullet points only
+- Lead with the answer, then supporting data
+- Total response under 150 words
+- Only use headers if the user asks a complex multi-part question
 
-### 1. Add diagnostic logging to the sync function
-Log the raw Intervals.icu wellness payload for one record so we can see exactly what field names are being sent. This will confirm the correct HRV field name.
+### 2. Analysis prompt (`supabase/functions/ai-coach/index.ts`, ~line 351)
+Tighten the analysis prompt:
+- Each section limited to 3-5 bullet points max
+- No prose paragraphs — data points and recommendations only
+- Recommendations: one bullet per action, no elaboration unless critical
+- Cut total output by roughly 50%
 
-### 2. Expand HRV field mapping
-Update `supabase/functions/intervals-wellness/index.ts` to also check these common Intervals.icu field names:
-- `rMSSD` (most common HRV metric from wearables)
-- `morningHrv`
-- `avgHrv`
-- `lnRmssd`
+### 3. Plan review prompt (~line 399)
+- Add word limits to each section (e.g., Progress Summary: 3-4 bullets, Coach's Notes: 2-3 sentences)
+- Remove redundant elaboration instructions
 
-### 3. Re-sync to backfill
-After deploying the fix, trigger a re-sync to pull in the last 90 days of HRV data that was previously ignored.
+### 4. Day-adjust prompt (~line 270)
+- Coach's Note: limit to 1-2 sentences (currently uncapped)
+- Sleep assessment: 2-3 bullets max
 
-### 4. Readiness score improvement
-Once real HRV data flows in, the readiness calculation will use actual values instead of the penalty default (25/100), which should bring the score closer to Zepp's number.
+No frontend changes needed — this is purely backend prompt tuning.
 
-### Technical Details
-
-**File: `supabase/functions/intervals-wellness/index.ts`**
-- Add `console.log` of the first wellness record's keys to identify the correct HRV field
-- Expand the HRV mapping block to try: `hrv`, `hrvSDNN`, `rMSSD`, `morningHrv`, `avgHrv`, `lnRmssd`
-
-**No other files need changes** -- the readiness scoring already handles HRV correctly when the data is present.
-
+## Technical Details
+- File: `supabase/functions/ai-coach/index.ts`
+- Affected prompt types: `chat`, `analysis`, `plan-review`, `day-adjust`
+- Redeploy the `ai-coach` edge function after changes
