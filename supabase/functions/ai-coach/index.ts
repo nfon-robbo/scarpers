@@ -305,10 +305,16 @@ If adjusted, provide the COMPLETE modified workout in the EXACT same markdown ta
 If kept as-is, restate the original workout.
 
 ## 💡 Coach's Note
-One practical tip for the athlete today (hydration, warm-up emphasis, mental approach, etc.).
+1-2 sentences max. One practical tip (hydration, warm-up, mental cue).
 
 ## 🔄 Sync Reminder
-Remind the athlete: "If the workout was adjusted, sync your updated plan to intervals.icu to get the changes on your watch."
+One sentence: "If adjusted, sync your plan to intervals.icu to update your watch."
+
+BREVITY RULES:
+- Sleep & Recovery Assessment: 2-3 bullet points max, no prose paragraphs
+- Decision section: 1-2 sentences explaining why
+- Coach's Note: 1-2 sentences only
+- Total response should be as short as possible while remaining actionable
 
 ${athleteContext}`;
 
@@ -332,15 +338,14 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
 
 You have access to the athlete's complete training data. Use it to give personalized, data-driven answers.
 
-When answering:
-- Reference specific data points from their activities (dates, distances, paces, heart rates)
-- Use their sleep data (sleep scores, deep/REM/light percentages, trends) to inform recovery and readiness advice
-- If sleep scores are declining or sleep quality is poor, flag this and adjust recommendations accordingly
-- Be practical and actionable
-- If asked about nutrition, hydration, or recovery, tailor advice to their training load, sleep quality, and upcoming sessions
-- If asked about their plan, reference their actual performance trends and recovery status from sleep data
-- Keep answers concise but thorough
-- Use markdown formatting with emoji headers for readability
+BREVITY RULES (strict):
+- Maximum 3-5 bullet points per answer
+- NO long paragraphs — bullet points only
+- Lead with the answer, then supporting data
+- Total response UNDER 150 words
+- Only use headers if the user asks a complex multi-part question
+- Reference specific data points (dates, paces, HR, sleep scores) but keep each bullet to one line
+- Be practical and actionable — no filler or preamble
 
 ${athleteContext}
 
@@ -371,13 +376,15 @@ Analyze sleep data if available:
 Reference National Sleep Foundation guidelines where relevant.
 
 ## 💡 Actionable Recommendations
-Group into categories:
-- **Load Management**: training volume/intensity adjustments
-- **Running/Cycling**: sport-specific technique and training suggestions  
-- **Recovery & Sleep**: rest, adaptation, injury prevention, sleep optimization tips based on their data
-- **Performance**: key workouts to add or modify
+- One bullet per action, no elaboration unless critical
+- Group: Load Management | Sport-Specific | Recovery & Sleep | Performance
+- Max 3-5 bullets total across all categories
 
-Use specific numbers from the data. Be direct and actionable. Format with markdown. Use emoji headers.`;
+BREVITY RULES (strict):
+- Each section above: 3-5 bullet points MAX, no prose paragraphs
+- Data points and recommendations only — no filler
+- Total analysis should be roughly half the length you'd normally write
+- Use specific numbers but keep each bullet to one line`;
 
       userPrompt = `${athleteContext}
 
@@ -431,7 +438,13 @@ Based on the progress review, clearly state one of these verdicts:
 Be specific about WHAT would change and WHY, but do NOT output the revised plan yet.
 
 ## 💡 Coach's Notes
-Personal advice, motivation, or specific technique cues based on what you've observed.`;
+2-3 sentences max. Personal advice or technique cues only.
+
+BREVITY RULES (strict):
+- Progress Summary: 3-4 bullets max with numbers
+- What Went Well / Needs Attention: 2-3 bullets each, one line per bullet
+- Recommended Adjustments: state verdict + 2-3 bullet reasons
+- No prose paragraphs anywhere — bullets and short sentences only`;
 
       userPrompt = `${athleteContext}
 
