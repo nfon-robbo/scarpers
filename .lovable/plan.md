@@ -1,37 +1,85 @@
 
-# Make AI Responses Concise and Cost-Effective
+# New Android API Endpoint for Plan Generation and Q&A
 
-## Problem
-The AI coach responses are too long and verbose, wasting credits and making it harder to quickly digest advice.
+## Overview
+Create a new backend function (`android-coach`) that provides a non-streaming, JSON-response API for your Android app. It will reuse the same AI logic and data access as the existing `ai-coach` but return a simple JSON object instead of SSE streaming.
 
-## Changes
+## Authentication
+Use a shared API key approach: your Android app sends a static secret key in the header, and the function validates it. This avoids requiring Android users to have accounts in this web app.
 
-### 1. Chat prompt (`supabase/functions/ai-coach/index.ts`, ~line 331)
-Add strict brevity rules to the chat system prompt:
-- Maximum 3-5 bullet points per answer
-- No long paragraphs — bullet points only
-- Lead with the answer, then supporting data
-- Total response under 150 words
-- Only use headers if the user asks a complex multi-part question
+Alternatively, if your Android app users DO have accounts here, we can use their auth token. I'll implement the API key approach since it's simpler for a standalone app.
 
-### 2. Analysis prompt (`supabase/functions/ai-coach/index.ts`, ~line 351)
-Tighten the analysis prompt:
-- Each section limited to 3-5 bullet points max
-- No prose paragraphs — data points and recommendations only
-- Recommendations: one bullet per action, no elaboration unless critical
-- Cut total output by roughly 50%
+## New Edge Function: `supabase/functions/android-coach/index.ts`
 
-### 3. Plan review prompt (~line 399)
-- Add word limits to each section (e.g., Progress Summary: 3-4 bullets, Coach's Notes: 2-3 sentences)
-- Remove redundant elaboration instructions
+**Endpoint:** `POST /functions/v1/android-coach`
 
-### 4. Day-adjust prompt (~line 270)
-- Coach's Note: limit to 1-2 sentences (currently uncapped)
-- Sleep assessment: 2-3 bullets max
+**Request format (JSON):**
+```text
+{
+  "api_key": "<your secret>",
+  "type": "training-plan" | "chat",
+  
+  // For training-plan:
+  "race_distance": "5k" | "10k" | "half-marathon" | "marathon",
+  "training_days": ["Mon", "Wed", "Fri", "Sat"],
+  "start_date": "2026-03-01",
+  "race_date": "2026-06-01",   // or "ai-recommend"
+  
+  // For chat:
+  "message": "Should I run today?",
+  
+  // Optional athlete context (since Android app may not have Supabase profile):
+  "athlete": {
+    "name": "John",
+    "sport": "running",
+    "experience": "intermediate",
+    "goals": "finish half marathon",
+    "context": "mild knee pain, prefer low impact"
+  },
+  
+  // Optional activity/metrics data from your app:
+  "activities": [...],
+  "metrics": [...]
+}
+```
 
-No frontend changes needed — this is purely backend prompt tuning.
+**Response format (JSON):**
+```text
+{
+  "success": true,
+  "type": "training-plan",
+  "content": "## Season Strategy Overview\n..."
+}
+```
 
-## Technical Details
-- File: `supabase/functions/ai-coach/index.ts`
-- Affected prompt types: `chat`, `analysis`, `plan-review`, `day-adjust`
-- Redeploy the `ai-coach` edge function after changes
+## Implementation Details
+
+### 1. Create the edge function (`supabase/functions/android-coach/index.ts`)
+- CORS headers for cross-origin access
+- Validate `api_key` against a stored secret (`ANDROID_API_KEY`)
+- Accept athlete profile + optional activity data in the request body (no database lookup needed)
+- Reuse the same system/user prompts from `ai-coach` for plan generation and chat
+- Call Lovable AI Gateway with `stream: false` for a simple JSON response
+- Return the AI content as a JSON object
+- Handle 429/402 rate limit errors
+
+### 2. Add secret: `ANDROID_API_KEY`
+- A secret key you generate and embed in your Android app
+- The function validates this on every request
+
+### 3. Update `supabase/config.toml`
+- Add `[functions.android-coach]` with `verify_jwt = false` (since auth is via API key, not JWT)
+
+### 4. Supported request types
+- **`training-plan`**: Full plan generation with the same detailed prompts (workout tables, HR zones, BPM targets, periodization)
+- **`chat`**: Quick Q&A with the same brevity rules (3-5 bullets, under 150 words)
+
+## What your Android app needs to do
+1. Store the API key securely
+2. POST to `https://datdwxsugeobqigtopnz.supabase.co/functions/v1/android-coach`
+3. Parse the JSON response and display the `content` field (it's markdown)
+
+## Technical Notes
+- Non-streaming means the response may take 10-30 seconds for plan generation (the AI generates the full plan before responding)
+- Chat responses will be faster (2-5 seconds)
+- The function does NOT access the database -- all athlete data comes from the Android app's request body, making it fully standalone
