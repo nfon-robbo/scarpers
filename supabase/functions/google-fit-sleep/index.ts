@@ -37,7 +37,19 @@ async function refreshAccessToken(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Token refresh failed: ${err}`);
+    const normalized = err.toLowerCase();
+
+    // User revoked/expired refresh token
+    if (normalized.includes("invalid_grant") && normalized.includes("expired or revoked")) {
+      throw new Error("GOOGLE_FIT_USER_TOKEN_INVALID");
+    }
+
+    // App/client credentials misconfigured
+    if (normalized.includes("invalid_client") || normalized.includes("unauthorized_client")) {
+      throw new Error("GOOGLE_FIT_APP_CREDENTIALS_INVALID");
+    }
+
+    throw new Error(`GOOGLE_FIT_TOKEN_REFRESH_FAILED:${err}`);
   }
 
   const data = await res.json();
@@ -213,9 +225,25 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Google Fit sleep error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    const message = error instanceof Error ? error.message : String(error);
+
+    let status = 500;
+    let clientError = "Google Fit sleep sync failed";
+
+    if (message === "GOOGLE_FIT_USER_TOKEN_INVALID") {
+      status = 401;
+      clientError = "Your Google Fit connection expired or was revoked. Please disconnect and reconnect Google Fit.";
+    } else if (message === "GOOGLE_FIT_APP_CREDENTIALS_INVALID") {
+      status = 400;
+      clientError = "Google Fit app credentials are invalid. Please update backend Google Fit credentials.";
+    } else if (message.startsWith("GOOGLE_FIT_TOKEN_REFRESH_FAILED:")) {
+      status = 502;
+      clientError = "Unable to refresh Google Fit token right now. Please reconnect and try again.";
+    }
+
+    console.error("Google Fit sleep error:", message);
+    return new Response(JSON.stringify({ error: clientError, code: message }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
