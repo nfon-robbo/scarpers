@@ -181,7 +181,7 @@ serve(async (req) => {
           prevIntensity = "Active";
         } else {
           // Active / generic steps
-          if (prevIntensity !== "Active" && prevIntensity !== "Warmup") { lines.push(""); lines.push("Run"); }
+          if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
           lines.push(`- ${fmtDur(s.duration)}`);
           prevIntensity = "Active";
           i++;
