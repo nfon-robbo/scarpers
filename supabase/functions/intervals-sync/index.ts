@@ -135,17 +135,19 @@ serve(async (req) => {
       const lines: string[] = [];
       let i = 0;
 
+      let prevIntensity = "";
       while (i < steps.length) {
         const s = steps[i];
 
         if (s.intensity === "Warmup") {
-          lines.push("Warmup");
+          if (prevIntensity !== "Warmup") lines.push("Warmup");
           lines.push(`- ${fmtDur(s.duration)}`);
+          prevIntensity = "Warmup";
           i++;
         } else if (s.intensity === "Cooldown") {
-          lines.push("");
-          lines.push("Cooldown");
+          if (prevIntensity !== "Cooldown") { lines.push(""); lines.push("Cooldown"); }
           lines.push(`- ${fmtDur(s.duration)}`);
+          prevIntensity = "Cooldown";
           i++;
         } else if (s.intensity === "Interval") {
           let reps = 0;
@@ -172,11 +174,16 @@ serve(async (req) => {
             if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest`);
             i = j;
           } else {
+            if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
             lines.push(`- ${fmtDur(s.duration)}`);
             i++;
           }
+          prevIntensity = "Active";
         } else {
+          // Active / generic steps
+          if (prevIntensity !== "Active" && prevIntensity !== "Warmup") { lines.push(""); lines.push("Run"); }
           lines.push(`- ${fmtDur(s.duration)}`);
+          prevIntensity = "Active";
           i++;
         }
       }
