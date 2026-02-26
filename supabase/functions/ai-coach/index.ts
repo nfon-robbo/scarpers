@@ -301,7 +301,7 @@ Show the original planned workout.
 State clearly whether you're modifying the workout or not, and why.
 
 ## 📝 Workout for Today
-If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration | Target | HR Zone | Notes). Include the workout title with "(Total: Xmin)".
+If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration/Distance | Target | Notes). Include the workout title with "(Total: Xmin)". When a segment has a distance target, include both distance and estimated duration.
 If kept as-is, restate the original workout.
 
 ## 💡 Coach's Note
@@ -488,14 +488,15 @@ You have been given:
 Generate a COMPLETE REVISED training plan for the remaining weeks. 
 
 CRITICAL FORMAT RULES: 
-1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns.
+1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column).
 2. Use UK date format (DD/MM/YYYY) for all dates.
 3. Only schedule workouts on: ${daysStr}.
 4. EVERY workout title MUST include the total duration as "(Total: Xmin)".
-5. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min") — NEVER use zone labels like "Z1", "Z2", "Z3" as the duration. HR zones go ONLY in the HR Zone column.
-6. EVERY running segment MUST include a music BPM target in the Notes column (🎵 150=Z1, 155=Z2, 165=Z3, 170=Z4, 175=Z5) for cadence matching.
-6. Include the Season Strategy Overview section before the weekly plan.
-7. Start from the next upcoming week based on today's date.`;
+5. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min") — NEVER use zone labels as the duration.
+6. When a segment has a specific distance target (e.g., long run of 10km, intervals of 800m), include BOTH the distance AND the estimated duration in the Duration column (e.g., "10km (~55 min)" or "4 x 800m (~3.5 min each)").
+7. EVERY running segment MUST include a music BPM target in the Notes column (🎵 150-175 BPM range based on intensity).
+8. Include the Season Strategy Overview section before the weekly plan.
+9. Start from the next upcoming week based on today's date.`;
 
       userPrompt = `${athleteContext}
 
@@ -554,9 +555,9 @@ CRITICAL INSTRUCTIONS:
 - Review sleep data to assess recovery status. If sleep scores are consistently low (<60) or deep/REM percentages are below recommended ranges, factor in extra recovery days or lower intensity sessions. Reference sleep trends when explaining rest day placement.
 - The athlete uses an Amazfit Balance 2 watch with the Zepp app. Structure each workout so it can be manually created as a custom workout in the Zepp app:
   - Break workouts into clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
-  - For each segment specify: duration OR distance, target HR zone (Z1-Z5) or target pace range
-  - For interval sessions, clearly state: number of reps, work duration/distance, recovery duration/distance, target pace/HR for each
-  - Use the Zepp-compatible HR zones: Z1 (50-60% max HR), Z2 (60-70%), Z3 (70-80%), Z4 (80-90%), Z5 (90-100%)
+  - For each segment specify: duration AND/OR distance, and target pace range
+  - For interval sessions, clearly state: number of reps, work duration/distance, recovery duration/distance, target pace for each
+  - When a workout has a distance goal (e.g., long run), always include the target distance alongside the estimated duration
 
 Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
 
@@ -587,26 +588,27 @@ Create a macro-cycle plan with:
 ${planLengthInstruction}
 
 CRITICAL FORMAT RULES:
-1. EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/HR Zone/Notes columns. Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
+1. EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column). Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
 2. EVERY workout title line MUST include the total duration in the format "(Total: Xmin)" — calculate this by summing all segment durations including warm-up, main set, and cool-down. This is mandatory for every single workout. For interval sessions, include the recovery time in the total.
-3. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min", "5 x 1 min") — NEVER use zone labels like "Z1", "Z2", "Z3", or "Z4" as the duration. The Duration column must always contain a time value in minutes or a distance. HR zones go ONLY in the HR Zone column.
-4. EVERY running segment in the Notes column MUST include a music BPM target aligned with the target cadence for that segment. Use the format "🎵 XXX BPM (target cadence)". Use these mappings:
-   - Z1 (walking/easy): 🎵 150 BPM
-   - Z2 (easy run): 🎵 155 BPM
-   - Z3 (steady/intervals): 🎵 165 BPM
-   - Z4 (tempo/threshold): 🎵 170 BPM
-   - Z5 (race pace/VO2max): 🎵 175 BPM
+3. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min", "5 x 1 min") — NEVER use zone labels like "Z1", "Z2", "Z3", or "Z4" as the duration.
+4. When a segment has a specific distance target (e.g., long run of 10km, intervals of 800m), include BOTH the distance AND the estimated duration in the Duration column (e.g., "10km (~55 min)" or "4 x 800m (~3.5 min each)").
+5. EVERY running segment in the Notes column MUST include a music BPM target aligned with the target cadence for that segment. Use the format "🎵 XXX BPM (target cadence)". Use these mappings:
+   - Walking/easy: 🎵 150 BPM
+   - Easy run: 🎵 155 BPM
+   - Steady/intervals: 🎵 165 BPM
+   - Tempo/threshold: 🎵 170 BPM
+   - Race pace/VO2max: 🎵 175 BPM
    This is critical for the athlete to match their running cadence to music tempo for joint protection. NEVER omit the music BPM from the Notes column on any running segment.
 
-For each workout day, use this Zepp-compatible format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
+For each workout day, use this format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
 
 ### Week 1: [Theme]
 **Monday ${planStartUK}** - [Workout Type] (Total: 40min)
-| Segment | Duration/Distance | Target | HR Zone | Notes |
-|---------|-------------------|--------|---------|-------|
-| Warm-up | 10 min | easy pace | Z1-Z2 | 🎵 150 BPM (target cadence) |
-| Main | 4 x 3 min | 5:30/km | Z4 | 🎵 170 BPM (target cadence); 2 min jog recovery |
-| Cool-down | 10 min | easy pace | Z1 | 🎵 150 BPM (target cadence) |
+| Segment | Duration/Distance | Target | Notes |
+|---------|-------------------|--------|-------|
+| Warm-up | 10 min | easy pace | 🎵 150 BPM (target cadence) |
+| Main | 4 x 3 min (800m each) | 5:30/km | 🎵 170 BPM (target cadence); 2 min jog recovery |
+| Cool-down | 10 min | easy pace | 🎵 150 BPM (target cadence) |
 
 EVERY workout in EVERY week must follow this exact table format. Continue for all weeks with actual dates.
 
