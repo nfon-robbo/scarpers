@@ -65,7 +65,7 @@ serve(async (req) => {
       // Auth failed — only allowed for AI types with API key fallback
     }
 
-    const needsAuth = ["get-plan", "push-activity", "get-activities"].includes(type as string);
+    const needsAuth = ["get-plan", "push-activity", "get-activities", "get-profile", "get-metrics", "get-sleep", "push-metrics"].includes(type as string);
     if (needsAuth && (!userId || !supabase)) {
       return new Response(
         JSON.stringify({ success: false, error: "Authentication required. Sign in with your account." }),
@@ -188,7 +188,93 @@ serve(async (req) => {
       );
     }
 
-    // ─── AI: training-plan or chat (original functionality) ───
+    // ─── SYNC: Get user profile ───
+    if (type === "get-profile") {
+      const { data: profile, error } = await supabase!
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) throw new Error(`Failed to fetch profile: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "get-profile", profile }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── SYNC: Get daily metrics (wellness data) ───
+    if (type === "get-metrics") {
+      const days = (body.days as number) || 30;
+      const since = new Date(Date.now() - days * 86400000).toISOString().split("T")[0];
+      const { data: metrics, error } = await supabase!
+        .from("daily_metrics")
+        .select("date, resting_heart_rate, hrv, sleep_score, sleep_duration_seconds, weight, body_fat_percentage, stress_score, steps, calories_total")
+        .eq("user_id", userId)
+        .gte("date", since)
+        .order("date", { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "get-metrics", metrics: metrics || [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── SYNC: Get sleep stages ───
+    if (type === "get-sleep") {
+      const days = (body.days as number) || 14;
+      const since = new Date(Date.now() - days * 86400000).toISOString().split("T")[0];
+      const { data: stages, error } = await supabase!
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds, start_time, end_time, source")
+        .eq("user_id", userId)
+        .gte("date", since)
+        .order("date", { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch sleep: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "get-sleep", stages: stages || [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── SYNC: Push daily metrics from mobile ───
+    if (type === "push-metrics") {
+      const metric = body.metric as Record<string, unknown>;
+      if (!metric || !metric.date) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing 'metric' object with 'date'" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data, error } = await supabase!
+        .from("daily_metrics")
+        .upsert({
+          user_id: userId,
+          date: metric.date as string,
+          resting_heart_rate: (metric.resting_heart_rate as number) || null,
+          hrv: (metric.hrv as number) || null,
+          sleep_score: (metric.sleep_score as number) || null,
+          sleep_duration_seconds: (metric.sleep_duration_seconds as number) || null,
+          weight: (metric.weight as number) || null,
+          steps: (metric.steps as number) || null,
+          stress_score: (metric.stress_score as number) || null,
+          calories_total: (metric.calories_total as number) || null,
+          source_file: (metric.source_file as string) || "mobile",
+        }, { onConflict: "user_id,date" })
+        .select("id")
+        .single();
+
+      if (error) throw new Error(`Failed to upsert metric: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "push-metrics", id: data?.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+
     const {
       race_distance,
       training_days,
@@ -321,7 +407,7 @@ ${dataContext}`;
       userPrompt = (message as string) || "Hello, I'd like some coaching advice.";
     } else {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid type. Use "training-plan", "chat", "get-plan", "push-activity", or "get-activities".' }),
+        JSON.stringify({ success: false, error: 'Invalid type. Use "training-plan", "chat", "get-plan", "push-activity", "get-activities", "get-profile", "get-metrics", "get-sleep", or "push-metrics".' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
