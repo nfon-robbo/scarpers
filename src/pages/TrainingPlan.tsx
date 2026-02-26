@@ -560,7 +560,9 @@ const TrainingPlanPage = () => {
 
       // Convert parsed workouts to API format, expanding intervals
       const apiWorkouts = withSegments.map(w => {
-        const dateStr = w.dateObj!.toISOString().split("T")[0];
+        const d = w.dateObj!;
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
         const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
         // Collect notes (including music BPM) from segments
