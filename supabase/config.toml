@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.readiness-advice]
 verify_jwt = false
+
+[functions.android-coach]
+verify_jwt = false
