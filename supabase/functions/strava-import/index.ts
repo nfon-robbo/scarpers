@@ -31,7 +31,20 @@ async function refreshTokenIfNeeded(
   });
 
   if (!res.ok) {
-    throw new Error(`Token refresh failed: ${await res.text()}`);
+    const errText = await res.text();
+    const normalized = errText.toLowerCase();
+
+    // Strava returns this when client_id/client_secret are invalid for the app
+    if (normalized.includes("authorization error") && normalized.includes("\"application\"")) {
+      throw new Error("STRAVA_APP_CREDENTIALS_INVALID");
+    }
+
+    // Strava returns invalid_grant when user's refresh token is revoked/expired
+    if (normalized.includes("invalid_grant")) {
+      throw new Error("STRAVA_USER_TOKEN_INVALID");
+    }
+
+    throw new Error(`STRAVA_TOKEN_REFRESH_FAILED:${errText}`);
   }
 
   const data = await res.json();
@@ -306,9 +319,25 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Strava import error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    const message = error instanceof Error ? error.message : String(error);
+
+    let status = 500;
+    let clientError = message;
+
+    if (message === "STRAVA_APP_CREDENTIALS_INVALID") {
+      status = 400;
+      clientError = "Strava app credentials are invalid. Please update your backend Strava credentials.";
+    } else if (message === "STRAVA_USER_TOKEN_INVALID") {
+      status = 401;
+      clientError = "Your Strava connection has expired. Please disconnect and reconnect Strava.";
+    } else if (message.startsWith("STRAVA_TOKEN_REFRESH_FAILED:")) {
+      status = 502;
+      clientError = "Unable to refresh Strava token right now. Please reconnect Strava and try again.";
+    }
+
+    console.error("Strava import error:", message);
+    return new Response(JSON.stringify({ error: clientError, code: message }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
