@@ -27,6 +27,8 @@ export type Database = {
           distance_meters: number | null
           duration_seconds: number | null
           id: string
+          latitude: number | null
+          longitude: number | null
           max_heart_rate: number | null
           max_power: number | null
           max_speed: number | null
@@ -35,6 +37,7 @@ export type Database = {
           start_time: string | null
           total_ascent: number | null
           total_descent: number | null
+          total_steps: number | null
           training_effect: number | null
           training_load: number | null
           training_plan_id: string | null
@@ -53,6 +56,8 @@ export type Database = {
           distance_meters?: number | null
           duration_seconds?: number | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           max_heart_rate?: number | null
           max_power?: number | null
           max_speed?: number | null
@@ -61,6 +66,7 @@ export type Database = {
           start_time?: string | null
           total_ascent?: number | null
           total_descent?: number | null
+          total_steps?: number | null
           training_effect?: number | null
           training_load?: number | null
           training_plan_id?: string | null
@@ -79,6 +85,8 @@ export type Database = {
           distance_meters?: number | null
           duration_seconds?: number | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           max_heart_rate?: number | null
           max_power?: number | null
           max_speed?: number | null
@@ -87,6 +95,7 @@ export type Database = {
           start_time?: string | null
           total_ascent?: number | null
           total_descent?: number | null
+          total_steps?: number | null
           training_effect?: number | null
           training_load?: number | null
           training_plan_id?: string | null
@@ -133,57 +142,81 @@ export type Database = {
       }
       daily_metrics: {
         Row: {
+          active_calories: number | null
+          awake_during_night_minutes: number | null
           body_fat_percentage: number | null
           calories_total: number | null
           created_at: string
           date: string
+          deep_sleep_minutes: number | null
+          height_m: number | null
           hrv: number | null
           id: string
+          light_sleep_minutes: number | null
           raw_data: Json | null
+          rem_sleep_minutes: number | null
           resting_heart_rate: number | null
           sleep_duration_seconds: number | null
           sleep_score: number | null
           source_file: string | null
+          spo2: number | null
           steps: number | null
           stress_score: number | null
           upload_id: string | null
           user_id: string
+          vo2_max: number | null
           weight: number | null
         }
         Insert: {
+          active_calories?: number | null
+          awake_during_night_minutes?: number | null
           body_fat_percentage?: number | null
           calories_total?: number | null
           created_at?: string
           date: string
+          deep_sleep_minutes?: number | null
+          height_m?: number | null
           hrv?: number | null
           id?: string
+          light_sleep_minutes?: number | null
           raw_data?: Json | null
+          rem_sleep_minutes?: number | null
           resting_heart_rate?: number | null
           sleep_duration_seconds?: number | null
           sleep_score?: number | null
           source_file?: string | null
+          spo2?: number | null
           steps?: number | null
           stress_score?: number | null
           upload_id?: string | null
           user_id: string
+          vo2_max?: number | null
           weight?: number | null
         }
         Update: {
+          active_calories?: number | null
+          awake_during_night_minutes?: number | null
           body_fat_percentage?: number | null
           calories_total?: number | null
           created_at?: string
           date?: string
+          deep_sleep_minutes?: number | null
+          height_m?: number | null
           hrv?: number | null
           id?: string
+          light_sleep_minutes?: number | null
           raw_data?: Json | null
+          rem_sleep_minutes?: number | null
           resting_heart_rate?: number | null
           sleep_duration_seconds?: number | null
           sleep_score?: number | null
           source_file?: string | null
+          spo2?: number | null
           steps?: number | null
           stress_score?: number | null
           upload_id?: string | null
           user_id?: string
+          vo2_max?: number | null
           weight?: number | null
         }
         Relationships: [
