@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,40 @@ const corsHeaders = {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+/** Authenticate via JWT (Authorization header) or API key (body.api_key) */
+async function authenticateRequest(
+  req: Request,
+  body: Record<string, unknown>
+): Promise<{ userId: string; supabase: ReturnType<typeof createClient> }> {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Try JWT first (mobile app with user login)
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "");
+    if (token !== SUPABASE_ANON_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (user && !error) {
+        return { userId: user.id, supabase };
+      }
+    }
+  }
+
+  // Fallback to API key (stateless mode)
+  const ANDROID_API_KEY = Deno.env.get("ANDROID_API_KEY");
+  if (ANDROID_API_KEY && body.api_key === ANDROID_API_KEY) {
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    return { userId: (body.user_id as string) || "", supabase: serviceClient };
+  }
+
+  throw new Error("Unauthorized");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
@@ -16,47 +51,169 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const ANDROID_API_KEY = Deno.env.get("ANDROID_API_KEY");
-    if (!ANDROID_API_KEY) throw new Error("ANDROID_API_KEY not configured");
-
     const body = await req.json();
+    const { type } = body;
 
-    // Validate API key
-    if (body.api_key !== ANDROID_API_KEY) {
+    // Authenticate
+    let userId = "";
+    let supabase: ReturnType<typeof createClient> | null = null;
+    try {
+      const auth = await authenticateRequest(req, body);
+      userId = auth.userId;
+      supabase = auth.supabase;
+    } catch {
+      // Auth failed — only allowed for AI types with API key fallback
+    }
+
+    const needsAuth = ["get-plan", "push-activity", "get-activities"].includes(type as string);
+    if (needsAuth && (!userId || !supabase)) {
       return new Response(
-        JSON.stringify({ success: false, error: "Invalid API key" }),
+        JSON.stringify({ success: false, error: "Authentication required. Sign in with your account." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    if (!needsAuth && !userId && !supabase) {
+      const ANDROID_API_KEY = Deno.env.get("ANDROID_API_KEY");
+      if (!ANDROID_API_KEY || body.api_key !== ANDROID_API_KEY) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid API key" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
+    // ─── SYNC: Get latest training plan ───
+    if (type === "get-plan") {
+      const { data: plan, error } = await supabase!
+        .from("training_plans")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw new Error(`Failed to fetch plan: ${error.message}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          type: "get-plan",
+          plan: plan
+            ? {
+                id: plan.id,
+                content: plan.content,
+                race_distance: plan.race_distance,
+                race_date: plan.race_date,
+                start_date: plan.start_date,
+                training_days: plan.training_days,
+                created_at: plan.created_at,
+              }
+            : null,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── SYNC: Push completed activity from mobile/watch ───
+    if (type === "push-activity") {
+      const activity = body.activity as Record<string, unknown>;
+      if (!activity) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing 'activity' object" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const sourceFile = (activity.source_file as string) || `mobile:${Date.now()}`;
+
+      // Deduplicate
+      const { data: existing } = await supabase!
+        .from("activities")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("source_file", sourceFile)
+        .maybeSingle();
+
+      if (existing) {
+        return new Response(
+          JSON.stringify({ success: true, type: "push-activity", action: "skipped", id: existing.id }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: inserted, error } = await supabase!
+        .from("activities")
+        .insert({
+          user_id: userId,
+          activity_type: (activity.activity_type as string) || "running",
+          start_time: (activity.start_time as string) || new Date().toISOString(),
+          duration_seconds: (activity.duration_seconds as number) || null,
+          distance_meters: (activity.distance_meters as number) || null,
+          avg_heart_rate: (activity.avg_heart_rate as number) || null,
+          max_heart_rate: (activity.max_heart_rate as number) || null,
+          avg_speed: (activity.avg_speed as number) || null,
+          max_speed: (activity.max_speed as number) || null,
+          avg_cadence: (activity.avg_cadence as number) || null,
+          avg_power: (activity.avg_power as number) || null,
+          total_ascent: (activity.total_ascent as number) || null,
+          calories: (activity.calories as number) || null,
+          source_file: sourceFile,
+          raw_data: (activity.raw_data as Record<string, unknown>) || null,
+          training_plan_id: (activity.training_plan_id as string) || null,
+        })
+        .select("id")
+        .single();
+
+      if (error) throw new Error(`Failed to insert activity: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "push-activity", action: "created", id: inserted.id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── SYNC: Get recent activities ───
+    if (type === "get-activities") {
+      const days = (body.days as number) || 30;
+      const since = new Date(Date.now() - days * 86400000).toISOString();
+      const { data: activities, error } = await supabase!
+        .from("activities")
+        .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, source_file, training_plan_id")
+        .eq("user_id", userId)
+        .gte("start_time", since)
+        .order("start_time", { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch activities: ${error.message}`);
+      return new Response(
+        JSON.stringify({ success: true, type: "get-activities", activities: activities || [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── AI: training-plan or chat (original functionality) ───
     const {
-      type,
       race_distance,
       training_days,
       start_date,
       race_date,
       message,
       athlete,
-      activities,
+      activities: activityData,
       metrics,
     } = body;
 
-    // Build athlete context from request body
     const athleteContext = `
-Athlete: ${athlete?.name || "Unknown"}
-Primary Sport: ${athlete?.sport || "running"}
-Experience: ${athlete?.experience || "intermediate"}
-Goals: ${athlete?.goals || "general fitness"}
-Additional Context: ${athlete?.context || "none"}
+Athlete: ${(athlete as any)?.name || "Unknown"}
+Primary Sport: ${(athlete as any)?.sport || "running"}
+Experience: ${(athlete as any)?.experience || "intermediate"}
+Goals: ${(athlete as any)?.goals || "general fitness"}
+Additional Context: ${(athlete as any)?.context || "none"}
 `;
 
-    // Build data context from optional arrays
     let dataContext = "";
-    if (activities && Array.isArray(activities) && activities.length > 0) {
-      dataContext += `\nTRAINING DATA (${activities.length} activities):\n${JSON.stringify(activities, null, 2)}\n`;
+    if (activityData && Array.isArray(activityData) && activityData.length > 0) {
+      dataContext += `\nTRAINING DATA (${activityData.length} activities):\n${JSON.stringify(activityData, null, 2)}\n`;
     }
-    if (metrics && Array.isArray(metrics) && metrics.length > 0) {
-      dataContext += `\nDAILY HEALTH METRICS (${metrics.length} days):\n${JSON.stringify(metrics, null, 2)}\n`;
+    if (metrics && Array.isArray(metrics) && (metrics as any[]).length > 0) {
+      dataContext += `\nDAILY HEALTH METRICS (${(metrics as any[]).length} days):\n${JSON.stringify(metrics, null, 2)}\n`;
     }
 
     let systemPrompt: string;
@@ -73,7 +230,7 @@ Additional Context: ${athlete?.context || "none"}
       const daysStr = (training_days as string[] | undefined)?.length
         ? (training_days as string[]).join(", ")
         : "Mon, Wed, Fri, Sat";
-      const planStart = start_date || new Date().toISOString().split("T")[0];
+      const planStart = (start_date as string) || new Date().toISOString().split("T")[0];
       const [y, m, d] = planStart.split("-");
       const planStartUK = `${d}/${m}/${y}`;
 
@@ -161,10 +318,10 @@ ${athleteContext}
 
 ${dataContext}`;
 
-      userPrompt = message || "Hello, I'd like some coaching advice.";
+      userPrompt = (message as string) || "Hello, I'd like some coaching advice.";
     } else {
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid type. Use "training-plan" or "chat".' }),
+        JSON.stringify({ success: false, error: 'Invalid type. Use "training-plan", "chat", "get-plan", "push-activity", or "get-activities".' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
