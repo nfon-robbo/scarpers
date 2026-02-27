@@ -376,7 +376,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     });
   }
 
-  // Overdrawn state: floor at 5 (Zepp BioCharge philosophy — never fully zero)
+  // Overdrawn state: floor at 5 — never fully zero
   const finalScore = Math.round(Math.max(5, Math.min(100, baseScore + totalAdj)));
 
   // Add visible modifiers to factors (only if |adj| >= 3)

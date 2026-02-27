@@ -4,7 +4,7 @@
  * Parses markdown training plans and exports them as:
  * - TCX workout files (for intervals.icu → watch sync)
  * - ICS calendar files
- * - Clipboard text (for manual Zepp entry)
+ * - Clipboard text (for manual entry)
  */
 
 import JSZip from "jszip";
@@ -203,9 +203,9 @@ export function generateIcsCalendar(workouts: ParsedWorkout[]): string {
 }
 
 /**
- * Format a single workout for clipboard copy (Zepp manual entry format).
+ * Format a single workout for clipboard copy.
  */
-export function formatWorkoutForZepp(workout: ParsedWorkout): string {
+export function formatWorkoutForClipboard(workout: ParsedWorkout): string {
   const parts: string[] = [`WORKOUT: ${workout.title}`, ""];
   workout.segments.forEach((seg, i) => {
     const hrInfo = seg.hrZone ? ` | ${seg.hrZone}` : "";

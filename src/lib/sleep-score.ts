@@ -1,7 +1,7 @@
 /**
  * Sleep Score Algorithm (0-100)
  * Based on National Sleep Foundation & Matthew Walker's research.
- * Calibrated to match Zepp/Garmin-style harsh scoring.
+ * Calibrated to match Garmin-style harsh scoring.
  *
  * Components:
  *  - Duration (25 pts): 7-9h optimal

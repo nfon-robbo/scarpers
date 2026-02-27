@@ -553,8 +553,7 @@ CRITICAL INSTRUCTIONS:
 - Carefully review the athlete's profile, especially "Additional Context" which may contain injuries, physical limitations, or health conditions. You MUST adapt every workout to account for these. If an injury is mentioned, include modifications, reduced intensity, or alternative exercises.
 - Review ALL activity data to understand the athlete's current fitness level, typical paces, heart rate zones, and recent training load. Base all targets on their ACTUAL performance, not generic estimates.
 - Review sleep data to assess recovery status. If sleep scores are consistently low (<60) or deep/REM percentages are below recommended ranges, factor in extra recovery days or lower intensity sessions. Reference sleep trends when explaining rest day placement.
-- The athlete uses an Amazfit Balance 2 watch with the Zepp app. Structure each workout so it can be manually created as a custom workout in the Zepp app:
-  - Break workouts into clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
+- Structure each workout with clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
   - For each segment specify: duration AND/OR distance, and target pace range
   - For interval sessions, clearly state: number of reps, work duration/distance, recovery duration/distance, target pace for each
   - When a workout has a distance goal (e.g., long run), always include the target distance alongside the estimated duration
