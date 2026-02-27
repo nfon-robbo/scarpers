@@ -626,6 +626,54 @@ Be specific with paces, durations, and intensities. Use the athlete's actual per
 ${dataContext}
 
 Generate a comprehensive ${raceLabel} ${isAIDecide ? 'fitness assessment, recommended timeline, and complete' : 'season strategy and detailed 4-week'} training plan starting ${planStart}. Schedule workouts only on ${daysStr}. Base all targets on the actual performance data above. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+    } else if (type === "post-plan-analysis") {
+      // After initial plan generation, analyse existing activities to see if plan needs amending
+      const raceLabel = {
+        "5k": "5K",
+        "10k": "10K",
+        "half-marathon": "Half Marathon",
+        "marathon": "Marathon",
+      }[race_distance as string] || "Half Marathon";
+
+      systemPrompt = `You are an elite endurance coach AI. A new ${raceLabel} training plan has just been generated for the athlete. Your job is to compare the plan against the athlete's RECENT ACTIVITY HISTORY to see if any amendments are warranted.
+
+Look for:
+1. **Pacing mismatch**: Are plan targets significantly faster or slower than recent performances?
+2. **Volume mismatch**: Is the planned weekly volume a big jump (>10-15%) from recent training?
+3. **Intensity distribution**: Does the plan match the athlete's current 80/20 easy-hard balance?
+4. **Recovery concerns**: Does sleep/HRV data suggest the athlete needs more recovery than planned?
+5. **Injury/limitation flags**: Are there activity patterns suggesting an injury that the plan doesn't account for?
+
+Your response MUST follow this format:
+
+## 🔍 Activity vs Plan Analysis
+3-5 bullet points comparing key metrics from recent activities to plan targets.
+
+## ✅ Verdict: [NO CHANGES NEEDED / CHANGES RECOMMENDED]
+State clearly whether you recommend amendments.
+
+If CHANGES RECOMMENDED:
+## 📝 Recommended Changes
+- List specific changes with reasons (3-5 bullets max)
+- Be precise: "Reduce Week 1 long run from 15km to 12km because longest recent run was 10km"
+
+If NO CHANGES NEEDED:
+## 👍 Plan Looks Good
+Brief 1-2 sentence confirmation that the plan aligns well with current fitness.
+
+BREVITY RULES:
+- Maximum 150 words total
+- Bullet points only, no paragraphs
+- Reference specific numbers from the data
+
+${athleteContext}`;
+
+      userPrompt = `${dataContext}
+
+NEW TRAINING PLAN:
+${current_plan || "No plan provided"}
+
+Analyse whether the new plan aligns with the athlete's recent activity history, or if amendments are needed. Today's date is ${new Date().toISOString().split("T")[0]}.`;
     } else if (type === "workout-review") {
       const reviewSystemPrompt = [
         "You are an incredibly supportive and encouraging running coach reviewing an athlete's completed workout vs their plan. Be warm, positive, celebratory. Keep it concise (150-200 words). Use emojis sparingly.",
