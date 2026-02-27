@@ -24,8 +24,7 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/upload", icon: Upload, label: "Import" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
-  { to: "/analysis", icon: Brain, label: "Analysis" },
-  { to: "/wellness", icon: Moon, label: "Wellness" },
+  { to: "/insights", icon: Brain, label: "Insights" },
   { to: "/training-plan", icon: Calendar, label: "Plan" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
