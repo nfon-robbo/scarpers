@@ -11,7 +11,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -145,6 +145,10 @@ const TrainingPlanPage = () => {
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
+  const [showPostAnalysis, setShowPostAnalysis] = useState(false);
+  const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
+  const [postAnalyzing, setPostAnalyzing] = useState(false);
+  const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -288,6 +292,9 @@ const TrainingPlanPage = () => {
         setLoading(false);
         savePlan(accumulated);
         toast({ title: "Plan saved", description: "Your training plan has been saved." });
+        // Offer post-generation analysis
+        setPostAnalysisPlanContent(accumulated);
+        setShowPostAnalysis(true);
       },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
@@ -395,6 +402,50 @@ const TrainingPlanPage = () => {
     setReviewResult(null);
     setOriginalPlanBeforeReview(null);
     toast({ title: "Keeping current plan" });
+  };
+
+  const runPostPlanAnalysis = async () => {
+    if (!user || !postAnalysisPlanContent) return;
+    setPostAnalyzing(true);
+    setPostAnalysisResult(null);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", variant: "destructive" });
+      setPostAnalyzing(false);
+      return;
+    }
+
+    let accumulated = "";
+    streamAICoach({
+      type: "post-plan-analysis",
+      token: session.access_token,
+      raceDistance,
+      currentPlan: postAnalysisPlanContent,
+      onDelta: (text) => {
+        accumulated += text;
+        setPostAnalysisResult(accumulated);
+      },
+      onDone: () => {
+        setPostAnalyzing(false);
+        const needsChanges = /Verdict:\s*CHANGES RECOMMENDED/i.test(accumulated);
+        if (needsChanges) {
+          // Store for the review/adjust flow
+          setOriginalPlanBeforeReview(postAnalysisPlanContent);
+          setReviewResult(accumulated);
+        }
+      },
+      onError: (err) => {
+        toast({ title: "Analysis failed", description: err, variant: "destructive" });
+        setPostAnalyzing(false);
+      },
+    });
+  };
+
+  const dismissPostAnalysis = () => {
+    setShowPostAnalysis(false);
+    setPostAnalysisResult(null);
+    setPostAnalysisPlanContent(null);
   };
 
   const extractTodayWorkout = (): string | null => {
@@ -1013,6 +1064,85 @@ const TrainingPlanPage = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Post-Plan Analysis Dialog */}
+        <Dialog open={showPostAnalysis} onOpenChange={(open) => { if (!open && !postAnalyzing) dismissPostAnalysis(); }}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5 text-primary" />
+                Analyse Your Workouts
+              </DialogTitle>
+              <DialogDescription>
+                {postAnalysisResult
+                  ? "Here's how your recent activity compares to the new plan"
+                  : "Would you like me to check your recent workouts against this plan to see if anything needs adjusting?"
+                }
+              </DialogDescription>
+            </DialogHeader>
+
+            {!postAnalysisResult && !postAnalyzing && (
+              <div className="space-y-3 py-2">
+                <p className="text-sm text-muted-foreground">
+                  I'll compare your recent training history against the plan to check for pacing, volume, or intensity mismatches — and suggest amendments if needed.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={runPostPlanAnalysis}>
+                    <Search className="w-4 h-4 mr-2" />
+                    Yes, analyse my workouts
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissPostAnalysis}>
+                    No thanks
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {postAnalyzing && !postAnalysisResult && (
+              <div className="flex items-center gap-3 py-4 justify-center text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="text-sm">Analysing your recent workouts...</span>
+              </div>
+            )}
+
+            {postAnalysisResult && (
+              <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
+                <MarkdownRenderer content={postAnalysisResult} />
+              </div>
+            )}
+
+            {!postAnalyzing && postAnalysisResult && (
+              <div className="flex flex-wrap gap-2 pt-3 border-t">
+                {/Verdict:\s*CHANGES RECOMMENDED/i.test(postAnalysisResult) ? (
+                  <>
+                    <Button size="sm" onClick={() => { dismissPostAnalysis(); applyAdjustment("apply"); }}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Apply Changes
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { dismissPostAnalysis(); applyAdjustment("easier"); }}>
+                      <ThumbsDown className="w-4 h-4 mr-2" />
+                      Make Easier
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { dismissPostAnalysis(); applyAdjustment("harder"); }}>
+                      <ThumbsUp className="w-4 h-4 mr-2" />
+                      Make Harder
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { dismissPostAnalysis(); keepCurrentPlan(); }}>
+                      <X className="w-4 h-4 mr-2" />
+                      Keep Current Plan
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={dismissPostAnalysis}>
+                    <Check className="w-4 h-4 mr-2" />
+                    Great, let's go!
+                  </Button>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
 
         <Card className="border-dashed">
           <CardHeader className="p-4 cursor-pointer" onClick={() => setShowSyncInstructions(!showSyncInstructions)}>
