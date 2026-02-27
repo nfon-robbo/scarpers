@@ -149,26 +149,6 @@ const Dashboard = () => {
     interface SyncResult { source: string; status: "success" | "skipped" | "error"; detail: string }
     const results: SyncResult[] = [];
 
-    // Strava
-    try {
-      const res = await fetch(`${baseUrl}/functions/v1/strava-import`, {
-        method: "POST", headers, body: JSON.stringify({ mode: "recent" }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        results.push({
-          source: "Strava",
-          status: d.imported > 0 ? "success" : "skipped",
-          detail: d.imported > 0 ? `${d.imported} activities imported` : "No new activities",
-        });
-      } else {
-        const errBody = await res.json().catch(() => ({ error: res.statusText }));
-        results.push({ source: "Strava", status: "error", detail: errBody.error || `HTTP ${res.status}` });
-      }
-    } catch {
-      results.push({ source: "Strava", status: "error", detail: "Not connected" });
-    }
-
     // Intervals.icu wellness
     try {
       const res = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
