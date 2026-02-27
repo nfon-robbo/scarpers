@@ -139,7 +139,6 @@ const Dashboard = () => {
   const handleSyncAll = async () => {
     if (!session?.access_token || syncing) return;
     setSyncing(true);
-    const results: string[] = [];
     const headers = {
       Authorization: `Bearer ${session.access_token}`,
       apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -147,53 +146,101 @@ const Dashboard = () => {
     };
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
 
+    interface SyncResult { source: string; status: "success" | "skipped" | "error"; detail: string }
+    const results: SyncResult[] = [];
+
+    // Strava
     try {
-      const stravaRes = await fetch(`${baseUrl}/functions/v1/strava-import`, {
+      const res = await fetch(`${baseUrl}/functions/v1/strava-import`, {
         method: "POST", headers, body: JSON.stringify({ mode: "recent" }),
-      }).catch(() => null);
-      if (stravaRes?.ok) {
-        const d = await stravaRes.json();
-        if (d.imported > 0) results.push(`${d.imported} Strava activities`);
-      }
-
-      const intRes = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
-        method: "POST", headers,
-      }).catch(() => null);
-      if (intRes?.ok) {
-        const d = await intRes.json();
-        if (d.upserted > 0) results.push(`${d.upserted} wellness records`);
-      }
-
-      const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST", headers, body: JSON.stringify({ days: 3 }),
-      }).catch(() => null);
-      if (gfRes?.ok) {
-        const d = await gfRes.json();
-        if (d.synced > 0) results.push(`${d.synced} sleep segments`);
-      }
-
-      toast({
-        title: results.length > 0 ? "Sync complete" : "Everything up to date",
-        description: results.length > 0 ? results.join(", ") : "No new data found from any source",
       });
-
-      if (results.length > 0 && user) {
-        const since = new Date();
-        since.setDate(since.getDate() - 56);
-        supabase.from("activities")
-          .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
-          .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
-          .then(({ data }) => setActivities((data as ActivityRow[]) || []));
-        supabase.from("daily_metrics")
-          .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
-          .eq("user_id", user.id).gte("date", since.toISOString().split("T")[0]).order("date", { ascending: true })
-          .then(({ data }) => setMetrics((data as MetricsRow[]) || []));
+      if (res.ok) {
+        const d = await res.json();
+        results.push({
+          source: "Strava",
+          status: d.imported > 0 ? "success" : "skipped",
+          detail: d.imported > 0 ? `${d.imported} activities imported` : "No new activities",
+        });
+      } else {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        results.push({ source: "Strava", status: "error", detail: errBody.error || `HTTP ${res.status}` });
       }
-    } catch (e: any) {
-      toast({ title: "Sync failed", description: e.message, variant: "destructive" });
-    } finally {
-      setSyncing(false);
+    } catch {
+      results.push({ source: "Strava", status: "error", detail: "Not connected" });
     }
+
+    // Intervals.icu wellness
+    try {
+      const res = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
+        method: "POST", headers,
+      });
+      if (res.ok) {
+        const d = await res.json();
+        results.push({
+          source: "Intervals.icu",
+          status: d.synced > 0 ? "success" : "skipped",
+          detail: d.synced > 0 ? `${d.synced} wellness records` : "No new wellness data",
+        });
+      } else {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        results.push({ source: "Intervals.icu", status: "error", detail: errBody.error || `HTTP ${res.status}` });
+      }
+    } catch {
+      results.push({ source: "Intervals.icu", status: "error", detail: "Not connected" });
+    }
+
+    // Google Fit sleep
+    try {
+      const res = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
+        method: "POST", headers, body: JSON.stringify({ days: 3 }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        results.push({
+          source: "Google Fit",
+          status: d.synced > 0 ? "success" : "skipped",
+          detail: d.synced > 0 ? `${d.synced} sleep segments` : "No new sleep data",
+        });
+      } else {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        results.push({ source: "Google Fit", status: "error", detail: errBody.error || `HTTP ${res.status}` });
+      }
+    } catch {
+      results.push({ source: "Google Fit", status: "error", detail: "Not connected" });
+    }
+
+    // Build detailed toast
+    const successCount = results.filter(r => r.status === "success").length;
+    const errorCount = results.filter(r => r.status === "error").length;
+    const icons = { success: "✅", skipped: "—", error: "❌" };
+    const lines = results.map(r => `${icons[r.status]} ${r.source}: ${r.detail}`).join("\n");
+
+    toast({
+      title: successCount > 0
+        ? `Sync complete — ${successCount} source${successCount > 1 ? "s" : ""} updated`
+        : errorCount === results.length
+        ? "Sync failed"
+        : "Everything up to date",
+      description: lines,
+      variant: errorCount === results.length ? "destructive" : undefined,
+      duration: 6000,
+    });
+
+    // Refresh data if anything was synced
+    if (successCount > 0 && user) {
+      const since = new Date();
+      since.setDate(since.getDate() - 56);
+      supabase.from("activities")
+        .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
+        .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
+        .then(({ data }) => setActivities((data as ActivityRow[]) || []));
+      supabase.from("daily_metrics")
+        .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
+        .eq("user_id", user.id).gte("date", since.toISOString().split("T")[0]).order("date", { ascending: true })
+        .then(({ data }) => setMetrics((data as MetricsRow[]) || []));
+    }
+
+    setSyncing(false);
   };
 
   useEffect(() => {
