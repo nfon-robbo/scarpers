@@ -29,33 +29,53 @@ const SleepCalendar = () => {
   const [insight, setInsight] = useState("");
   const [insightLoading, setInsightLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchSleepData = useCallback(async () => {
     if (!user) return;
-    const since = subDays(new Date(), 60).toISOString().split("T")[0];
-    supabase
-      .from("sleep_stages")
-      .select("date, stage, duration_seconds")
-      .eq("user_id", user.id)
-      .gte("date", since)
-      .order("date", { ascending: true })
-      .then(({ data }) => {
-        setRows((data as SleepStageRow[]) || []);
-        setLoading(false);
-      });
+    const since = subDays(new Date(), 365).toISOString().split("T")[0];
 
-    const handler = () => {
-      const since2 = subDays(new Date(), 60).toISOString().split("T")[0];
+    // Fetch both sources in parallel
+    const [stagesRes, metricsRes] = await Promise.all([
       supabase
         .from("sleep_stages")
         .select("date, stage, duration_seconds")
         .eq("user_id", user.id)
-        .gte("date", since2)
-        .order("date", { ascending: true })
-        .then(({ data }) => setRows((data as SleepStageRow[]) || []));
-    };
-    window.addEventListener("sleep-stages-synced", handler);
-    return () => window.removeEventListener("sleep-stages-synced", handler);
+        .gte("date", since)
+        .order("date", { ascending: true }),
+      supabase
+        .from("daily_metrics")
+        .select("date, sleep_duration_seconds")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .not("sleep_duration_seconds", "is", null)
+        .order("date", { ascending: true }),
+    ]);
+
+    const stageRows = (stagesRes.data as SleepStageRow[]) || [];
+
+    // Build set of dates already covered by sleep_stages
+    const stageDates = new Set(stageRows.map((r) => r.date));
+
+    // Create fallback rows from daily_metrics for dates missing from sleep_stages
+    const fallbackRows: SleepStageRow[] = [];
+    for (const m of metricsRes.data || []) {
+      if (!stageDates.has(m.date) && m.sleep_duration_seconds) {
+        fallbackRows.push({
+          date: m.date,
+          stage: "sleep",
+          duration_seconds: m.sleep_duration_seconds as number,
+        });
+      }
+    }
+
+    setRows([...stageRows, ...fallbackRows]);
+    setLoading(false);
   }, [user]);
+
+  useEffect(() => {
+    fetchSleepData();
+    window.addEventListener("sleep-stages-synced", fetchSleepData);
+    return () => window.removeEventListener("sleep-stages-synced", fetchSleepData);
+  }, [fetchSleepData]);
 
   const byDate = useMemo(() => {
     const map: Record<string, DailyData> = {};
