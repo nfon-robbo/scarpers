@@ -43,7 +43,7 @@ const SleepCalendar = () => {
         .order("date", { ascending: true }),
       supabase
         .from("daily_metrics")
-        .select("date, sleep_duration_seconds")
+        .select("date, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
         .eq("user_id", user.id)
         .gte("date", since)
         .not("sleep_duration_seconds", "is", null)
@@ -59,11 +59,15 @@ const SleepCalendar = () => {
     const fallbackRows: SleepStageRow[] = [];
     for (const m of metricsRes.data || []) {
       if (!stageDates.has(m.date) && m.sleep_duration_seconds) {
-        fallbackRows.push({
-          date: m.date,
-          stage: "sleep",
-          duration_seconds: m.sleep_duration_seconds as number,
-        });
+        const hasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0;
+        if (hasStages) {
+          if (m.deep_sleep_minutes) fallbackRows.push({ date: m.date, stage: "deep", duration_seconds: m.deep_sleep_minutes * 60 });
+          if (m.rem_sleep_minutes) fallbackRows.push({ date: m.date, stage: "rem", duration_seconds: m.rem_sleep_minutes * 60 });
+          if (m.light_sleep_minutes) fallbackRows.push({ date: m.date, stage: "light", duration_seconds: m.light_sleep_minutes * 60 });
+          if (m.awake_during_night_minutes) fallbackRows.push({ date: m.date, stage: "awake", duration_seconds: m.awake_during_night_minutes * 60 });
+        } else {
+          fallbackRows.push({ date: m.date, stage: "sleep", duration_seconds: m.sleep_duration_seconds as number });
+        }
       }
     }
 
