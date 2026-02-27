@@ -57,33 +57,47 @@ const WellnessPage = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/intervals-wellness`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({}),
-        }
-      );
-      const data = await resp.json();
-      if (!resp.ok) {
-        toast({ title: "Sync failed", description: data.error, variant: "destructive" });
-      } else {
-        toast({ title: "Synced", description: `${data.synced} days updated` });
-        // Reload
-        const since = subDays(new Date(), 90).toISOString().split("T")[0];
-        const { data: fresh } = await supabase
-          .from("daily_metrics")
-          .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv, weight, stress_score, body_fat_percentage, calories_total")
-          .eq("user_id", user.id)
-          .gte("date", since)
-          .order("date", { ascending: true });
-        setMetrics((fresh as MetricsRow[]) || []);
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      };
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const results: string[] = [];
+
+      // 1. Intervals.icu wellness
+      const intRes = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
+        method: "POST", headers, body: JSON.stringify({}),
+      }).catch(() => null);
+      if (intRes?.ok) {
+        const d = await intRes.json();
+        if (d.synced > 0) results.push(`${d.synced} wellness days`);
       }
+
+      // 2. Google Fit sleep stages
+      const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
+        method: "POST", headers, body: JSON.stringify({ days: 7 }),
+      }).catch(() => null);
+      if (gfRes?.ok) {
+        const d = await gfRes.json();
+        if (d.synced > 0) results.push(`${d.synced} sleep segments`);
+        window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
+      }
+
+      toast({
+        title: results.length > 0 ? "Sync complete" : "Everything up to date",
+        description: results.length > 0 ? results.join(", ") : "No new data found",
+      });
+
+      // Reload metrics
+      const since = subDays(new Date(), 90).toISOString().split("T")[0];
+      const { data: fresh } = await supabase
+        .from("daily_metrics")
+        .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv, weight, stress_score, body_fat_percentage, calories_total")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .order("date", { ascending: true });
+      setMetrics((fresh as MetricsRow[]) || []);
     } catch (e: any) {
       toast({ title: "Sync failed", description: e.message, variant: "destructive" });
     } finally {
