@@ -179,10 +179,17 @@ const AppLayout = () => {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14">
-        <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14 flex flex-col min-h-0">
+        <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <Outlet />
         </div>
+        <footer className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 border-t border-border/50">
+          <p className="text-xs text-muted-foreground text-center">
+            <NavLink to="/privacy" className="hover:text-foreground transition-colors underline underline-offset-2">
+              Privacy Policy
+            </NavLink>
+          </p>
+        </footer>
       </main>
 
       <AIChatbot />
