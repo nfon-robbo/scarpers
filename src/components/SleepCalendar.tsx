@@ -61,11 +61,13 @@ const SleepCalendar = () => {
     const map: Record<string, DailyData> = {};
     for (const r of rows) {
       if (!map[r.date]) {
-        map[r.date] = { date: r.date, stages: { deep: 0, light: 0, rem: 0, awake: 0 }, score: 0 };
+        map[r.date] = { date: r.date, stages: { deep: 0, light: 0, rem: 0, awake: 0, sleep: 0 }, score: 0 };
       }
       const key = r.stage as keyof SleepStageData;
       if (key in map[r.date].stages) {
         map[r.date].stages[key] += r.duration_seconds;
+      } else if (r.stage === "sleep") {
+        map[r.date].stages.sleep += r.duration_seconds;
       }
     }
     for (const d of Object.values(map)) {
@@ -260,36 +262,46 @@ const SleepCalendar = () => {
               </div>
 
               {/* Stage breakdown */}
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  { key: "deep", label: "Deep", color: "bg-primary" },
-                  { key: "rem", label: "REM", color: "bg-blue-500" },
-                  { key: "light", label: "Light", color: "bg-muted-foreground/40" },
-                  { key: "awake", label: "Awake", color: "bg-destructive/50" },
-                ] as const).map(({ key, label, color }) => {
-                  const secs = selected.stages[key];
-                  const h = Math.floor(secs / 3600);
-                  const m = Math.round((secs % 3600) / 60);
-                  const total = selected.stages.deep + selected.stages.light + selected.stages.rem + selected.stages.awake;
-                  const pct = total > 0 ? Math.round((secs / total) * 100) : 0;
-                  return (
-                    <div key={key} className="flex items-center gap-2 rounded-md border p-2">
-                      <div className={`w-3 h-3 rounded-full ${color}`} />
-                      <div>
-                        <p className="text-sm font-medium">{label}</p>
-                        <p className="text-xs text-muted-foreground">{h}h {m}m ({pct}%)</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Total */}
               {(() => {
-                const totalSecs = selected.stages.deep + selected.stages.light + selected.stages.rem + selected.stages.awake;
-                const th = Math.floor(totalSecs / 3600);
-                const tm = Math.round((totalSecs % 3600) / 60);
-                return <p className="text-sm text-muted-foreground">Total: {th}h {tm}m</p>;
+                const hasStages = selected.stages.deep > 0 || selected.stages.rem > 0;
+                const stageItems = hasStages
+                  ? [
+                      { key: "deep" as const, label: "Deep", color: "bg-primary" },
+                      { key: "rem" as const, label: "REM", color: "bg-blue-500" },
+                      { key: "light" as const, label: "Light", color: "bg-muted-foreground/40" },
+                      { key: "awake" as const, label: "Awake", color: "bg-destructive/50" },
+                    ]
+                  : [
+                      { key: "sleep" as const, label: "Sleep", color: "bg-primary" },
+                      { key: "awake" as const, label: "Awake", color: "bg-destructive/50" },
+                    ];
+                const total = selected.stages.deep + selected.stages.light + selected.stages.rem + selected.stages.awake + selected.stages.sleep;
+                return (
+                  <>
+                    <div className={`grid gap-2 ${hasStages ? "grid-cols-2" : "grid-cols-2"}`}>
+                      {stageItems.map(({ key, label, color }) => {
+                        const secs = selected.stages[key];
+                        if (secs === 0 && key !== "awake") return null;
+                        const h = Math.floor(secs / 3600);
+                        const m = Math.round((secs % 3600) / 60);
+                        const pct = total > 0 ? Math.round((secs / total) * 100) : 0;
+                        return (
+                          <div key={key} className="flex items-center gap-2 rounded-md border p-2">
+                            <div className={`w-3 h-3 rounded-full ${color}`} />
+                            <div>
+                              <p className="text-sm font-medium">{label}</p>
+                              <p className="text-xs text-muted-foreground">{h}h {m}m ({pct}%)</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!hasStages && (
+                      <p className="text-xs text-muted-foreground italic">No stage breakdown available — showing total sleep time</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">Total: {Math.floor(total / 3600)}h {Math.round((total % 3600) / 60)}m</p>
+                  </>
+                );
               })()}
 
               {/* AI Insight */}

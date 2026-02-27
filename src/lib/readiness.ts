@@ -402,16 +402,17 @@ export function groupSleepByDate(
   const byDate = new Map<string, SleepStageData>();
   for (const s of stages) {
     const key = s.stage?.toLowerCase();
-    if (!byDate.has(s.date)) byDate.set(s.date, { deep: 0, light: 0, rem: 0, awake: 0 });
+    if (!byDate.has(s.date)) byDate.set(s.date, { deep: 0, light: 0, rem: 0, awake: 0, sleep: 0 });
     const entry = byDate.get(s.date)!;
     if (key === "deep") entry.deep += s.duration_seconds || 0;
     else if (key === "light") entry.light += s.duration_seconds || 0;
     else if (key === "rem") entry.rem += s.duration_seconds || 0;
     else if (key === "awake") entry.awake += s.duration_seconds || 0;
+    else if (key === "sleep") entry.sleep += s.duration_seconds || 0;
   }
 
   // Pick most recent date
   const dates = [...byDate.keys()].sort().reverse();
-  if (dates.length === 0) return { deep: 0, light: 0, rem: 0, awake: 0 };
+  if (dates.length === 0) return { deep: 0, light: 0, rem: 0, awake: 0, sleep: 0 };
   return byDate.get(dates[0])!;
 }
