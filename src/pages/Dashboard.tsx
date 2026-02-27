@@ -192,8 +192,17 @@ const Dashboard = () => {
     // Build detailed toast
     const successCount = results.filter(r => r.status === "success").length;
     const errorCount = results.filter(r => r.status === "error").length;
-    const icons = { success: "✅", skipped: "—", error: "❌" };
-    const lines = results.map(r => `${icons[r.status]} ${r.source}: ${r.detail}`).join("\n");
+    const icons: Record<string, string> = { success: "✅", skipped: "—", error: "❌" };
+
+    const descriptionEl = (
+      <div className="flex flex-col gap-1 mt-1">
+        {results.map((r, i) => (
+          <div key={i} className="text-sm">
+            {icons[r.status]} <span className="font-medium">{r.source}:</span> {r.detail}
+          </div>
+        ))}
+      </div>
+    );
 
     toast({
       title: successCount > 0
@@ -201,9 +210,9 @@ const Dashboard = () => {
         : errorCount === results.length
         ? "Sync failed"
         : "Everything up to date",
-      description: lines,
+      description: descriptionEl,
       variant: errorCount === results.length ? "destructive" : undefined,
-      duration: 6000,
+      duration: 8000,
     });
 
     // Refresh data if anything was synced
