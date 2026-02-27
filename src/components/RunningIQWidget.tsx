@@ -66,43 +66,70 @@ const RunningIQWidget = () => {
     if (!user) return;
 
     const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 3600000).toISOString();
+
+    // First check if there's a recent snapshot (e.g. from mobile)
+    supabase
+      .from("running_iq_snapshots")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("recorded_at", oneHourAgo)
+      .order("recorded_at", { ascending: false })
+      .limit(1)
+      .then(({ data: snapshots }) => {
+        if (snapshots && snapshots.length > 0) {
+          const s = snapshots[0] as any;
+          setResult({
+            totalScore: s.score,
+            adjustedScore: s.adjusted_score,
+            label: s.label,
+            pillars: (s.pillars as any[]) || [],
+            lowestPillar: s.lowest_pillar || "",
+            coachingTip: s.coaching_tip || "",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // No recent snapshot — compute from scratch
+        computeFromData(user.id, now);
+      });
+  }, [user]);
+
+  const computeFromData = (userId: string, now: Date) => {
     const twelveWeeksAgo = new Date(now.getTime() - 12 * 7 * 86400000);
     const today = now.toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
     const twentyEightDaysAgo = new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0];
 
     Promise.all([
-      // All runs in 12 weeks
       supabase
         .from("activities")
         .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("start_time", twelveWeeksAgo.toISOString())
         .order("start_time", { ascending: true })
         .then(({ data }) => data || []),
 
-      // Latest daily metrics for VO2max, RHR, HRV, sleep
       supabase
         .from("daily_metrics")
         .select("date, resting_heart_rate, hrv, sleep_score, vo2_max")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: false })
         .then(({ data }) => data || []),
 
-      // Sleep stages for readiness
       supabase
         .from("sleep_stages")
         .select("stage, duration_seconds, date, end_time")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .in("date", [today, yesterday])
         .then(({ data }) => data || []),
 
-      // Training plans for missed workouts
       supabase
         .from("training_plans")
         .select("training_days, start_date")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .then(({ data }) => data || []),
@@ -116,7 +143,6 @@ const RunningIQWidget = () => {
         start_time: a.start_time,
       })) as RunActivity[];
 
-      // Get latest metrics
       const metrics = allMetrics as any[];
       const latestWithVO2 = metrics.find((m) => m.vo2_max);
       const rhrValues = metrics.filter((m) => m.resting_heart_rate).slice(0, 14);
@@ -126,7 +152,6 @@ const RunningIQWidget = () => {
       const latestHRV = metrics.find((m) => m.hrv);
       const latestSleep = metrics.find((m) => m.sleep_score);
 
-      // Calculate readiness for adjustment
       let readinessScore = 50;
       try {
         const stages = groupSleepByDate(sleepStages as any);
@@ -134,43 +159,28 @@ const RunningIQWidget = () => {
         const sleepScore = totalSleep > 0 ? calculateSleepScore(stages) : null;
         const todayMetrics = metrics.find((m: any) => m.date === today);
 
-        // Simplified readiness calc
         const readinessData: ReadinessData = {
           sleepScore: sleepScore ?? (todayMetrics?.sleep_score ?? null),
           sleepHours: totalSleep > 0 ? totalSleep / 3600 : null,
-          deepPct: null,
-          remPct: null,
-          rhr: todayMetrics?.resting_heart_rate ?? null,
-          rhrBaseline: avgRHR,
-          hrv: todayMetrics?.hrv ?? null,
-          hrvBaseline: null,
-          yesterdayLoad: null,
-          stressScore: null,
-          todayLoad: null,
-          recoveryHoursSinceLastHard: null,
-          lastWorkoutIntensity: null,
-          recentSleepAvgHours: null,
-          baselineSleepAvgHours: null,
-          stressHistory: [],
-          weeklyLoadAvg: null,
-          monthlyLoadAvg: null,
-          currentHour: now.getHours(),
-          wakeTimeIso: null,
-          todayActivities: [],
+          deepPct: null, remPct: null,
+          rhr: todayMetrics?.resting_heart_rate ?? null, rhrBaseline: avgRHR,
+          hrv: todayMetrics?.hrv ?? null, hrvBaseline: null,
+          yesterdayLoad: null, stressScore: null, todayLoad: null,
+          recoveryHoursSinceLastHard: null, lastWorkoutIntensity: null,
+          recentSleepAvgHours: null, baselineSleepAvgHours: null,
+          stressHistory: [], weeklyLoadAvg: null, monthlyLoadAvg: null,
+          currentHour: now.getHours(), wakeTimeIso: null, todayActivities: [],
         };
         const readinessResult = computeReadiness(readinessData);
         readinessScore = readinessResult.score;
       } catch { /* use default 50 */ }
 
-      // Missed/planned workouts
       let missed = 0;
       let planned = 0;
       if (plans.length > 0) {
         const plan = plans[0] as any;
         const trainingDays = plan.training_days || [];
-        // Count planned days in last 4 weeks
         planned = trainingDays.length * 4;
-        // Count actual runs in last 4 weeks
         const fourWeeksAgo = new Date(now.getTime() - 28 * 86400000);
         const recentRunCount = runs.filter(
           (r) => r.start_time && new Date(r.start_time) >= fourWeeksAgo
@@ -178,7 +188,6 @@ const RunningIQWidget = () => {
         missed = Math.max(0, planned - recentRunCount);
       }
 
-      // Estimate age from profile (default 30 if unknown)
       const ageYears = 30;
 
       const iqResult = computeRunningIQ({
@@ -196,8 +205,31 @@ const RunningIQWidget = () => {
 
       setResult(iqResult);
       setLoading(false);
+
+      // Save snapshot (throttled: max once per hour)
+      const cacheKey = `running_iq_snapshot_last_${userId}`;
+      const last = localStorage.getItem(cacheKey);
+      const nowMs = Date.now();
+      if (!last || nowMs - Number(last) >= 3600000) {
+        localStorage.setItem(cacheKey, String(nowMs));
+        supabase
+          .from("running_iq_snapshots")
+          .insert({
+            user_id: userId,
+            score: iqResult.totalScore,
+            adjusted_score: iqResult.adjustedScore,
+            label: iqResult.label,
+            pillars: iqResult.pillars as any,
+            lowest_pillar: iqResult.lowestPillar,
+            coaching_tip: iqResult.coachingTip,
+            recorded_at: new Date().toISOString(),
+          })
+          .then(({ error }) => {
+            if (error) localStorage.removeItem(cacheKey);
+          });
+      }
     });
-  }, [user]);
+  };
 
   if (loading) {
     return (
