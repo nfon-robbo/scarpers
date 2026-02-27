@@ -90,6 +90,30 @@ serve(async (req) => {
       if (w.sleepScore != null) record.sleep_score = w.sleepScore;
       if (w.sleepQuality != null && record.sleep_score == null) record.sleep_score = w.sleepQuality;
 
+      // Sleep stages (pushed by wearables like Garmin, Whoop, etc.)
+      if (w.sleepDeep != null) record.deep_sleep_minutes = Math.round(w.sleepDeep / 60);
+      else if (w.deepSleep != null) record.deep_sleep_minutes = Math.round(w.deepSleep / 60);
+      else if (w.deepSleepSecs != null) record.deep_sleep_minutes = Math.round(w.deepSleepSecs / 60);
+      else if (w.deepSleepMinutes != null) record.deep_sleep_minutes = w.deepSleepMinutes;
+
+      if (w.sleepLight != null) record.light_sleep_minutes = Math.round(w.sleepLight / 60);
+      else if (w.lightSleep != null) record.light_sleep_minutes = Math.round(w.lightSleep / 60);
+      else if (w.lightSleepSecs != null) record.light_sleep_minutes = Math.round(w.lightSleepSecs / 60);
+      else if (w.lightSleepMinutes != null) record.light_sleep_minutes = w.lightSleepMinutes;
+
+      if (w.sleepRem != null) record.rem_sleep_minutes = Math.round(w.sleepRem / 60);
+      else if (w.remSleep != null) record.rem_sleep_minutes = Math.round(w.remSleep / 60);
+      else if (w.remSleepSecs != null) record.rem_sleep_minutes = Math.round(w.remSleepSecs / 60);
+      else if (w.remSleepMinutes != null) record.rem_sleep_minutes = w.remSleepMinutes;
+
+      if (w.sleepAwake != null) record.awake_during_night_minutes = Math.round(w.sleepAwake / 60);
+      else if (w.awakeSleep != null) record.awake_during_night_minutes = Math.round(w.awakeSleep / 60);
+      else if (w.awakeSleepSecs != null) record.awake_during_night_minutes = Math.round(w.awakeSleepSecs / 60);
+      else if (w.awakeMinutes != null) record.awake_during_night_minutes = w.awakeMinutes;
+
+      // SpO2
+      if (w.spO2 != null) record.spo2 = w.spO2;
+
       // HRV: try multiple field names used by Intervals.icu / wearables
       const hrvValue = w.hrv ?? w.hrvSDNN ?? w.rMSSD ?? w.morningHrv ?? w.avgHrv ?? w.lnRmssd ?? null;
       if (hrvValue != null) record.hrv = hrvValue;

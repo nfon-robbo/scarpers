@@ -52,26 +52,45 @@ const SleepCalendar = () => {
 
     const stageRows = (stagesRes.data as SleepStageRow[]) || [];
 
-    // Build set of dates already covered by sleep_stages
-    const stageDates = new Set(stageRows.map((r) => r.date));
+    // Identify dates where sleep_stages only has generic "sleep" (no real stages)
+    const dateStageTypes = new Map<string, Set<string>>();
+    for (const r of stageRows) {
+      if (!dateStageTypes.has(r.date)) dateStageTypes.set(r.date, new Set());
+      dateStageTypes.get(r.date)!.add(r.stage);
+    }
 
-    // Create fallback rows from daily_metrics for dates missing from sleep_stages
-    const fallbackRows: SleepStageRow[] = [];
+    // A date has "real" stages if it has deep, rem, or light
+    const hasRealStages = (stages: Set<string>) =>
+      stages.has("deep") || stages.has("rem") || stages.has("light");
+
+    // Build replacement/fallback rows from daily_metrics
+    const metricsReplacements: SleepStageRow[] = [];
+    const replacedDates = new Set<string>();
+
     for (const m of metricsRes.data || []) {
-      if (!stageDates.has(m.date) && m.sleep_duration_seconds) {
-        const hasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0;
-        if (hasStages) {
-          if (m.deep_sleep_minutes) fallbackRows.push({ date: m.date, stage: "deep", duration_seconds: m.deep_sleep_minutes * 60 });
-          if (m.rem_sleep_minutes) fallbackRows.push({ date: m.date, stage: "rem", duration_seconds: m.rem_sleep_minutes * 60 });
-          if (m.light_sleep_minutes) fallbackRows.push({ date: m.date, stage: "light", duration_seconds: m.light_sleep_minutes * 60 });
-          if (m.awake_during_night_minutes) fallbackRows.push({ date: m.date, stage: "awake", duration_seconds: m.awake_during_night_minutes * 60 });
+      if (!m.sleep_duration_seconds) continue;
+      const metricsHasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0;
+      const existingStages = dateStageTypes.get(m.date);
+      const existingHasReal = existingStages ? hasRealStages(existingStages) : false;
+
+      // Use daily_metrics if: no sleep_stages data, OR sleep_stages is generic but daily_metrics has real stages
+      if (!existingStages || (metricsHasStages && !existingHasReal)) {
+        if (existingStages) replacedDates.add(m.date);
+        if (metricsHasStages) {
+          if (m.deep_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "deep", duration_seconds: m.deep_sleep_minutes * 60 });
+          if (m.rem_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "rem", duration_seconds: m.rem_sleep_minutes * 60 });
+          if (m.light_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "light", duration_seconds: m.light_sleep_minutes * 60 });
+          if (m.awake_during_night_minutes) metricsReplacements.push({ date: m.date, stage: "awake", duration_seconds: m.awake_during_night_minutes * 60 });
         } else {
-          fallbackRows.push({ date: m.date, stage: "sleep", duration_seconds: m.sleep_duration_seconds as number });
+          metricsReplacements.push({ date: m.date, stage: "sleep", duration_seconds: m.sleep_duration_seconds as number });
         }
       }
     }
 
-    setRows([...stageRows, ...fallbackRows]);
+    // Filter out sleep_stages rows for dates being replaced by better daily_metrics data
+    const filteredStageRows = stageRows.filter((r) => !replacedDates.has(r.date));
+
+    setRows([...filteredStageRows, ...metricsReplacements]);
     setLoading(false);
   }, [user]);
 
