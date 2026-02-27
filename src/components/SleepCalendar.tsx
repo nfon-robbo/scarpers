@@ -68,8 +68,16 @@ const SleepCalendar = () => {
     const replacedDates = new Set<string>();
 
     for (const m of metricsRes.data || []) {
-      if (!m.sleep_duration_seconds) continue;
-      const metricsHasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0 || (m.light_sleep_minutes || 0) > 0;
+      const deepMins = Number(m.deep_sleep_minutes || 0);
+      const remMins = Number(m.rem_sleep_minutes || 0);
+      const lightMins = Number(m.light_sleep_minutes || 0);
+      const awakeMins = Number(m.awake_during_night_minutes || 0);
+      const totalSleepSecs = Number(m.sleep_duration_seconds || 0);
+
+      const metricsHasStages = deepMins > 0 || remMins > 0 || lightMins > 0;
+      const metricsHasAnySleepData = metricsHasStages || totalSleepSecs > 0;
+      if (!metricsHasAnySleepData) continue;
+
       const existingStages = dateStageTypes.get(m.date);
       const existingHasReal = existingStages ? hasRealStages(existingStages) : false;
 
@@ -77,12 +85,12 @@ const SleepCalendar = () => {
       if (!existingStages || (metricsHasStages && !existingHasReal)) {
         if (existingStages) replacedDates.add(m.date);
         if (metricsHasStages) {
-          if (m.deep_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "deep", duration_seconds: m.deep_sleep_minutes * 60 });
-          if (m.rem_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "rem", duration_seconds: m.rem_sleep_minutes * 60 });
-          if (m.light_sleep_minutes) metricsReplacements.push({ date: m.date, stage: "light", duration_seconds: m.light_sleep_minutes * 60 });
-          if (m.awake_during_night_minutes) metricsReplacements.push({ date: m.date, stage: "awake", duration_seconds: m.awake_during_night_minutes * 60 });
+          if (deepMins > 0) metricsReplacements.push({ date: m.date, stage: "deep", duration_seconds: deepMins * 60 });
+          if (remMins > 0) metricsReplacements.push({ date: m.date, stage: "rem", duration_seconds: remMins * 60 });
+          if (lightMins > 0) metricsReplacements.push({ date: m.date, stage: "light", duration_seconds: lightMins * 60 });
+          if (awakeMins > 0) metricsReplacements.push({ date: m.date, stage: "awake", duration_seconds: awakeMins * 60 });
         } else {
-          metricsReplacements.push({ date: m.date, stage: "sleep", duration_seconds: m.sleep_duration_seconds as number });
+          metricsReplacements.push({ date: m.date, stage: "sleep", duration_seconds: totalSleepSecs });
         }
       }
     }
