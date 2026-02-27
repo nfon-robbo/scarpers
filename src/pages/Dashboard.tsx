@@ -172,7 +172,7 @@ const Dashboard = () => {
     // Google Fit sleep
     try {
       const res = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST", headers, body: JSON.stringify({ days: 3 }),
+        method: "POST", headers, body: JSON.stringify({ days: 7 }),
       });
       if (res.ok) {
         const d = await res.json();
