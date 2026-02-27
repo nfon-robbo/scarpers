@@ -10,10 +10,9 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import Activities from "./pages/Activities";
-import AnalysisPage from "./pages/Analysis";
+import InsightsPage from "./pages/Insights";
 import TrainingPlanPage from "./pages/TrainingPlan";
 import Settings from "./pages/Settings";
-import WellnessPage from "./pages/Wellness";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -42,9 +41,8 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/activities" element={<Activities />} />
-              <Route path="/analysis" element={<AnalysisPage />} />
+              <Route path="/insights" element={<InsightsPage />} />
               <Route path="/training-plan" element={<TrainingPlanPage />} />
-              <Route path="/wellness" element={<WellnessPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/privacy" element={<Privacy />} />
             </Route>

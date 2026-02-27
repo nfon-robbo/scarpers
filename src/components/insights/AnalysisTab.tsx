@@ -5,11 +5,10 @@ import { streamAICoach } from "@/lib/ai-stream";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Loader2, RotateCcw, BarChart3, HeartPulse, Lightbulb, Activity, ChevronLeft, Trash2, Plus } from "lucide-react";
+import { Brain, Loader2, BarChart3, HeartPulse, Lightbulb, Activity, ChevronLeft, Trash2, Plus } from "lucide-react";
 import { format } from "date-fns";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import AIChatbot from "@/components/AIChatbot";
 
 interface SavedAnalysis {
   id: string;
@@ -17,7 +16,19 @@ interface SavedAnalysis {
   created_at: string;
 }
 
-const AnalysisPage = () => {
+const FeatureCard = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
+  <Card className="border-dashed">
+    <CardHeader className="p-4">
+      <div className="rounded-lg bg-primary/10 p-2 w-fit mb-2">
+        <Icon className="w-5 h-5 text-primary" />
+      </div>
+      <CardTitle className="text-sm">{title}</CardTitle>
+      <CardDescription className="text-xs">{desc}</CardDescription>
+    </CardHeader>
+  </Card>
+);
+
+const AnalysisTab = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState("");
@@ -65,7 +76,6 @@ const AnalysisPage = () => {
       },
       onDone: async () => {
         setLoading(false);
-        // Save to database
         const { data, error } = await supabase
           .from("analyses")
           .insert({ user_id: user.id, content: accumulated })
@@ -113,36 +123,24 @@ const AnalysisPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {view !== "list" && (
-              <Button variant="ghost" size="icon" onClick={() => { setView("list"); setSelectedId(null); setContent(""); }} className="shrink-0">
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-            )}
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Brain className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
-              AI Analysis
-            </h1>
-          </div>
-          {view === "list" && (
-            <Button onClick={runAnalysis} disabled={loading}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Analysis
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {view !== "list" && (
+            <Button variant="ghost" size="icon" onClick={() => { setView("list"); setSelectedId(null); setContent(""); }} className="shrink-0">
+              <ChevronLeft className="w-5 h-5" />
             </Button>
           )}
+          {view !== "list" && <p className="text-sm text-muted-foreground">KPI dashboard, execution, physiology & recommendations</p>}
         </div>
-        <p className="text-sm text-muted-foreground">
-          {view === "list"
-            ? "Multi-domain training analysis history"
-            : "KPI dashboard, execution, physiology & recommendations"
-          }
-        </p>
+        {view === "list" && (
+          <Button onClick={runAnalysis} disabled={loading}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Analysis
+          </Button>
+        )}
       </div>
 
-      {/* List view */}
       {view === "list" && (
         <>
           {analyses.length === 0 ? (
@@ -169,20 +167,11 @@ const AnalysisPage = () => {
                     <div className="flex items-center gap-3 min-w-0">
                       <Brain className="w-5 h-5 text-primary shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-medium text-sm">
-                          Training Analysis
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(a.created_at), "dd MMM yyyy, HH:mm")}
-                        </p>
+                        <p className="font-medium text-sm">Training Analysis</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(a.created_at), "dd MMM yyyy, HH:mm")}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => { e.stopPropagation(); setDeleteId(a.id); }}
-                    >
+                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(a.id); }}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </CardContent>
@@ -193,7 +182,6 @@ const AnalysisPage = () => {
         </>
       )}
 
-      {/* Detail / generating view */}
       {(view === "detail" || view === "generating") && (
         <Card>
           <CardContent className="p-4 sm:p-6">
@@ -215,7 +203,6 @@ const AnalysisPage = () => {
         </Card>
       )}
 
-      {/* Delete dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -228,21 +215,8 @@ const AnalysisPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AIChatbot />
     </div>
   );
 };
 
-const FeatureCard = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
-  <Card className="border-dashed">
-    <CardHeader className="p-4">
-      <div className="rounded-lg bg-primary/10 p-2 w-fit mb-2">
-        <Icon className="w-5 h-5 text-primary" />
-      </div>
-      <CardTitle className="text-sm">{title}</CardTitle>
-      <CardDescription className="text-xs">{desc}</CardDescription>
-    </CardHeader>
-  </Card>
-);
-
-export default AnalysisPage;
+export default AnalysisTab;
