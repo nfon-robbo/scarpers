@@ -69,7 +69,7 @@ const SleepCalendar = () => {
 
     for (const m of metricsRes.data || []) {
       if (!m.sleep_duration_seconds) continue;
-      const metricsHasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0;
+      const metricsHasStages = (m.deep_sleep_minutes || 0) > 0 || (m.rem_sleep_minutes || 0) > 0 || (m.light_sleep_minutes || 0) > 0;
       const existingStages = dateStageTypes.get(m.date);
       const existingHasReal = existingStages ? hasRealStages(existingStages) : false;
 
@@ -306,7 +306,7 @@ const SleepCalendar = () => {
 
               {/* Stage breakdown */}
               {(() => {
-                const hasStages = selected.stages.deep > 0 || selected.stages.rem > 0;
+                const hasStages = selected.stages.deep > 0 || selected.stages.rem > 0 || selected.stages.light > 0;
                 const stageItems = hasStages
                   ? [
                       { key: "deep" as const, label: "Deep", color: "bg-primary" },
