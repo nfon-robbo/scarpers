@@ -343,6 +343,45 @@ export type Database = {
         }
         Relationships: []
       }
+      running_iq_snapshots: {
+        Row: {
+          adjusted_score: number
+          coaching_tip: string | null
+          created_at: string
+          id: string
+          label: string
+          lowest_pillar: string | null
+          pillars: Json
+          recorded_at: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          adjusted_score: number
+          coaching_tip?: string | null
+          created_at?: string
+          id?: string
+          label: string
+          lowest_pillar?: string | null
+          pillars?: Json
+          recorded_at?: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          adjusted_score?: number
+          coaching_tip?: string | null
+          created_at?: string
+          id?: string
+          label?: string
+          lowest_pillar?: string | null
+          pillars?: Json
+          recorded_at?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       sleep_stages: {
         Row: {
           created_at: string
