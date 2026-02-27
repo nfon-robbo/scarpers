@@ -16,7 +16,7 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 import RunningIQWidget from "@/components/RunningIQWidget";
-import BodyBatteryChart from "@/components/BodyBatteryChart";
+
 
 // ── Types ──
 
@@ -419,7 +419,7 @@ const Dashboard = () => {
 
       {/* ── Running IQ ── */}
       <RunningIQWidget />
-      <BodyBatteryChart />
+      
 
       {!hasData ? (
         <Card className="border-dashed border-2 border-muted-foreground/20">
