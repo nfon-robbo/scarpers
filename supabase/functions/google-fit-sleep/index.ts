@@ -139,6 +139,11 @@ Deno.serve(async (req) => {
     const sessionsData = await sessionsRes.json();
     const sessions = sessionsData.session || [];
     console.log(`Google Fit: found ${sessions.length} sleep sessions in last ${daysBack} days`);
+    if (sessions.length === 0) {
+      console.log(`Google Fit API query: startTime=${new Date(startTimeMillis).toISOString()}, endTime=${new Date(endTimeMillis).toISOString()}, activityType=72`);
+      console.log(`Google Fit raw response keys:`, Object.keys(sessionsData));
+      if (sessionsData.deletedSession) console.log(`Google Fit: ${sessionsData.deletedSession.length} deleted sessions found`);
+    }
 
     let totalStages = 0;
 
