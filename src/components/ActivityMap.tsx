@@ -21,7 +21,7 @@ const ActivityMap = ({ track, className = "" }: Props) => {
   const mapInstance = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current || track.length < 2) return;
+    if (!mapRef.current || track.length < 1) return;
 
     // Clean up previous instance
     if (mapInstance.current) {
@@ -46,39 +46,43 @@ const ActivityMap = ({ track, className = "" }: Props) => {
       .filter((p) => p.lat != null && (p.lng != null || p.lon != null) && isFinite(p.lat) && isFinite((p.lng ?? p.lon)!))
       .map((p) => [p.lat, (p.lng ?? p.lon)!] as [number, number]);
 
-    if (latlngs.length < 2) {
+    if (latlngs.length === 0) {
       map.remove();
       mapInstance.current = null;
       return;
     }
 
-    // Draw route polyline
-    const polyline = L.polyline(latlngs, {
-      color: "hsl(152, 60%, 36%)",
-      weight: 3,
-      opacity: 0.9,
-    }).addTo(map);
-
-    // Start marker
-    const startIcon = L.divIcon({
+    const markerIcon = L.divIcon({
       html: '<div style="width:12px;height:12px;background:hsl(152,60%,36%);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
       iconSize: [12, 12],
       iconAnchor: [6, 6],
       className: "",
     });
 
-    // End marker
-    const endIcon = L.divIcon({
-      html: '<div style="width:12px;height:12px;background:hsl(0,72%,51%);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-      className: "",
-    });
+    if (latlngs.length === 1) {
+      // Single point — show marker at zoom 15
+      L.marker(latlngs[0], { icon: markerIcon }).addTo(map);
+      map.setView(latlngs[0] as L.LatLngExpression, 15);
+    } else {
+      // Draw route polyline
+      const polyline = L.polyline(latlngs, {
+        color: "hsl(152, 60%, 36%)",
+        weight: 3,
+        opacity: 0.9,
+      }).addTo(map);
 
-    L.marker(latlngs[0], { icon: startIcon }).addTo(map);
-    L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
+      L.marker(latlngs[0], { icon: markerIcon }).addTo(map);
 
-    map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+      const endIcon = L.divIcon({
+        html: '<div style="width:12px;height:12px;background:hsl(0,72%,51%);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6],
+        className: "",
+      });
+      L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
+
+      map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    }
 
     return () => {
       if (mapInstance.current) {
@@ -88,7 +92,7 @@ const ActivityMap = ({ track, className = "" }: Props) => {
     };
   }, [track]);
 
-  if (track.length < 2) return null;
+  if (track.length < 1) return null;
 
   return (
     <div

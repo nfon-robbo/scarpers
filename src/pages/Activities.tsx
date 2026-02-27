@@ -226,15 +226,22 @@ const Activities = () => {
                   {/* Expanded detail view */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t border-border space-y-4">
-                      {/* GPS Route Map */}
-                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 2 && (
+                      {/* GPS Route Map or single-point map */}
+                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 2 ? (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> Route Map
                           </p>
                           <ActivityMap track={a.raw_data.gps_track} />
                         </div>
-                      )}
+                      ) : a.latitude && a.longitude && Math.abs(a.latitude) > 0.01 && Math.abs(a.longitude) > 0.01 ? (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> Location
+                          </p>
+                          <ActivityMap track={[{ lat: a.latitude, lng: a.longitude }]} />
+                        </div>
+                      ) : null}
 
                       {/* Performance Charts */}
                       {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 10 && (
