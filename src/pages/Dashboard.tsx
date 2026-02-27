@@ -15,8 +15,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
-import ReadinessWidget from "@/components/ReadinessWidget";
-import ReadinessHistoryChart from "@/components/ReadinessHistoryChart";
+import RunningIQWidget from "@/components/RunningIQWidget";
 import BodyBatteryChart from "@/components/BodyBatteryChart";
 
 // ── Types ──
@@ -418,10 +417,9 @@ const Dashboard = () => {
         "{dailyQuote.text}" — {dailyQuote.author}
       </p>
 
-      {/* ── Readiness ── */}
-      <ReadinessWidget />
+      {/* ── Running IQ ── */}
+      <RunningIQWidget />
       <BodyBatteryChart />
-      <ReadinessHistoryChart />
 
       {!hasData ? (
         <Card className="border-dashed border-2 border-muted-foreground/20">

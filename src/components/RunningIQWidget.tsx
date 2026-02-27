@@ -1,0 +1,271 @@
+import { useEffect, useState, useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, TrendingUp, ChevronRight } from "lucide-react";
+import { computeRunningIQ, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
+import { calculateSleepScore } from "@/lib/sleep-score";
+
+// ── Large Score Display ──
+function IQGauge({ score, label }: { score: number; label: string }) {
+  const color =
+    score >= 140
+      ? "text-emerald-400"
+      : score >= 80
+      ? "text-amber-400"
+      : "text-destructive";
+
+  return (
+    <div className="flex flex-col items-end">
+      <span className={`text-6xl font-black tracking-tighter ${color}`}>
+        {score}
+      </span>
+      <span className="text-sm text-muted-foreground">/ 200</span>
+    </div>
+  );
+}
+
+// ── Pillar Bar ──
+function PillarBar({ name, score, icon, weight }: { name: string; score: number; icon: string; weight: number }) {
+  const barColor =
+    score >= 80
+      ? "bg-emerald-500"
+      : score >= 50
+      ? "bg-amber-500"
+      : "bg-destructive";
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+          <span>{icon}</span>
+          {name}
+          <span className="text-muted-foreground/60 text-[10px]">({Math.round(weight * 100)}%)</span>
+        </span>
+        <span className="text-xs font-bold">{score}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor}`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+const RunningIQWidget = () => {
+  const { user } = useAuth();
+  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [result, setResult] = useState<RunningIQResult | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const now = new Date();
+    const twelveWeeksAgo = new Date(now.getTime() - 12 * 7 * 86400000);
+    const today = now.toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    const twentyEightDaysAgo = new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0];
+
+    Promise.all([
+      // All runs in 12 weeks
+      supabase
+        .from("activities")
+        .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect")
+        .eq("user_id", user.id)
+        .gte("start_time", twelveWeeksAgo.toISOString())
+        .order("start_time", { ascending: true })
+        .then(({ data }) => data || []),
+
+      // Latest daily metrics for VO2max, RHR, HRV, sleep
+      supabase
+        .from("daily_metrics")
+        .select("date, resting_heart_rate, hrv, sleep_score, vo2_max")
+        .eq("user_id", user.id)
+        .gte("date", twentyEightDaysAgo)
+        .order("date", { ascending: false })
+        .then(({ data }) => data || []),
+
+      // Sleep stages for readiness
+      supabase
+        .from("sleep_stages")
+        .select("stage, duration_seconds, date, end_time")
+        .eq("user_id", user.id)
+        .in("date", [today, yesterday])
+        .then(({ data }) => data || []),
+
+      // Training plans for missed workouts
+      supabase
+        .from("training_plans")
+        .select("training_days, start_date")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .then(({ data }) => data || []),
+    ]).then(([activities, allMetrics, sleepStages, plans]) => {
+      const runs = (activities as any[]).map((a) => ({
+        distance_meters: a.distance_meters,
+        duration_seconds: a.duration_seconds,
+        avg_heart_rate: a.avg_heart_rate,
+        max_heart_rate: a.max_heart_rate,
+        avg_cadence: a.avg_cadence,
+        start_time: a.start_time,
+      })) as RunActivity[];
+
+      // Get latest metrics
+      const metrics = allMetrics as any[];
+      const latestWithVO2 = metrics.find((m) => m.vo2_max);
+      const rhrValues = metrics.filter((m) => m.resting_heart_rate).slice(0, 14);
+      const avgRHR = rhrValues.length
+        ? rhrValues.reduce((s: number, m: any) => s + m.resting_heart_rate, 0) / rhrValues.length
+        : null;
+      const latestHRV = metrics.find((m) => m.hrv);
+      const latestSleep = metrics.find((m) => m.sleep_score);
+
+      // Calculate readiness for adjustment
+      let readinessScore = 50;
+      try {
+        const stages = groupSleepByDate(sleepStages as any);
+        const totalSleep = stages.deep + stages.light + stages.rem;
+        const sleepScore = totalSleep > 0 ? calculateSleepScore(stages) : null;
+        const todayMetrics = metrics.find((m: any) => m.date === today);
+
+        // Simplified readiness calc
+        const readinessData: ReadinessData = {
+          sleepScore: sleepScore ?? (todayMetrics?.sleep_score ?? null),
+          sleepHours: totalSleep > 0 ? totalSleep / 3600 : null,
+          deepPct: null,
+          remPct: null,
+          rhr: todayMetrics?.resting_heart_rate ?? null,
+          rhrBaseline: avgRHR,
+          hrv: todayMetrics?.hrv ?? null,
+          hrvBaseline: null,
+          yesterdayLoad: null,
+          stressScore: null,
+          todayLoad: null,
+          recoveryHoursSinceLastHard: null,
+          lastWorkoutIntensity: null,
+          recentSleepAvgHours: null,
+          baselineSleepAvgHours: null,
+          stressHistory: [],
+          weeklyLoadAvg: null,
+          monthlyLoadAvg: null,
+          currentHour: now.getHours(),
+          wakeTimeIso: null,
+          todayActivities: [],
+        };
+        const readinessResult = computeReadiness(readinessData);
+        readinessScore = readinessResult.score;
+      } catch { /* use default 50 */ }
+
+      // Missed/planned workouts
+      let missed = 0;
+      let planned = 0;
+      if (plans.length > 0) {
+        const plan = plans[0] as any;
+        const trainingDays = plan.training_days || [];
+        // Count planned days in last 4 weeks
+        planned = trainingDays.length * 4;
+        // Count actual runs in last 4 weeks
+        const fourWeeksAgo = new Date(now.getTime() - 28 * 86400000);
+        const recentRunCount = runs.filter(
+          (r) => r.start_time && new Date(r.start_time) >= fourWeeksAgo
+        ).length;
+        missed = Math.max(0, planned - recentRunCount);
+      }
+
+      // Estimate age from profile (default 30 if unknown)
+      const ageYears = 30;
+
+      const iqResult = computeRunningIQ({
+        runs,
+        vo2Max: latestWithVO2?.vo2_max ?? null,
+        restingHR: avgRHR,
+        hrv: latestHRV?.hrv ?? null,
+        sleepScore: latestSleep?.sleep_score ?? null,
+        readinessScore,
+        ageYears,
+        gender: "UNSPECIFIED",
+        missedWorkoutsLast4Weeks: missed,
+        plannedWorkoutsLast4Weeks: planned,
+      });
+
+      setResult(iqResult);
+      setLoading(false);
+    });
+  }, [user]);
+
+  if (loading) {
+    return (
+      <Card className="glass border-border/30">
+        <CardContent className="py-12 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!result) return null;
+
+  return (
+    <div className="space-y-3 animate-fade-in">
+      {/* Main IQ Card */}
+      <Card className="glass border-border/30 overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+        <CardContent className="p-5 relative z-10">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Running IQ</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Keep running — history will appear here
+              </p>
+            </div>
+            <IQGauge score={result.adjustedScore} label={result.label} />
+          </div>
+
+          {/* Label badge */}
+          <div className="mb-5">
+            <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${
+              result.adjustedScore >= 140
+                ? "bg-emerald-500/10 text-emerald-500"
+                : result.adjustedScore >= 80
+                ? "bg-amber-500/10 text-amber-500"
+                : "bg-destructive/10 text-destructive"
+            }`}>
+              {result.label}
+            </span>
+          </div>
+
+          {/* Pillar Breakdown */}
+          <div className="space-y-3">
+            {result.pillars.map((p) => (
+              <PillarBar key={p.name} {...p} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Coaching Tip Card */}
+      <Card className="overflow-hidden border-border/30 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8" />
+        <CardContent className="p-4 flex items-start gap-3 relative z-10">
+          <div className="text-2xl mt-0.5">🏅</div>
+          <div className="flex-1">
+            <h4 className="text-xs font-bold text-foreground mb-1">
+              Focus Area: {result.lowestPillar}
+            </h4>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {result.coachingTip}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default RunningIQWidget;
