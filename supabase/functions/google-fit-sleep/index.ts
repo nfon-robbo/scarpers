@@ -204,7 +204,8 @@ Deno.serve(async (req) => {
             const stageName = SLEEP_STAGE_MAP[stageType];
             if (!stageName || stageName === "out_of_bed") continue;
 
-            const normalizedStage = stageName === "sleep" ? "light" : stageName;
+            // Keep "sleep" as-is (generic sleep without stage breakdown)
+            const normalizedStage = stageName;
             const durationSeconds = Math.round((endNanos - startNanos) / 1e9);
 
             await supabase.from("sleep_stages").insert({
@@ -223,7 +224,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Fallback: if no granular stage data, create a single "light" entry
+      // Fallback: if no granular stage data, create a single "sleep" entry
       // from the session itself so we at least capture total sleep time
       if (sessionStages === 0) {
         const durationSeconds = Math.round((sessionEnd - sessionStart) / 1000);
@@ -231,7 +232,7 @@ Deno.serve(async (req) => {
         await supabase.from("sleep_stages").insert({
           user_id: user.id,
           date: sleepDate,
-          stage: "light",
+          stage: "sleep",
           duration_seconds: durationSeconds,
           start_time: new Date(sessionStart).toISOString(),
           end_time: new Date(sessionEnd).toISOString(),

@@ -3,12 +3,15 @@
  * Based on National Sleep Foundation & Matthew Walker's research.
  * Calibrated to match Garmin-style harsh scoring.
  *
- * Components:
+ * Components (when stage data available):
  *  - Duration (25 pts): 7-9h optimal
  *  - Deep sleep % (30 pts): 15-20% optimal — HEAVIEST, critical for recovery
  *  - REM sleep % (20 pts): 20-25% optimal
  *  - Sleep efficiency (15 pts): low awake time
  *  - Continuity bonus (10 pts): penalises fragmented sleep
+ *
+ * When only generic "sleep" data is available (no stage breakdown),
+ * score is based purely on duration (scaled to 0-100).
  */
 
 export interface SleepStageData {
@@ -16,14 +19,29 @@ export interface SleepStageData {
   light: number;
   rem: number;
   awake: number;
+  sleep: number;  // generic sleep (no stage breakdown)
 }
 
 export function calculateSleepScore(stages: SleepStageData): number {
-  const total = stages.deep + stages.light + stages.rem + stages.awake;
+  const stageTotal = stages.deep + stages.light + stages.rem + stages.awake;
+  const genericSleep = stages.sleep || 0;
+  const total = stageTotal + genericSleep;
   if (total === 0) return 0;
 
+  // If we only have generic "sleep" data (no stage breakdown),
+  // score based on duration alone
+  const hasStages = stageTotal > 0;
+  if (!hasStages) {
+    const totalHours = genericSleep / 3600;
+    if (totalHours >= 7 && totalHours <= 9) return 75;
+    if (totalHours >= 6 && totalHours < 7) return Math.round(50 + 25 * ((totalHours - 6)));
+    if (totalHours > 9 && totalHours <= 10) return Math.round(65 + 10 * (10 - totalHours));
+    if (totalHours < 6) return Math.round(Math.max(15, 50 * (totalHours / 6)));
+    return 55; // >10h
+  }
+
   const totalHours = total / 3600;
-  const sleepTime = stages.deep + stages.light + stages.rem;
+  const sleepTime = stages.deep + stages.light + stages.rem + genericSleep;
   if (sleepTime === 0) return 0;
   const deepPct = (stages.deep / sleepTime) * 100;
   const remPct = (stages.rem / sleepTime) * 100;
@@ -38,7 +56,6 @@ export function calculateSleepScore(stages: SleepStageData): number {
   } else if (totalHours > 9 && totalHours <= 10) {
     durationScore = 25 * (10 - totalHours);
   } else if (totalHours < 6) {
-    // Harsh: under 6h is terrible
     durationScore = Math.max(0, 25 * (totalHours / 7) * 0.4);
   } else {
     durationScore = Math.max(0, 25 * 0.25);
@@ -49,14 +66,12 @@ export function calculateSleepScore(stages: SleepStageData): number {
   if (deepPct >= 15 && deepPct <= 25) {
     deepScore = 30;
   } else if (deepPct >= 12 && deepPct < 15) {
-    deepScore = 30 * ((deepPct - 8) / 7); // 8-15 range maps to 0-30
+    deepScore = 30 * ((deepPct - 8) / 7);
   } else if (deepPct >= 10 && deepPct < 12) {
-    deepScore = 30 * 0.35; // ~10.5 pts
+    deepScore = 30 * 0.35;
   } else if (deepPct > 25 && deepPct <= 35) {
     deepScore = Math.max(20, 30 - (deepPct - 25) * 0.5);
   } else if (deepPct < 10) {
-    // CATASTROPHIC — below 10% means almost no physical recovery
-    // 7% → ~2.1pts, 5% → ~1pts, 3% → ~0.4pts
     deepScore = Math.max(0, 30 * (deepPct / 15) * 0.15);
   } else {
     deepScore = 15;
@@ -87,7 +102,7 @@ export function calculateSleepScore(stages: SleepStageData): number {
   }
 
   // Light-heavy penalty: if light sleep dominates (>75% of sleep time), extra penalty
-  const lightPct = (stages.light / sleepTime) * 100;
+  const lightPct = ((stages.light + genericSleep) / sleepTime) * 100;
   let lightPenalty = 0;
   if (lightPct > 75) {
     lightPenalty = Math.min(10, (lightPct - 75) * 0.5);
