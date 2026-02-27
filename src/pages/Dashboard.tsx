@@ -2,12 +2,12 @@ import { useEffect, useState, useMemo } from "react";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Upload, Brain, Calendar, Activity, TrendingUp, Heart,
-  Timer, Zap, Flame, ArrowUpRight, ArrowDownRight, Minus,
-  Moon, Footprints, ChevronRight, RefreshCw,
+  Timer, Zap, Flame, Moon, Footprints, RefreshCw, Medal,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -44,7 +44,21 @@ interface MetricsRow {
   hrv: number | null;
 }
 
-// ── Shared tooltip style ──
+interface PlanRow {
+  content: string;
+  start_date: string;
+  training_days: string[];
+}
+
+// ── Motivational quotes ──
+const quotes = [
+  { text: "We run, not because we think it is doing us good, but because we enjoy it and cannot help ourselves.", author: "Sir Roger Bannister" },
+  { text: "The miracle isn't that I finished. The miracle is that I had the courage to start.", author: "John Bingham" },
+  { text: "Run when you can, walk if you have to, crawl if you must; just never give up.", author: "Dean Karnazes" },
+  { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
+  { text: "Pain is temporary. Quitting lasts forever.", author: "Lance Armstrong" },
+  { text: "The only bad workout is the one that didn't happen.", author: "Unknown" },
+];
 
 const tooltipStyle = {
   background: "hsl(var(--card))",
@@ -53,6 +67,57 @@ const tooltipStyle = {
   fontSize: 12,
   boxShadow: "0 8px 32px -8px hsl(var(--foreground) / 0.1)",
 };
+
+// ── Circular Progress Ring ──
+function ProgressRing({
+  value,
+  max,
+  size = 160,
+  strokeWidth = 10,
+}: {
+  value: number;
+  max: number;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = max > 0 ? Math.min(value / max, 1) : 0;
+  const dashOffset = circumference * (1 - progress);
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--muted))"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--destructive))"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-all duration-1000 ease-out"
+          style={{ filter: "drop-shadow(0 0 8px hsl(var(--destructive) / 0.5))" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-black tracking-tight">{value}</span>
+        <span className="text-xs text-muted-foreground">/ {max}</span>
+      </div>
+    </div>
+  );
+}
 
 // ── Dashboard ──
 
@@ -63,8 +128,14 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [metrics, setMetrics] = useState<MetricsRow[]>([]);
+  const [plan, setPlan] = useState<PlanRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+
+  const dailyQuote = useMemo(() => {
+    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+    return quotes[dayOfYear % quotes.length];
+  }, []);
 
   const handleSyncAll = async () => {
     if (!session?.access_token || syncing) return;
@@ -78,7 +149,6 @@ const Dashboard = () => {
     const baseUrl = import.meta.env.VITE_SUPABASE_URL;
 
     try {
-      // Strava
       const stravaRes = await fetch(`${baseUrl}/functions/v1/strava-import`, {
         method: "POST", headers, body: JSON.stringify({ mode: "recent" }),
       }).catch(() => null);
@@ -87,7 +157,6 @@ const Dashboard = () => {
         if (d.imported > 0) results.push(`${d.imported} Strava activities`);
       }
 
-      // Intervals.icu wellness
       const intRes = await fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
         method: "POST", headers,
       }).catch(() => null);
@@ -96,7 +165,6 @@ const Dashboard = () => {
         if (d.upserted > 0) results.push(`${d.upserted} wellness records`);
       }
 
-      // Google Fit sleep
       const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
         method: "POST", headers, body: JSON.stringify({ days: 3 }),
       }).catch(() => null);
@@ -110,7 +178,6 @@ const Dashboard = () => {
         description: results.length > 0 ? results.join(", ") : "No new data found from any source",
       });
 
-      // Refresh dashboard data
       if (results.length > 0 && user) {
         const since = new Date();
         since.setDate(since.getDate() - 56);
@@ -152,6 +219,17 @@ const Dashboard = () => {
       .then(({ data }) => {
         setMetrics((data as MetricsRow[]) || []);
         setLoading(false);
+      });
+
+    // Get latest training plan for "Today's Workout" card
+    supabase
+      .from("training_plans")
+      .select("content, start_date, training_days")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) setPlan(data[0] as PlanRow);
       });
   }, [user]);
 
@@ -210,9 +288,92 @@ const Dashboard = () => {
     };
   }, [activities]);
 
+  // Weekly progress
+  const weeklyProgress = useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const thisWeekActivities = activities.filter(
+      (a) => a.start_time && new Date(a.start_time) >= startOfWeek
+    );
+    const lastWeekStart = new Date(startOfWeek);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekActivities = activities.filter(
+      (a) => a.start_time && new Date(a.start_time) >= lastWeekStart && new Date(a.start_time) < startOfWeek
+    );
+
+    // Try to get planned workouts from training plan
+    let plannedThisWeek = 3; // default
+    if (plan?.training_days) {
+      plannedThisWeek = plan.training_days.length;
+    }
+
+    return {
+      completed: thisWeekActivities.length,
+      planned: Math.max(plannedThisWeek, thisWeekActivities.length),
+      delta: thisWeekActivities.length - lastWeekActivities.length,
+    };
+  }, [activities, plan]);
+
+  // Recent runs (last 3)
+  const recentRuns = useMemo(() => {
+    return activities
+      .filter((a) => a.distance_meters && a.duration_seconds)
+      .slice(-3)
+      .reverse()
+      .map((a, i) => {
+        const distMi = (a.distance_meters || 0) / 1609.34;
+        const durMin = (a.duration_seconds || 0) / 60;
+        const pace = distMi > 0 ? durMin / distMi : 0;
+        const paceMin = Math.floor(pace);
+        const paceSec = Math.round((pace - paceMin) * 60);
+        const colors = ["bg-emerald-500", "bg-amber-500", "bg-purple-500"];
+        return {
+          id: a.id,
+          dist: distMi.toFixed(2),
+          pace: `${paceMin}:${paceSec.toString().padStart(2, "0")}`,
+          color: colors[i % colors.length],
+          type: a.activity_type || "Run",
+        };
+      });
+  }, [activities]);
+
+  // Today's workout from plan
+  const todaysWorkout = useMemo(() => {
+    if (!plan?.content) return null;
+    const today = new Date();
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const todayName = dayNames[today.getDay()];
+
+    // Parse plan content for today's workout
+    const lines = plan.content.split("\n");
+    let capturing = false;
+    let workout: string[] = [];
+
+    for (const line of lines) {
+      if (line.toLowerCase().includes(todayName.toLowerCase()) || line.includes(today.toISOString().split("T")[0])) {
+        capturing = true;
+        continue;
+      }
+      if (capturing) {
+        if (line.match(/^(#{1,3}\s|---|\*\*Day)/)) break;
+        if (line.trim()) workout.push(line.trim());
+      }
+    }
+
+    return workout.length > 0 ? workout.slice(0, 6) : null;
+  }, [plan]);
+
+  // Latest resting HR
+  const latestRHR = useMemo(() => {
+    const withRHR = metrics.filter((m) => m.resting_heart_rate);
+    return withRHR.length > 0 ? withRHR[withRHR.length - 1].resting_heart_rate : null;
+  }, [metrics]);
+
   const hasData = stats && stats.count > 0;
 
-  // Greeting based on time of day
   const greeting = useMemo(() => {
     const h = new Date().getHours();
     if (h < 5) return "Late night";
@@ -222,54 +383,54 @@ const Dashboard = () => {
     return "Late night";
   }, []);
 
+  // AI coach focus message
+  const coachFocus = useMemo(() => {
+    if (!stats) return null;
+    const { acwr, count } = stats;
+    if (count < 3) return "Let's work on your solid — Some gaps in training detected — 3+ runs per week for 6+ weeks unlocks the best adaptations.";
+    if (acwr !== null && acwr > 1.5) return "Your training load is ramping up fast. Consider an easy week to let your body adapt and reduce injury risk.";
+    if (acwr !== null && acwr < 0.8) return "You have capacity to train harder. Gradually increase volume this week — your body is ready for more.";
+    return "You're in the sweet spot! Keep this consistent training rhythm going. Consistency beats intensity over time.";
+  }, [stats]);
+
   return (
-    <div className="space-y-6 pb-8 animate-fade-in">
-      {/* ── Hero Header ── */}
-      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 gradient-border">
-        {/* Ambient glow orbs */}
-        <div className="absolute -top-20 -right-20 w-60 h-60 bg-primary/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-accent/8 rounded-full blur-3xl animate-float" style={{ animationDelay: '3s' }} />
-        
-        <div className="relative z-10">
-          <p className="text-xs font-semibold text-primary tracking-[0.2em] uppercase mb-2">{greeting}</p>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            {profile?.name || "Athlete"}
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-md text-sm">
-            Your AI-powered endurance training command centre
-          </p>
+    <div className="space-y-4 pb-8 animate-fade-in">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          {greeting}, <span className="gradient-text">{profile?.name || "Runner"}</span>
+        </h1>
+        <div className="flex items-center gap-2">
           <Button
-            size="sm"
-            className="mt-5 gap-2 rounded-xl bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 transition-opacity glow-sm"
+            variant="ghost"
+            size="icon"
+            className="rounded-xl"
             onClick={handleSyncAll}
             disabled={syncing}
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing…" : "Sync All Sources"}
+            <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
+
+      {/* ── Motivational Quote ── */}
+      <p className="text-sm text-muted-foreground leading-relaxed italic">
+        "{dailyQuote.text}" — {dailyQuote.author}
+      </p>
 
       {/* ── Readiness ── */}
       <ReadinessWidget />
       <BodyBatteryChart />
       <ReadinessHistoryChart />
 
-      {/* ── Quick Actions ── */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <ActionCard icon={Upload} title="Import Data" desc="Upload FIT files" to="/upload" navigate={navigate} accent="primary" />
-        <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/analysis" navigate={navigate} accent="chart-2" />
-        <ActionCard icon={Calendar} title="Training Plan" desc="Generate your plan" to="/training-plan" navigate={navigate} accent="accent" />
-      </div>
-
       {!hasData ? (
         <Card className="border-dashed border-2 border-muted-foreground/20">
-          <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <div className="rounded-full bg-muted p-6 mb-6">
-              <Upload className="w-10 h-10 opacity-40" />
+          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <div className="rounded-full bg-muted p-5 mb-5">
+              <Upload className="w-8 h-8 opacity-40" />
             </div>
-            <p className="text-xl font-semibold text-foreground">No data yet</p>
-            <p className="text-sm mt-1 mb-6">Upload your first FIT file to unlock your dashboard</p>
+            <p className="text-lg font-semibold text-foreground">No data yet</p>
+            <p className="text-sm mt-1 mb-5">Upload your first FIT file to unlock your dashboard</p>
             <Button size="lg" className="gap-2 shadow-lg shadow-primary/20" onClick={() => navigate("/upload")}>
               <Upload className="w-4 h-4" />
               Import Data
@@ -278,110 +439,176 @@ const Dashboard = () => {
         </Card>
       ) : (
         <>
-          {/* ── KPI Strip ── */}
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            <KPICard
-              icon={Activity}
-              label="Activities"
-              value={`${stats.count}`}
-              sub="Last 8 weeks"
-              color="primary"
-            />
-            <KPICard
-              icon={Timer}
-              label="Total Time"
-              value={`${stats.totalHours}h`}
-              sub="Training volume"
-              color="chart-2"
-            />
-            <KPICard
-              icon={Heart}
-              label="Avg HR"
-              value={stats.avgHR ? `${stats.avgHR}` : "—"}
-              unit={stats.avgHR ? "bpm" : ""}
-              sub="Across sessions"
-              color="destructive"
-            />
-            <KPICard
-              icon={TrendingUp}
-              label="ACWR"
-              value={stats.acwr !== null ? `${stats.acwr}` : "—"}
-              sub={
-                stats.acwr !== null
-                  ? stats.acwr >= 0.8 && stats.acwr <= 1.3
-                    ? "Sweet spot"
-                    : stats.acwr > 1.5
-                    ? "High risk"
-                    : "Under-training"
-                  : "Need more data"
-              }
-              color={
-                stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
-                  ? "primary"
-                  : stats.acwr !== null && stats.acwr > 1.3
-                  ? "destructive"
-                  : "accent"
-              }
-              trend={
-                stats.acwr !== null
-                  ? stats.acwr >= 0.8 && stats.acwr <= 1.3
-                    ? "neutral"
-                    : stats.acwr > 1.3
-                    ? "up"
-                    : "down"
-                  : undefined
-              }
-            />
+          {/* ── Weekly Progress + Today's Workout ── */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Weekly Progress */}
+            <Card className="glass border-border/30">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Weekly Progress</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center pb-4 px-4">
+                <ProgressRing value={weeklyProgress.completed} max={weeklyProgress.planned} size={140} />
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Footprints className="w-3 h-3" />
+                    {weeklyProgress.completed} of {weeklyProgress.planned} workouts
+                  </p>
+                  <p className={`text-xs font-medium mt-0.5 ${weeklyProgress.delta >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                    {weeklyProgress.delta >= 0 ? "+" : ""}{weeklyProgress.delta} vs last week
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Today's Workout */}
+            <Card className="glass border-border/30">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Today's Run</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                {todaysWorkout ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-primary">{todaysWorkout[0]}</p>
+                    {todaysWorkout.slice(1, 5).map((line, i) => (
+                      <p key={i} className="text-xs text-muted-foreground leading-tight">{line}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No workout scheduled today. Enjoy your rest day! 🧘</p>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-3 text-xs gap-1.5 bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 rounded-xl"
+                  onClick={() => navigate("/training-plan")}
+                >
+                  <Calendar className="w-3 h-3" />
+                  View Plan
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* ── Load Balance Highlight ── */}
-          <Card className="overflow-hidden">
+          {/* ── Workouts This Week Summary ── */}
+          <Card className="glass border-border/30">
+            <CardContent className="flex items-center gap-4 py-4 px-5">
+              <span className="text-2xl">🏃</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold">
+                  {weeklyProgress.completed} / {weeklyProgress.planned} workouts this week
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ↓ {Math.abs(weeklyProgress.delta)} last week
+                </p>
+              </div>
+              <div className="text-sm font-bold px-3 py-1 rounded-full bg-primary/10 text-primary">
+                +{weeklyProgress.delta >= 0 ? weeklyProgress.delta : 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Recent Runs + Resting HR ── */}
+          <div className="grid grid-cols-5 gap-3">
+            {/* Recent Runs - takes 3 columns */}
+            <Card className="col-span-3 glass border-border/30">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-semibold">Recent Runs</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-2.5">
+                {recentRuns.length > 0 ? recentRuns.map((run) => (
+                  <div key={run.id} className="flex items-center gap-3">
+                    <span className={`w-2.5 h-2.5 rounded-full ${run.color}`} />
+                    <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
+                    <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
+                  </div>
+                )) : (
+                  <p className="text-xs text-muted-foreground">No recent runs yet</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Resting HR + Recovery Tip - takes 2 columns */}
+            <div className="col-span-2 space-y-3">
+              <Card className="glass border-border/30">
+                <CardContent className="p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Hydrate well today to aid your recovery</p>
+                </CardContent>
+              </Card>
+
+              <Card className="glass border-border/30">
+                <CardContent className="p-4 flex flex-col items-center">
+                  <Heart className="w-5 h-5 text-destructive mb-1" />
+                  <p className="text-2xl font-black">{latestRHR ?? "—"}<span className="text-sm font-normal text-muted-foreground ml-1">bpm</span></p>
+                  <p className="text-[10px] text-muted-foreground">Resting HR</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* ── AI Coach Training Focus ── */}
+          {coachFocus && (
+            <Card className="overflow-hidden border-border/30 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8" />
+              <CardContent className="p-5 flex items-start gap-4 relative z-10">
+                <div className="text-3xl">🏅</div>
+                <div>
+                  <h3 className="text-sm font-bold mb-1">AI Coach Training Focus</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{coachFocus}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Quick Actions ── */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ActionCard icon={Upload} title="Import Data" desc="Upload FIT files" to="/upload" navigate={navigate} />
+            <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/analysis" navigate={navigate} />
+            <ActionCard icon={Calendar} title="Training Plan" desc="Generate your plan" to="/training-plan" navigate={navigate} />
+          </div>
+
+          {/* ── KPI Strip ── */}
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <KPICard icon={Activity} label="Activities" value={`${stats.count}`} sub="Last 8 weeks" />
+            <KPICard icon={Timer} label="Total Time" value={`${stats.totalHours}h`} sub="Training volume" />
+            <KPICard icon={Heart} label="Avg HR" value={stats.avgHR ? `${stats.avgHR}` : "—"} unit={stats.avgHR ? "bpm" : ""} sub="Across sessions" />
+            <KPICard icon={TrendingUp} label="ACWR" value={stats.acwr !== null ? `${stats.acwr}` : "—"} sub={
+              stats.acwr !== null
+                ? stats.acwr >= 0.8 && stats.acwr <= 1.3 ? "Sweet spot" : stats.acwr > 1.5 ? "High risk" : "Under-training"
+                : "Need more data"
+            } />
+          </div>
+
+          {/* ── Load Balance ── */}
+          <Card className="overflow-hidden glass border-border/30">
             <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
               <LoadStat label="Acute Load" value={stats.acuteLoad} unit="min" sub="Last 7 days" />
               <LoadStat label="Chronic Load" value={stats.chronicLoad} unit="min/wk" sub="Last 28 days" />
-              <div className="p-6 flex flex-col items-center justify-center text-center">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">ACWR Ratio</p>
-                <p className={`text-4xl font-black tracking-tight ${
+              <div className="p-5 flex flex-col items-center justify-center text-center">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">ACWR</p>
+                <p className={`text-3xl font-black tracking-tight ${
                   stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
-                    ? "text-primary"
-                    : stats.acwr !== null && stats.acwr > 1.5
-                    ? "text-destructive"
-                    : "text-accent"
-                }`}>
-                  {stats.acwr ?? "—"}
-                </p>
-                <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+                    ? "text-primary" : stats.acwr !== null && stats.acwr > 1.5 ? "text-destructive" : "text-accent"
+                }`}>{stats.acwr ?? "—"}</p>
+                <div className={`mt-1.5 inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${
                   stats.acwr !== null && stats.acwr >= 0.8 && stats.acwr <= 1.3
-                    ? "bg-primary/10 text-primary"
-                    : stats.acwr !== null && stats.acwr > 1.5
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-accent/10 text-accent"
+                    ? "bg-primary/10 text-primary" : stats.acwr !== null && stats.acwr > 1.5 ? "bg-destructive/10 text-destructive" : "bg-accent/10 text-accent"
                 }`}>
                   {stats.acwr !== null
-                    ? stats.acwr >= 0.8 && stats.acwr <= 1.3
-                      ? "✅ Optimal zone"
-                      : stats.acwr > 1.5
-                      ? "⚠️ Injury risk"
-                      : "📉 Build more"
+                    ? stats.acwr >= 0.8 && stats.acwr <= 1.3 ? "✅ Optimal" : stats.acwr > 1.5 ? "⚠️ Injury risk" : "📉 Build more"
                     : "Insufficient data"}
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* ── Charts Grid ── */}
+          {/* ── Charts ── */}
           <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard
-              icon={<Zap className="w-4 h-4" />}
-              title="Weekly Training Load"
-              description="Minutes per week"
-              iconColor="text-primary"
-            >
-              <ResponsiveContainer width="100%" height={220}>
+            <ChartCard icon={<Zap className="w-4 h-4" />} title="Weekly Training Load" description="Minutes per week" iconColor="text-primary">
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={stats.weeks} barCategoryGap="20%">
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} cursor={{ fill: "hsl(var(--muted))" }} />
                   <defs>
                     <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
@@ -394,17 +621,12 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard
-              icon={<Heart className="w-4 h-4" />}
-              title="Heart Rate Trend"
-              description="Average HR per session"
-              iconColor="text-destructive"
-            >
-              <ResponsiveContainer width="100%" height={220}>
+            <ChartCard icon={<Heart className="w-4 h-4" />} title="Heart Rate Trend" description="Average HR per session" iconColor="text-destructive">
+              <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={stats.hrTrend}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
                   <defs>
                     <linearGradient id="hrGrad" x1="0" y1="0" x2="0" y2="1">
@@ -421,27 +643,21 @@ const Dashboard = () => {
           {/* ── Wellness Charts ── */}
           {metrics.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+              <h2 className="text-base font-semibold tracking-tight flex items-center gap-2">
                 <Moon className="w-4 h-4 text-primary" />
                 Wellness Trends
               </h2>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                {/* Sleep Score */}
-                <ChartCard
-                  icon={<Moon className="w-4 h-4" />}
-                  title="Sleep Score"
-                  description="Daily sleep quality"
-                  iconColor="text-primary"
-                >
-                  <ResponsiveContainer width="100%" height={200}>
+                <ChartCard icon={<Moon className="w-4 h-4" />} title="Sleep Score" description="Daily sleep quality" iconColor="text-primary">
+                  <ResponsiveContainer width="100%" height={180}>
                     <AreaChart data={metrics.filter(m => m.sleep_score != null).map(m => ({
                       date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
                       score: m.sleep_score,
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
                       <defs>
                         <linearGradient id="sleepGrad" x1="0" y1="0" x2="0" y2="1">
@@ -454,21 +670,15 @@ const Dashboard = () => {
                   </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Steps */}
-                <ChartCard
-                  icon={<Footprints className="w-4 h-4" />}
-                  title="Daily Steps"
-                  description="Step count trend"
-                  iconColor="text-primary"
-                >
-                  <ResponsiveContainer width="100%" height={200}>
+                <ChartCard icon={<Footprints className="w-4 h-4" />} title="Daily Steps" description="Step count trend" iconColor="text-primary">
+                  <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={metrics.filter(m => m.steps != null).map(m => ({
                       date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
                       steps: m.steps,
                     }))} barCategoryGap="15%">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
                       <defs>
                         <linearGradient id="stepsGrad" x1="0" y1="0" x2="0" y2="1">
@@ -482,22 +692,16 @@ const Dashboard = () => {
                 </ChartCard>
               </div>
 
-              {/* Resting HR */}
               {metrics.some(m => m.resting_heart_rate != null) && (
-                <ChartCard
-                  icon={<Heart className="w-4 h-4" />}
-                  title="Resting Heart Rate"
-                  description="Daily resting HR trend"
-                  iconColor="text-destructive"
-                >
-                  <ResponsiveContainer width="100%" height={180}>
+                <ChartCard icon={<Heart className="w-4 h-4" />} title="Resting Heart Rate" description="Daily resting HR trend" iconColor="text-destructive">
+                  <ResponsiveContainer width="100%" height={160}>
                     <LineChart data={metrics.filter(m => m.resting_heart_rate != null).map(m => ({
                       date: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
                       rhr: Math.round(m.resting_heart_rate!),
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                      <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                      <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "hsl(var(--foreground))" }} />
                       <Line type="monotone" dataKey="rhr" stroke="hsl(var(--destructive))" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "hsl(var(--destructive))" }} />
                     </LineChart>
@@ -515,61 +719,55 @@ const Dashboard = () => {
 // ── Sub-components ──
 
 const ActionCard = ({
-  icon: Icon, title, desc, to, navigate, accent,
+  icon: Icon, title, desc, to, navigate,
 }: {
-  icon: any; title: string; desc: string; to: string; navigate: (to: string) => void; accent: string;
+  icon: any; title: string; desc: string; to: string; navigate: (to: string) => void;
 }) => (
   <Card
     className="group cursor-pointer glass card-hover border-border/30 hover:border-primary/30"
     onClick={() => navigate(to)}
   >
-    <CardHeader className="flex flex-row items-center gap-3 p-4">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center group-hover:from-primary/25 group-hover:to-accent/15 transition-all duration-300">
-        <Icon className="w-5 h-5 text-primary" />
+    <CardContent className="flex items-center gap-3 p-4">
+      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 flex items-center justify-center group-hover:from-primary/25 group-hover:to-accent/15 transition-all duration-300">
+        <Icon className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-        <CardDescription className="text-xs">{desc}</CardDescription>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-[11px] text-muted-foreground">{desc}</p>
       </div>
       <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
-    </CardHeader>
+    </CardContent>
   </Card>
 );
 
 const KPICard = ({
-  icon: Icon, label, value, unit, sub, color, trend,
+  icon: Icon, label, value, unit, sub,
 }: {
-  icon: any; label: string; value: string; unit?: string; sub: string; color: string; trend?: "up" | "down" | "neutral";
+  icon: any; label: string; value: string; unit?: string; sub: string;
 }) => (
-  <Card className="group glass card-hover overflow-hidden relative border-border/30">
-    <div className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-${color} to-${color}/50`} />
-    <CardContent className="p-4 pt-5">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`w-8 h-8 rounded-lg bg-${color}/10 flex items-center justify-center`}>
-          <Icon className={`w-4 h-4 text-${color}`} />
-        </div>
-        {trend === "up" && <ArrowUpRight className="w-4 h-4 text-destructive" />}
-        {trend === "down" && <ArrowDownRight className="w-4 h-4 text-accent" />}
-        {trend === "neutral" && <Minus className="w-4 h-4 text-primary" />}
+  <Card className="glass border-border/30 overflow-hidden">
+    <CardContent className="p-4">
+      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
+        <Icon className="w-3.5 h-3.5 text-primary" />
       </div>
       <div className="flex items-baseline gap-1">
-        <p className="text-2xl font-black tracking-tight">{value}</p>
-        {unit && <span className="text-sm font-medium text-muted-foreground">{unit}</span>}
+        <p className="text-xl font-black tracking-tight">{value}</p>
+        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
       </div>
-      <p className="text-xs font-semibold text-muted-foreground mt-1">{label}</p>
-      <p className="text-[11px] text-muted-foreground/60 mt-0.5">{sub}</p>
+      <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">{label}</p>
+      <p className="text-[10px] text-muted-foreground/60">{sub}</p>
     </CardContent>
   </Card>
 );
 
 const LoadStat = ({ label, value, unit, sub }: { label: string; value: number; unit: string; sub: string }) => (
-  <div className="p-6 text-center">
-    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
+  <div className="p-5 text-center">
+    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
     <div className="flex items-baseline justify-center gap-1">
-      <p className="text-3xl font-black tracking-tight">{value}</p>
-      <span className="text-sm font-medium text-muted-foreground">{unit}</span>
+      <p className="text-2xl font-black tracking-tight">{value}</p>
+      <span className="text-xs text-muted-foreground">{unit}</span>
     </div>
-    <p className="text-xs text-muted-foreground/70 mt-1">{sub}</p>
+    <p className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}</p>
   </div>
 );
 
@@ -578,15 +776,15 @@ const ChartCard = ({
 }: {
   icon: React.ReactNode; title: string; description: string; iconColor: string; children: React.ReactNode;
 }) => (
-  <Card className="overflow-hidden glass border-border/30 card-hover">
-    <CardHeader className="pb-2">
+  <Card className="overflow-hidden glass border-border/30">
+    <CardHeader className="pb-1 pt-4 px-4">
       <CardTitle className="text-sm font-semibold flex items-center gap-2">
         <span className={iconColor}>{icon}</span>
         {title}
       </CardTitle>
-      <CardDescription className="text-xs">{description}</CardDescription>
+      <p className="text-[11px] text-muted-foreground">{description}</p>
     </CardHeader>
-    <CardContent className="pr-2">
+    <CardContent className="pr-2 pb-3 px-4">
       {children}
     </CardContent>
   </Card>
