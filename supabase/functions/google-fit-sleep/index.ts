@@ -166,9 +166,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             aggregateBy: [
-              {
-                dataTypeName: "com.google.sleep.segment",
-              },
+              { dataTypeName: "com.google.sleep.segment" },
             ],
             startTimeMillis: sessionStart,
             endTimeMillis: sessionEnd,
@@ -192,6 +190,8 @@ Deno.serve(async (req) => {
         .eq("source", "google_fit");
 
       const buckets = datasetData.bucket || [];
+      let sessionStages = 0;
+
       for (const bucket of buckets) {
         for (const dataset of bucket.dataset || []) {
           for (const point of dataset.point || []) {
@@ -204,7 +204,6 @@ Deno.serve(async (req) => {
             const stageName = SLEEP_STAGE_MAP[stageType];
             if (!stageName || stageName === "out_of_bed") continue;
 
-            // Normalize "sleep" to "light"
             const normalizedStage = stageName === "sleep" ? "light" : stageName;
             const durationSeconds = Math.round((endNanos - startNanos) / 1e9);
 
@@ -218,9 +217,27 @@ Deno.serve(async (req) => {
               source: "google_fit",
             });
 
+            sessionStages++;
             totalStages++;
           }
         }
+      }
+
+      // Fallback: if no granular stage data, create a single "light" entry
+      // from the session itself so we at least capture total sleep time
+      if (sessionStages === 0) {
+        const durationSeconds = Math.round((sessionEnd - sessionStart) / 1000);
+        console.log(`No stage data for session ${session.id}, creating fallback entry (${durationSeconds}s)`);
+        await supabase.from("sleep_stages").insert({
+          user_id: user.id,
+          date: sleepDate,
+          stage: "light",
+          duration_seconds: durationSeconds,
+          start_time: new Date(sessionStart).toISOString(),
+          end_time: new Date(sessionEnd).toISOString(),
+          source: "google_fit",
+        });
+        totalStages++;
       }
     }
 
