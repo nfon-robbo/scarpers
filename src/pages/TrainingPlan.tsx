@@ -1029,9 +1029,9 @@ const TrainingPlanPage = () => {
               <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                 <li>Click <strong className="text-foreground">Sync to intervals.icu</strong> above to push all workouts directly to your intervals.icu calendar</li>
                 <li>Open <a href="https://intervals.icu" target="_blank" rel="noopener noreferrer" className="text-primary underline">intervals.icu</a> → check your <strong className="text-foreground">Calendar</strong> to see the planned workouts</li>
-                <li>Connect your <strong className="text-foreground">Garmin/Amazfit</strong> account in intervals.icu settings to sync planned workouts to your watch</li>
+                <li>Connect your watch account in intervals.icu settings to sync planned workouts to your watch</li>
               </ol>
-              <p className="text-xs text-muted-foreground mt-3">intervals.icu is free and supports direct sync to Garmin, Wahoo, and other devices. For Amazfit, you can also use the "Copy for Zepp" buttons to manually enter workouts in the Zepp app.</p>
+              <p className="text-xs text-muted-foreground mt-3">intervals.icu is free and supports direct sync to Garmin, Wahoo, and other devices.</p>
             </CardContent>
           )}
         </Card>
