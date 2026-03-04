@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-api-key, x-user-id, automation-name, automation-id, automation-aggregation, automation-period, session-id",
+    "authorization, x-client-info, apikey, content-type, x-user-id",
 };
 
 // Map Health Auto Export sleep stage values to our internal stage names
@@ -31,27 +31,10 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const APPLE_HEALTH_API_KEY = Deno.env.get("APPLE_HEALTH_API_KEY");
 
   try {
-    // ── Auth: X-API-Key header + X-User-Id header ──
-    const apiKey = req.headers.get("x-api-key") || req.headers.get("X-API-Key");
+    // ── Auth: X-User-Id header identifies the user ──
     const userId = req.headers.get("x-user-id") || req.headers.get("X-User-Id");
-
-    if (!APPLE_HEALTH_API_KEY) {
-      console.error("APPLE_HEALTH_API_KEY secret not configured");
-      return new Response(JSON.stringify({ error: "Server not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!apiKey || apiKey !== APPLE_HEALTH_API_KEY) {
-      return new Response(JSON.stringify({ error: "Invalid API key" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing X-User-Id header" }), {
