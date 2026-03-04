@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnitOption<K extends keyof UnitPreferences> {
