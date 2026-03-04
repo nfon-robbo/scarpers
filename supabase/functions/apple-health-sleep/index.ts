@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-api-key, x-user-id, automation-name, automation-id, automation-aggregation, automation-period, session-id",
+    "authorization, x-client-info, apikey, content-type, x-user-id",
 };
 
 // Map Health Auto Export sleep stage values to our internal stage names
