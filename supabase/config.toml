@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.android-coach]
 verify_jwt = false
+
+[functions.apple-health-sleep]
+verify_jwt = false
