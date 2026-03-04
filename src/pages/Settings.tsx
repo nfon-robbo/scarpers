@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnitOption<K extends keyof UnitPreferences> {
@@ -96,6 +97,16 @@ const Settings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-health-sleep`;
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+    toast({ title: "Copied to clipboard" });
+  };
 
   // Auto-sync state
   const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
@@ -400,6 +411,54 @@ const Settings = () => {
           </p>
         </CardContent>
       </Card>
+
+      {/* Apple Health Setup Card */}
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Apple className="w-5 h-5" />
+              Apple Health (Auto Export)
+            </CardTitle>
+            <CardDescription>
+              Connect sleep data from your iPhone using the{" "}
+              <a href="https://apps.apple.com/app/health-auto-export/id1115567461" target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                Health Auto Export
+              </a>{" "}app
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Webhook URL</label>
+              <div className="flex gap-2">
+                <Input value={webhookUrl} readOnly className="font-mono text-xs" />
+                <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl, "url")}>
+                  {copiedField === "url" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Your User ID</label>
+              <div className="flex gap-2">
+                <Input value={user.id} readOnly className="font-mono text-xs" />
+                <Button variant="outline" size="icon" onClick={() => copyToClipboard(user.id, "uid")}>
+                  {copiedField === "uid" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Setup in Health Auto Export:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>New Automation → REST API</li>
+                <li>Paste the <strong>Webhook URL</strong> above</li>
+                <li>Add header: <code className="bg-background px-1 rounded">X-User-Id</code> → paste your <strong>User ID</strong></li>
+                <li>Data Type → Health Metrics → select <strong>Sleep Analysis</strong></li>
+                <li>Export Format → JSON, Summarize Data → OFF</li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
