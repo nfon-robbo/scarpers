@@ -97,6 +97,16 @@ const Settings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-health-sleep`;
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+    toast({ title: "Copied to clipboard" });
+  };
 
   // Auto-sync state
   const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
