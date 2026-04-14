@@ -63,53 +63,72 @@ function extractTotalMinutes(description: string): number {
 }
 
 /**
+ * Map workout type + segment role to an HR zone string for intervals.icu.
+ */
+function inferHrZone(workoutType: string, segmentRole: string): string {
+  const role = segmentRole.toLowerCase();
+  if (/warm|cool|walk/i.test(role)) return "Z1";
+  if (/stride|pickup/i.test(role)) return "Z4";
+  if (/rest|recover/i.test(role)) return "Z1";
+
+  const t = workoutType.toLowerCase();
+  if (/race\s*pace|race/i.test(t)) return "Z4";
+  if (/tempo/i.test(t)) return "Z3";
+  if (/long/i.test(t)) return "Z2";
+  // Easy / default
+  return "Z2";
+}
+
+/**
  * Convert a workout description into structured segments for the app format.
  */
 function descriptionToSegments(type: string, description: string, targetPace: string): Array<{
   segment: string;
   duration: string;
   target: string;
+  hrZone: string;
   notes: string;
 }> {
-  const segments: Array<{ segment: string; duration: string; target: string; notes: string }> = [];
+  const segments: Array<{ segment: string; duration: string; target: string; hrZone: string; notes: string }> = [];
   const desc = description.toLowerCase();
 
   // Check for structured workouts with warm-up → main → cool-down
   const arrowParts = description.split(/→|➜|->/).map(p => p.trim());
 
   if (arrowParts.length >= 3) {
-    // Structured workout: warm-up → intervals/tempo → cool-down
     for (let i = 0; i < arrowParts.length; i++) {
       const part = arrowParts[i];
       const durMatch = part.match(/(\d+)\s*min/i);
       const dur = durMatch ? `${durMatch[1]} min` : "5 min";
 
       if (i === 0) {
-        segments.push({ segment: "Warm-up", duration: dur, target: "Easy jog", notes: "" });
+        segments.push({ segment: "Warm-up", duration: dur, target: "Easy jog", hrZone: "Z1", notes: "" });
       } else if (i === arrowParts.length - 1) {
-        segments.push({ segment: "Cool-down", duration: dur, target: "Easy jog", notes: "" });
+        segments.push({ segment: "Cool-down", duration: dur, target: "Easy jog", hrZone: "Z1", notes: "" });
       } else {
-        // Check for intervals: "2 × 8 min at tempo" or "3 × 6 min at race pace"
         const intervalMatch = part.match(/(\d+)\s*[x×]\s*(\d+)\s*min/i);
         const restMatch = part.match(/(\d+)\s*min\s*(?:easy\s*)?(?:jog\s*)?recover/i);
-        
+
         if (intervalMatch) {
           const reps = parseInt(intervalMatch[1], 10);
           const workMin = parseInt(intervalMatch[2], 10);
           const restMin = restMatch ? parseInt(restMatch[1], 10) : 2;
+          const mainZone = /tempo/i.test(part) ? "Z3" : /race\s*pace/i.test(part) ? "Z4" : "Z4";
           segments.push({
             segment: "Main",
             duration: `${reps} x ${workMin} min / ${restMin} min rest`,
             target: /tempo/i.test(part) ? "Tempo effort" : /race\s*pace/i.test(part) ? "Race pace" : "Hard effort",
+            hrZone: mainZone,
             notes: "",
           });
         } else {
-          // Single block (e.g. "20 min CONTINUOUS at goal race pace")
           const contMatch = part.match(/(\d+)\s*min/i);
+          const mainZone = /tempo/i.test(part) ? "Z3" : /race\s*pace/i.test(part) ? "Z4" : inferHrZone(type, "Main");
           segments.push({
             segment: "Main",
             duration: contMatch ? `${contMatch[1]} min` : dur,
             target: /tempo/i.test(part) ? "Tempo effort" : /race\s*pace/i.test(part) ? "Race pace" : "Moderate effort",
+            hrZone: mainZone,
             notes: "",
           });
         }
@@ -118,24 +137,24 @@ function descriptionToSegments(type: string, description: string, targetPace: st
     return segments;
   }
 
-  // Check for pickups pattern: "In the final X minutes, do Y × Z sec pickups"
+  // Check for pickups pattern
   const pickupsMatch = description.match(/(\d+)\s*(?:short\s*)?(\d+)[\s-]*sec(?:ond)?\s*pickups?/i) ||
                        description.match(/(\d+)\s*[x×]\s*(\d+)[\s-]*sec/i);
 
   if (pickupsMatch && /pickup/i.test(description)) {
     const totalMin = extractTotalMinutes(description);
     const pickupSec = parseInt(pickupsMatch[2] || pickupsMatch[1], 10);
-    segments.push({ segment: "Warm-up", duration: "5 min", target: "Easy", notes: "" });
-    segments.push({ segment: "Main", duration: `${totalMin - 10} min`, target: "Easy run", notes: "" });
-    segments.push({ segment: "Strides", duration: `${pickupsMatch[1] || 4} x ${pickupSec} sec`, target: "Fast pickups", notes: "60 sec easy between" });
-    segments.push({ segment: "Cool-down", duration: "5 min", target: "Easy", notes: "" });
+    segments.push({ segment: "Warm-up", duration: "5 min", target: "Easy", hrZone: "Z1", notes: "" });
+    segments.push({ segment: "Main", duration: `${totalMin - 10} min`, target: "Easy run", hrZone: "Z2", notes: "" });
+    segments.push({ segment: "Strides", duration: `${pickupsMatch[1] || 4} x ${pickupSec} sec`, target: "Fast pickups", hrZone: "Z4", notes: "60 sec easy between" });
+    segments.push({ segment: "Cool-down", duration: "5 min", target: "Easy", hrZone: "Z1", notes: "" });
     return segments;
   }
 
   // Simple continuous run
   const totalMin = extractTotalMinutes(description);
-  
-  // Check if warm-up/cool-down walk is mentioned
+  const mainZone = inferHrZone(type, "Main");
+
   const warmUpMatch = description.match(/(\d+)\s*min\s*warm[\s-]*up\s*walk/i);
   const coolDownMatch = description.match(/(\d+)\s*min\s*cool[\s-]*down\s*walk/i);
 
@@ -143,11 +162,11 @@ function descriptionToSegments(type: string, description: string, targetPace: st
     const wuMin = warmUpMatch ? parseInt(warmUpMatch[1], 10) : 0;
     const cdMin = coolDownMatch ? parseInt(coolDownMatch[1], 10) : 0;
     const mainMin = totalMin - wuMin - cdMin;
-    if (wuMin > 0) segments.push({ segment: "Warm-up", duration: `${wuMin} min`, target: "Walk", notes: "" });
-    segments.push({ segment: "Main", duration: `${mainMin > 0 ? mainMin : totalMin} min`, target: `Easy run @ ${targetPace}/mi`, notes: description.slice(0, 80) });
-    if (cdMin > 0) segments.push({ segment: "Cool-down", duration: `${cdMin} min`, target: "Walk", notes: "" });
+    if (wuMin > 0) segments.push({ segment: "Warm-up", duration: `${wuMin} min`, target: "Walk", hrZone: "Z1", notes: "" });
+    segments.push({ segment: "Main", duration: `${mainMin > 0 ? mainMin : totalMin} min`, target: `Easy run @ ${targetPace}/mi`, hrZone: mainZone, notes: description.slice(0, 80) });
+    if (cdMin > 0) segments.push({ segment: "Cool-down", duration: `${cdMin} min`, target: "Walk", hrZone: "Z1", notes: "" });
   } else {
-    segments.push({ segment: "Main", duration: `${totalMin} min`, target: `${type} @ ${targetPace}/mi`, notes: description.slice(0, 100) });
+    segments.push({ segment: "Main", duration: `${totalMin} min`, target: `${type} @ ${targetPace}/mi`, hrZone: mainZone, notes: description.slice(0, 100) });
   }
 
   return segments;
