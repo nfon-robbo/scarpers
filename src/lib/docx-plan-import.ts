@@ -6,7 +6,7 @@
  * with parseWorkoutsFromPlan() and intervals.icu sync.
  */
 
-import mammoth from "mammoth";
+import * as mammoth from "mammoth";
 
 interface ImportedWorkout {
   date: Date;
