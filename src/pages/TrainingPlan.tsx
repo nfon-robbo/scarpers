@@ -647,7 +647,8 @@ const TrainingPlanPage = () => {
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
-        return { date: dateStr, name: correctedName, description, steps, notes };
+        // Pass native intervals.icu text if available (from DOCX import)
+        return { date: dateStr, name: correctedName, description, steps, notes, rawDescription: w.intervalsText };
       });
 
       // Calculate date range for clearing
