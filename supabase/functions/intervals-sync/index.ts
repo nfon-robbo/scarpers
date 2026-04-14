@@ -120,7 +120,7 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build bulk events using timed intervals (no HR targets)
+    // Step 2: Build bulk events with HR targets in workout description
     const bulkEvents = workouts.map((workout, idx) => {
       function fmtDur(secs: number): string {
         const m = Math.floor(secs / 60);
@@ -130,36 +130,45 @@ serve(async (req) => {
         return `${s}s`;
       }
 
-      // Build workout text with plain timed steps (no HR zones)
+      function fmtHr(step: { hrLow: number; hrHigh: number }): string {
+        if (step.hrLow > 0 && step.hrHigh > 0) {
+          return ` ${step.hrLow}-${step.hrHigh}bpm`;
+        }
+        return "";
+      }
+
       const steps = workout.steps;
       const lines: string[] = [];
       let i = 0;
-
       let prevIntensity = "";
+
       while (i < steps.length) {
         const s = steps[i];
 
         if (s.intensity === "Warmup") {
           if (prevIntensity !== "Warmup") lines.push("Warmup");
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
           prevIntensity = "Warmup";
           i++;
         } else if (s.intensity === "Cooldown") {
           if (prevIntensity !== "Cooldown") { lines.push(""); lines.push("Cooldown"); }
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
           prevIntensity = "Cooldown";
           i++;
         } else if (s.intensity === "Interval") {
           let reps = 0;
           let j = i;
           const workDur = s.duration;
+          const workHr = { hrLow: s.hrLow, hrHigh: s.hrHigh };
           let restDur = 0;
+          let restHr = { hrLow: 0, hrHigh: 0 };
 
           while (j < steps.length && steps[j].intensity === "Interval" &&
                  steps[j].duration === workDur) {
             reps++;
             if (j + 1 < steps.length && (steps[j + 1].intensity === "Recovery" || steps[j + 1].intensity === "Rest")) {
               restDur = steps[j + 1].duration;
+              restHr = { hrLow: steps[j + 1].hrLow, hrHigh: steps[j + 1].hrHigh };
               j += 2;
             } else {
               j++;
@@ -170,19 +179,18 @@ serve(async (req) => {
           if (reps > 1) {
             lines.push("");
             lines.push(`${reps}x`);
-            lines.push(`- ${fmtDur(workDur)}`);
-            if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest`);
+            lines.push(`- ${fmtDur(workDur)}${fmtHr(workHr)}`);
+            if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest${fmtHr(restHr)}`);
             i = j;
           } else {
             if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
-            lines.push(`- ${fmtDur(s.duration)}`);
+            lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
             i++;
           }
           prevIntensity = "Active";
         } else {
-          // Active / generic steps
           if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
-          lines.push(`- ${fmtDur(s.duration)}`);
+          lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
           prevIntensity = "Active";
           i++;
         }
