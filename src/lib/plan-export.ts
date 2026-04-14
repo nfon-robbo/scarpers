@@ -24,6 +24,7 @@ export interface ParsedWorkout {
   title: string;      // e.g. "Easy Recovery Run (30 min)"
   segments: ParsedSegment[];
   rawText: string;    // full markdown text of this workout
+  intervalsText?: string; // Native intervals.icu workout text block (from DOCX import)
 }
 
 /**
@@ -129,12 +130,20 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
       // Capture raw text
       const rawText = lines.slice(startLine, i).join("\n");
 
+      // Extract native intervals.icu text from ~~~intervals code blocks
+      let intervalsText: string | undefined;
+      const intervalsMatch = rawText.match(/~~~intervals\n([\s\S]*?)~~~/);
+      if (intervalsMatch) {
+        intervalsText = intervalsMatch[1].trim();
+      }
+
       workouts.push({
         date: dateStr,
         dateObj,
         title,
         segments,
         rawText,
+        intervalsText,
       });
       continue;
     }
