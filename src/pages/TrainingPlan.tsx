@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
@@ -11,7 +11,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanCalendarView from "@/components/PlanCalendarView";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
+import { importDocxPlan } from "@/lib/docx-plan-import";
 
 interface ApiStep {
   duration: number;
@@ -149,6 +150,8 @@ const TrainingPlanPage = () => {
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
   const [postAnalyzing, setPostAnalyzing] = useState(false);
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -692,6 +695,47 @@ const TrainingPlanPage = () => {
     toast({ title: "Calendar downloaded!" });
   };
 
+  const handleImportDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+
+    if (!file.name.endsWith(".docx")) {
+      toast({ title: "Invalid file", description: "Please select a .docx Word document.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const result = await importDocxPlan(file);
+      
+      // Update state with imported plan metadata
+      setRaceDistance(result.raceDistance);
+      setTrainingDays(result.trainingDays);
+      setStartDate(new Date(result.startDate));
+      setRaceDate(new Date(result.endDate));
+      setLetAIDecide(false);
+      setContent(result.markdown);
+      
+      // Save to database
+      await savePlan(result.markdown);
+
+      toast({
+        title: `Imported ${result.workoutCount} workouts!`,
+        description: `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Could not parse the document.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const showConfig = !content && !loading;
 
   if (initialLoading) {
@@ -796,19 +840,47 @@ const TrainingPlanPage = () => {
         </>
       )}
       {(showConfig || loading) && (
-        <Button onClick={generatePlan} disabled={loading} size="lg" className="w-full sm:w-auto">
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Calendar className="w-4 h-4 mr-2" />
-              Generate Plan
-            </>
-          )}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={generatePlan} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4 mr-2" />
+                Generate Plan
+              </>
+            )}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx"
+            onChange={handleImportDocx}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={loading || importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <FileUp className="w-4 h-4 mr-2" />
+                Import .docx Plan
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
       {showConfig && (
