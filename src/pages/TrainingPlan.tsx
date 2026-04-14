@@ -25,6 +25,7 @@ interface ApiStep {
   duration: number;
   hrLow: number;
   hrHigh: number;
+  hrZone?: string;
   intensity: string;
 }
 
@@ -43,10 +44,7 @@ function parseDurationSeconds(duration: string): number {
   return total || 600;
 }
 
-function hrZoneToBpm(hrZone: string): { low: number; high: number } {
-  const match = hrZone.match(/Z(\d)/i);
-  if (!match) return { low: 100, high: 140 };
-  const zone = parseInt(match[1], 10);
+function zoneNumberToBpm(zone: number): { low: number; high: number } {
   switch (zone) {
     case 1: return { low: 100, high: 120 };
     case 2: return { low: 120, high: 140 };
@@ -57,12 +55,30 @@ function hrZoneToBpm(hrZone: string): { low: number; high: number } {
   }
 }
 
+function normalizeHrZone(hrZone: string): string {
+  const matches = Array.from(hrZone.matchAll(/Z(\d)/gi)).map((match) => parseInt(match[1], 10));
+  if (matches.length === 0) return "Z2";
+  if (matches.length === 1) return `Z${matches[0]}`;
+  return `Z${matches[0]}-Z${matches[matches.length - 1]}`;
+}
+
+function hrZoneToBpm(hrZone: string): { low: number; high: number } {
+  const matches = Array.from(hrZone.matchAll(/Z(\d)/gi)).map((match) => parseInt(match[1], 10));
+  if (matches.length === 0) return zoneNumberToBpm(2);
+
+  const lowZone = zoneNumberToBpm(matches[0]);
+  const highZone = zoneNumberToBpm(matches[matches.length - 1]);
+
+  return { low: lowZone.low, high: highZone.high };
+}
+
 /**
  * Expand a segment into API steps.
  * Handles repeat patterns like "5 x 2 min run / 1 min walk"
  */
 function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
-  const { low, high } = hrZoneToBpm(seg.hrZone);
+  const hrZone = normalizeHrZone(seg.hrZone);
+  const { low, high } = hrZoneToBpm(hrZone);
 
   // Determine step type from segment name
   const segName = seg.segment.toLowerCase();
@@ -81,12 +97,14 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     const reps = parseInt(repeatMatch[1], 10);
     const workDuration = parseDurationSeconds(repeatMatch[2]);
     const restDuration = parseDurationSeconds(repeatMatch[3]);
-    const restHr = hrZoneToBpm(`Z${Math.max(1, (parseInt(seg.hrZone.match(/Z(\d)/i)?.[1] || "2", 10)) - 1)}`);
+    const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
+    const restZone = `Z${Math.max(1, workZoneNumber - 1)}`;
+    const restHr = hrZoneToBpm(restZone);
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Interval" });
-      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Recovery" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval" });
+      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery" });
     }
     return steps;
   }
@@ -98,13 +116,14 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
     const restMatch = seg.target?.match(/([\d.]+)\s*(?:min|sec)/i);
     const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60;
-    const restHr = hrZoneToBpm("Z1");
+    const restZone = "Z1";
+    const restHr = hrZoneToBpm(restZone);
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, intensity: "Interval" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval" });
       if (i < reps - 1 || restMatch) {
-        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, intensity: "Recovery" });
+        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery" });
       }
     }
     return steps;
@@ -112,7 +131,7 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
 
   // Simple single step
   const duration = parseDurationSeconds(seg.duration);
-  return [{ duration, hrLow: low, hrHigh: high, intensity: stepType }];
+  return [{ duration, hrLow: low, hrHigh: high, hrZone, intensity: stepType }];
 }
 
 const RACE_DISTANCES = [

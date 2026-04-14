@@ -33,6 +33,7 @@ serve(async (req) => {
           duration: number;
           hrLow: number;
           hrHigh: number;
+          hrZone?: string;
           intensity: string;
         }>;
       }>;
@@ -130,9 +131,29 @@ serve(async (req) => {
         return `${s}s`;
       }
 
-      function fmtHr(step: { hrLow: number; hrHigh: number }): string {
+      function normalizeHrZone(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
+        if (step.hrZone && /Z\d/i.test(step.hrZone)) {
+          const zones = Array.from(step.hrZone.matchAll(/Z(\d)/gi)).map((match) => Number(match[1]));
+          if (zones.length === 1) return `Z${zones[0]}`;
+          if (zones.length > 1) return `Z${zones[0]}-Z${zones[zones.length - 1]}`;
+        }
+
+        const bpmToZone = (bpm: number) => {
+          if (bpm <= 120) return 1;
+          if (bpm <= 140) return 2;
+          if (bpm <= 160) return 3;
+          if (bpm <= 175) return 4;
+          return 5;
+        };
+
+        const lowZone = bpmToZone(step.hrLow);
+        const highZone = bpmToZone(step.hrHigh);
+        return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
+      }
+
+      function fmtHr(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
         if (step.hrLow > 0 && step.hrHigh > 0) {
-          return ` ${step.hrLow}-${step.hrHigh}bpm`;
+          return ` ${normalizeHrZone(step)} HR (${step.hrLow}-${step.hrHigh}bpm)`;
         }
         return "";
       }
