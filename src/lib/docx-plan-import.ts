@@ -9,158 +9,149 @@ import * as mammoth from "mammoth";
 
 interface ExtractedWorkout {
   date: Date;
-  dateStr: string;       // e.g. "Wed 15 Apr 2026"
-  type: string;          // Easy, Tempo, Long, Race Pace, etc.
-  session: string;       // S1, S2, S3
-  description: string;   // Coach description text
-  targetPace: string;    // e.g. "11:30–12:30/mi"
-  hrZone: string;        // e.g. "Z2", "Z1–Z2", "Z3–Z4"
+  type: string;
+  session: string;
+  description: string;
+  targetPace: string;
+  hrZone: string;
   weekNumber: number;
   weekTheme: string;
   intervalsText: string; // Native intervals.icu workout text block
 }
 
+const MONTHS: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
 /**
- * Extract the native intervals.icu workout text from nested tables.
- * These look like:
- *   Warmup
- *   - Warmup walk 5m Z1 HR
- *   Easy run
- *   - Easy run/walk 20m Z2 HR
- *   Cooldown
- *   - Cooldown walk 5m Z1 HR
+ * Extract text content from HTML, stripping tags.
  */
-function extractIntervalsTextFromTable(tableHtml: string): string | null {
-  // Look for nested table content with the workout steps
-  // The pattern is: Section name followed by "- step description"
-  const lines: string[] = [];
-  
-  // Extract text content from <p> tags in order
-  const pMatches = tableHtml.match(/<p[^>]*>(?:<b>)?(.*?)(?:<\/b>)?<\/p>/gi) || [];
-  
-  for (const p of pMatches) {
-    const text = p.replace(/<[^>]+>/g, "").trim();
-    if (!text) {
-      // Empty <p> = blank line separator
-      if (lines.length > 0 && lines[lines.length - 1] !== "") {
-        lines.push("");
-      }
-      continue;
-    }
-    lines.push(text);
-  }
-  
-  // Check if this looks like a workout text block (has "- " step lines with zone refs)
-  const hasSteps = lines.some(l => l.startsWith("- ") && /Z\d/i.test(l));
-  if (!hasSteps) return null;
-  
-  return lines.join("\n").trim();
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 }
 
 /**
- * Parse the full DOCX HTML to extract workouts with their native intervals.icu text.
+ * Extract native intervals.icu workout text from a nested table's <p> tags.
+ * Input: HTML of the nested <table> inside a workout row.
+ */
+function extractWorkoutSteps(nestedTableHtml: string): string {
+  const lines: string[] = [];
+
+  // Extract all <p> content in order
+  const pRegex = /<p[^>]*>(.*?)<\/p>/gi;
+  let match;
+  while ((match = pRegex.exec(nestedTableHtml)) !== null) {
+    const text = stripHtml(match[1]).trim();
+    if (!text || text === " ") {
+      // Blank line separator
+      if (lines.length > 0 && lines[lines.length - 1] !== "") {
+        lines.push("");
+      }
+    } else {
+      lines.push(text);
+    }
+  }
+
+  // Trim trailing empty lines
+  while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+
+  return lines.join("\n");
+}
+
+/**
+ * Parse the mammoth HTML output to extract all workouts with native intervals.icu text.
  */
 function parseWorkoutsFromHtml(html: string): ExtractedWorkout[] {
   const workouts: ExtractedWorkout[] = [];
+
+  // Track week context
   let currentWeek = 0;
   let currentTheme = "";
 
-  // Find week headers
-  const weekHeaderRegex = /Week\s+(\d+)\s*(?:<\/b>)?(?:<b>)?[-–—]\s*(?:<\/b>)?(?:<b>)?\s*([^<·]+)/gi;
-  
-  // Split into workout sections by looking for date patterns in table headers
-  // Date pattern: "Wed 15 Apr 2026" or similar
-  const dateTableRegex = /<table[^>]*>[\s\S]*?<\/table>/gi;
-  const tables = html.match(dateTableRegex) || [];
-  
-  // Process the HTML linearly to maintain week context
-  const fullText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  
-  // Extract week info
-  const weekMatches = [...fullText.matchAll(/Week\s+(\d+)\s*[-–—]\s*([^·]+?)(?:\s*·|\s*Coach)/gi)];
-  const weekMap: Array<{ week: number; theme: string; pos: number }> = weekMatches.map(m => ({
-    week: parseInt(m[1], 10),
-    theme: m[2].trim(),
-    pos: m.index || 0,
-  }));
+  // Extract week headers from the full text
+  const weekHeaders: Array<{ week: number; theme: string; pos: number }> = [];
+  const weekRegex = /Week\s+(\d+)<\/strong><strong>\s*[-–—]\s*([^<]+)/gi;
+  let wm;
+  while ((wm = weekRegex.exec(html)) !== null) {
+    weekHeaders.push({
+      week: parseInt(wm[1], 10),
+      theme: wm[2].replace(/\s*·.*$/, "").trim(),
+      pos: wm.index,
+    });
+  }
 
-  // Find all workout blocks: date header table + nested workout text table
-  // Pattern: table with date → coach description → nested table with workout steps
-  const dateRegex = /(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})/gi;
-  
-  // Process tables to find workout sections
-  for (let t = 0; t < tables.length; t++) {
-    const table = tables[t];
-    
-    // Check if this table contains a date header
-    const dateMatch = table.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})/i);
-    if (!dateMatch) continue;
-    
-    const months: Record<string, number> = {
-      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
-    };
-    
-    const day = parseInt(dateMatch[1], 10);
-    const month = months[dateMatch[2].toLowerCase()];
-    const year = parseInt(dateMatch[3], 10);
+  // Find each workout by looking for date patterns in <strong> tags within <td>
+  // Pattern: <td><p><strong>Wed 15 Apr 2026</strong></p></td>
+  const dateRegex = /<td[^>]*><p><strong>((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(\w{3})\s+(\d{4}))<\/strong><\/p><\/td>/gi;
+
+  let dm;
+  while ((dm = dateRegex.exec(html)) !== null) {
+    const fullDateStr = dm[1];
+    const day = parseInt(dm[2], 10);
+    const monthStr = dm[3].toLowerCase();
+    const year = parseInt(dm[4], 10);
+    const month = MONTHS[monthStr];
     if (month === undefined) continue;
-    
+
     const date = new Date(year, month, day);
-    
-    // Determine which week this belongs to
-    const tablePos = html.indexOf(table);
-    for (const w of weekMap) {
-      if (w.pos < tablePos) {
-        currentWeek = w.week;
-        currentTheme = w.theme;
+    const datePos = dm.index;
+
+    // Determine week context
+    for (const wh of weekHeaders) {
+      if (wh.pos < datePos) {
+        currentWeek = wh.week;
+        currentTheme = wh.theme;
       }
     }
-    
+
+    // Extract the rest of the workout from the surrounding table
+    // The workout table structure after the date <td> continues with:
+    // <td>S1</td><td>Easy</td><td>pace</td><td>HR Zone</td>
+    // Then: <tr><td colspan="5">description</td></tr>
+    // Then: <tr><td colspan="5"><table>...workout steps...</table></td></tr>
+    // Then: </table>
+
+    // Find the enclosing outer table by searching forward for the matching </table>
+    // We need to find the section from the date to the end of the outer table
+    const afterDate = html.substring(datePos);
+
     // Extract session (S1, S2, S3)
-    const sessionMatch = table.match(/\bS(\d)\b/);
+    const sessionMatch = afterDate.match(/<td[^>]*><p><strong>S(\d)<\/strong><\/p><\/td>/i);
     const session = sessionMatch ? `S${sessionMatch[1]}` : "S1";
-    
-    // Extract type (Easy, Tempo, Long, Race Pace, RACE)
-    const tableText = table.replace(/<[^>]+>/g, " ");
-    const typeMatch = tableText.match(/\b(Easy|Tempo|Long|Race\s*Pace|RACE)\b/i);
+
+    // Extract type
+    const typeMatch = afterDate.match(/<td[^>]*><p><strong>(Easy|Tempo|Long|Race\s*Pace|RACE)<\/strong><\/p><\/td>/i);
     const type = typeMatch ? typeMatch[1] : "Easy";
-    
+
     // Extract HR zone
-    const hrZoneMatch = tableText.match(/HR Zone[\s\S]*?(Z\d[\s–-]*(?:Z\d)?)/i) ||
-                        tableText.match(/(Z\d[\s–-]*Z\d)/i) ||
-                        tableText.match(/(Z\d)/i);
+    const hrZoneMatch = afterDate.match(/HR Zone<\/p><p><strong>(Z[\d][\s–-]*(?:Z\d)?)/i) ||
+                        afterDate.match(/(Z\d[\s–-]*Z\d)/i);
     const hrZone = hrZoneMatch ? hrZoneMatch[1].replace(/\s/g, "") : "Z2";
-    
+
     // Extract target pace
-    const paceMatch = tableText.match(/(\d{1,2}:\d{2}[\s–-]+\d{1,2}:\d{2}\/mi)/i) ||
-                      tableText.match(/(\d{1,2}:\d{2}[\s–-]+\d{1,2}:\d{2})/i);
-    const targetPace = paceMatch ? paceMatch[1] : "";
-    
-    // Extract coach description from colspan cell
-    const descMatch = table.match(/<td[^>]*colspan[^>]*>[\s\S]*?<p[^>]*>(?:<b>)?([\s\S]*?)(?:<\/b>)?<\/p>[\s\S]*?<\/td>/i);
-    const description = descMatch 
-      ? descMatch[1].replace(/<[^>]+>/g, "").trim()
-      : "";
-    
-    // Extract native intervals.icu workout text from nested table
-    const nestedTableMatch = table.match(/<td[^>]*colspan[^>]*>[\s\S]*?(<table[\s\S]*?<\/table>)[\s\S]*?<\/td>/i);
+    const paceMatch = afterDate.match(/Target pace<\/p><p><strong>([^<]+)<\/strong>/i);
+    const targetPace = paceMatch ? stripHtml(paceMatch[1]) : "";
+
+    // Extract coach description from colspan row
+    const descMatch = afterDate.match(/<tr><td colspan="5"><p>([^<]+)<\/p><\/td><\/tr>/i);
+    const description = descMatch ? stripHtml(descMatch[1]) : "";
+
+    // Extract the nested table with workout steps
+    // Pattern: <td colspan="5"><table><tr><td>...<p>steps</p>...</td></tr></table></td>
+    const nestedMatch = afterDate.match(/<td colspan="5"><table><tr><td>([\s\S]*?)<\/td><\/tr><\/table><\/td>/i);
     let intervalsText = "";
-    
-    if (nestedTableMatch) {
-      const extracted = extractIntervalsTextFromTable(nestedTableMatch[1]);
-      if (extracted) {
-        intervalsText = extracted;
-      }
+
+    if (nestedMatch) {
+      intervalsText = extractWorkoutSteps(nestedMatch[0]);
     }
-    
-    // Skip if we already have this date+session (avoid duplicates)
+
+    // Skip duplicate date+session combos
     const dateKey = `${date.toISOString()}-${session}`;
     if (workouts.some(w => `${w.date.toISOString()}-${w.session}` === dateKey)) continue;
-    
+
     workouts.push({
       date,
-      dateStr: dateMatch[0],
       type: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase(),
       session,
       description,
@@ -171,8 +162,58 @@ function parseWorkoutsFromHtml(html: string): ExtractedWorkout[] {
       intervalsText,
     });
   }
-  
+
   return workouts;
+}
+
+/**
+ * Parse intervals.icu text into display segments for the markdown table.
+ */
+function parseIntervalsTextToSegments(text: string): Array<{
+  segment: string; duration: string; target: string; hrZone: string; notes: string;
+}> {
+  const segments: Array<{ segment: string; duration: string; target: string; hrZone: string; notes: string }> = [];
+  const lines = text.split("\n");
+  let currentSection = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Section header (not a step line)
+    if (!trimmed.startsWith("- ")) {
+      currentSection = trimmed.replace(/\s*\d+x\s*$/i, "").trim();
+      continue;
+    }
+
+    // Step line: "- Warmup walk 5m Z1 HR"
+    const stepText = trimmed.slice(2).trim();
+    const durMinMatch = stepText.match(/(\d+)m\b/i);
+    const durSecMatch = stepText.match(/(\d+)s\b/i);
+    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)\s*HR/i) || stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
+
+    let duration = "";
+    if (durMinMatch) duration = `${durMinMatch[1]} min`;
+    else if (durSecMatch) duration = `${durSecMatch[1]} sec`;
+
+    const hrZone = zoneMatch ? zoneMatch[1].replace(/\s/g, "") : "Z2";
+
+    // Segment name from section header
+    let segName = currentSection || "Main";
+    if (/warm/i.test(stepText)) segName = "Warm-up";
+    else if (/cool/i.test(stepText)) segName = "Cool-down";
+    else if (/recover/i.test(stepText)) segName = "Recovery";
+
+    const target = stepText
+      .replace(/\d+[ms]\b/g, "")
+      .replace(/Z\d(?:\s*[-–]\s*Z\d)?\s*HR/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    segments.push({ segment: segName, duration, target, hrZone, notes: "" });
+  }
+
+  return segments;
 }
 
 /**
@@ -180,14 +221,13 @@ function parseWorkoutsFromHtml(html: string): ExtractedWorkout[] {
  */
 function workoutsToMarkdown(workouts: ExtractedWorkout[], planTitle: string): string {
   const lines: string[] = [];
-  
   lines.push(`# ${planTitle}`);
   lines.push("");
 
   let currentWeek = 0;
 
   for (const w of workouts) {
-    if (w.weekNumber !== currentWeek) {
+    if (w.weekNumber !== currentWeek && w.weekNumber > 0) {
       currentWeek = w.weekNumber;
       lines.push("");
       lines.push(`### Week ${w.weekNumber} — ${w.weekTheme}`);
@@ -200,28 +240,30 @@ function workoutsToMarkdown(workouts: ExtractedWorkout[], planTitle: string): st
     const dateStr = `${day}/${month}/${year}`;
     const dayName = w.date.toLocaleDateString("en-GB", { weekday: "long" });
 
-    // Extract total minutes from intervals text
+    // Calculate total duration from intervals text
     const minMatches = w.intervalsText.match(/(\d+)m\b/g) || [];
     const secMatches = w.intervalsText.match(/(\d+)s\b/g) || [];
     let totalSecs = 0;
     for (const m of minMatches) totalSecs += parseInt(m, 10) * 60;
     for (const s of secMatches) totalSecs += parseInt(s, 10);
     const totalMin = Math.round(totalSecs / 60) || 30;
-    
+
     const title = `${w.type} Run (${totalMin} min)`;
 
     lines.push(`**${dayName} ${dateStr}** – ${title}`);
     lines.push("");
 
-    // Build segment table for display
-    const segments = parseIntervalsTextToSegments(w.intervalsText, w.hrZone);
-    lines.push("| Segment | Duration | Target | HR Zone | Notes |");
-    lines.push("|---------|----------|--------|---------|-------|");
-    for (const seg of segments) {
-      lines.push(`| ${seg.segment} | ${seg.duration} | ${seg.target} | ${seg.hrZone} | ${seg.notes || ""} |`);
+    // Build display segment table
+    const segments = parseIntervalsTextToSegments(w.intervalsText);
+    if (segments.length > 0) {
+      lines.push("| Segment | Duration | Target | HR Zone | Notes |");
+      lines.push("|---------|----------|--------|---------|-------|");
+      for (const seg of segments) {
+        lines.push(`| ${seg.segment} | ${seg.duration} | ${seg.target} | ${seg.hrZone} | ${seg.notes || ""} |`);
+      }
+      lines.push("");
     }
-    lines.push("");
-    
+
     // Embed native intervals.icu workout text in a fenced code block
     if (w.intervalsText) {
       lines.push("~~~intervals");
@@ -229,7 +271,7 @@ function workoutsToMarkdown(workouts: ExtractedWorkout[], planTitle: string): st
       lines.push("~~~");
       lines.push("");
     }
-    
+
     // Add coaching note
     if (w.description && w.description.length > 10) {
       lines.push(`> 💡 ${w.description}`);
@@ -238,69 +280,6 @@ function workoutsToMarkdown(workouts: ExtractedWorkout[], planTitle: string): st
   }
 
   return lines.join("\n");
-}
-
-/**
- * Parse intervals.icu text into display segments for the table.
- */
-function parseIntervalsTextToSegments(text: string, defaultZone: string): Array<{
-  segment: string; duration: string; target: string; hrZone: string; notes: string;
-}> {
-  const segments: Array<{ segment: string; duration: string; target: string; hrZone: string; notes: string }> = [];
-  const lines = text.split("\n");
-  let currentSection = "";
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    // Section header (not a step line)
-    if (!trimmed.startsWith("- ")) {
-      // Check for repeat pattern like "Pickups 4x" or "Tempo set 2x" or "Race pace intervals 3x"
-      const repeatMatch = trimmed.match(/(\d+)x\s*$/i);
-      if (repeatMatch) {
-        currentSection = trimmed.replace(/\s*\d+x\s*$/i, "").trim();
-      } else {
-        currentSection = trimmed;
-      }
-      continue;
-    }
-    
-    // Step line: "- Warmup walk 5m Z1 HR"
-    const stepText = trimmed.slice(2).trim();
-    const durMatch = stepText.match(/(\d+)m\b/i);
-    const secMatch = stepText.match(/(\d+)s\b/i);
-    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)\s*HR/i) || stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
-    
-    let duration = "";
-    if (durMatch) duration = `${durMatch[1]} min`;
-    else if (secMatch) duration = `${secMatch[1]} sec`;
-    
-    const hrZone = zoneMatch ? zoneMatch[1].replace(/\s/g, "") : defaultZone;
-    
-    // Determine segment name from section header or step text
-    let segName = currentSection || "Main";
-    if (/warm/i.test(stepText)) segName = "Warm-up";
-    else if (/cool/i.test(stepText)) segName = "Cool-down";
-    else if (/recover/i.test(stepText)) segName = "Recovery";
-    
-    // Target from step text (remove duration and zone parts)
-    const target = stepText
-      .replace(/\d+[ms]\b/g, "")
-      .replace(/Z\d(?:\s*[-–]\s*Z\d)?\s*HR/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    
-    segments.push({
-      segment: segName,
-      duration,
-      target,
-      hrZone,
-      notes: "",
-    });
-  }
-  
-  return segments;
 }
 
 /**
@@ -316,27 +295,26 @@ export async function importDocxPlan(file: File): Promise<{
   trainingDays: string[];
 }> {
   const arrayBuffer = await file.arrayBuffer();
-  
-  // Extract both HTML and raw text
-  const [htmlResult, textResult] = await Promise.all([
-    mammoth.convertToHtml({ arrayBuffer }),
-    mammoth.extractRawText({ arrayBuffer }),
-  ]);
-  
+
+  // Extract HTML (preserves table structure with workout steps)
+  const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
   const html = htmlResult.value;
+
+  // Also get raw text for metadata extraction
+  const textResult = await mammoth.extractRawText({ arrayBuffer });
   const text = textResult.value;
 
-  // Extract plan metadata from raw text
+  // Extract plan metadata
   const titleMatch = text.match(/(\d+[\s-]*Week\s+\w+\s+Plan)/i) ||
                      text.match(/(Running\s+Plan)/i);
   const planTitle = titleMatch ? titleMatch[1] : "Imported Training Plan";
 
   const distanceMatch = text.match(/(?:Goal|Target):\s*(?:Sub[\s-]?\d+[:\d]*\s+)?(\d+k|half[\s-]*marathon|marathon)/i);
-  const raceDistance = distanceMatch 
-    ? distanceMatch[1].toLowerCase().replace(/\s+/g, "-") 
+  const raceDistance = distanceMatch
+    ? distanceMatch[1].toLowerCase().replace(/\s+/g, "-")
     : "5k";
 
-  // Parse workouts from HTML to get native intervals.icu text blocks
+  // Parse workouts from HTML
   const workouts = parseWorkoutsFromHtml(html);
 
   if (workouts.length === 0) {
@@ -353,7 +331,7 @@ export async function importDocxPlan(file: File): Promise<{
   const trainingDays = Object.entries(dayCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
-    .map(([day]) => day)
+    .map(([d]) => d)
     .sort((a, b) => dayNames.indexOf(a) - dayNames.indexOf(b));
 
   const markdown = workoutsToMarkdown(workouts, planTitle);
