@@ -302,10 +302,10 @@ function workoutsToMarkdown(workouts: ImportedWorkout[], planTitle: string): str
     // Build segment table
     const segments = descriptionToSegments(w.type, w.description, w.targetPace);
 
-    lines.push("| Segment | Duration | Target | Notes |");
-    lines.push("|---------|----------|--------|-------|");
+    lines.push("| Segment | Duration | Target | HR Zone | Notes |");
+    lines.push("|---------|----------|--------|---------|-------|");
     for (const seg of segments) {
-      lines.push(`| ${seg.segment} | ${seg.duration} | ${seg.target} | ${seg.notes} |`);
+      lines.push(`| ${seg.segment} | ${seg.duration} | ${seg.target} | ${seg.hrZone} | ${seg.notes} |`);
     }
     lines.push("");
     
