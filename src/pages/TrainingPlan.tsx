@@ -695,6 +695,47 @@ const TrainingPlanPage = () => {
     toast({ title: "Calendar downloaded!" });
   };
 
+  const handleImportDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+
+    if (!file.name.endsWith(".docx")) {
+      toast({ title: "Invalid file", description: "Please select a .docx Word document.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const result = await importDocxPlan(file);
+      
+      // Update state with imported plan metadata
+      setRaceDistance(result.raceDistance);
+      setTrainingDays(result.trainingDays);
+      setStartDate(new Date(result.startDate));
+      setRaceDate(new Date(result.endDate));
+      setLetAIDecide(false);
+      setContent(result.markdown);
+      
+      // Save to database
+      await savePlan(result.markdown);
+
+      toast({
+        title: `Imported ${result.workoutCount} workouts!`,
+        description: `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Could not parse the document.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const showConfig = !content && !loading;
 
   if (initialLoading) {
