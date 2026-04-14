@@ -840,19 +840,47 @@ const TrainingPlanPage = () => {
         </>
       )}
       {(showConfig || loading) && (
-        <Button onClick={generatePlan} disabled={loading} size="lg" className="w-full sm:w-auto">
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Calendar className="w-4 h-4 mr-2" />
-              Generate Plan
-            </>
-          )}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={generatePlan} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4 mr-2" />
+                Generate Plan
+              </>
+            )}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx"
+            onChange={handleImportDocx}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={loading || importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <FileUp className="w-4 h-4 mr-2" />
+                Import .docx Plan
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
       {showConfig && (
