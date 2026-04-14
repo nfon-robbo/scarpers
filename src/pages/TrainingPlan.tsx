@@ -150,6 +150,8 @@ const TrainingPlanPage = () => {
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
   const [postAnalyzing, setPostAnalyzing] = useState(false);
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
