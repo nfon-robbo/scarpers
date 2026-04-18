@@ -238,26 +238,34 @@ function parseIntervalsTextToSegments(text: string): Array<{
       continue;
     }
 
-    // Step line: "- Warmup walk 5m Z1 HR"
+    // Step line: "- 5m 132-154bpmHR"
     const stepText = trimmed.slice(2).trim();
-    const durMinMatch = stepText.match(/(\d+)m\b/i);
-    const durSecMatch = stepText.match(/(\d+)s\b/i);
-    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)\s*HR/i) || stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
+    const durationMatch = stepText.match(/(\d+m\d+s|\d+m|\d+s)\b/i);
 
     let duration = "";
-    if (durMinMatch) duration = `${durMinMatch[1]} min`;
-    else if (durSecMatch) duration = `${durSecMatch[1]} sec`;
+    if (durationMatch) {
+      const durationText = durationMatch[1].toLowerCase();
+      if (/^\d+m\d+s$/.test(durationText)) {
+        const [, mins, secs] = durationText.match(/(\d+)m(\d+)s/) || [];
+        duration = `${mins} min ${secs} sec`;
+      } else if (/m/.test(durationText)) {
+        duration = `${durationText.replace("m", "")} min`;
+      } else if (/s/.test(durationText)) {
+        duration = `${durationText.replace("s", "")} sec`;
+      }
+    }
 
-    const hrZone = zoneMatch ? zoneMatch[1].replace(/\s/g, "") : "Z2";
+    const hrZone = bpmRangeToZone(stepText);
 
     // Segment name from section header
     let segName = currentSection || "Main";
-    if (/warm/i.test(stepText)) segName = "Warm-up";
-    else if (/cool/i.test(stepText)) segName = "Cool-down";
-    else if (/recover/i.test(stepText)) segName = "Recovery";
+    if (/warm/i.test(currentSection)) segName = "Warm-up";
+    else if (/cool/i.test(currentSection)) segName = "Cool-down";
+    else if (/recover/i.test(currentSection)) segName = "Recovery";
 
     const target = stepText
-      .replace(/\d+[ms]\b/g, "")
+      .replace(/\d+m\d+s|\d+m|\d+s/gi, "")
+      .replace(/\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*HR/gi, "")
       .replace(/Z\d(?:\s*[-–]\s*Z\d)?\s*HR/gi, "")
       .replace(/\s+/g, " ")
       .trim();
