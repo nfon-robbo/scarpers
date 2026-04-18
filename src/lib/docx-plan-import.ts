@@ -31,6 +31,60 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 }
 
+function normalizeSectionHeader(line: string): string {
+  const trimmed = line.trim();
+  const repeatMatch = trimmed.match(/(?:^|\s)(\d+)x\s*$/i) || trimmed.match(/(?:^|\s)(\d+)\s*x\s*$/i);
+
+  if (repeatMatch) return `${repeatMatch[1]}x`;
+  if (/^warm/i.test(trimmed)) return "Warmup";
+  if (/^cool/i.test(trimmed)) return "Cooldown";
+  if (/recover|rest/i.test(trimmed)) return "Recovery";
+
+  return trimmed;
+}
+
+function normalizeWorkoutStep(line: string): string {
+  const stepText = line.replace(/^[-•]\s*/, "").trim();
+  const durationMatch = stepText.match(/(\d+m\d+s|\d+m|\d+s)\b/i);
+  const bpmMatch = stepText.match(/(\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*HR)/i);
+
+  if (!durationMatch || !bpmMatch) return `- ${stepText}`;
+
+  const normalizedBpm = bpmMatch[1]
+    .replace(/\s*[-–]\s*/g, "-")
+    .replace(/\s*bpm\s*HR/i, "bpm HR");
+
+  return `- ${durationMatch[1]} ${normalizedBpm}`;
+}
+
+function bpmLowerBoundToZone(bpm: number): number {
+  if (bpm < 132) return 1;
+  if (bpm < 154) return 2;
+  if (bpm < 170) return 3;
+  if (bpm < 183) return 4;
+  return 5;
+}
+
+function bpmUpperBoundToZone(bpm: number): number {
+  if (bpm <= 132) return 1;
+  if (bpm <= 154) return 2;
+  if (bpm <= 170) return 3;
+  if (bpm <= 183) return 4;
+  return 5;
+}
+
+function bpmRangeToZone(stepText: string): string {
+  const bpmMatch = stepText.match(/(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm/i);
+  if (!bpmMatch) {
+    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
+    return zoneMatch ? zoneMatch[1].replace(/\s+/g, "") : "Z2";
+  }
+
+  const lowZone = bpmLowerBoundToZone(Number(bpmMatch[1]));
+  const highZone = bpmUpperBoundToZone(Number(bpmMatch[2]));
+  return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
+}
+
 /**
  * Extract native intervals.icu workout text from a nested table's <p> tags.
  * Input: HTML of the nested <table> inside a workout row.
@@ -48,8 +102,10 @@ function extractWorkoutSteps(nestedTableHtml: string): string {
       if (lines.length > 0 && lines[lines.length - 1] !== "") {
         lines.push("");
       }
+    } else if (text.startsWith("- ") || text.startsWith("• ")) {
+      lines.push(normalizeWorkoutStep(text));
     } else {
-      lines.push(text);
+      lines.push(normalizeSectionHeader(text));
     }
   }
 
@@ -186,26 +242,34 @@ function parseIntervalsTextToSegments(text: string): Array<{
       continue;
     }
 
-    // Step line: "- Warmup walk 5m Z1 HR"
+    // Step line: "- 5m 132-154bpmHR"
     const stepText = trimmed.slice(2).trim();
-    const durMinMatch = stepText.match(/(\d+)m\b/i);
-    const durSecMatch = stepText.match(/(\d+)s\b/i);
-    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)\s*HR/i) || stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
+    const durationMatch = stepText.match(/(\d+m\d+s|\d+m|\d+s)\b/i);
 
     let duration = "";
-    if (durMinMatch) duration = `${durMinMatch[1]} min`;
-    else if (durSecMatch) duration = `${durSecMatch[1]} sec`;
+    if (durationMatch) {
+      const durationText = durationMatch[1].toLowerCase();
+      if (/^\d+m\d+s$/.test(durationText)) {
+        const [, mins, secs] = durationText.match(/(\d+)m(\d+)s/) || [];
+        duration = `${mins} min ${secs} sec`;
+      } else if (/m/.test(durationText)) {
+        duration = `${durationText.replace("m", "")} min`;
+      } else if (/s/.test(durationText)) {
+        duration = `${durationText.replace("s", "")} sec`;
+      }
+    }
 
-    const hrZone = zoneMatch ? zoneMatch[1].replace(/\s/g, "") : "Z2";
+    const hrZone = bpmRangeToZone(stepText);
 
     // Segment name from section header
     let segName = currentSection || "Main";
-    if (/warm/i.test(stepText)) segName = "Warm-up";
-    else if (/cool/i.test(stepText)) segName = "Cool-down";
-    else if (/recover/i.test(stepText)) segName = "Recovery";
+    if (/warm/i.test(currentSection)) segName = "Warm-up";
+    else if (/cool/i.test(currentSection)) segName = "Cool-down";
+    else if (/recover/i.test(currentSection)) segName = "Recovery";
 
     const target = stepText
-      .replace(/\d+[ms]\b/g, "")
+      .replace(/\d+m\d+s|\d+m|\d+s/gi, "")
+      .replace(/\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*HR/gi, "")
       .replace(/Z\d(?:\s*[-–]\s*Z\d)?\s*HR/gi, "")
       .replace(/\s+/g, " ")
       .trim();
