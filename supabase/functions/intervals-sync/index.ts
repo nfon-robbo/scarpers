@@ -247,12 +247,6 @@ serve(async (req) => {
         target: "HR",
         moving_time: totalDuration,
         description: fullDescription,
-        workout: {
-          name: workout.name,
-          type: "Run",
-          target: "HR",
-          description: fullDescription,
-        },
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
