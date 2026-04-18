@@ -84,8 +84,11 @@ function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensi
     durationValue: durationMs,
     targetType: WKT_STEP_TARGET.HEART_RATE,
     targetValue: 0,
-    customTargetLow: hrLow,
-    customTargetHigh: hrHigh,
+    // FIT spec: HR custom targets must be offset by +100 to be interpreted
+    // as absolute bpm. Without the offset, Intervals.icu treats the value
+    // as a percentage of LTHR / max HR.
+    customTargetLow: hrLow + 100,
+    customTargetHigh: hrHigh + 100,
   };
 }
 
