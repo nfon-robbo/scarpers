@@ -31,6 +31,56 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 }
 
+function normalizeSectionHeader(line: string): string {
+  const trimmed = line.trim();
+  const repeatMatch = trimmed.match(/(?:^|\s)(\d+)x\s*$/i) || trimmed.match(/(?:^|\s)(\d+)\s*x\s*$/i);
+
+  if (repeatMatch) return `${repeatMatch[1]}x`;
+  if (/^warm/i.test(trimmed)) return "Warmup";
+  if (/^cool/i.test(trimmed)) return "Cooldown";
+  if (/recover|rest/i.test(trimmed)) return "Recovery";
+
+  return trimmed;
+}
+
+function normalizeWorkoutStep(line: string): string {
+  const stepText = line.replace(/^[-•]\s*/, "").trim();
+  const durationMatch = stepText.match(/(\d+m\d+s|\d+m|\d+s)\b/i);
+  const bpmMatch = stepText.match(/(\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*HR)/i);
+
+  if (!durationMatch || !bpmMatch) return `- ${stepText}`;
+
+  return `- ${durationMatch[1]} ${bpmMatch[1].replace(/\s+/g, "")}`;
+}
+
+function bpmLowerBoundToZone(bpm: number): number {
+  if (bpm < 132) return 1;
+  if (bpm < 154) return 2;
+  if (bpm < 170) return 3;
+  if (bpm < 183) return 4;
+  return 5;
+}
+
+function bpmUpperBoundToZone(bpm: number): number {
+  if (bpm <= 132) return 1;
+  if (bpm <= 154) return 2;
+  if (bpm <= 170) return 3;
+  if (bpm <= 183) return 4;
+  return 5;
+}
+
+function bpmRangeToZone(stepText: string): string {
+  const bpmMatch = stepText.match(/(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm/i);
+  if (!bpmMatch) {
+    const zoneMatch = stepText.match(/(Z\d(?:\s*[-–]\s*Z\d)?)/i);
+    return zoneMatch ? zoneMatch[1].replace(/\s+/g, "") : "Z2";
+  }
+
+  const lowZone = bpmLowerBoundToZone(Number(bpmMatch[1]));
+  const highZone = bpmUpperBoundToZone(Number(bpmMatch[2]));
+  return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
+}
+
 /**
  * Extract native intervals.icu workout text from a nested table's <p> tags.
  * Input: HTML of the nested <table> inside a workout row.
@@ -48,8 +98,10 @@ function extractWorkoutSteps(nestedTableHtml: string): string {
       if (lines.length > 0 && lines[lines.length - 1] !== "") {
         lines.push("");
       }
+    } else if (text.startsWith("- ") || text.startsWith("• ")) {
+      lines.push(normalizeWorkoutStep(text));
     } else {
-      lines.push(text);
+      lines.push(normalizeSectionHeader(text));
     }
   }
 
