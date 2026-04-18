@@ -194,3 +194,5 @@ export function buildIntervalsFitFile(workout: SyncWorkoutInput): FitFilePayload
     fileContentsBase64: encodeBase64(fileBytes),
   };
 }
+
+export type { SyncApiStep, SyncWorkoutInput, FitFilePayload };
