@@ -50,7 +50,11 @@ function normalizeWorkoutStep(line: string): string {
 
   if (!durationMatch || !bpmMatch) return `- ${stepText}`;
 
-  return `- ${durationMatch[1]} ${bpmMatch[1].replace(/\s+/g, "")}`;
+  const normalizedBpm = bpmMatch[1]
+    .replace(/\s*[-–]\s*/g, "-")
+    .replace(/\s*bpm\s*HR/i, "bpm HR");
+
+  return `- ${durationMatch[1]} ${normalizedBpm}`;
 }
 
 function bpmLowerBoundToZone(bpm: number): number {
