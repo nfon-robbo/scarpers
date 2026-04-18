@@ -1,0 +1,196 @@
+import {
+  encodeWorkoutFit,
+  INTENSITY,
+  WKT_STEP_DURATION,
+  WKT_STEP_TARGET,
+  WorkoutStep,
+} from "./fit-workout-encoder";
+
+interface SyncApiStep {
+  duration: number;
+  hrLow: number;
+  hrHigh: number;
+  hrZone?: string;
+  intensity: string;
+}
+
+interface SyncWorkoutInput {
+  name: string;
+  rawDescription?: string;
+  steps: SyncApiStep[];
+}
+
+interface FitFilePayload {
+  fileContentsBase64: string;
+  fileName: string;
+}
+
+const durationPattern = /(\d+m\d+s|\d+m|\d+s)\b/i;
+const bpmPattern = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm\s*HR/i;
+
+function durationTextToMilliseconds(value: string): number {
+  const match = value.toLowerCase().match(/(?:(\d+)m)?(?:(\d+)s)?/);
+  const minutes = Number(match?.[1] ?? 0);
+  const seconds = Number(match?.[2] ?? 0);
+  return (minutes * 60 + seconds) * 1000;
+}
+
+function zoneToBpmRange(zone: string): { low: number; high: number } {
+  const matches = Array.from(zone.matchAll(/Z(\d)/gi)).map((match) => Number(match[1]));
+  const bpmForZone = (zoneNumber: number) => {
+    switch (zoneNumber) {
+      case 1:
+        return { low: 100, high: 120 };
+      case 2:
+        return { low: 120, high: 140 };
+      case 3:
+        return { low: 140, high: 160 };
+      case 4:
+        return { low: 160, high: 175 };
+      case 5:
+        return { low: 175, high: 200 };
+      default:
+        return { low: 120, high: 140 };
+    }
+  };
+
+  if (matches.length === 0) return bpmForZone(2);
+  const low = bpmForZone(matches[0]);
+  const high = bpmForZone(matches[matches.length - 1]);
+  return { low: low.low, high: high.high };
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function toFitIntensity(intensity: string): string {
+  const normalized = intensity.toLowerCase();
+  if (normalized === "warmup") return INTENSITY.WARMUP;
+  if (normalized === "cooldown") return INTENSITY.COOLDOWN;
+  if (normalized === "rest" || normalized === "recovery") return INTENSITY.REST;
+  return INTENSITY.ACTIVE;
+}
+
+function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensity: string): WorkoutStep {
+  return {
+    intensity: toFitIntensity(intensity),
+    durationType: WKT_STEP_DURATION.TIME,
+    durationValue: durationMs,
+    targetType: WKT_STEP_TARGET.HEART_RATE,
+    targetValue: 0,
+    customTargetLow: hrLow,
+    customTargetHigh: hrHigh,
+  };
+}
+
+function parseTextStep(line: string, intensity: string): WorkoutStep | null {
+  const durationMatch = line.match(durationPattern);
+  if (!durationMatch) return null;
+
+  const bpmMatch = line.match(bpmPattern);
+  const zoneMatch = line.match(/Z\d(?:\s*[-–]\s*Z\d)?/i);
+  const range = bpmMatch
+    ? { low: Number(bpmMatch[1]), high: Number(bpmMatch[2]) }
+    : zoneMatch
+      ? zoneToBpmRange(zoneMatch[0])
+      : null;
+
+  if (!range) return null;
+
+  return buildFitStep(durationTextToMilliseconds(durationMatch[1]), range.low, range.high, intensity);
+}
+
+function parseRawDescriptionToFitSteps(rawDescription: string): WorkoutStep[] {
+  const lines = rawDescription.split("\n");
+  const steps: WorkoutStep[] = [];
+  let currentIntensity = "Active";
+  let i = 0;
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+
+    if (!trimmed) {
+      i += 1;
+      continue;
+    }
+
+    if (!trimmed.startsWith("-")) {
+      const repeatMatch = trimmed.match(/^(\d+)x$/i);
+      if (repeatMatch) {
+        const reps = Number(repeatMatch[1]);
+        const block: WorkoutStep[] = [];
+        i += 1;
+
+        while (i < lines.length) {
+          const candidate = lines[i].trim();
+          if (!candidate) {
+            i += 1;
+            continue;
+          }
+          if (!candidate.startsWith("-")) break;
+
+          const parsed = parseTextStep(candidate, block.length === 0 ? "Interval" : "Recovery");
+          if (parsed) block.push(parsed);
+          i += 1;
+        }
+
+        for (let rep = 0; rep < reps; rep += 1) {
+          steps.push(...block);
+        }
+        continue;
+      }
+
+      if (/warm/i.test(trimmed)) currentIntensity = "Warmup";
+      else if (/cool/i.test(trimmed)) currentIntensity = "Cooldown";
+      else if (/recover|rest/i.test(trimmed)) currentIntensity = "Recovery";
+      else currentIntensity = "Active";
+
+      i += 1;
+      continue;
+    }
+
+    const parsed = parseTextStep(trimmed, currentIntensity);
+    if (parsed) steps.push(parsed);
+    i += 1;
+  }
+
+  return steps;
+}
+
+function convertApiStepsToFitSteps(steps: SyncApiStep[]): WorkoutStep[] {
+  return steps
+    .filter((step) => step.duration > 0)
+    .map((step) => {
+      const bpmRange =
+        step.hrLow > 0 && step.hrHigh > 0
+          ? { low: step.hrLow, high: step.hrHigh }
+          : zoneToBpmRange(step.hrZone ?? "Z2");
+
+      return buildFitStep(step.duration * 1000, bpmRange.low, bpmRange.high, step.intensity);
+    });
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "workout";
+}
+
+export function buildIntervalsFitFile(workout: SyncWorkoutInput): FitFilePayload | undefined {
+  const fitSteps = workout.rawDescription
+    ? parseRawDescriptionToFitSteps(workout.rawDescription)
+    : convertApiStepsToFitSteps(workout.steps);
+
+  if (fitSteps.length === 0) return undefined;
+
+  const fileBytes = encodeWorkoutFit(workout.name, fitSteps);
+
+  return {
+    fileName: `${sanitizeFileName(workout.name)}.fit`,
+    fileContentsBase64: encodeBase64(fileBytes),
+  };
+}
