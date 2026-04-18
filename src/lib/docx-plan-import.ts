@@ -139,18 +139,38 @@ function parseWorkoutsFromHtml(html: string): ExtractedWorkout[] {
 
   // Find each workout by looking for date patterns in <strong> tags within <td>
   // Pattern: <td><p><strong>Wed 15 Apr 2026</strong></p></td>
-  const dateRegex = /<td[^>]*><p><strong>((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(\w{3})\s+(\d{4}))<\/strong><\/p><\/td>/gi;
+  // We capture the weekday name separately because plan authors sometimes mistype
+  // dates (e.g. "Mon 21 Apr 2026" when 21 Apr is actually a Tuesday). When the
+  // weekday name disagrees with the calendar date, we trust the weekday name and
+  // snap the date to the nearest matching weekday (±3 days).
+  const dateRegex = /<td[^>]*><p><strong>((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(\w{3})\s+(\d{4}))<\/strong><\/p><\/td>/gi;
+  const DOW_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
   let dm;
   while ((dm = dateRegex.exec(html)) !== null) {
     const fullDateStr = dm[1];
-    const day = parseInt(dm[2], 10);
-    const monthStr = dm[3].toLowerCase();
-    const year = parseInt(dm[4], 10);
+    const dowStr = dm[2].toLowerCase();
+    const day = parseInt(dm[3], 10);
+    const monthStr = dm[4].toLowerCase();
+    const year = parseInt(dm[5], 10);
     const month = MONTHS[monthStr];
     if (month === undefined) continue;
 
-    const date = new Date(year, month, day);
+    let date = new Date(year, month, day);
+    const targetDow = DOW_INDEX[dowStr];
+    if (targetDow !== undefined && date.getDay() !== targetDow) {
+      // Snap to nearest matching weekday within ±3 days
+      let best = date;
+      let bestDiff = Infinity;
+      for (let offset = -3; offset <= 3; offset++) {
+        const candidate = new Date(year, month, day + offset);
+        if (candidate.getDay() === targetDow && Math.abs(offset) < bestDiff) {
+          best = candidate;
+          bestDiff = Math.abs(offset);
+        }
+      }
+      date = best;
+    }
     const datePos = dm.index;
 
     // Determine week context
@@ -385,18 +405,43 @@ export async function importDocxPlan(file: File): Promise<{
     throw new Error("No workouts found in the document. Make sure the plan contains dates and workout descriptions.");
   }
 
-  // Infer training days
-  const dayCounts: Record<string, number> = {};
+  // Infer training days. Prefer the explicit "Sessions:" header from the doc when
+  // present (e.g. "Sessions: Monday · Wednesday · Friday"), otherwise fall back to
+  // the most-frequent weekdays from the parsed workout dates.
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  for (const w of workouts) {
-    const dayName = dayNames[w.date.getDay()];
-    dayCounts[dayName] = (dayCounts[dayName] || 0) + 1;
+  const fullToShort: Record<string, string> = {
+    sunday: "Sun", monday: "Mon", tuesday: "Tue", wednesday: "Wed",
+    thursday: "Thu", friday: "Fri", saturday: "Sat",
+  };
+  let trainingDays: string[] = [];
+  const sessionsMatch = text.match(/Sessions?:\s*([^\n|]+)/i);
+  if (sessionsMatch) {
+    const found = (sessionsMatch[1].toLowerCase().match(/sun|mon|tues|wednes|thurs|fri|satur/g) || [])
+      .map(d => {
+        if (d.startsWith("sun")) return "Sun";
+        if (d.startsWith("mon")) return "Mon";
+        if (d.startsWith("tues")) return "Tue";
+        if (d.startsWith("wednes")) return "Wed";
+        if (d.startsWith("thurs")) return "Thu";
+        if (d.startsWith("fri")) return "Fri";
+        if (d.startsWith("satur")) return "Sat";
+        return "";
+      })
+      .filter(Boolean);
+    trainingDays = Array.from(new Set(found)).sort((a, b) => dayNames.indexOf(a) - dayNames.indexOf(b));
   }
-  const trainingDays = Object.entries(dayCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([d]) => d)
-    .sort((a, b) => dayNames.indexOf(a) - dayNames.indexOf(b));
+  if (trainingDays.length === 0) {
+    const dayCounts: Record<string, number> = {};
+    for (const w of workouts) {
+      const dayName = dayNames[w.date.getDay()];
+      dayCounts[dayName] = (dayCounts[dayName] || 0) + 1;
+    }
+    trainingDays = Object.entries(dayCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([d]) => d)
+      .sort((a, b) => dayNames.indexOf(a) - dayNames.indexOf(b));
+  }
 
   const markdown = workoutsToMarkdown(workouts, planTitle);
 
