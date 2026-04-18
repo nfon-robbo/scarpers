@@ -139,18 +139,38 @@ function parseWorkoutsFromHtml(html: string): ExtractedWorkout[] {
 
   // Find each workout by looking for date patterns in <strong> tags within <td>
   // Pattern: <td><p><strong>Wed 15 Apr 2026</strong></p></td>
-  const dateRegex = /<td[^>]*><p><strong>((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(\w{3})\s+(\d{4}))<\/strong><\/p><\/td>/gi;
+  // We capture the weekday name separately because plan authors sometimes mistype
+  // dates (e.g. "Mon 21 Apr 2026" when 21 Apr is actually a Tuesday). When the
+  // weekday name disagrees with the calendar date, we trust the weekday name and
+  // snap the date to the nearest matching weekday (±3 days).
+  const dateRegex = /<td[^>]*><p><strong>((Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+(\d{1,2})\s+(\w{3})\s+(\d{4}))<\/strong><\/p><\/td>/gi;
+  const DOW_INDEX: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
   let dm;
   while ((dm = dateRegex.exec(html)) !== null) {
     const fullDateStr = dm[1];
-    const day = parseInt(dm[2], 10);
-    const monthStr = dm[3].toLowerCase();
-    const year = parseInt(dm[4], 10);
+    const dowStr = dm[2].toLowerCase();
+    const day = parseInt(dm[3], 10);
+    const monthStr = dm[4].toLowerCase();
+    const year = parseInt(dm[5], 10);
     const month = MONTHS[monthStr];
     if (month === undefined) continue;
 
-    const date = new Date(year, month, day);
+    let date = new Date(year, month, day);
+    const targetDow = DOW_INDEX[dowStr];
+    if (targetDow !== undefined && date.getDay() !== targetDow) {
+      // Snap to nearest matching weekday within ±3 days
+      let best = date;
+      let bestDiff = Infinity;
+      for (let offset = -3; offset <= 3; offset++) {
+        const candidate = new Date(year, month, day + offset);
+        if (candidate.getDay() === targetDow && Math.abs(offset) < bestDiff) {
+          best = candidate;
+          bestDiff = Math.abs(offset);
+        }
+      }
+      date = best;
+    }
     const datePos = dm.index;
 
     // Determine week context
