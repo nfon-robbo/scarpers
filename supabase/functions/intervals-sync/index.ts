@@ -1,5 +1,133 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+type WorkoutStep = {
+  duration: number;
+  hrLow: number;
+  hrHigh: number;
+  hrZone?: string;
+  intensity: string;
+};
+
+type WorkoutInput = {
+  date: string;
+  name: string;
+  description: string;
+  notes?: string;
+  rawDescription?: string;
+  fitFileBase64?: string;
+  fitFileName?: string;
+  steps: WorkoutStep[];
+};
+
+function formatWorkoutDescription(workout: WorkoutInput): string {
+  if (workout.rawDescription) {
+    return workout.notes ? `${workout.rawDescription}\n\n${workout.notes}` : workout.rawDescription;
+  }
+
+  function fmtDur(secs: number): string {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (m > 0 && s > 0) return `${m}m${s}s`;
+    if (m > 0) return `${m}m`;
+    return `${s}s`;
+  }
+
+  function normalizeHrZone(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
+    if (step.hrZone && /Z\d/i.test(step.hrZone)) {
+      const zones = Array.from(step.hrZone.matchAll(/Z(\d)/gi)).map((match) => Number(match[1]));
+      if (zones.length === 1) return `Z${zones[0]}`;
+      if (zones.length > 1) return `Z${zones[0]}-Z${zones[zones.length - 1]}`;
+    }
+
+    const bpmToZone = (bpm: number) => {
+      if (bpm <= 120) return 1;
+      if (bpm <= 140) return 2;
+      if (bpm <= 160) return 3;
+      if (bpm <= 175) return 4;
+      return 5;
+    };
+
+    const lowZone = bpmToZone(step.hrLow);
+    const highZone = bpmToZone(step.hrHigh);
+    return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
+  }
+
+  function fmtHr(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
+    if (step.hrLow > 0 && step.hrHigh > 0) return ` ${normalizeHrZone(step)} HR`;
+    return "";
+  }
+
+  const lines: string[] = [];
+  let i = 0;
+  let prevIntensity = "";
+
+  while (i < workout.steps.length) {
+    const step = workout.steps[i];
+
+    if (step.intensity === "Warmup") {
+      if (prevIntensity !== "Warmup") lines.push("Warmup");
+      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      prevIntensity = "Warmup";
+      i += 1;
+    } else if (step.intensity === "Cooldown") {
+      if (prevIntensity !== "Cooldown") {
+        lines.push("");
+        lines.push("Cooldown");
+      }
+      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      prevIntensity = "Cooldown";
+      i += 1;
+    } else if (step.intensity === "Interval") {
+      let reps = 0;
+      let j = i;
+      const workDur = step.duration;
+      const workHr = { hrLow: step.hrLow, hrHigh: step.hrHigh };
+      let restDur = 0;
+      let restHr = { hrLow: 0, hrHigh: 0 };
+
+      while (j < workout.steps.length && workout.steps[j].intensity === "Interval" && workout.steps[j].duration === workDur) {
+        reps += 1;
+        if (j + 1 < workout.steps.length && (workout.steps[j + 1].intensity === "Recovery" || workout.steps[j + 1].intensity === "Rest")) {
+          restDur = workout.steps[j + 1].duration;
+          restHr = { hrLow: workout.steps[j + 1].hrLow, hrHigh: workout.steps[j + 1].hrHigh };
+          j += 2;
+        } else {
+          j += 1;
+          break;
+        }
+      }
+
+      if (reps > 1) {
+        lines.push("");
+        lines.push(`${reps}x`);
+        lines.push(`- ${fmtDur(workDur)}${fmtHr(workHr)}`);
+        if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest${fmtHr(restHr)}`);
+        i = j;
+      } else {
+        if (prevIntensity !== "Active") {
+          lines.push("");
+          lines.push("Run");
+        }
+        lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+        i += 1;
+      }
+
+      prevIntensity = "Active";
+    } else {
+      if (prevIntensity !== "Active") {
+        lines.push("");
+        lines.push("Run");
+      }
+      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      prevIntensity = "Active";
+      i += 1;
+    }
+  }
+
+  const workoutText = lines.join("\n");
+  return workout.notes ? `${workoutText}\n\n${workout.notes}` : workoutText;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -24,20 +152,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const { workouts, clearRange, deleteRange } = body as {
-      workouts?: Array<{
-        date: string;
-        name: string;
-        description: string;
-        notes?: string;
-        rawDescription?: string;
-        steps: Array<{
-          duration: number;
-          hrLow: number;
-          hrHigh: number;
-          hrZone?: string;
-          intensity: string;
-        }>;
-      }>;
+      workouts?: WorkoutInput[];
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
     };
@@ -124,119 +239,7 @@ serve(async (req) => {
 
     // Step 2: Build bulk events
     const bulkEvents = workouts.map((workout, idx) => {
-      // If we have native intervals.icu workout text from DOCX import, use it directly
-      let fullDescription: string;
-      
-      if (workout.rawDescription) {
-        // Use the native intervals.icu format directly - this is already in the correct
-        // syntax that intervals.icu's workout parser understands (e.g. "- 5m Z2 HR")
-        fullDescription = workout.rawDescription;
-        if (workout.notes) {
-          fullDescription += `\n\n${workout.notes}`;
-        }
-        console.log(`Using native intervals.icu text for ${workout.name}`);
-      } else {
-        // Fall back to building from steps
-        function fmtDur(secs: number): string {
-          const m = Math.floor(secs / 60);
-          const s = secs % 60;
-          if (m > 0 && s > 0) return `${m}m${s}s`;
-          if (m > 0) return `${m}m`;
-          return `${s}s`;
-        }
-
-        function normalizeHrZone(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
-          if (step.hrZone && /Z\d/i.test(step.hrZone)) {
-            const zones = Array.from(step.hrZone.matchAll(/Z(\d)/gi)).map((match) => Number(match[1]));
-            if (zones.length === 1) return `Z${zones[0]}`;
-            if (zones.length > 1) return `Z${zones[0]}-Z${zones[zones.length - 1]}`;
-          }
-
-          const bpmToZone = (bpm: number) => {
-            if (bpm <= 120) return 1;
-            if (bpm <= 140) return 2;
-            if (bpm <= 160) return 3;
-            if (bpm <= 175) return 4;
-            return 5;
-          };
-
-          const lowZone = bpmToZone(step.hrLow);
-          const highZone = bpmToZone(step.hrHigh);
-          return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
-        }
-
-        function fmtHr(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
-          if (step.hrLow > 0 && step.hrHigh > 0) {
-            return ` ${normalizeHrZone(step)} HR`;
-          }
-          return "";
-        }
-
-        const steps = workout.steps;
-        const lines: string[] = [];
-        let i = 0;
-        let prevIntensity = "";
-
-        while (i < steps.length) {
-          const s = steps[i];
-
-          if (s.intensity === "Warmup") {
-            if (prevIntensity !== "Warmup") lines.push("Warmup");
-            lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
-            prevIntensity = "Warmup";
-            i++;
-          } else if (s.intensity === "Cooldown") {
-            if (prevIntensity !== "Cooldown") { lines.push(""); lines.push("Cooldown"); }
-            lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
-            prevIntensity = "Cooldown";
-            i++;
-          } else if (s.intensity === "Interval") {
-            let reps = 0;
-            let j = i;
-            const workDur = s.duration;
-            const workHr = { hrLow: s.hrLow, hrHigh: s.hrHigh };
-            let restDur = 0;
-            let restHr = { hrLow: 0, hrHigh: 0 };
-
-            while (j < steps.length && steps[j].intensity === "Interval" &&
-                   steps[j].duration === workDur) {
-              reps++;
-              if (j + 1 < steps.length && (steps[j + 1].intensity === "Recovery" || steps[j + 1].intensity === "Rest")) {
-                restDur = steps[j + 1].duration;
-                restHr = { hrLow: steps[j + 1].hrLow, hrHigh: steps[j + 1].hrHigh };
-                j += 2;
-              } else {
-                j++;
-                break;
-              }
-            }
-
-            if (reps > 1) {
-              lines.push("");
-              lines.push(`${reps}x`);
-              lines.push(`- ${fmtDur(workDur)}${fmtHr(workHr)}`);
-              if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest${fmtHr(restHr)}`);
-              i = j;
-            } else {
-              if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
-              lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
-              i++;
-            }
-            prevIntensity = "Active";
-          } else {
-            if (prevIntensity !== "Active") { lines.push(""); lines.push("Run"); }
-            lines.push(`- ${fmtDur(s.duration)}${fmtHr(s)}`);
-            prevIntensity = "Active";
-            i++;
-          }
-        }
-
-        const workoutText = lines.join("\n");
-        fullDescription = workout.notes
-          ? `${workoutText}\n\n${workout.notes}`
-          : workoutText;
-      }
-      
+      const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
 
       return {
@@ -247,6 +250,12 @@ serve(async (req) => {
         target: "HR",
         moving_time: totalDuration,
         description: fullDescription,
+        ...(workout.fitFileBase64 && workout.fitFileName
+          ? {
+              filename: workout.fitFileName,
+              file_contents_base64: workout.fitFileBase64,
+            }
+          : {}),
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
