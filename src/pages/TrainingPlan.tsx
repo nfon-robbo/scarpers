@@ -20,6 +20,7 @@ import PlanCalendarView from "@/components/PlanCalendarView";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { importDocxPlan } from "@/lib/docx-plan-import";
+import { buildIntervalsFitFile } from "@/lib/intervals-workout-fit";
 
 interface ApiStep {
   duration: number;
@@ -648,7 +649,22 @@ const TrainingPlanPage = () => {
         const totalMins = Math.round(totalSecs / 60);
         const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
         // Pass native intervals.icu text if available (from DOCX import)
-        return { date: dateStr, name: correctedName, description, steps, notes, rawDescription: w.intervalsText };
+        const fitFile = buildIntervalsFitFile({
+          name: correctedName,
+          rawDescription: w.intervalsText,
+          steps,
+        });
+
+        return {
+          date: dateStr,
+          name: correctedName,
+          description,
+          steps,
+          notes,
+          rawDescription: w.intervalsText,
+          fitFileBase64: fitFile?.fileContentsBase64,
+          fitFileName: fitFile?.fileName,
+        };
       });
 
       // Calculate date range for clearing
