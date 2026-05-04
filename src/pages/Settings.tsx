@@ -557,6 +557,85 @@ const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Previous Plans Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Archive className="w-5 h-5" />
+            Previous Plans
+          </CardTitle>
+          <CardDescription>
+            Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {archivedPlans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No previous plans yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {archivedPlans.map((plan) => (
+                <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{plan.race_distance}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
+                      {plan.race_date && plan.race_date !== "ai-recommend" && (
+                        <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
+                      )}
+                      {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resumePlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => restartPlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(plan)}
+                      disabled={planActionId === plan.id}
+                      aria-label="Delete permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete plan permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the plan from Previous Plans for good. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmDelete && deletePlanForever(confirmDelete)}>
+              Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Auto-Sync Schedule Card */}
       <Card>
         <CardHeader>
