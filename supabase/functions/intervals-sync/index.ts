@@ -259,9 +259,10 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events. Do not send workout_doc: the Intervals.icu API parses
-    // the workout-builder text in description and creates workout_doc server-side.
-    // Sending an empty workout_doc keeps the structured graph empty.
+    // Step 2: Build events. Intervals.icu only rebuilds the structured workout
+    // graph from native workout-builder text when workout_doc is present as an
+    // empty object. Do not attach generated FIT files here because they convert
+    // absolute paces into 0% pace targets for running workouts.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
@@ -277,12 +278,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        ...(workout.fitFileBase64 && workout.fitFileName
-          ? {
-              filename: workout.fitFileName,
-              file_contents_base64: workout.fitFileBase64,
-            }
-          : {}),
+        workout_doc: {},
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
