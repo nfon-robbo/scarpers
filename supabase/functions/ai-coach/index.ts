@@ -539,87 +539,196 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         raceDateInstruction = `No race date specified. Suggest a realistic timeline.`;
       }
 
+      // ===== Compute athlete physiological summary for prompt placeholders =====
+      const recentMetrics = (metrics || []).slice(0, 7);
+      const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+      const restingHrVals = recentMetrics.map((m: any) => m.resting_heart_rate).filter((v: any) => v != null);
+      const hrvVals = recentMetrics.map((m: any) => m.hrv).filter((v: any) => v != null);
+      const sleepVals = recentMetrics.map((m: any) => m.sleep_duration_seconds).filter((v: any) => v != null);
+      const restingHr = restingHrVals.length ? Math.round(avg(restingHrVals)!) : null;
+      const hrv = hrvVals.length ? Math.round(avg(hrvVals)!) : null;
+      const avgSleepH = sleepVals.length ? (avg(sleepVals)! / 3600).toFixed(1) : null;
+
+      // HRV trend: compare last 3 days vs previous 7
+      let hrvTrend = "stable";
+      const recent3 = hrvVals.slice(0, 3);
+      const prior7 = hrvVals.slice(3, 10);
+      if (recent3.length >= 2 && prior7.length >= 3) {
+        const r = avg(recent3)!;
+        const p = avg(prior7)!;
+        const diff = ((r - p) / p) * 100;
+        if (diff < -10) hrvTrend = "declining (>10% drop)";
+        else if (diff > 5) hrvTrend = "improving";
+      }
+
+      // HR zones from estimated max HR (220 - age fallback) or from activity max
+      const ageMax = profile?.date_of_birth
+        ? 220 - (new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear())
+        : null;
+      const observedMax = Math.max(...(activities || []).map((a: any) => a.max_heart_rate || 0));
+      const maxHr = ageMax || (observedMax > 0 ? observedMax : 190);
+      const z1Max = Math.round(maxHr * 0.65);
+      const z2Range = `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.75)}`;
+      const z3Range = `${Math.round(maxHr * 0.75)}-${Math.round(maxHr * 0.85)}`;
+      const z4Range = `${Math.round(maxHr * 0.85)}-${Math.round(maxHr * 0.92)}`;
+      const z5Min = Math.round(maxHr * 0.92);
+
+      // Recent run stats
+      const runs = (activities || []).filter((a: any) => /run/i.test(a.activity_type || ""));
+      const longestRun = runs.length ? Math.max(...runs.map((a: any) => (a.distance_meters || 0) / 1000)).toFixed(1) : "N/A";
+      // Z2 pace estimate: avg pace of runs with avg_hr in Z2 range
+      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
+      const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
+      const z2Pace = z2PaceMps ? (() => {
+        const secPerKm = 1000 / z2PaceMps;
+        const m = Math.floor(secPerKm / 60);
+        const s = Math.round(secPerKm % 60).toString().padStart(2, "0");
+        return `${m}:${s}`;
+      })() : "N/A";
+
+      // ACWR (acute:chronic workload ratio) from training load
+      const today = new Date();
+      const acuteLoad = runs.filter((a: any) => {
+        const d = new Date(a.start_time);
+        return (today.getTime() - d.getTime()) / 86400000 <= 7;
+      }).reduce((s: number, a: any) => s + (a.duration_seconds || 0) / 60, 0);
+      const chronicLoad = runs.filter((a: any) => {
+        const d = new Date(a.start_time);
+        return (today.getTime() - d.getTime()) / 86400000 <= 28;
+      }).reduce((s: number, a: any) => s + (a.duration_seconds || 0) / 60, 0) / 4;
+      const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad).toFixed(2) : "N/A";
+
+      // Weeks calculation
+      let weeks = "TBD (ai-recommend)";
+      let baseWeeks = "?", buildWeeks = "?", sharpenWeeks = "?", taperWeeks = "2";
+      if (race_date && race_date !== "ai-recommend") {
+        const start = new Date(planStart);
+        const race = new Date(race_date);
+        const w = Math.max(1, Math.round((race.getTime() - start.getTime()) / (7 * 86400000)));
+        weeks = String(w);
+        taperWeeks = String(Math.min(2, Math.max(1, Math.round(w * 0.15))));
+        sharpenWeeks = String(Math.max(1, Math.round(w * 0.20)));
+        buildWeeks = String(Math.max(1, Math.round(w * 0.30)));
+        baseWeeks = String(w - Number(taperWeeks) - Number(sharpenWeeks) - Number(buildWeeks));
+      }
+
       const planLengthInstruction = isAIDecide
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed.`
-        : `Generate a detailed 28-day plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery.`;
+        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery. Every single week from week 1 to week ${weeks} must be detailed.`;
 
-      systemPrompt = `You are an elite endurance coach AI that generates periodized training plans for a ${raceLabel} race, modeled after the garmin-ai-coach system.
+      systemPrompt = `══ ATHLETE ══
+Name: ${profile?.name || "Athlete"}
+Experience: ${profile?.experience_level || "intermediate"}
+Goal: ${profile?.training_goals || "complete the race strong"}
+Race: ${raceLabel} on ${race_date && race_date !== "ai-recommend" ? race_date : "TBD (you decide)"}
+Plan: ${weeks} weeks starting ${planStart}
+Training Days: ${(training_days as string[] | undefined)?.length || 4} (${daysStr})
 
-The athlete trains on these days: ${daysStr}. All other days should be rest or active recovery. The plan starts on ${planStartUK}.
+══ PHYSIOLOGICAL DATA ══
+HR Zones (estimated from max HR ${maxHr}): Z1<${z1Max}, Z2:${z2Range}, Z3:${z3Range}, Z4:${z4Range}, Z5>${z5Min} bpm
+VO2max: derive from activity history above
+Resting HR: ${restingHr ?? "N/A"} bpm (7-day avg)
+HRV: ${hrv ?? "N/A"} ms (trend: ${hrvTrend})
+Sleep: ${avgSleepH ?? "N/A"}h/night (see sleep scores in data above)
+ACWR: ${acwr} (acute:chronic workload ratio, last 7d vs 28d running minutes)
+Injury History: ${profile?.athlete_context || "none reported"}
+Current Niggles: ${profile?.athlete_context || "none reported"}
 
-RACE DATE: ${raceDateInstruction}
+══ RECENT PERFORMANCE ══
+Easy Run Pace (Z2): ${z2Pace}/km
+Long Run: ${longestRun} km
+(Recent 5K time and tempo pace: derive from activity history above)
 
-CRITICAL INSTRUCTIONS:
-- Carefully review the athlete's profile, especially "Additional Context" which may contain injuries, physical limitations, or health conditions. You MUST adapt every workout to account for these. If an injury is mentioned, include modifications, reduced intensity, or alternative exercises.
-- Review ALL activity data to understand the athlete's current fitness level, typical paces, heart rate zones, and recent training load. Base all targets on their ACTUAL performance, not generic estimates.
-- Review sleep data to assess recovery status. If sleep scores are consistently low (<60) or deep/REM percentages are below recommended ranges, factor in extra recovery days or lower intensity sessions. Reference sleep trends when explaining rest day placement.
-- Structure each workout with clear segments: Warm-up → Main set (with intervals if applicable) → Cool-down
-  - For each segment specify: duration AND/OR distance, and target pace range
-  - For interval sessions, clearly state: number of reps, work duration/distance, recovery duration/distance, target pace for each
-  - When a workout has a distance goal (e.g., long run), always include the target distance alongside the estimated duration
+══ COACHING TASK ══
+You are an elite running coach with 35 years of experience, training beginners to olympic gold medalists to be the best runner they can be. Generate a ${weeks}-week periodized training plan. Be concise, specific, coach-like.
 
-Based on the athlete's data and goals, generate a plan specifically targeting a ${raceLabel}:
+INTERVAL INTRODUCTION BY EXPERIENCE:
+IF Beginner OR Injured OR Returning (>8 weeks off):
+  - Weeks 1-2: Walk/run intervals ONLY (progressive: 30s run/30s walk → 5min run/1min walk over 10 sessions)
+  - Week 3: Introduce tempo (10min Z3)
+  - Week 5+: Race pace intervals
+IF Intermediate AND No Injury:
+  - Weeks 1-2: Easy continuous running Z2
+  - Week 2: Add strides (6×20sec)
+  - Week 3: Tempo introduction
+  - Week 4+: Intervals (race pace, VO2max)
+IF Advanced:
+  - Week 1: Easy base week Z2
+  - Week 2+: Quality sessions with recovery weeks
 
-${isAIDecide ? `## 🏥 Fitness Assessment
-Before creating the plan, provide a detailed assessment of the athlete's current fitness:
-- Current estimated VO2max / fitness level based on pace and HR data
-- Average run distance, pace, and cadence
-- Longest recent run and how it compares to ${raceLabel} distance
-- Heart rate trends and aerobic base status
-- Training consistency and volume over time
-- Health indicators (sleep, HRV, resting HR, stress) if available
-- Overall readiness assessment for ${raceLabel}
+TRAINING PRINCIPLES:
+- 80% volume in Z2 (easy), 20% in Z3-Z5 (hard)
+- Increase weekly volume max 10%
+- Recovery week every 3-4 weeks (reduce volume 40-50%)
+- Taper: Final 10-14 days reduce volume 50-60%, maintain intensity
+- Include 2x/week strength/band circuits (glute bridges, single-leg deadlifts, planks, clamshells)
+- If ACWR>1.5 OR HRV drops >10% OR RHR elevated >5bpm for 3+ days: force recovery week
 
-## ⏱️ Recommended Training Duration
-Based on the fitness assessment above:
-- State exactly how many weeks of training are needed and why
-- Recommend a specific race date (DD/MM/YYYY format)
-- Explain the reasoning behind the timeline
+PERIODIZATION:
+Phase 1 — Base (${baseWeeks} weeks): Z2 volume, aerobic foundation, injury prevention
+Phase 2 — Build (${buildWeeks} weeks): Tempo + threshold, maintain volume
+Phase 3 — Sharpen (${sharpenWeeks} weeks): Race pace + VO2max, reduce volume 10%
+Phase 4 — Taper (${taperWeeks} weeks): -50% volume, maintain intensity
 
-` : ''}## 📅 Season Strategy Overview
-Create a macro-cycle plan with:
-- Phase architecture (base, build, peak, taper, race) tailored for ${raceLabel}
-- Key training blocks and their focus
-- Volume/intensity progression targets appropriate for ${raceLabel} distance
-- Any modifications needed based on the athlete's injuries or limitations
+WORKOUT TYPES:
+- Easy: Z2, conversational, 30-60min
+- Long: Z2, progressive finish, 60-120min
+- Tempo: Z3, comfortably hard, 20-40min sustained
+- Race Pace: Z3-Z4, 3-10min blocks with 2-3min recovery
+- VO2max: Z4-Z5, 400m-1200m reps with equal rest
+- Strides: 6×20sec @ 5K pace (neuromuscular)
 
-## 📋 ${isAIDecide ? 'Complete' : '4-Week'} Training Plan
+══ OUTPUT FORMAT ══
+
+**SEASON OVERVIEW** (max 150 words)
+- Phase breakdown with weeks
+- Weekly volume progression by phase
+- Intensity distribution (% time in each zone)
+- Key milestone sessions
+
+**WEEK-BY-WEEK PLAN**
 ${planLengthInstruction}
 
-CRITICAL FORMAT RULES:
-1. EVERY single workout day MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column). Do NOT use compact one-liner formats like "Easy Run (30 min) @ Z2". Even simple easy runs must have a table with at least Warm-up, Main, and Cool-down rows. This is required for watch sync to work. No exceptions for any week.
-2. EVERY workout title line MUST include the total duration in the format "(Total: Xmin)" — calculate this by summing all segment durations including warm-up, main set, and cool-down. This is mandatory for every single workout. For interval sessions, include the recovery time in the total.
-3. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min", "5 x 1 min") — NEVER use zone labels like "Z1", "Z2", "Z3", or "Z4" as the duration.
-4. When a segment has a specific distance target (e.g., long run of 10km, intervals of 800m), include BOTH the distance AND the estimated duration in the Duration column (e.g., "10km (~55 min)" or "4 x 800m (~3.5 min each)").
-5. EVERY running segment in the Notes column MUST include a music BPM target aligned with the target cadence for that segment. Use the format "🎵 XXX BPM (target cadence)". Use these mappings:
+CRITICAL FORMAT RULES (required for watch sync — do not deviate):
+1. Use UK date format (DD/MM/YYYY) for every date.
+2. EVERY workout day MUST be presented as a markdown table with columns: Segment | Duration/Distance | Target | Notes. No compact one-liners.
+3. EVERY workout title MUST include "(Total: Xmin)" — sum all segments including warm-up, recoveries, cool-down.
+4. Interval durations in MINUTES (e.g., "4 x 3 min"), never bare zone labels.
+5. When a segment has a distance target, include BOTH distance AND estimated duration (e.g., "10km (~55 min)").
+6. EVERY running segment in Notes MUST include music BPM target:
    - Walking/easy: 🎵 150 BPM
    - Easy run: 🎵 155 BPM
    - Steady/intervals: 🎵 165 BPM
    - Tempo/threshold: 🎵 170 BPM
    - Race pace/VO2max: 🎵 175 BPM
-   This is critical for the athlete to match their running cadence to music tempo for joint protection. NEVER omit the music BPM from the Notes column on any running segment.
+7. Include HR target ranges from the zones above in the Target column.
 
-For each workout day, use this format. IMPORTANT: Use UK date format (DD/MM/YYYY) for all dates:
-
-### Week 1: [Theme]
-**Monday ${planStartUK}** - [Workout Type] (Total: 40min)
+Example workout format:
+### Week 1: Base Building
+**Monday ${planStart}** - Easy Run (Total: 30min)
 | Segment | Duration/Distance | Target | Notes |
 |---------|-------------------|--------|-------|
-| Warm-up | 10 min | easy pace | 🎵 150 BPM (target cadence) |
-| Main | 4 x 3 min (800m each) | 5:30/km | 🎵 170 BPM (target cadence); 2 min jog recovery |
-| Cool-down | 10 min | easy pace | 🎵 150 BPM (target cadence) |
+| Warm-up | 5 min walk | Z1 (<${z1Max} bpm) | 🎵 150 BPM (target cadence) |
+| Main | 20 min easy run | Z2 (${z2Range} bpm) | 🎵 155 BPM (target cadence); walk breaks OK if HR spikes |
+| Cool-down | 5 min walk | Z1 (<${z1Max} bpm) | 🎵 150 BPM (target cadence) |
+- Strength: Band circuit after (glute bridges, clamshells, planks)
 
-EVERY workout in EVERY week must follow this exact table format. Continue for all weeks with actual dates.
+After all weekly sessions, append:
 
-Include:
-- Progression across weeks (build weeks + recovery week pattern)
-- Session RPE targets
-- Weekly volume targets appropriate for ${raceLabel}
-- Key ${raceLabel}-specific workouts (tempo runs, race-pace sessions, long runs)
-- Injury/limitation accommodations noted where relevant
-- Adaptation goals per week
+**RACE DAY STRATEGY**
+- Mile-by-mile splits (conservative start, build, finish strong)
+- HR targets per mile
+- Warm-up protocol (10min jog Z2 + 4×20sec strides)
+- Fueling (if race >60min)
 
-Be specific with paces, durations, and intensities. Use the athlete's actual performance data to set realistic ${raceLabel} targets.`;
+**STRENGTH CIRCUIT** (2x/week)
+- Single-leg deadlifts: 3×10 each leg
+- Glute bridges: 3×15
+- Clamshells: 3×20 each side
+- Planks: 3×30-60sec
+- Calf raises: 3×20
+
+Generate the complete plan now. Be specific with paces, HR zones, and workout structures. Base all targets on the athlete's actual performance data above.`;
 
       userPrompt = `${athleteContext}
 
