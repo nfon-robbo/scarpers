@@ -220,27 +220,25 @@ export default function PlanOverview({
       {/* Plan Header */}
       <Card className="overflow-hidden">
         <div className="bg-gradient-to-br from-primary to-accent p-5 text-primary-foreground">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-bold tracking-tight">
-                {DISTANCE_LABELS[raceDistance] || raceDistance}
-              </h2>
-              <div className="flex items-center gap-2 text-sm opacity-90">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>
-                  {format(planDates.start, "d MMM")} – {format(planDates.end, "d MMM yyyy")}
-                </span>
-              </div>
-              {daysRemaining !== null && (
-                <p className="text-sm font-medium mt-1">
-                  <Trophy className="w-3.5 h-3.5 inline mr-1" />
-                  {daysRemaining === 0
-                    ? "Race Day! 🎉"
-                    : `${Math.floor(daysRemaining / 7)} week(s) and ${daysRemaining % 7} day(s) to go`}
-                </p>
-              )}
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-tight">
+              {DISTANCE_LABELS[raceDistance] || raceDistance}
+            </h2>
+            <div className="flex items-center gap-2 text-sm opacity-90">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>
+                {format(planDates.start, "d MMM")} – {format(planDates.end, "d MMM yyyy")}
+              </span>
             </div>
-            {headerAction && <div className="shrink-0">{headerAction}</div>}
+            {daysRemaining !== null && (
+              <p className="text-sm font-medium mt-1">
+                <Trophy className="w-3.5 h-3.5 inline mr-1" />
+                {daysRemaining === 0
+                  ? "Race Day! 🎉"
+                  : `${Math.floor(daysRemaining / 7)} week(s) and ${daysRemaining % 7} day(s) to go`}
+              </p>
+            )}
+            {headerAction && <div className="mt-3">{headerAction}</div>}
           </div>
         </div>
 
