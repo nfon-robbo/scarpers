@@ -113,7 +113,7 @@ const Settings = () => {
   const [syncing, setSyncing] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Personal details
+  // Personal details (always stored as cm/kg, displayed per unit prefs)
   const [personal, setPersonal] = useState({
     sex: "",
     date_of_birth: "",
@@ -121,6 +121,61 @@ const Settings = () => {
     weight_kg: "",
   });
   const [savingPersonal, setSavingPersonal] = useState(false);
+
+  // Display fields driven by unit prefs
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
+  const [weightDisplay, setWeightDisplay] = useState(""); // primary unit value (kg/lbs/st whole)
+  const [weightStLb, setWeightStLb] = useState(""); // remainder lb when stone
+
+  // Sync display fields when stored cm/kg or unit prefs change
+  useEffect(() => {
+    const cm = personal.height_cm ? Number(personal.height_cm) : null;
+    if (cm == null) { setHeightFt(""); setHeightIn(""); return; }
+    if (units.height === "ft") {
+      const totalIn = cm * 0.393701;
+      const ft = Math.floor(totalIn / 12);
+      const inches = Math.round(totalIn - ft * 12);
+      setHeightFt(String(ft));
+      setHeightIn(String(inches));
+    }
+  }, [personal.height_cm, units.height]);
+
+  useEffect(() => {
+    const kg = personal.weight_kg ? Number(personal.weight_kg) : null;
+    if (kg == null) { setWeightDisplay(""); setWeightStLb(""); return; }
+    if (units.weight === "kg") {
+      setWeightDisplay(String(kg));
+    } else if (units.weight === "lbs") {
+      setWeightDisplay((kg * 2.20462).toFixed(1));
+    } else if (units.weight === "st") {
+      const totalLb = kg * 2.20462;
+      const st = Math.floor(totalLb / 14);
+      const lb = +(totalLb - st * 14).toFixed(1);
+      setWeightDisplay(String(st));
+      setWeightStLb(String(lb));
+    }
+  }, [personal.weight_kg, units.weight]);
+
+  const commitHeight = (ftStr: string, inStr: string) => {
+    const ft = Number(ftStr) || 0;
+    const inches = Number(inStr) || 0;
+    if (!ftStr && !inStr) { setPersonal((p) => ({ ...p, height_cm: "" })); return; }
+    const cm = (ft * 12 + inches) * 2.54;
+    setPersonal((p) => ({ ...p, height_cm: cm.toFixed(1) }));
+  };
+
+  const commitWeight = (primary: string, lbRem: string = "") => {
+    if (!primary && !lbRem) { setPersonal((p) => ({ ...p, weight_kg: "" })); return; }
+    let kg = 0;
+    if (units.weight === "kg") kg = Number(primary) || 0;
+    else if (units.weight === "lbs") kg = (Number(primary) || 0) / 2.20462;
+    else if (units.weight === "st") {
+      const totalLb = (Number(primary) || 0) * 14 + (Number(lbRem) || 0);
+      kg = totalLb / 2.20462;
+    }
+    setPersonal((p) => ({ ...p, weight_kg: kg ? kg.toFixed(2) : "" }));
+  };
 
   useEffect(() => {
     if (profile) {
