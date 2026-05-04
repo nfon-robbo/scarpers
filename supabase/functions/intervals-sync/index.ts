@@ -259,8 +259,10 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build bulk events
-    const bulkEvents = workouts.map((workout, idx) => {
+    // Step 2: Build events. Do not send workout_doc: the Intervals.icu API parses
+    // the workout-builder text in description and creates workout_doc server-side.
+    // Sending an empty workout_doc keeps the structured graph empty.
+    const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
@@ -275,7 +277,6 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
         ...(workout.fitFileBase64 && workout.fitFileName
           ? {
               filename: workout.fitFileName,
@@ -286,28 +287,42 @@ serve(async (req) => {
       };
     });
 
-    // Use bulk upsert endpoint for reliability
-    console.log(`Syncing ${bulkEvents.length} workouts via bulk endpoint`);
-    const resp = await fetch(`${baseUrl}/events/bulk?upsert=true`, {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify(bulkEvents),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("Bulk sync error:", resp.status, errText);
-      return new Response(
-        JSON.stringify({ error: `Intervals.icu API error: ${resp.status} ${errText}`, succeeded: 0, failed: bulkEvents.length }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const existingByExternalId = new Map<string, string | number>();
+    if (!clearRange) {
+      const dates = eventsToSync.map((event) => event.start_date_local.slice(0, 10)).sort();
+      const eventsResp = await fetch(`${baseUrl}/events?oldest=${dates[0]}&newest=${dates[dates.length - 1]}`, { headers: authHeaders });
+      if (eventsResp.ok) {
+        const existingEvents = await eventsResp.json();
+        for (const evt of existingEvents) {
+          if (evt.category === "WORKOUT" && evt.external_id) existingByExternalId.set(evt.external_id, evt.id);
+        }
+      }
     }
 
-    const result = await resp.json();
-    console.log(`Bulk sync result: ${result.length} events created/updated`);
+    console.log(`Syncing ${eventsToSync.length} workouts via parsed event endpoint`);
+    const result = [];
+    const failures = [];
+    for (const event of eventsToSync) {
+      const existingId = existingByExternalId.get(event.external_id);
+      const resp = await fetch(existingId ? `${baseUrl}/events/${existingId}` : `${baseUrl}/events`, {
+        method: existingId ? "PUT" : "POST",
+        headers: authHeaders,
+        body: JSON.stringify(event),
+      });
+
+      if (resp.ok) {
+        result.push(await resp.json());
+      } else {
+        const errText = await resp.text();
+        console.error("Event sync error:", resp.status, errText, event.name);
+        failures.push({ event, error: `${resp.status} ${errText}` });
+      }
+    }
+
+    console.log(`Parsed event sync result: ${result.length} created/updated, ${failures.length} failed`);
 
     return new Response(
-      JSON.stringify({ succeeded: result.length, failed: 0, results: result.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
+      JSON.stringify({ succeeded: result.length, failed: failures.length, results: result.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
