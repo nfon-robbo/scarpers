@@ -132,7 +132,7 @@ export default function PlanOverview({
     const pastWorkouts = workouts.filter(w => w.dateObj && isBefore(w.dateObj, today) && !isToday(w.dateObj) && !/rest/i.test(w.title));
     const completed = pastWorkouts.filter(w => completedDates.has(format(w.dateObj!, "yyyy-MM-dd"))).length;
     const skipped = pastWorkouts.length - completed;
-    const remaining = total - pastWorkouts.length - completed;
+    const remaining = total - pastWorkouts.length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, completed, skipped, remaining, completionRate };
