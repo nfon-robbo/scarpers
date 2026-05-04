@@ -73,10 +73,10 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtStep(step: WorkoutStep): string {
-    // Intervals.icu parses cue text most reliably before the duration, e.g.
-    // "- Walk 1m 9:57/km Pace". Putting "rest" between duration and pace
-    // can leave the visual workout graph empty even though the text is shown.
-    return `- ${stepCue(step)} ${fmtDur(step.duration)}${fmtTarget(step)}`;
+    // Keep Intervals.icu workout-builder syntax minimal: dash, duration,
+    // then target. Extra cue words before the duration can be shown as text
+    // but fail to populate workout_doc/graph/watch steps for some run workouts.
+    return `- ${fmtDur(step.duration)}${fmtTarget(step)}`;
   }
 
   const lines: string[] = [];
@@ -259,10 +259,9 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events. Intervals.icu only rebuilds the structured workout
-    // graph from native workout-builder text when workout_doc is present as an
-    // empty object. Do not attach generated FIT files here because they convert
-    // absolute paces into 0% pace targets for running workouts.
+    // Step 2: Build events. Let Intervals.icu parse the workout-builder text
+    // into workout_doc itself. Sending an empty workout_doc can persist an empty
+    // structure, which leaves the graph blank and pushes generic steps to watches.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
@@ -279,7 +278,6 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
