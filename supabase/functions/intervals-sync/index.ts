@@ -20,6 +20,15 @@ type WorkoutInput = {
   steps: WorkoutStep[];
 };
 
+function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
+  const match = pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
+  if (!match) return 0;
+  const paceSeconds = Number(match[1]) * 60 + Number(match[2]);
+  if (!Number.isFinite(paceSeconds) || paceSeconds <= 0) return 0;
+  const metresPerUnit = /mi/i.test(match[3] || "") ? 1609.344 : 1000;
+  return (durationSeconds / paceSeconds) * metresPerUnit;
+}
+
 function formatWorkoutDescription(workout: WorkoutInput): string {
   if (workout.rawDescription && /\bpace\b/i.test(workout.rawDescription) && !/\b(?:hr|lthr|bpm)\b/i.test(workout.rawDescription)) {
     return workout.notes ? `${workout.rawDescription}\n\n${workout.notes}` : workout.rawDescription;
@@ -258,6 +267,7 @@ serve(async (req) => {
     const bulkEvents = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
+      const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
 
       return {
         category: "WORKOUT",
@@ -266,8 +276,9 @@ serve(async (req) => {
         type: "Run",
         target: "PACE",
         moving_time: totalDuration,
+        time_target: totalDuration,
+        ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
         ...(workout.fitFileBase64 && workout.fitFileName
           ? {
               filename: workout.fitFileName,
