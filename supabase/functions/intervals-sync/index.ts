@@ -59,6 +59,21 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return "";
   }
 
+  function stepCue(step: WorkoutStep): string {
+    const normalized = step.intensity.toLowerCase();
+    const pace = step.pace?.replace(/\s+/g, "").toLowerCase();
+    if (normalized === "recovery" || normalized === "rest" || pace === "9:57/km") return "Walk";
+    if (normalized === "warmup" || normalized === "cooldown") return pace === "9:57/km" ? "Walk" : "Easy";
+    return "Run";
+  }
+
+  function fmtStep(step: WorkoutStep): string {
+    // Intervals.icu parses cue text most reliably before the duration, e.g.
+    // "- Walk 1m 9:57/km Pace". Putting "rest" between duration and pace
+    // can leave the visual workout graph empty even though the text is shown.
+    return `- ${stepCue(step)} ${fmtDur(step.duration)}${fmtTarget(step)}`;
+  }
+
   const lines: string[] = [];
   let i = 0;
   let prevIntensity = "";
@@ -68,7 +83,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
 
     if (step.intensity === "Warmup") {
       if (prevIntensity !== "Warmup") lines.push("Warmup");
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Warmup";
       i += 1;
     } else if (step.intensity === "Cooldown") {
@@ -76,7 +91,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Cooldown");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Cooldown";
       i += 1;
     } else if (step.intensity === "Interval") {
@@ -102,15 +117,15 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       if (reps > 1) {
         lines.push("");
         lines.push(`${reps}x`);
-        lines.push(`- ${fmtDur(workDur)}${fmtTarget(workStep)}`);
-        if (restDur > 0 && restStep) lines.push(`- ${fmtDur(restDur)} rest${fmtTarget(restStep)}`);
+        lines.push(fmtStep(workStep));
+        if (restDur > 0 && restStep) lines.push(fmtStep(restStep));
         i = j;
       } else {
         if (prevIntensity !== "Active") {
           lines.push("");
           lines.push("Run");
         }
-        lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+        lines.push(fmtStep(step));
         i += 1;
       }
 
@@ -120,7 +135,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Run");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Active";
       i += 1;
     }
