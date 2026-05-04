@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -11,6 +11,10 @@ export interface Profile {
   training_goals: string | null;
   athlete_context: string | null;
   onboarding_completed: boolean;
+  sex: string | null;
+  date_of_birth: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
 }
 
 export function useProfile() {
@@ -18,28 +22,25 @@ export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       setLoading(false);
       return;
     }
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setProfile(data as Profile);
-      }
-      setLoading(false);
-    };
-
-    fetchProfile();
+    if (!error && data) setProfile(data as Profile);
+    setLoading(false);
   }, [user]);
 
-  return { profile, loading };
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  return { profile, loading, refresh: fetchProfile };
 }
