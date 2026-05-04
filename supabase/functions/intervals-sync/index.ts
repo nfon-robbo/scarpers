@@ -249,7 +249,6 @@ serve(async (req) => {
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
         type: "Run",
-        target: "Pace",
         moving_time: totalDuration,
         description: fullDescription,
         ...(workout.fitFileBase64 && workout.fitFileName
