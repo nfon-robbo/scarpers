@@ -275,6 +275,91 @@ const TrainingPlanPage = () => {
     toast({ title: "Plan archived", description: "Find it under Settings → Previous Plans" });
   };
 
+  // Floating start/end date editor
+  const [updatingDates, setUpdatingDates] = useState(false);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [pendingStart, setPendingStart] = useState<Date | undefined>(undefined);
+  const [pendingEnd, setPendingEnd] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    if (datePopoverOpen) {
+      setPendingStart(startDate);
+      setPendingEnd(raceDate);
+    }
+  }, [datePopoverOpen, startDate, raceDate]);
+
+  const persistStartDateShift = async (newStart: Date) => {
+    if (!savedPlanId || !user) { setStartDate(newStart); return; }
+    setUpdatingDates(true);
+    try {
+      await supabase.from("training_plans")
+        .update({ start_date: newStart.toISOString().split("T")[0] })
+        .eq("id", savedPlanId);
+      setStartDate(newStart);
+      toast({ title: "Start date updated", description: "Workouts shifted to the new start date." });
+    } catch (e: any) {
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUpdatingDates(false);
+    }
+  };
+
+  const regenerateForNewEndDate = async (newStart: Date, newEnd: Date) => {
+    if (!user) return;
+    if (newEnd <= newStart) {
+      toast({ title: "Invalid dates", description: "End date must be after start date.", variant: "destructive" });
+      return;
+    }
+    setDatePopoverOpen(false);
+    if (savedPlanId) {
+      await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
+      setSavedPlanId(null);
+    }
+    setStartDate(newStart);
+    setRaceDate(newEnd);
+    setLetAIDecide(false);
+    setContent("");
+    setLoading(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
+
+    let accumulated = "";
+    streamAICoach({
+      type: "training-plan",
+      token: session.access_token,
+      raceDistance,
+      trainingDays,
+      startDate: newStart.toISOString().split("T")[0],
+      raceDate: newEnd.toISOString().split("T")[0],
+      onDelta: (text) => { accumulated += text; setContent(accumulated); },
+      onDone: () => {
+        setLoading(false);
+        savePlan(accumulated);
+        toast({ title: "Plan regenerated", description: "New plan built for updated end date." });
+      },
+      onError: (err) => {
+        toast({ title: "Regeneration failed", description: err, variant: "destructive" });
+        setLoading(false);
+      },
+    });
+  };
+
+  const applyDateChanges = () => {
+    if (!pendingStart) return;
+    const startChanged = pendingStart.toDateString() !== startDate.toDateString();
+    const endChanged = (pendingEnd?.toDateString() || "") !== (raceDate?.toDateString() || "");
+    if (endChanged && pendingEnd) {
+      regenerateForNewEndDate(pendingStart, pendingEnd);
+    } else if (startChanged) {
+      persistStartDateShift(pendingStart);
+      setDatePopoverOpen(false);
+    } else {
+      setDatePopoverOpen(false);
+    }
+  };
+
+
   const toggleDay = (day: string) => {
     setTrainingDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
