@@ -26,12 +26,12 @@ interface FitFilePayload {
   fileName: string;
 }
 
-const durationPattern = /(\d+m\d+s|\d+m|\d+s)\b/i;
+const durationPattern = /(\d+m\d+s?|\d+m|\d+s)\b/i;
 const bpmPattern = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm\s*HR/i;
 const pacePattern = /(\d{1,2}:\d{2})(?:\s*\/\s*(km|mi))?\s*Pace/i;
 
 function durationTextToMilliseconds(value: string): number {
-  const match = value.toLowerCase().match(/(?:(\d+)m)?(?:(\d+)s)?/);
+  const match = value.toLowerCase().match(/(?:(\d+)m)?(?:(\d+)s?)?/);
   const minutes = Number(match?.[1] ?? 0);
   const seconds = Number(match?.[2] ?? 0);
   return (minutes * 60 + seconds) * 1000;
