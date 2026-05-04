@@ -87,6 +87,7 @@ export default function PlanOverview({
   raceDate,
   completedDates = new Set(),
   linkedActivities = {},
+  headerAction,
 }: PlanOverviewProps) {
   const today = new Date();
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
