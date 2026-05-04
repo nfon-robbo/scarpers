@@ -75,7 +75,9 @@ function toFitIntensity(intensity: string): string {
   const normalized = intensity.toLowerCase();
   if (normalized === "warmup") return INTENSITY.WARMUP;
   if (normalized === "cooldown") return INTENSITY.COOLDOWN;
-  if (normalized === "rest" || normalized === "recovery") return INTENSITY.REST;
+  if (normalized === "recovery") return INTENSITY.RECOVERY;
+  if (normalized === "rest") return INTENSITY.REST;
+  if (normalized === "interval") return "interval";
   return INTENSITY.ACTIVE;
 }
 
@@ -98,6 +100,7 @@ function buildSpeedFitStep(durationMs: number, pace: string, intensity: string):
   const speed = paceToSpeedMps(pace);
   if (!speed) return null;
   const targetPace = pace.replace(/\s+/g, "").replace(/\s*Pace$/i, "");
+  const speedFitValue = speed * 1000;
   return {
     name: stepName(intensity, targetPace),
     intensity: toFitIntensity(intensity),
@@ -105,8 +108,8 @@ function buildSpeedFitStep(durationMs: number, pace: string, intensity: string):
     durationValue: durationMs,
     targetType: WKT_STEP_TARGET.SPEED,
     targetValue: 0,
-    customTargetLow: speed * 0.97,
-    customTargetHigh: speed * 1.03,
+    customTargetLow: speedFitValue * 0.97,
+    customTargetHigh: speedFitValue * 1.03,
   };
 }
 

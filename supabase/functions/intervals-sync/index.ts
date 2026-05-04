@@ -259,9 +259,10 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events. Let Intervals.icu parse the workout-builder text
-    // into workout_doc itself. Sending an empty workout_doc can persist an empty
-    // structure, which leaves the graph blank and pushes generic steps to watches.
+    // Step 2: Build events with an attached Garmin FIT workout file. Relying on
+    // description parsing alone can leave workout_doc empty, which gives a blank
+    // graph and generic watch steps. FIT gives Intervals.icu/Garmin explicit run
+    // and walk steps with pace targets.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
@@ -278,6 +279,9 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
+        ...(workout.fitFileBase64 && workout.fitFileName
+          ? { filename: workout.fitFileName, file_contents_base64: workout.fitFileBase64 }
+          : { workout_doc: {} }),
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
