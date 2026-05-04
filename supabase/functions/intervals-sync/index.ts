@@ -339,42 +339,29 @@ serve(async (req) => {
       };
     });
 
-    const existingByExternalId = new Map<string, string | number>();
-    if (!clearRange) {
-      const dates = eventsToSync.map((event) => event.start_date_local.slice(0, 10)).sort();
-      const eventsResp = await fetch(`${baseUrl}/events?oldest=${dates[0]}&newest=${dates[dates.length - 1]}`, { headers: authHeaders });
-      if (eventsResp.ok) {
-        const existingEvents = await eventsResp.json();
-        for (const evt of existingEvents) {
-          if (evt.category === "WORKOUT" && evt.external_id) existingByExternalId.set(evt.external_id, evt.id);
-        }
-      }
+    console.log(`Syncing ${eventsToSync.length} workouts via Intervals.icu bulk planned-workout endpoint`);
+    const resp = await fetch(`${baseUrl}/events/bulk?upsert=true`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify(eventsToSync),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error("Bulk workout sync error:", resp.status, errText);
+      return new Response(
+        JSON.stringify({ error: `Intervals.icu bulk sync failed: ${resp.status} ${errText}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log(`Syncing ${eventsToSync.length} workouts via structured workout_doc endpoint`);
-    const result = [];
-    const failures = [];
-    for (const event of eventsToSync) {
-      const existingId = existingByExternalId.get(event.external_id);
-      const resp = await fetch(existingId ? `${baseUrl}/events/${existingId}` : `${baseUrl}/events`, {
-        method: existingId ? "PUT" : "POST",
-        headers: authHeaders,
-        body: JSON.stringify(event),
-      });
+    const result = await resp.json();
+    const syncedEvents = Array.isArray(result) ? result : [];
 
-      if (resp.ok) {
-        result.push(await resp.json());
-      } else {
-        const errText = await resp.text();
-        console.error("Event sync error:", resp.status, errText, event.name);
-        failures.push({ event, error: `${resp.status} ${errText}` });
-      }
-    }
-
-    console.log(`Structured event sync result: ${result.length} created/updated, ${failures.length} failed`);
+    console.log(`Structured bulk sync result: ${syncedEvents.length} created/updated, 0 failed`);
 
     return new Response(
-      JSON.stringify({ succeeded: result.length, failed: failures.length, results: result.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
+      JSON.stringify({ succeeded: syncedEvents.length, failed: 0, results: syncedEvents.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
