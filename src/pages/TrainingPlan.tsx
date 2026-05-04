@@ -347,6 +347,9 @@ const TrainingPlanPage = () => {
       await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
     }
     toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]}.` });
+  };
+
+  const persistStartDateShift = async (newStart: Date) => {
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
