@@ -274,6 +274,7 @@ export type Database = {
           training_goals: string | null
           unit_distance: string
           unit_elevation: string
+          unit_height: string
           unit_speed: string
           unit_temperature: string
           unit_weight: string
@@ -295,6 +296,7 @@ export type Database = {
           training_goals?: string | null
           unit_distance?: string
           unit_elevation?: string
+          unit_height?: string
           unit_speed?: string
           unit_temperature?: string
           unit_weight?: string
@@ -316,6 +318,7 @@ export type Database = {
           training_goals?: string | null
           unit_distance?: string
           unit_elevation?: string
+          unit_height?: string
           unit_speed?: string
           unit_temperature?: string
           unit_weight?: string
