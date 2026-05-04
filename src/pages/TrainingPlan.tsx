@@ -867,11 +867,19 @@ const TrainingPlanPage = () => {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Start a new plan?</AlertDialogTitle>
-                <AlertDialogDescription>This will discard your current plan and take you back to the configuration screen. Your saved plan will still be in the database until you generate a new one.</AlertDialogDescription>
+                <AlertDialogDescription>This will archive your current plan (you can resume it later from Settings → Previous Plans) and take you back to the configuration screen.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => { setContent(""); setSavedPlanId(null); setShowNewPlanDialog(false); }}>Continue</AlertDialogAction>
+                <AlertDialogAction onClick={async () => {
+                  if (savedPlanId) {
+                    await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
+                  }
+                  setContent("");
+                  setSavedPlanId(null);
+                  setShowNewPlanDialog(false);
+                  toast({ title: "Plan archived", description: "Find it under Settings → Previous Plans" });
+                }}>Continue</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
