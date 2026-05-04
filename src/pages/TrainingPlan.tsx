@@ -19,7 +19,6 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
-import { buildIntervalsFitFile } from "@/lib/intervals-workout-fit";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 
 interface ApiStep {
@@ -838,12 +837,6 @@ const TrainingPlanPage = () => {
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
-        const fitFile = buildIntervalsFitFile({
-          name: correctedName,
-          rawDescription: w.intervalsText,
-          steps,
-        });
-
         return {
           date: dateStr,
           name: correctedName,
@@ -851,8 +844,6 @@ const TrainingPlanPage = () => {
           steps,
           notes,
           rawDescription: w.intervalsText,
-          fitFileBase64: fitFile?.fileContentsBase64,
-          fitFileName: fitFile?.fileName,
         };
       });
 
