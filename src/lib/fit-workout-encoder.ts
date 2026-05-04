@@ -25,6 +25,7 @@ export const WKT_STEP_TARGET: Record<string, string> = {
 export const INTENSITY: Record<string, string> = {
   ACTIVE: "active",
   REST: "rest",
+  RECOVERY: "recovery",
   WARMUP: "warmup",
   COOLDOWN: "cooldown",
 };
