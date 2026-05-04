@@ -225,6 +225,90 @@ const Settings = () => {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [googleFitConnected, setGoogleFitConnected] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const navigate = useNavigate();
+
+  // Previous (archived) plans
+  type ArchivedPlan = {
+    id: string;
+    race_distance: string;
+    start_date: string;
+    race_date: string | null;
+    training_days: string[];
+    created_at: string;
+    content: string;
+  };
+  const [archivedPlans, setArchivedPlans] = useState<ArchivedPlan[]>([]);
+  const [planActionId, setPlanActionId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ArchivedPlan | null>(null);
+
+  const loadArchivedPlans = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("training_plans")
+      .select("id, race_distance, start_date, race_date, training_days, created_at, content")
+      .eq("user_id", user.id)
+      .eq("archived", true)
+      .order("created_at", { ascending: false });
+    setArchivedPlans((data as ArchivedPlan[]) || []);
+  };
+
+  useEffect(() => { loadArchivedPlans(); }, [user]);
+
+  const resumePlan = async (plan: ArchivedPlan) => {
+    if (!user) return;
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").update({ archived: true })
+        .eq("user_id", user.id).eq("archived", false);
+      await supabase.from("training_plans").update({ archived: false }).eq("id", plan.id);
+      toast({ title: "Plan resumed" });
+      await loadArchivedPlans();
+      navigate("/training-plan");
+    } catch (e: any) {
+      toast({ title: "Failed to resume", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+    }
+  };
+
+  const restartPlan = async (plan: ArchivedPlan) => {
+    if (!user) return;
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").update({ archived: true })
+        .eq("user_id", user.id).eq("archived", false);
+      const today = new Date().toISOString().split("T")[0];
+      await supabase.from("training_plans").insert({
+        user_id: user.id,
+        race_distance: plan.race_distance,
+        training_days: plan.training_days,
+        start_date: today,
+        race_date: plan.race_date,
+        content: plan.content,
+      });
+      toast({ title: "Plan restarted from today" });
+      await loadArchivedPlans();
+      navigate("/training-plan");
+    } catch (e: any) {
+      toast({ title: "Failed to restart", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+    }
+  };
+
+  const deletePlanForever = async (plan: ArchivedPlan) => {
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").delete().eq("id", plan.id);
+      toast({ title: "Plan permanently deleted" });
+      await loadArchivedPlans();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+      setConfirmDelete(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
