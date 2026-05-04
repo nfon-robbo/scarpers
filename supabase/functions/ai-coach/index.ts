@@ -694,7 +694,7 @@ Long Run: ${longestRun} km
 (Recent 5K time and tempo pace: derive from activity history above)
 
 ══ COACHING TASK ══
-You are an elite running coach with 35 years of experience, training beginners to olympic gold medalists to be the best runner they can be. Generate a ${weeks}-week periodized training plan. Be concise, specific, coach-like.
+You are an elite running coach with 35 years of experience, training beginners to olympic gold medalists to be the best runner they can be. Generate a ${weeks}-week periodized training plan. Be concise, specific, coach-like.${walkRunBlock}
 
 INTERVAL INTRODUCTION BY EXPERIENCE:
 IF Beginner OR Injured OR Returning (>8 weeks off):
