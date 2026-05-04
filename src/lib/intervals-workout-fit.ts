@@ -12,6 +12,7 @@ interface SyncApiStep {
   hrHigh: number;
   hrZone?: string;
   intensity: string;
+  pace?: string;
 }
 
 interface SyncWorkoutInput {
@@ -27,6 +28,7 @@ interface FitFilePayload {
 
 const durationPattern = /(\d+m\d+s|\d+m|\d+s)\b/i;
 const bpmPattern = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm\s*HR/i;
+const pacePattern = /(\d{1,2}:\d{2})(?:\s*\/\s*(km|mi))?\s*Pace/i;
 
 function durationTextToMilliseconds(value: string): number {
   const match = value.toLowerCase().match(/(?:(\d+)m)?(?:(\d+)s)?/);
@@ -77,6 +79,29 @@ function toFitIntensity(intensity: string): string {
   return INTENSITY.ACTIVE;
 }
 
+function paceToSpeedMps(pace: string): number | null {
+  const match = pace.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
+  if (!match) return null;
+  const seconds = Number(match[1]) * 60 + Number(match[2]);
+  if (seconds <= 0) return null;
+  const metres = /mi/i.test(match[3] || "") ? 1609.344 : 1000;
+  return metres / seconds;
+}
+
+function buildSpeedFitStep(durationMs: number, pace: string, intensity: string): WorkoutStep | null {
+  const speed = paceToSpeedMps(pace);
+  if (!speed) return null;
+  return {
+    intensity: toFitIntensity(intensity),
+    durationType: WKT_STEP_DURATION.TIME,
+    durationValue: durationMs,
+    targetType: WKT_STEP_TARGET.SPEED,
+    targetValue: 0,
+    customTargetLow: speed * 0.97,
+    customTargetHigh: speed * 1.03,
+  };
+}
+
 function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensity: string): WorkoutStep {
   return {
     intensity: toFitIntensity(intensity),
@@ -95,6 +120,8 @@ function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensi
 function parseTextStep(line: string, intensity: string): WorkoutStep | null {
   const durationMatch = line.match(durationPattern);
   if (!durationMatch) return null;
+  const paceMatch = line.match(pacePattern);
+  if (paceMatch) return buildSpeedFitStep(durationTextToMilliseconds(durationMatch[1]), paceMatch[0], intensity);
 
   const bpmMatch = line.match(bpmPattern);
   const zoneMatch = line.match(/Z\d(?:\s*[-–]\s*Z\d)?/i);
@@ -175,7 +202,8 @@ function convertApiStepsToFitSteps(steps: SyncApiStep[]): WorkoutStep[] {
           ? { low: step.hrLow, high: step.hrHigh }
           : zoneToBpmRange(step.hrZone ?? "Z2");
 
-      return buildFitStep(step.duration * 1000, bpmRange.low, bpmRange.high, step.intensity);
+      return buildSpeedFitStep(step.duration * 1000, step.pace || "6:27/km", step.intensity)
+        ?? buildFitStep(step.duration * 1000, bpmRange.low, bpmRange.high, step.intensity);
     });
 }
 

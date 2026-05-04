@@ -82,6 +82,12 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
         // Detect table header row with "Segment" column
         if (lines[i].includes("|") && /segment/i.test(lines[i])) {
           const headerCells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
+          const headerIndex = (patterns: RegExp[]) => headerCells.findIndex((cell) => patterns.some((pattern) => pattern.test(cell)));
+          const segmentIdx = headerIndex([/^segment$/i, /^section$/i]);
+          const durationIdx = headerIndex([/duration/i, /distance/i]);
+          const targetIdx = headerIndex([/target/i, /pace/i, /intensity/i]);
+          const hrIdx = headerIndex([/hr\s*zone/i, /heart\s*rate/i]);
+          const notesIdx = headerIndex([/notes?/i, /cue/i]);
           i++; // skip header
           // Skip separator row
           if (i < lines.length && /^\s*\|?\s*[-:]+/.test(lines[i])) i++;
@@ -90,12 +96,16 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
           while (i < lines.length && lines[i].includes("|") && !/^\s*\|?\s*[-:]+[-|:\s]+$/.test(lines[i])) {
             const cells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
             if (cells.length >= 3) {
+              const getCell = (idx: number, fallback = "") => (idx >= 0 ? (cells[idx] || fallback) : fallback);
+              const target = getCell(targetIdx, cells[2] || "");
+              const explicitHrZone = getCell(hrIdx, "");
+              const derivedHrZone = explicitHrZone || (/\bZ\d|\bLTHR\b|\bbpm\b/i.test(target) ? target : "");
               segments.push({
-                segment: cells[0] || "",
-                duration: cells[1] || "",
-                target: cells[2] || "",
-                hrZone: cells[3] || "",
-                notes: cells[4] || "",
+                segment: getCell(segmentIdx, cells[0] || ""),
+                duration: getCell(durationIdx, cells[1] || ""),
+                target,
+                hrZone: derivedHrZone,
+                notes: getCell(notesIdx, hrIdx >= 0 ? cells[4] || "" : cells[3] || ""),
               });
             }
             i++;

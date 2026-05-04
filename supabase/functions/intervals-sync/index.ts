@@ -6,6 +6,7 @@ type WorkoutStep = {
   hrHigh: number;
   hrZone?: string;
   intensity: string;
+  pace?: string;
 };
 
 type WorkoutInput = {
@@ -52,7 +53,8 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
   }
 
-  function fmtHr(step: { hrZone?: string; hrLow: number; hrHigh: number }): string {
+  function fmtTarget(step: WorkoutStep): string {
+    if (step.pace) return ` ${step.pace.replace(/\s+/g, "").replace(/\/$/, "")} Pace`;
     if (step.hrLow > 0 && step.hrHigh > 0) return ` ${normalizeHrZone(step)} HR`;
     return "";
   }
@@ -66,7 +68,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
 
     if (step.intensity === "Warmup") {
       if (prevIntensity !== "Warmup") lines.push("Warmup");
-      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
       prevIntensity = "Warmup";
       i += 1;
     } else if (step.intensity === "Cooldown") {
@@ -74,22 +76,22 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Cooldown");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
       prevIntensity = "Cooldown";
       i += 1;
     } else if (step.intensity === "Interval") {
       let reps = 0;
       let j = i;
       const workDur = step.duration;
-      const workHr = { hrLow: step.hrLow, hrHigh: step.hrHigh };
+      const workStep = step;
       let restDur = 0;
-      let restHr = { hrLow: 0, hrHigh: 0 };
+      let restStep: WorkoutStep | undefined;
 
       while (j < workout.steps.length && workout.steps[j].intensity === "Interval" && workout.steps[j].duration === workDur) {
         reps += 1;
         if (j + 1 < workout.steps.length && (workout.steps[j + 1].intensity === "Recovery" || workout.steps[j + 1].intensity === "Rest")) {
           restDur = workout.steps[j + 1].duration;
-          restHr = { hrLow: workout.steps[j + 1].hrLow, hrHigh: workout.steps[j + 1].hrHigh };
+          restStep = workout.steps[j + 1];
           j += 2;
         } else {
           j += 1;
@@ -100,15 +102,15 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       if (reps > 1) {
         lines.push("");
         lines.push(`${reps}x`);
-        lines.push(`- ${fmtDur(workDur)}${fmtHr(workHr)}`);
-        if (restDur > 0) lines.push(`- ${fmtDur(restDur)} rest${fmtHr(restHr)}`);
+        lines.push(`- ${fmtDur(workDur)}${fmtTarget(workStep)}`);
+        if (restDur > 0 && restStep) lines.push(`- ${fmtDur(restDur)} rest${fmtTarget(restStep)}`);
         i = j;
       } else {
         if (prevIntensity !== "Active") {
           lines.push("");
           lines.push("Run");
         }
-        lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+        lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
         i += 1;
       }
 
@@ -118,7 +120,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Run");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtHr(step)}`);
+      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
       prevIntensity = "Active";
       i += 1;
     }
@@ -247,7 +249,7 @@ serve(async (req) => {
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
         type: "Run",
-        target: "HR",
+        target: "Pace",
         moving_time: totalDuration,
         description: fullDescription,
         ...(workout.fitFileBase64 && workout.fitFileName

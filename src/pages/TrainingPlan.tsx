@@ -28,9 +28,14 @@ interface ApiStep {
   hrHigh: number;
   hrZone?: string;
   intensity: string;
+  pace?: string;
 }
 
+const WALK_PACE = "9:57/km";
+
 function parseDurationSeconds(duration: string): number {
+  const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
   const hourMatch = duration.match(/([\d.]+)\s*h(?:r|our)?s?\b/i);
   const minMatch = duration.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/i);
   const secMatch = duration.match(/(\d+)\s*s(?:ec(?:ond)?s?)?\b/i);
@@ -42,6 +47,7 @@ function parseDurationSeconds(duration: string): number {
     const kmMatch = duration.match(/([\d.]+)\s*km/i);
     if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
   }
+  if (total === 0 && /^\d+(?:\.\d+)?$/.test(duration.trim())) total = Math.round(parseFloat(duration.trim()) * 60);
   return total || 600;
 }
 
@@ -73,6 +79,24 @@ function hrZoneToBpm(hrZone: string): { low: number; high: number } {
   return { low: lowZone.low, high: highZone.high };
 }
 
+function paceForSegment(seg: ParsedSegment, intensity: string): string {
+  const txt = `${seg.segment} ${seg.duration} ${seg.target} ${seg.notes || ""}`.toLowerCase();
+  const explicit = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
+  if (explicit) return `${explicit[1]}/km`;
+  if (/walk|recovery|rest/.test(txt) || /warmup|cooldown/i.test(intensity)) return WALK_PACE;
+  if (/z5|vo2|sprint|fast/.test(txt)) return "4:30/km";
+  if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
+  if (/z3|tempo|steady/.test(txt)) return "5:30/km";
+  return "6:27/km";
+}
+
+function normalizePaceInput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/\/\s*(km|mi)$/i.test(trimmed)) return trimmed.replace(/\s+/g, "");
+  return /^\d{1,2}:\d{2}$/.test(trimmed) ? `${trimmed}/km` : trimmed;
+}
+
 /**
  * Expand a segment into API steps.
  * Handles repeat patterns like "5 x 2 min run / 1 min walk"
@@ -88,6 +112,8 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   else if (/cool/i.test(segName)) stepType = "Cooldown";
   else if (/rest/i.test(segName)) stepType = "Rest";
   else if (/recover/i.test(segName)) stepType = "Recovery";
+  const workPace = paceForSegment(seg, stepType);
+  const restPace = WALK_PACE;
 
   // Normalize duration: strip parentheses and extra text like "Run", "Walk" etc.
   const cleanDuration = seg.duration.replace(/[()]/g, "").trim();
@@ -104,8 +130,8 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval" });
-      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace });
+      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery", pace: restPace });
     }
     return steps;
   }
@@ -122,9 +148,9 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
-      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval" });
+      steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace });
       if (i < reps - 1 || restMatch) {
-        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery" });
+        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery", pace: restPace });
       }
     }
     return steps;
@@ -132,7 +158,7 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
 
   // Simple single step
   const duration = parseDurationSeconds(seg.duration);
-  return [{ duration, hrLow: low, hrHigh: high, hrZone, intensity: stepType }];
+  return [{ duration, hrLow: low, hrHigh: high, hrZone, intensity: stepType, pace: workPace }];
 }
 
 const RACE_DISTANCES = [
@@ -787,12 +813,19 @@ const TrainingPlanPage = () => {
         return;
       }
 
+      const stepOverrides = JSON.parse(localStorage.getItem("plan-step-overrides") || "{}") as Record<string, Record<number, { duration?: string; pace?: string }>>;
+
       // Convert parsed workouts to API format, expanding intervals
       const apiWorkouts = withSegments.map(w => {
         const d = w.dateObj!;
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg));
+        const overridesForWorkout = stepOverrides[dateStr] || {};
+        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg)).map((step, idx) => ({
+          ...step,
+          duration: overridesForWorkout[idx]?.duration ? parseDurationSeconds(overridesForWorkout[idx].duration) : step.duration,
+          pace: overridesForWorkout[idx]?.pace ? normalizePaceInput(overridesForWorkout[idx].pace) : step.pace,
+        }));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
         // Collect notes (including music BPM) from segments
         const notes = w.segments
