@@ -34,6 +34,8 @@ interface ApiStep {
 const WALK_PACE = "9:57/km";
 
 function parseDurationSeconds(duration: string): number {
+  const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
   const hourMatch = duration.match(/([\d.]+)\s*h(?:r|our)?s?\b/i);
   const minMatch = duration.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/i);
   const secMatch = duration.match(/(\d+)\s*s(?:ec(?:ond)?s?)?\b/i);
@@ -45,6 +47,7 @@ function parseDurationSeconds(duration: string): number {
     const kmMatch = duration.match(/([\d.]+)\s*km/i);
     if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
   }
+  if (total === 0 && /^\d+(?:\.\d+)?$/.test(duration.trim())) total = Math.round(parseFloat(duration.trim()) * 60);
   return total || 600;
 }
 
@@ -85,6 +88,13 @@ function paceForSegment(seg: ParsedSegment, intensity: string): string {
   if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
   if (/z3|tempo|steady/.test(txt)) return "5:30/km";
   return "6:27/km";
+}
+
+function normalizePaceInput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (/\/\s*(km|mi)$/i.test(trimmed)) return trimmed.replace(/\s+/g, "");
+  return /^\d{1,2}:\d{2}$/.test(trimmed) ? `${trimmed}/km` : trimmed;
 }
 
 /**
