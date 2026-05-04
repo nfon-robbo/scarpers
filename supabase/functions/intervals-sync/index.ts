@@ -15,9 +15,21 @@ type WorkoutInput = {
   description: string;
   notes?: string;
   rawDescription?: string;
-  fitFileBase64?: string;
-  fitFileName?: string;
   steps: WorkoutStep[];
+};
+
+type WorkoutDocStep = {
+  duration: number;
+  text?: string;
+  pace?: { units: "min/km" | "min/mi"; value?: number; start?: number; end?: number };
+  hr?: { units: "bpm"; start: number; end: number };
+};
+
+type WorkoutDoc = {
+  steps: WorkoutDocStep[];
+  duration: number;
+  zoneTimes: number[];
+  hrZoneTimes: number[];
 };
 
 function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
@@ -27,6 +39,49 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
   if (!Number.isFinite(paceSeconds) || paceSeconds <= 0) return 0;
   const metresPerUnit = /mi/i.test(match[3] || "") ? 1609.344 : 1000;
   return (durationSeconds / paceSeconds) * metresPerUnit;
+}
+
+function paceToMinutes(pace?: string): { value: number; units: "min/km" | "min/mi" } | null {
+  const match = pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
+  if (!match) return null;
+  const seconds = Number(match[1]) * 60 + Number(match[2]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return { value: seconds / 60, units: /mi/i.test(match[3] || "") ? "min/mi" : "min/km" };
+}
+
+function buildWorkoutDoc(steps: WorkoutStep[]): WorkoutDoc {
+  const docSteps = steps
+    .filter((step) => step.duration > 0)
+    .map((step): WorkoutDocStep => {
+      const normalized = step.intensity.toLowerCase();
+      const cue = normalized === "warmup" ? "Warmup" : normalized === "cooldown" ? "Cooldown" : normalized === "recovery" || normalized === "rest" ? "Walk" : "Run";
+      const pace = paceToMinutes(step.pace);
+      if (pace) {
+        const spread = pace.value * 0.03;
+        return {
+          duration: step.duration,
+          text: cue,
+          pace: { units: pace.units, start: pace.value - spread, end: pace.value + spread },
+        };
+      }
+      if (step.hrLow > 0 && step.hrHigh > 0) {
+        return { duration: step.duration, text: cue, hr: { units: "bpm", start: step.hrLow, end: step.hrHigh } };
+      }
+      return { duration: step.duration, text: cue };
+    });
+
+  const duration = docSteps.reduce((sum, step) => sum + step.duration, 0);
+  const zoneTimes = Array(7).fill(0);
+  const hrZoneTimes = Array(7).fill(0);
+
+  for (const step of steps) {
+    const zoneMatch = step.hrZone?.match(/Z(\d)/i);
+    const zone = Math.max(1, Math.min(7, Number(zoneMatch?.[1] || 2)));
+    zoneTimes[zone - 1] += step.duration;
+    hrZoneTimes[zone - 1] += step.duration;
+  }
+
+  return { steps: docSteps, duration, zoneTimes, hrZoneTimes };
 }
 
 function formatWorkoutDescription(workout: WorkoutInput): string {
