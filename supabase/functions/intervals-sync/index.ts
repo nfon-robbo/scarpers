@@ -18,6 +18,24 @@ type WorkoutInput = {
   steps: WorkoutStep[];
 };
 
+type StructuredWorkoutStep =
+  | {
+      type: "WARMUP" | "COOLDOWN" | "INTERVAL_ACTIVE" | "INTERVAL_REST" | "ACTIVE";
+      duration: number;
+      durationType: "TIME";
+      target: string;
+    }
+  | {
+      type: "REPEAT";
+      repeat: number;
+      steps: StructuredWorkoutStep[];
+    };
+
+type StructuredWorkoutDoc = {
+  name: string;
+  steps: StructuredWorkoutStep[];
+};
+
 function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
   const match = pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
   if (!match) return 0;
@@ -25,6 +43,90 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
   if (!Number.isFinite(paceSeconds) || paceSeconds <= 0) return 0;
   const metresPerUnit = /mi/i.test(match[3] || "") ? 1609.344 : 1000;
   return (durationSeconds / paceSeconds) * metresPerUnit;
+}
+
+function zoneTarget(step: WorkoutStep): string {
+  const zoneMatch = step.hrZone?.match(/Z(\d)/i);
+  if (zoneMatch) return `ZONE${zoneMatch[1]}`;
+
+  const normalized = step.intensity.toLowerCase();
+  if (normalized === "interval") return "ZONE4";
+  if (normalized === "recovery" || normalized === "rest" || normalized === "warmup" || normalized === "cooldown") return "ZONE1";
+  return "ZONE2";
+}
+
+function structuredStep(step: WorkoutStep, forcedType?: "INTERVAL_ACTIVE" | "INTERVAL_REST"): StructuredWorkoutStep {
+  const normalized = step.intensity.toLowerCase();
+  const type = forcedType
+    ?? (normalized === "warmup"
+      ? "WARMUP"
+      : normalized === "cooldown"
+        ? "COOLDOWN"
+        : normalized === "recovery" || normalized === "rest"
+          ? "INTERVAL_REST"
+          : normalized === "interval"
+            ? "INTERVAL_ACTIVE"
+            : "ACTIVE");
+
+  return {
+    type,
+    duration: Math.max(1, Math.round(step.duration)),
+    durationType: "TIME",
+    target: zoneTarget(step),
+  };
+}
+
+function sameRepeatPair(aWork: WorkoutStep, aRest: WorkoutStep, bWork: WorkoutStep, bRest: WorkoutStep): boolean {
+  return aWork.duration === bWork.duration
+    && aRest.duration === bRest.duration
+    && zoneTarget(aWork) === zoneTarget(bWork)
+    && zoneTarget(aRest) === zoneTarget(bRest);
+}
+
+function buildStructuredWorkoutDoc(workout: WorkoutInput): StructuredWorkoutDoc {
+  const steps: StructuredWorkoutStep[] = [];
+  const source = workout.steps.filter((step) => step.duration > 0);
+  let i = 0;
+
+  while (i < source.length) {
+    const step = source[i];
+    const next = source[i + 1];
+    const isWork = step.intensity === "Interval";
+    const isRest = next && (next.intensity === "Recovery" || next.intensity === "Rest");
+
+    if (isWork && isRest) {
+      const workStep = step;
+      const restStep = next;
+      let repeat = 0;
+      let j = i;
+
+      while (
+        j + 1 < source.length
+        && source[j].intensity === "Interval"
+        && (source[j + 1].intensity === "Recovery" || source[j + 1].intensity === "Rest")
+        && sameRepeatPair(workStep, restStep, source[j], source[j + 1])
+      ) {
+        repeat += 1;
+        j += 2;
+      }
+
+      steps.push({
+        type: "REPEAT",
+        repeat,
+        steps: [
+          structuredStep(workStep, "INTERVAL_ACTIVE"),
+          structuredStep(restStep, "INTERVAL_REST"),
+        ],
+      });
+      i = j;
+      continue;
+    }
+
+    steps.push(structuredStep(step));
+    i += 1;
+  }
+
+  return { name: workout.name, steps };
 }
 
 function formatWorkoutDescription(workout: WorkoutInput): string {
@@ -254,13 +356,14 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events using native Intervals.icu workout-builder text.
-    // workout_doc: {} is intentional: it tells Intervals.icu to parse the
-    // description server-side so graphs and Garmin structured workout sync are populated.
+    // Step 2: Build events with an explicit structured workout_doc. Walk/run
+    // pairs are wrapped as REPEAT blocks with second-based TIME durations and
+    // Garmin-friendly INTERVAL_ACTIVE / INTERVAL_REST step types.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
+      const workoutDoc = buildStructuredWorkoutDoc(workout);
 
       return {
         category: "WORKOUT",
@@ -273,7 +376,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
+        workout_doc: workoutDoc,
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
