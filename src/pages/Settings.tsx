@@ -358,29 +358,73 @@ const Settings = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="height">Height (cm)</Label>
-              <Input
-                id="height"
-                type="number"
-                inputMode="decimal"
-                min="50"
-                max="250"
-                value={personal.height_cm}
-                onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
-              />
+              <Label>Height {units.height === "ft" ? "(ft / in)" : "(cm)"}</Label>
+              {units.height === "ft" ? (
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="8"
+                    placeholder="ft"
+                    value={heightFt}
+                    onChange={(e) => { setHeightFt(e.target.value); commitHeight(e.target.value, heightIn); }}
+                  />
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="11"
+                    placeholder="in"
+                    value={heightIn}
+                    onChange={(e) => { setHeightIn(e.target.value); commitHeight(heightFt, e.target.value); }}
+                  />
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="50"
+                  max="250"
+                  value={personal.height_cm}
+                  onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
+                />
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="weight">Weight (kg)</Label>
-              <Input
-                id="weight"
-                type="number"
-                inputMode="decimal"
-                min="20"
-                max="300"
-                step="0.1"
-                value={personal.weight_kg}
-                onChange={(e) => setPersonal((p) => ({ ...p, weight_kg: e.target.value }))}
-              />
+              <Label>Weight {units.weight === "kg" ? "(kg)" : units.weight === "lbs" ? "(lbs)" : "(st / lb)"}</Label>
+              {units.weight === "st" ? (
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="st"
+                    value={weightDisplay}
+                    onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value, weightStLb); }}
+                  />
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="13.9"
+                    step="0.1"
+                    placeholder="lb"
+                    value={weightStLb}
+                    onChange={(e) => { setWeightStLb(e.target.value); commitWeight(weightDisplay, e.target.value); }}
+                  />
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="20"
+                  max="600"
+                  step="0.1"
+                  value={weightDisplay}
+                  onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value); }}
+                />
+              )}
             </div>
           </div>
           <div className="flex justify-end">
