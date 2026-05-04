@@ -61,7 +61,18 @@ const StravaConnect = () => {
         { headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
       );
       const { url } = await res.json();
-      window.open(url, "strava-auth", "width=600,height=700");
+      const popup = window.open(url, "strava-auth", "width=600,height=700");
+
+      // Fallback: COOP can block postMessage, so poll status until connected or popup closes
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        const popupClosed = !popup || popup.closed;
+        await checkStatus();
+        if (popupClosed || attempts > 60) {
+          clearInterval(interval);
+        }
+      }, 2000);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
