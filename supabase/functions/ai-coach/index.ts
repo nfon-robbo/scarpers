@@ -621,6 +621,51 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
         : null;
 
+      // ===== Detect beginner / injury / returning runner =====
+      const expLevel = (profile?.experience_level || "intermediate").toLowerCase();
+      const ctxText = `${profile?.athlete_context || ""} ${profile?.training_goals || ""}`.toLowerCase();
+      const isBeginner = expLevel === "beginner" || /beginner|novice|new\s+to\s+run|just\s+start|first[- ]time/.test(ctxText);
+      const hasInjury = /injur|niggle|pain|surgery|physio|rehab|tendon|fracture|strain|sprain/i.test(ctxText);
+      const mostRecentRunMs = runs.length
+        ? Math.max(...runs.map((a: any) => new Date(a.start_time).getTime()))
+        : 0;
+      const daysSinceLastRun = mostRecentRunMs ? Math.floor((Date.now() - mostRecentRunMs) / 86400000) : 999;
+      const isReturning = /return|coming\s+back|comeback|time\s+off|break\s+from\s+run/i.test(ctxText) || daysSinceLastRun > 56;
+      const needsWalkRunRamp = isBeginner || hasInjury || isReturning;
+
+      const walkRunFlags = [
+        isBeginner ? "Beginner" : null,
+        hasInjury ? "Injured/Recovering" : null,
+        isReturning ? `Returning (${daysSinceLastRun >= 999 ? "no recent runs" : daysSinceLastRun + "d since last run"})` : null,
+      ].filter(Boolean).join(", ");
+
+      const walkRunBlock = needsWalkRunRamp
+        ? `
+
+══ MANDATORY WALK/RUN RAMP (athlete flagged as ${walkRunFlags}) ══
+HARD RULE — DO NOT DEVIATE:
+The FIRST 10 scheduled workouts in this plan MUST be WALK/RUN INTERVAL sessions. No continuous easy runs, no tempo, no long runs in those 10 slots. Each session must be a structured walk/run interval workout, individually tailored to THIS athlete using their profile, recent activity history, HR zones, and any injury/niggle context above.
+
+Progressive structure across the 10 sessions (adapt run/walk durations and rep counts to the athlete's current capacity — use longest recent run (${longestRun} km), Z2 pace (${z2Pace}/km), resting HR ${restingHr ?? "N/A"}, HRV trend ${hrvTrend}, and injury notes to set the right starting point):
+  Sessions 1-2: shortest run intervals (e.g. 30-60s run / 60-90s walk) × 8-12 reps
+  Sessions 3-4: 60-90s run / 60s walk × 8-12 reps
+  Sessions 5-6: 2 min run / 60s walk × 6-10 reps
+  Sessions 7-8: 3-4 min run / 60-90s walk × 5-8 reps
+  Sessions 9-10: 5 min run / 60s walk × 4-6 reps (transition toward continuous)
+
+For EACH of the 10 sessions:
+- Title MUST start with "Walk/Run Intervals:" e.g. "Walk/Run Intervals: 10 × 1min (Total: 30min)"
+- Markdown table with a warm-up walk row, the structured interval rep block row(s), and a cool-down walk row
+- Run intensity stays in Z1-Z2 (HR < ${Math.round(maxHr * 0.75)} bpm). NO Z3+ work in these 10 sessions
+- Walk recoveries in Z1
+- Music BPM target on every running segment (🎵 150 BPM walking, 🎵 155 BPM easy run)
+- Notes column must briefly reference WHY this fits THIS athlete (their injury, layoff length, or beginner status)
+- If athlete has an injury, add a short form/safety cue tied to that injury
+
+After session 10, transition into the normal periodised plan (Z2 continuous, then tempo, then quality work) per the rules below.
+`
+        : "";
+
       systemPrompt = `══ ATHLETE ══
 Name: ${profile?.name || "Athlete"}
 Sex: ${profile?.sex || "not specified"}
