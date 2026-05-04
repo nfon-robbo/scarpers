@@ -191,9 +191,9 @@ const TrainingPlanPage = () => {
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
         setTrainingDays(data.training_days);
-        setStartDate(new Date(data.start_date));
+        setStartDate(parseLocalISODate(data.start_date));
         if (data.race_date && data.race_date !== "ai-recommend") {
-          setRaceDate(new Date(data.race_date));
+          setRaceDate(parseLocalISODate(data.race_date));
         } else if (data.race_date === "ai-recommend") {
           setLetAIDecide(true);
         }
@@ -241,7 +241,7 @@ const TrainingPlanPage = () => {
 
   const savePlan = async (planContent: string) => {
     if (!user) return;
-    const raceDateValue = letAIDecide ? "ai-recommend" : raceDate?.toISOString().split("T")[0] || null;
+    const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
 
     // Archive old plan instead of deleting, then insert new one
     if (savedPlanId) {
@@ -254,7 +254,7 @@ const TrainingPlanPage = () => {
         user_id: user.id,
         race_distance: raceDistance,
         training_days: trainingDays,
-        start_date: startDate.toISOString().split("T")[0],
+        start_date: toLocalISODate(startDate),
         race_date: raceDateValue,
         content: planContent,
       })
@@ -280,6 +280,20 @@ const TrainingPlanPage = () => {
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [pendingStart, setPendingStart] = useState<Date | undefined>(undefined);
   const [pendingEnd, setPendingEnd] = useState<Date | undefined>(undefined);
+
+  // Format a Date as YYYY-MM-DD using LOCAL components (avoids UTC off-by-one)
+  const toLocalISODate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  // Parse YYYY-MM-DD as a local date (avoids UTC midnight drift)
+  const parseLocalISODate = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
 
   useEffect(() => {
     if (datePopoverOpen) {
@@ -311,7 +325,7 @@ const TrainingPlanPage = () => {
       if (savedPlanId && user) {
         await supabase.from("training_plans")
           .update({
-            start_date: newStart.toISOString().split("T")[0],
+            start_date: toLocalISODate(newStart),
             content: newContent,
           })
           .eq("id", savedPlanId);
@@ -350,8 +364,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       trainingDays,
-      startDate: newStart.toISOString().split("T")[0],
-      raceDate: newEnd.toISOString().split("T")[0],
+      startDate: toLocalISODate(newStart),
+      raceDate: toLocalISODate(newEnd),
       onDelta: (text) => { accumulated += text; setContent(accumulated); },
       onDone: () => {
         setLoading(false);
@@ -412,8 +426,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       trainingDays,
-      startDate: startDate.toISOString().split("T")[0],
-      raceDate: letAIDecide ? "ai-recommend" : raceDate?.toISOString().split("T")[0],
+      startDate: toLocalISODate(startDate),
+      raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
       onDelta: (text) => {
         accumulated += text;
         setContent(accumulated);
@@ -462,7 +476,7 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       trainingDays,
-      startDate: startDate.toISOString().split("T")[0],
+      startDate: toLocalISODate(startDate),
       currentPlan: originalPlan,
       onDelta: (text) => {
         accumulated += text;
@@ -502,7 +516,7 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       trainingDays,
-      startDate: startDate.toISOString().split("T")[0],
+      startDate: toLocalISODate(startDate),
       currentPlan: originalPlanBeforeReview,
       adjustment,
       reviewText: reviewResult,
