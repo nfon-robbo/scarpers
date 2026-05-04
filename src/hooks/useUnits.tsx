@@ -6,7 +6,8 @@ export interface UnitPreferences {
   speed: "km/h" | "mph" | "min/km" | "min/mi";
   elevation: "m" | "ft";
   temperature: "C" | "F";
-  weight: "kg" | "lbs";
+  weight: "kg" | "lbs" | "st";
+  height: "cm" | "ft";
 }
 
 const defaultUnits: UnitPreferences = {
@@ -15,6 +16,7 @@ const defaultUnits: UnitPreferences = {
   elevation: "m",
   temperature: "C",
   weight: "kg",
+  height: "cm",
 };
 
 interface UnitsContextType {
@@ -26,6 +28,7 @@ interface UnitsContextType {
     elevation: (meters: number | null | undefined) => string | null;
     temperature: (celsius: number | null | undefined) => string | null;
     weight: (kg: number | null | undefined) => string | null;
+    height: (cm: number | null | undefined) => string | null;
     pace: (kmh: number | null | undefined) => string | null;
   };
   label: {
@@ -34,6 +37,7 @@ interface UnitsContextType {
     elevation: string;
     temperature: string;
     weight: string;
+    height: string;
     pace: string;
   };
 }
@@ -67,7 +71,7 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("unit_distance, unit_speed, unit_elevation, unit_temperature, unit_weight")
+        .select("unit_distance, unit_speed, unit_elevation, unit_temperature, unit_weight, unit_height")
         .eq("user_id", session.user.id)
         .maybeSingle();
 
@@ -78,6 +82,7 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
           elevation: (profile.unit_elevation as UnitPreferences["elevation"]) || defaultUnits.elevation,
           temperature: (profile.unit_temperature as UnitPreferences["temperature"]) || defaultUnits.temperature,
           weight: (profile.unit_weight as UnitPreferences["weight"]) || defaultUnits.weight,
+          height: ((profile as any).unit_height as UnitPreferences["height"]) || defaultUnits.height,
         };
         setUnits(dbUnits);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dbUnits));
@@ -101,7 +106,8 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
         unit_elevation: newUnits.elevation,
         unit_temperature: newUnits.temperature,
         unit_weight: newUnits.weight,
-      })
+        unit_height: newUnits.height,
+      } as any)
       .eq("user_id", session.user.id);
   }, []);
 
@@ -119,6 +125,8 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
   const KM_TO_MI = 0.621371;
   const M_TO_FT = 3.28084;
   const KG_TO_LBS = 2.20462;
+  const KG_TO_ST = 0.157473;
+  const CM_TO_IN = 0.393701;
 
   const fmt = {
     distance: (meters: number | null | undefined): string | null => {
@@ -158,8 +166,26 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
     },
     weight: (kg: number | null | undefined): string | null => {
       if (kg == null) return null;
-      if (units.weight === "lbs") return `${(Number(kg) * KG_TO_LBS).toFixed(1)} lbs`;
-      return `${Number(kg)} kg`;
+      const n = Number(kg);
+      if (units.weight === "lbs") return `${(n * KG_TO_LBS).toFixed(1)} lbs`;
+      if (units.weight === "st") {
+        const totalLbs = n * KG_TO_LBS;
+        const stones = Math.floor(totalLbs / 14);
+        const lbs = Math.round(totalLbs - stones * 14);
+        return `${stones} st ${lbs} lb`;
+      }
+      return `${n} kg`;
+    },
+    height: (cm: number | null | undefined): string | null => {
+      if (cm == null) return null;
+      const n = Number(cm);
+      if (units.height === "ft") {
+        const totalIn = n * CM_TO_IN;
+        const ft = Math.floor(totalIn / 12);
+        const inches = Math.round(totalIn - ft * 12);
+        return `${ft}′${inches}″`;
+      }
+      return `${Math.round(n)} cm`;
     },
   };
 
@@ -168,7 +194,8 @@ export function UnitsProvider({ children }: { children: ReactNode }) {
     speed: units.speed,
     elevation: units.elevation === "ft" ? "ft" : "m",
     temperature: units.temperature === "F" ? "°F" : "°C",
-    weight: units.weight === "lbs" ? "lbs" : "kg",
+    weight: units.weight === "lbs" ? "lbs" : units.weight === "st" ? "st" : "kg",
+    height: units.height === "ft" ? "ft/in" : "cm",
     pace: units.distance === "mi" || units.speed === "min/mi" ? "min/mi" : "min/km",
   };
 
