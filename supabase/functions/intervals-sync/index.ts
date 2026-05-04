@@ -45,6 +45,16 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
   return (durationSeconds / paceSeconds) * metresPerUnit;
 }
 
+function paceTarget(step: WorkoutStep): string {
+  if (step.pace) return `${step.pace.replace(/\s+/g, "").replace(/\/$/, "")} Pace`;
+
+  const normalized = step.intensity.toLowerCase();
+  if (normalized === "recovery" || normalized === "rest") return "9:57/km Pace";
+  if (normalized === "warmup" || normalized === "cooldown") return "6:27/km Pace";
+  if (normalized === "interval") return "5:00/km Pace";
+  return "6:27/km Pace";
+}
+
 function zoneTarget(step: WorkoutStep): string {
   const zoneMatch = step.hrZone?.match(/Z(\d)/i);
   if (zoneMatch) return `ZONE${zoneMatch[1]}`;
@@ -72,7 +82,7 @@ function structuredStep(step: WorkoutStep, forcedType?: "INTERVAL_ACTIVE" | "INT
     type,
     duration: Math.max(1, Math.round(step.duration)),
     durationType: "TIME",
-    target: zoneTarget(step),
+    target: paceTarget(step),
   };
 }
 
@@ -159,15 +169,11 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtTarget(step: WorkoutStep): string {
-    const hrTarget = normalizeHrZone(step);
-    if (hrTarget) return ` ${hrTarget} HR`;
-    if (step.hrLow > 0 && step.hrHigh > 0) return ` ${step.hrLow}-${step.hrHigh}bpm HR`;
-    if (step.pace) return ` ${step.pace.replace(/\s+/g, "").replace(/\/$/, "")} Pace`;
-    return " Z2 HR";
+    return ` ${paceTarget(step)}`;
   }
 
   // Cue text mirrors the Cooper/Garmin layout: warmup, run, walk, cooldown.
-  // Targets are kept explicit on every line so Garmin does not show "No Target".
+  // Pace targets are kept explicit on every line so Garmin does not show "No Target".
   function stepCue(step: WorkoutStep): string {
     const normalized = step.intensity.toLowerCase();
     if (normalized === "recovery" || normalized === "rest") return "Walk";
@@ -376,8 +382,8 @@ serve(async (req) => {
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
         type: "Run",
-        target: "HR",
-        targets: ["HR"],
+        target: "PACE",
+        targets: ["PACE"],
         moving_time: totalDuration,
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
