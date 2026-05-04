@@ -20,6 +20,15 @@ type WorkoutInput = {
   steps: WorkoutStep[];
 };
 
+function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
+  const match = pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
+  if (!match) return 0;
+  const paceSeconds = Number(match[1]) * 60 + Number(match[2]);
+  if (!Number.isFinite(paceSeconds) || paceSeconds <= 0) return 0;
+  const metresPerUnit = /mi/i.test(match[3] || "") ? 1609.344 : 1000;
+  return (durationSeconds / paceSeconds) * metresPerUnit;
+}
+
 function formatWorkoutDescription(workout: WorkoutInput): string {
   if (workout.rawDescription && /\bpace\b/i.test(workout.rawDescription) && !/\b(?:hr|lthr|bpm)\b/i.test(workout.rawDescription)) {
     return workout.notes ? `${workout.rawDescription}\n\n${workout.notes}` : workout.rawDescription;
@@ -59,6 +68,21 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return "";
   }
 
+  function stepCue(step: WorkoutStep): string {
+    const normalized = step.intensity.toLowerCase();
+    const pace = step.pace?.replace(/\s+/g, "").toLowerCase();
+    if (normalized === "recovery" || normalized === "rest" || pace === "9:57/km") return "Walk";
+    if (normalized === "warmup" || normalized === "cooldown") return pace === "9:57/km" ? "Walk" : "Easy";
+    return "Run";
+  }
+
+  function fmtStep(step: WorkoutStep): string {
+    // Intervals.icu parses cue text most reliably before the duration, e.g.
+    // "- Walk 1m 9:57/km Pace". Putting "rest" between duration and pace
+    // can leave the visual workout graph empty even though the text is shown.
+    return `- ${stepCue(step)} ${fmtDur(step.duration)}${fmtTarget(step)}`;
+  }
+
   const lines: string[] = [];
   let i = 0;
   let prevIntensity = "";
@@ -68,7 +92,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
 
     if (step.intensity === "Warmup") {
       if (prevIntensity !== "Warmup") lines.push("Warmup");
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Warmup";
       i += 1;
     } else if (step.intensity === "Cooldown") {
@@ -76,7 +100,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Cooldown");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Cooldown";
       i += 1;
     } else if (step.intensity === "Interval") {
@@ -102,15 +126,15 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       if (reps > 1) {
         lines.push("");
         lines.push(`${reps}x`);
-        lines.push(`- ${fmtDur(workDur)}${fmtTarget(workStep)}`);
-        if (restDur > 0 && restStep) lines.push(`- ${fmtDur(restDur)} rest${fmtTarget(restStep)}`);
+        lines.push(fmtStep(workStep));
+        if (restDur > 0 && restStep) lines.push(fmtStep(restStep));
         i = j;
       } else {
         if (prevIntensity !== "Active") {
           lines.push("");
           lines.push("Run");
         }
-        lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+        lines.push(fmtStep(step));
         i += 1;
       }
 
@@ -120,7 +144,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
         lines.push("");
         lines.push("Run");
       }
-      lines.push(`- ${fmtDur(step.duration)}${fmtTarget(step)}`);
+      lines.push(fmtStep(step));
       prevIntensity = "Active";
       i += 1;
     }
@@ -243,6 +267,7 @@ serve(async (req) => {
     const bulkEvents = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
+      const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
 
       return {
         category: "WORKOUT",
@@ -251,8 +276,9 @@ serve(async (req) => {
         type: "Run",
         target: "PACE",
         moving_time: totalDuration,
+        time_target: totalDuration,
+        ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
         ...(workout.fitFileBase64 && workout.fitFileName
           ? {
               filename: workout.fitFileName,
