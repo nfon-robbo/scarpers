@@ -1265,24 +1265,22 @@ const TrainingPlanPage = () => {
           </>
         )}
 
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            {content ? (
-              <MarkdownRenderer content={content} />
-            ) : (
+        {!content && (
+          <Card>
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Generating your personalized training plan...</span>
+                <span>Generating your personalised training plan...</span>
               </div>
-            )}
-            {loading && content && (
-              <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Still generating...</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+        {loading && content && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Still generating...</span>
+          </div>
+        )}
 
         {reviewResult && !loading && (
           <Card className="border-primary/30 bg-primary/5">
