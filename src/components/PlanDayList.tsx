@@ -211,6 +211,65 @@ function expandSegments(
   return steps;
 }
 
+function EditableStat({
+  value,
+  label,
+  placeholder,
+  onSave,
+  isOverridden,
+}: {
+  value: string;
+  label: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+  isOverridden?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { if (open) setDraft(value); }, [open, value]);
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    setOpen(false);
+  };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="px-3 py-2 text-center w-full hover:bg-accent/40 transition-colors group"
+        >
+          <p className={cn("text-base font-bold leading-tight inline-flex items-center gap-1", isOverridden && "text-primary")}>
+            {value}
+            <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-2" align="center">
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <Input
+            autoFocus
+            value={draft}
+            placeholder={placeholder}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") setOpen(false);
+            }}
+            className="h-8 text-sm"
+          />
+          <div className="flex justify-end gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={commit}>Save</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function PlanDayList({
   workouts,
   planStartDate,
