@@ -1415,51 +1415,6 @@ const TrainingPlanPage = () => {
           )}
         </Card>
       </>)}
-      {content && !loading && (
-        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              size="lg"
-              className="fixed bottom-6 right-6 z-40 shadow-lg rounded-full h-12 px-4 gap-2"
-            >
-              <CalendarIcon className="w-4 h-4" />
-              {format(startDate, "dd MMM yyyy")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" side="top" className="w-auto p-4 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
-              <CalendarComponent
-                mode="single"
-                selected={pendingStart}
-                onSelect={(d) => d && setPendingStart(d)}
-                initialFocus
-                className={cn("p-3 pointer-events-auto rounded-md border")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">End date (race day)</Label>
-              <CalendarComponent
-                mode="single"
-                selected={pendingEnd}
-                onSelect={(d) => d && setPendingEnd(d)}
-                disabled={(date) => !!pendingStart && date <= pendingStart}
-                className={cn("p-3 pointer-events-auto rounded-md border")}
-              />
-              <p className="text-xs text-muted-foreground">
-                Changing the end date regenerates the whole plan. Changing only the start date shifts existing workouts.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="ghost" size="sm" onClick={() => setDatePopoverOpen(false)}>Cancel</Button>
-              <Button size="sm" onClick={applyDateChanges} disabled={updatingDates}>
-                {updatingDates && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                Apply
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
     </div>
   );
 };
