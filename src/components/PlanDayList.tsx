@@ -387,7 +387,7 @@ export default function PlanDayList({
 
               {selectedWorkout.segments.length > 0 ? (
                 (() => {
-                  const steps = expandSegments(selectedWorkout.segments);
+                  const steps = expandSegments(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "");
                   return (
                     <div className="relative mt-2 pl-2">
                       {/* Vertical dotted spine */}
