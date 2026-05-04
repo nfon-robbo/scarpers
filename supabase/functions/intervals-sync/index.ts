@@ -356,13 +356,14 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events using native Intervals.icu workout-builder text.
-    // workout_doc: {} is intentional: it tells Intervals.icu to parse the
-    // description server-side so graphs and Garmin structured workout sync are populated.
+    // Step 2: Build events with an explicit structured workout_doc. Walk/run
+    // pairs are wrapped as REPEAT blocks with second-based TIME durations and
+    // Garmin-friendly INTERVAL_ACTIVE / INTERVAL_REST step types.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
+      const workoutDoc = buildStructuredWorkoutDoc(workout);
 
       return {
         category: "WORKOUT",
@@ -375,7 +376,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: {},
+        workout_doc: workoutDoc,
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
