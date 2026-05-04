@@ -314,14 +314,14 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events with an attached Garmin FIT workout file. Relying on
-    // description parsing alone can leave workout_doc empty, which gives a blank
-    // graph and generic watch steps. FIT gives Intervals.icu/Garmin explicit run
-    // and walk steps with pace targets.
+    // Step 2: Build events with both native Intervals.icu text and a structured
+    // workout_doc. The server can parse the text, but Garmin sync depends on
+    // workout_doc being populated immediately with run/walk steps and pace targets.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
+      const workoutDoc = buildWorkoutDoc(workout.steps);
 
       return {
         category: "WORKOUT",
@@ -334,9 +334,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        ...(workout.fitFileBase64 && workout.fitFileName
-          ? { filename: workout.fitFileName, file_contents_base64: workout.fitFileBase64 }
-          : { workout_doc: {} }),
+        workout_doc: workoutDoc,
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
@@ -353,7 +351,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Syncing ${eventsToSync.length} workouts via parsed event endpoint`);
+    console.log(`Syncing ${eventsToSync.length} workouts via structured workout_doc endpoint`);
     const result = [];
     const failures = [];
     for (const event of eventsToSync) {
@@ -373,7 +371,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Parsed event sync result: ${result.length} created/updated, ${failures.length} failed`);
+    console.log(`Structured event sync result: ${result.length} created/updated, ${failures.length} failed`);
 
     return new Response(
       JSON.stringify({ succeeded: result.length, failed: failures.length, results: result.map((r: any) => ({ date: r.start_date_local, name: r.name, success: true })) }),
