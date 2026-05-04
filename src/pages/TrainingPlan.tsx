@@ -243,9 +243,9 @@ const TrainingPlanPage = () => {
     if (!user) return;
     const raceDateValue = letAIDecide ? "ai-recommend" : raceDate?.toISOString().split("T")[0] || null;
 
-    // Delete old plan, insert new one
+    // Archive old plan instead of deleting, then insert new one
     if (savedPlanId) {
-      await supabase.from("training_plans").delete().eq("id", savedPlanId);
+      await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
     }
 
     const { data, error } = await supabase
@@ -268,10 +268,11 @@ const TrainingPlanPage = () => {
 
   const deletePlan = async () => {
     if (!savedPlanId) return;
-    await supabase.from("training_plans").delete().eq("id", savedPlanId);
+    // Archive (soft delete) so the plan is preserved under Settings → Previous Plans
+    await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
     setSavedPlanId(null);
     setContent("");
-    toast({ title: "Plan deleted" });
+    toast({ title: "Plan archived", description: "Find it under Settings → Previous Plans" });
   };
 
   const toggleDay = (day: string) => {
