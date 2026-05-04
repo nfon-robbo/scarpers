@@ -239,6 +239,19 @@ export default function PlanDayList({
     }));
   };
 
+  // Load/persist overrides
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("plan-step-overrides");
+      if (raw) setOverrides(JSON.parse(raw));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
+    } catch {}
+  }, [overrides]);
+
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
     for (const w of workouts) {
