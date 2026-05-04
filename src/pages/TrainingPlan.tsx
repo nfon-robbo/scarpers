@@ -288,14 +288,34 @@ const TrainingPlanPage = () => {
     }
   }, [datePopoverOpen, startDate, raceDate]);
 
+  const shiftPlanDates = (markdown: string, deltaDays: number): string => {
+    if (!deltaDays) return markdown;
+    return markdown.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g, (_m, d, mo, y) => {
+      const date = new Date(Number(y), Number(mo) - 1, Number(d));
+      if (isNaN(date.getTime())) return _m;
+      date.setDate(date.getDate() + deltaDays);
+      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const yy = date.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    });
+  };
+
   const persistStartDateShift = async (newStart: Date) => {
-    if (!savedPlanId || !user) { setStartDate(newStart); return; }
     setUpdatingDates(true);
     try {
-      await supabase.from("training_plans")
-        .update({ start_date: newStart.toISOString().split("T")[0] })
-        .eq("id", savedPlanId);
+      const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
+      const newContent = shiftPlanDates(content, deltaDays);
+      setContent(newContent);
       setStartDate(newStart);
+      if (savedPlanId && user) {
+        await supabase.from("training_plans")
+          .update({
+            start_date: newStart.toISOString().split("T")[0],
+            content: newContent,
+          })
+          .eq("id", savedPlanId);
+      }
       toast({ title: "Start date updated", description: "Workouts shifted to the new start date." });
     } catch (e: any) {
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
