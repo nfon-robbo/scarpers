@@ -281,6 +281,20 @@ const TrainingPlanPage = () => {
   const [pendingStart, setPendingStart] = useState<Date | undefined>(undefined);
   const [pendingEnd, setPendingEnd] = useState<Date | undefined>(undefined);
 
+  // Format a Date as YYYY-MM-DD using LOCAL components (avoids UTC off-by-one)
+  const toLocalISODate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  // Parse YYYY-MM-DD as a local date (avoids UTC midnight drift)
+  const parseLocalISODate = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
   useEffect(() => {
     if (datePopoverOpen) {
       setPendingStart(startDate);
