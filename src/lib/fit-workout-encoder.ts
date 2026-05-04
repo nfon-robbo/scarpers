@@ -89,10 +89,10 @@ export function encodeWorkoutFit(
       };
 
       if (step.customTargetLow != null) {
-        stepData.customTargetValueLow = step.customTargetLow;
+        stepData.customTargetValueLow = Math.round(step.customTargetLow);
       }
       if (step.customTargetHigh != null) {
-        stepData.customTargetValueHigh = step.customTargetHigh;
+        stepData.customTargetValueHigh = Math.round(step.customTargetHigh);
       }
 
       encoder.onMesg(Profile.MesgNum.WORKOUT_STEP, stepData);
