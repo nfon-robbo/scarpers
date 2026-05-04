@@ -80,6 +80,7 @@ export function encodeWorkoutFit(
     } else {
       const stepData: Record<string, unknown> = {
         messageIndex: i,
+        wktStepName: step.name?.slice(0, 31) ?? `Step ${i + 1}`,
         intensity: step.intensity,
         durationType: step.durationType,
         durationValue: step.durationValue ?? 0,
