@@ -96,38 +96,62 @@ function formatTime(duration: string): string {
 // Expand a segment row like "10 x 1 min" into individual run/walk/recovery steps
 type Step = { kind: "run" | "walk" | "rest"; label: string; duration: string; pace: string };
 
-function expandSegments(segments: { segment: string; duration: string; target: string; hrZone: string; notes?: string }[]): Step[] {
+// Try to detect the interval prescription (reps + run / walk durations) from a free-text source
+// e.g. "Walk/Run Intervals: 10 × 1min", "8 x 2min run / 90s walk", "10x1min", "12 × 1 min"
+function detectIntervalSpec(text: string): { reps: number; on: string; off: string } | null {
+  if (!text) return null;
+  const re = /(\d+)\s*[x×]\s*(\d+(?:\.\d+)?\s*(?:min|sec|s|m)\b)(?:\s*(?:run|on)?)?(?:\s*[\/,]\s*(\d+(?:\.\d+)?\s*(?:min|sec|s|m)\b)(?:\s*(?:walk|off|recovery)?)?)?/i;
+  const m = text.match(re);
+  if (!m) return null;
+  return { reps: parseInt(m[1], 10), on: m[2], off: m[3] || "1 min" };
+}
+
+function expandSegments(
+  segments: { segment: string; duration: string; target: string; hrZone: string; notes?: string }[],
+  workoutTitle: string,
+  rawText: string,
+): Step[] {
   const steps: Step[] = [];
   let runIdx = 0;
   let walkIdx = 0;
+  let mainEmitted = false;
+
+  // Pre-compute fallback interval spec from the workout title or full raw text
+  const fallbackSpec = detectIntervalSpec(workoutTitle) || detectIntervalSpec(rawText);
+
+  const emitIntervalBlock = (spec: { reps: number; on: string; off: string }, hrZone: string, segText: string, notes?: string) => {
+    for (let i = 0; i < spec.reps; i++) {
+      runIdx++;
+      steps.push({
+        kind: "run",
+        label: `Run ${runIdx}`,
+        duration: formatTime(spec.on),
+        pace: paceForZone(hrZone, segText + " " + (notes || "")),
+      });
+      if (i < spec.reps - 1) {
+        walkIdx++;
+        steps.push({
+          kind: "walk",
+          label: `Walk ${walkIdx}`,
+          duration: formatTime(spec.off),
+          pace: "9:57",
+        });
+      }
+    }
+    mainEmitted = true;
+  };
+
   for (const seg of segments) {
     const isWarmup = /warm/i.test(seg.segment);
     const isCooldown = /cool/i.test(seg.segment);
-    const isWalk = /walk|recovery/i.test(seg.segment) || /walk|recovery/i.test(seg.duration);
-    const repsMatch = seg.duration.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?\s*(?:min|sec))(?:\s*(?:run|on))?(?:\s*[\/,]\s*(\d+(?:\.\d+)?\s*(?:min|sec))(?:\s*(?:walk|off|recovery))?)?/i);
+    const isMain = /main|interval|rep|work/i.test(seg.segment);
+    const isWalk = !isMain && (/walk|recovery|rest/i.test(seg.segment) || /walk|recovery/i.test(seg.duration));
 
-    if (repsMatch) {
-      const reps = parseInt(repsMatch[1], 10);
-      const onDur = repsMatch[2];
-      const offDur = repsMatch[3];
-      for (let i = 0; i < reps; i++) {
-        runIdx++;
-        steps.push({
-          kind: "run",
-          label: `Run ${runIdx}`,
-          duration: formatTime(onDur),
-          pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
-        });
-        if (offDur && i < reps - 1) {
-          walkIdx++;
-          steps.push({
-            kind: "walk",
-            label: `Walk ${walkIdx}`,
-            duration: formatTime(offDur),
-            pace: "9:57",
-          });
-        }
-      }
+    // Try to expand reps from this segment's own duration first
+    const segSpec = detectIntervalSpec(seg.duration) || (isMain ? detectIntervalSpec(seg.segment + " " + (seg.notes || "")) : null);
+
+    if (segSpec) {
+      emitIntervalBlock(segSpec, seg.hrZone, seg.segment, seg.notes);
       continue;
     }
 
@@ -138,7 +162,16 @@ function expandSegments(segments: { segment: string; duration: string; target: s
         duration: formatTime(seg.duration),
         pace: paceForZone(seg.hrZone, seg.segment),
       });
+      // If the table has no main interval row, inject the fallback spec straight after warm-up
+      if (fallbackSpec && !mainEmitted) {
+        const mainSeg = segments.find((s) => /main|interval|rep|work/i.test(s.segment));
+        emitIntervalBlock(fallbackSpec, mainSeg?.hrZone || "Z2", mainSeg?.segment || "Run", mainSeg?.notes);
+      }
     } else if (isCooldown) {
+      // Safety net: if main was never emitted (no warm-up row either) inject before cool-down
+      if (fallbackSpec && !mainEmitted) {
+        emitIntervalBlock(fallbackSpec, seg.hrZone, "Run", seg.notes);
+      }
       steps.push({
         kind: "walk",
         label: "Cool Down - Walk",
@@ -161,8 +194,17 @@ function expandSegments(segments: { segment: string; duration: string; target: s
         duration: formatTime(seg.duration),
         pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
       });
+      mainEmitted = true;
     }
   }
+
+  // Final safety net: nothing matched but title says "10 × 1min" — emit warm-up + reps + cool-down
+  if (fallbackSpec && !mainEmitted && steps.length === 0) {
+    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "05:00", pace: "9:57" });
+    emitIntervalBlock(fallbackSpec, "Z2", "Run", undefined);
+    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "05:00", pace: "9:57" });
+  }
+
   return steps;
 }
 
