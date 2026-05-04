@@ -315,7 +315,38 @@ const TrainingPlanPage = () => {
     });
   };
 
-  const persistStartDateShift = async (newStart: Date) => {
+  // Move a single workout from one date to another by rewriting the bold date marker in the markdown
+  const moveWorkoutDate = async (fromIso: string, toIso: string) => {
+    if (!content) return;
+    const fromParts = fromIso.split("-");
+    const toParts = toIso.split("-");
+    if (fromParts.length !== 3 || toParts.length !== 3) return;
+    const fromDmy = `${fromParts[2]}/${fromParts[1]}/${fromParts[0]}`;
+    const toDmy = `${toParts[2]}/${toParts[1]}/${toParts[0]}`;
+
+    // Replace inside **...DD/MM/YYYY...** date headers only
+    const lines = content.split("\n");
+    let replaced = false;
+    const newLines = lines.map((ln) => {
+      if (replaced) return ln;
+      const headerRe = /\*\*[^*]*\b(\d{1,2}\/\d{1,2}\/\d{4})\b[^*]*\*\*/;
+      const m = ln.match(headerRe);
+      if (m && m[1] === fromDmy) {
+        replaced = true;
+        return ln.replace(fromDmy, toDmy);
+      }
+      return ln;
+    });
+    if (!replaced) {
+      toast({ title: "Could not move workout", description: "Workout header not found.", variant: "destructive" });
+      return;
+    }
+    const newContent = newLines.join("\n");
+    setContent(newContent);
+    if (savedPlanId && user) {
+      await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
+    }
+    toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]}.` });
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
