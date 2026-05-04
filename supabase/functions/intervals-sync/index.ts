@@ -128,10 +128,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtStep(step: WorkoutStep): string {
-    // Keep Intervals.icu workout-builder syntax minimal: dash, duration,
-    // then target. Extra cue words before the duration can be shown as text
-    // but fail to populate workout_doc/graph/watch steps for some run workouts.
-    return `- ${fmtDur(step.duration)}${fmtTarget(step)}`;
+    return `- ${stepCue(step)} ${fmtDur(step.duration)}${fmtTarget(step)}`;
   }
 
   const lines: string[] = [];
@@ -314,14 +311,13 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events with both native Intervals.icu text and a structured
-    // workout_doc. The server can parse the text, but Garmin sync depends on
-    // workout_doc being populated immediately with run/walk steps and pace targets.
+    // Step 2: Build events using native Intervals.icu workout-builder text.
+    // workout_doc: {} is intentional: it tells Intervals.icu to parse the
+    // description server-side so graphs and Garmin structured workout sync are populated.
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
-      const workoutDoc = buildWorkoutDoc(workout.steps);
 
       return {
         category: "WORKOUT",
@@ -334,7 +330,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
-        workout_doc: workoutDoc,
+        workout_doc: {},
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
