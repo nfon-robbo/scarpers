@@ -72,6 +72,17 @@ const unitSettings: UnitOption<keyof UnitPreferences>[] = [
     options: [
       { value: "kg", label: "Kilograms (kg)" },
       { value: "lbs", label: "Pounds (lbs)" },
+      { value: "st", label: "Stone (st)" },
+    ],
+  },
+  {
+    key: "height",
+    label: "Height",
+    icon: Ruler,
+    description: "Used for body height",
+    options: [
+      { value: "cm", label: "Centimeters (cm)" },
+      { value: "ft", label: "Feet & inches (ft/in)" },
     ],
   },
 ];
