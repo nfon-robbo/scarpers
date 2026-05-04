@@ -813,12 +813,19 @@ const TrainingPlanPage = () => {
         return;
       }
 
+      const stepOverrides = JSON.parse(localStorage.getItem("plan-step-overrides") || "{}") as Record<string, Record<number, { duration?: string; pace?: string }>>;
+
       // Convert parsed workouts to API format, expanding intervals
       const apiWorkouts = withSegments.map(w => {
         const d = w.dateObj!;
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg));
+        const overridesForWorkout = stepOverrides[dateStr] || {};
+        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg)).map((step, idx) => ({
+          ...step,
+          duration: overridesForWorkout[idx]?.duration ? parseDurationSeconds(overridesForWorkout[idx].duration) : step.duration,
+          pace: overridesForWorkout[idx]?.pace ? normalizePaceInput(overridesForWorkout[idx].pace) : step.pace,
+        }));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
         // Collect notes (including music BPM) from segments
         const notes = w.segments
