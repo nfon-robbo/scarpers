@@ -1,12 +1,15 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
@@ -208,6 +211,65 @@ function expandSegments(
   return steps;
 }
 
+function EditableStat({
+  value,
+  label,
+  placeholder,
+  onSave,
+  isOverridden,
+}: {
+  value: string;
+  label: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+  isOverridden?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { if (open) setDraft(value); }, [open, value]);
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    setOpen(false);
+  };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="px-3 py-2 text-center w-full hover:bg-accent/40 transition-colors group"
+        >
+          <p className={cn("text-base font-bold leading-tight inline-flex items-center gap-1", isOverridden && "text-primary")}>
+            {value}
+            <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60" />
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-2" align="center">
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <Input
+            autoFocus
+            value={draft}
+            placeholder={placeholder}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              if (e.key === "Escape") setOpen(false);
+            }}
+            className="h-8 text-sm"
+          />
+          <div className="flex justify-end gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={commit}>Save</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function PlanDayList({
   workouts,
   planStartDate,
@@ -219,6 +281,35 @@ export default function PlanDayList({
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const touchSourceRef = useRef<string | null>(null);
+  // Per-workout overrides: { [workoutKey]: { [stepIdx]: { duration?, pace? } } }
+  const [overrides, setOverrides] = useState<Record<string, Record<number, { duration?: string; pace?: string }>>>({});
+
+  const workoutKey = (w: ParsedWorkout) =>
+    w.dateObj ? format(w.dateObj, "yyyy-MM-dd") : w.date;
+
+  const setStepOverride = (w: ParsedWorkout, idx: number, field: "duration" | "pace", value: string) => {
+    const key = workoutKey(w);
+    setOverrides((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        [idx]: { ...((prev[key] || {})[idx] || {}), [field]: value },
+      },
+    }));
+  };
+
+  // Load/persist overrides
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("plan-step-overrides");
+      if (raw) setOverrides(JSON.parse(raw));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
+    } catch {}
+  }, [overrides]);
 
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
@@ -408,14 +499,20 @@ export default function PlanDayList({
                                     <Icon className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
-                                    <div className="px-3 py-2 text-center">
-                                      <p className="text-base font-bold leading-tight">{step.duration}</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">Time (mm:ss)</p>
-                                    </div>
-                                    <div className="px-3 py-2 text-center">
-                                      <p className="text-base font-bold leading-tight">{step.pace}</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">Pace (min/km)</p>
-                                    </div>
+                                    <EditableStat
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? step.duration}
+                                      label="Time (mm:ss)"
+                                      placeholder="mm:ss"
+                                      onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
+                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
+                                    />
+                                    <EditableStat
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? step.pace}
+                                      label="Pace (min/km)"
+                                      placeholder="m:ss"
+                                      onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
+                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                    />
                                   </div>
                                 </div>
                               </div>
