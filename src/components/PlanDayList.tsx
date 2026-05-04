@@ -64,6 +64,108 @@ function hrZoneBpm(zone: string): string | null {
   }
 }
 
+// Map an HR zone (or text cue) to a target pace (min/km).
+// Defaults assume a recreational runner; tweak per-athlete in a future iteration.
+function paceForZone(zone: string, segmentText: string): string {
+  const txt = `${zone} ${segmentText}`.toLowerCase();
+  if (/walk/.test(txt)) return "9:57";
+  if (/z5|vo2|sprint/.test(txt)) return "4:30";
+  if (/z4|threshold|race\s*pace/.test(txt)) return "5:00";
+  if (/z3|tempo|steady/.test(txt)) return "5:30";
+  if (/easy|recovery|z1|z2|warm|cool/.test(txt)) return "6:27";
+  return "6:27";
+}
+
+// Format any "1 min", "30 sec", "5 min", "10km" duration into MM:SS where possible
+function formatTime(duration: string): string {
+  const minMatch = duration.match(/(\d+(?:\.\d+)?)\s*min/i);
+  if (minMatch) {
+    const total = Math.round(parseFloat(minMatch[1]) * 60);
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  const secMatch = duration.match(/(\d+)\s*sec/i);
+  if (secMatch) {
+    const s = parseInt(secMatch[1], 10);
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  }
+  return duration;
+}
+
+// Expand a segment row like "10 x 1 min" into individual run/walk/recovery steps
+type Step = { kind: "run" | "walk" | "rest"; label: string; duration: string; pace: string };
+
+function expandSegments(segments: { segment: string; duration: string; target: string; hrZone: string; notes?: string }[]): Step[] {
+  const steps: Step[] = [];
+  let runIdx = 0;
+  let walkIdx = 0;
+  for (const seg of segments) {
+    const isWarmup = /warm/i.test(seg.segment);
+    const isCooldown = /cool/i.test(seg.segment);
+    const isWalk = /walk|recovery/i.test(seg.segment) || /walk|recovery/i.test(seg.duration);
+    const repsMatch = seg.duration.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?\s*(?:min|sec))(?:\s*(?:run|on))?(?:\s*[\/,]\s*(\d+(?:\.\d+)?\s*(?:min|sec))(?:\s*(?:walk|off|recovery))?)?/i);
+
+    if (repsMatch) {
+      const reps = parseInt(repsMatch[1], 10);
+      const onDur = repsMatch[2];
+      const offDur = repsMatch[3];
+      for (let i = 0; i < reps; i++) {
+        runIdx++;
+        steps.push({
+          kind: "run",
+          label: `Run ${runIdx}`,
+          duration: formatTime(onDur),
+          pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
+        });
+        if (offDur && i < reps - 1) {
+          walkIdx++;
+          steps.push({
+            kind: "walk",
+            label: `Walk ${walkIdx}`,
+            duration: formatTime(offDur),
+            pace: "9:57",
+          });
+        }
+      }
+      continue;
+    }
+
+    if (isWarmup) {
+      steps.push({
+        kind: "walk",
+        label: "Warm Up - Walk",
+        duration: formatTime(seg.duration),
+        pace: paceForZone(seg.hrZone, seg.segment),
+      });
+    } else if (isCooldown) {
+      steps.push({
+        kind: "walk",
+        label: "Cool Down - Walk",
+        duration: formatTime(seg.duration),
+        pace: paceForZone(seg.hrZone, seg.segment),
+      });
+    } else if (isWalk) {
+      walkIdx++;
+      steps.push({
+        kind: "walk",
+        label: `Walk ${walkIdx}`,
+        duration: formatTime(seg.duration),
+        pace: "9:57",
+      });
+    } else {
+      runIdx++;
+      steps.push({
+        kind: "run",
+        label: runIdx === 1 && !/main/i.test(seg.segment) ? seg.segment : `Run ${runIdx}`,
+        duration: formatTime(seg.duration),
+        pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
+      });
+    }
+  }
+  return steps;
+}
+
 export default function PlanDayList({
   workouts,
   planStartDate,
