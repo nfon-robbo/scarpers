@@ -261,6 +261,73 @@ const Settings = () => {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Personal Details
+          </CardTitle>
+          <CardDescription>
+            Used to personalise your AI training plan (HR zones, pacing, calories)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sex">Sex</Label>
+              <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
+                <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other / prefer not to say</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dob">Date of birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={personal.date_of_birth}
+                onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="height">Height (cm)</Label>
+              <Input
+                id="height"
+                type="number"
+                inputMode="decimal"
+                min="50"
+                max="250"
+                value={personal.height_cm}
+                onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                inputMode="decimal"
+                min="20"
+                max="300"
+                step="0.1"
+                value={personal.weight_kg}
+                onChange={(e) => setPersonal((p) => ({ ...p, weight_kg: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
+              {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              {savingPersonal ? "Saving..." : "Save Details"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-lg">Units of Measurement</CardTitle>
           <CardDescription>Choose your preferred units for each metric type</CardDescription>
         </CardHeader>
