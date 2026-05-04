@@ -159,20 +159,18 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtTarget(step: WorkoutStep): string {
+    const hrTarget = normalizeHrZone(step);
+    if (hrTarget) return ` ${hrTarget} HR`;
+    if (step.hrLow > 0 && step.hrHigh > 0) return ` ${step.hrLow}-${step.hrHigh}bpm HR`;
     if (step.pace) return ` ${step.pace.replace(/\s+/g, "").replace(/\/$/, "")} Pace`;
-    if (step.hrLow > 0 && step.hrHigh > 0) return ` ${normalizeHrZone(step)} HR`;
-    return "";
+    return " Z2 HR";
   }
 
-  // Cue keywords are how Intervals.icu derives the Garmin step type.
-  // - "Recovery" / "Rest" -> Garmin "Recovery" step
-  // - Inside Warmup section -> Garmin "Warm Up"
-  // - Inside Cooldown section -> Garmin "Cool Down"
-  // - Otherwise -> Garmin "Run" (active)
-  // Plain "Walk" / "Run" cues are treated as free text and produce "Other".
+  // Cue text mirrors the Cooper/Garmin layout: warmup, run, walk, cooldown.
+  // Targets are kept explicit on every line so Garmin does not show "No Target".
   function stepCue(step: WorkoutStep): string {
     const normalized = step.intensity.toLowerCase();
-    if (normalized === "recovery" || normalized === "rest") return "Recovery";
+    if (normalized === "recovery" || normalized === "rest") return "Walk";
     if (normalized === "warmup") return "Warmup";
     if (normalized === "cooldown") return "Cooldown";
     return "Run";
