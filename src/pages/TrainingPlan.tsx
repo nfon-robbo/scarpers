@@ -971,12 +971,29 @@ const TrainingPlanPage = () => {
             Training Plan
           </h1>
           {content && !loading && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="shrink-0">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleSyncToIntervals(true)}
+                disabled={syncing}
+                className="gap-2"
+                title="Rebuild all workouts on intervals.icu so graphs refresh"
+              >
+                {syncing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Refresh on intervals.icu</span>
+                <span className="sm:hidden">Refresh</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleSyncToIntervals(false)} disabled={syncing}>
                   <Upload className="w-4 h-4 mr-2" />
