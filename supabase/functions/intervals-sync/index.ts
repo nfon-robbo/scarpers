@@ -279,12 +279,6 @@ serve(async (req) => {
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
         workout_doc: {},
-        ...(workout.fitFileBase64 && workout.fitFileName
-          ? {
-              filename: workout.fitFileName,
-              file_contents_base64: workout.fitFileBase64,
-            }
-          : {}),
         external_id: `lovable-${workout.date}-${idx}`,
       };
     });
