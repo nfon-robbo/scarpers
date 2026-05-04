@@ -1022,7 +1022,8 @@ const TrainingPlanPage = () => {
                   Delete Plan
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+            </div>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
