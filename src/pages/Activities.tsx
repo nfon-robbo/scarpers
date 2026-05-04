@@ -44,6 +44,7 @@ const Activities = () => {
         .from("training_plans")
         .select("id")
         .eq("user_id", user.id)
+        .eq("archived", false)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),

@@ -516,6 +516,7 @@ export type Database = {
       }
       training_plans: {
         Row: {
+          archived: boolean
           content: string
           created_at: string
           id: string
@@ -526,6 +527,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           content: string
           created_at?: string
           id?: string
@@ -536,6 +538,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           content?: string
           created_at?: string
           id?: string

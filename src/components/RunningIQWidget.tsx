@@ -130,6 +130,7 @@ const RunningIQWidget = () => {
         .from("training_plans")
         .select("training_days, start_date")
         .eq("user_id", userId)
+        .eq("archived", false)
         .order("created_at", { ascending: false })
         .limit(1)
         .then(({ data }) => data || []),

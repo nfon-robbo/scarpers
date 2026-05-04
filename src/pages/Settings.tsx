@@ -10,7 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User } from "lucide-react";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnitOption<K extends keyof UnitPreferences> {
@@ -223,6 +225,90 @@ const Settings = () => {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [googleFitConnected, setGoogleFitConnected] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  const navigate = useNavigate();
+
+  // Previous (archived) plans
+  type ArchivedPlan = {
+    id: string;
+    race_distance: string;
+    start_date: string;
+    race_date: string | null;
+    training_days: string[];
+    created_at: string;
+    content: string;
+  };
+  const [archivedPlans, setArchivedPlans] = useState<ArchivedPlan[]>([]);
+  const [planActionId, setPlanActionId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ArchivedPlan | null>(null);
+
+  const loadArchivedPlans = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("training_plans")
+      .select("id, race_distance, start_date, race_date, training_days, created_at, content")
+      .eq("user_id", user.id)
+      .eq("archived", true)
+      .order("created_at", { ascending: false });
+    setArchivedPlans((data as ArchivedPlan[]) || []);
+  };
+
+  useEffect(() => { loadArchivedPlans(); }, [user]);
+
+  const resumePlan = async (plan: ArchivedPlan) => {
+    if (!user) return;
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").update({ archived: true })
+        .eq("user_id", user.id).eq("archived", false);
+      await supabase.from("training_plans").update({ archived: false }).eq("id", plan.id);
+      toast({ title: "Plan resumed" });
+      await loadArchivedPlans();
+      navigate("/training-plan");
+    } catch (e: any) {
+      toast({ title: "Failed to resume", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+    }
+  };
+
+  const restartPlan = async (plan: ArchivedPlan) => {
+    if (!user) return;
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").update({ archived: true })
+        .eq("user_id", user.id).eq("archived", false);
+      const today = new Date().toISOString().split("T")[0];
+      await supabase.from("training_plans").insert({
+        user_id: user.id,
+        race_distance: plan.race_distance,
+        training_days: plan.training_days,
+        start_date: today,
+        race_date: plan.race_date,
+        content: plan.content,
+      });
+      toast({ title: "Plan restarted from today" });
+      await loadArchivedPlans();
+      navigate("/training-plan");
+    } catch (e: any) {
+      toast({ title: "Failed to restart", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+    }
+  };
+
+  const deletePlanForever = async (plan: ArchivedPlan) => {
+    setPlanActionId(plan.id);
+    try {
+      await supabase.from("training_plans").delete().eq("id", plan.id);
+      toast({ title: "Plan permanently deleted" });
+      await loadArchivedPlans();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    } finally {
+      setPlanActionId(null);
+      setConfirmDelete(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -470,6 +556,85 @@ const Settings = () => {
           ))}
         </CardContent>
       </Card>
+
+      {/* Previous Plans Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Archive className="w-5 h-5" />
+            Previous Plans
+          </CardTitle>
+          <CardDescription>
+            Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {archivedPlans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No previous plans yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {archivedPlans.map((plan) => (
+                <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{plan.race_distance}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
+                      {plan.race_date && plan.race_date !== "ai-recommend" && (
+                        <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
+                      )}
+                      {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resumePlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => restartPlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(plan)}
+                      disabled={planActionId === plan.id}
+                      aria-label="Delete permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete plan permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the plan from Previous Plans for good. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmDelete && deletePlanForever(confirmDelete)}>
+              Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Auto-Sync Schedule Card */}
       <Card>

@@ -34,7 +34,7 @@ serve(async (req) => {
     const [profileRes, planRes] = await Promise.all([
       supabase.from("profiles").select("name, primary_sport").eq("user_id", user.id).maybeSingle(),
       supabase.from("training_plans").select("content, start_date, race_date, training_days")
-        .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        .eq("user_id", user.id).eq("archived", false).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     const profile = profileRes.data;
     const plan = planRes.data;
