@@ -164,11 +164,17 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return "";
   }
 
+  // Cue keywords are how Intervals.icu derives the Garmin step type.
+  // - "Recovery" / "Rest" -> Garmin "Recovery" step
+  // - Inside Warmup section -> Garmin "Warm Up"
+  // - Inside Cooldown section -> Garmin "Cool Down"
+  // - Otherwise -> Garmin "Run" (active)
+  // Plain "Walk" / "Run" cues are treated as free text and produce "Other".
   function stepCue(step: WorkoutStep): string {
     const normalized = step.intensity.toLowerCase();
-    const pace = step.pace?.replace(/\s+/g, "").toLowerCase();
-    if (normalized === "recovery" || normalized === "rest" || pace === "9:57/km") return "Walk";
-    if (normalized === "warmup" || normalized === "cooldown") return pace === "9:57/km" ? "Walk" : "Easy";
+    if (normalized === "recovery" || normalized === "rest") return "Recovery";
+    if (normalized === "warmup") return "Warmup";
+    if (normalized === "cooldown") return "Cooldown";
     return "Run";
   }
 
