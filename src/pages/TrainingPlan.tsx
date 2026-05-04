@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import PlanCalendarView from "@/components/PlanCalendarView";
+import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { importDocxPlan } from "@/lib/docx-plan-import";
