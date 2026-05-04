@@ -240,6 +240,7 @@ export default function PlanOverview({
                 </p>
               )}
             </div>
+            {headerAction && <div className="shrink-0">{headerAction}</div>}
           </div>
         </div>
 
