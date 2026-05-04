@@ -88,10 +88,18 @@ function paceToSpeedMps(pace: string): number | null {
   return metres / seconds;
 }
 
+function stepName(intensity: string, target: string): string {
+  const normalized = intensity.toLowerCase();
+  const label = normalized === "warmup" ? "Warm up" : normalized === "cooldown" ? "Cool down" : normalized === "rest" || normalized === "recovery" ? "Recover" : "Run";
+  return `${label} ${target}`.slice(0, 31);
+}
+
 function buildSpeedFitStep(durationMs: number, pace: string, intensity: string): WorkoutStep | null {
   const speed = paceToSpeedMps(pace);
   if (!speed) return null;
+  const targetPace = pace.replace(/\s+/g, "").replace(/\s*Pace$/i, "");
   return {
+    name: stepName(intensity, targetPace),
     intensity: toFitIntensity(intensity),
     durationType: WKT_STEP_DURATION.TIME,
     durationValue: durationMs,
@@ -104,6 +112,7 @@ function buildSpeedFitStep(durationMs: number, pace: string, intensity: string):
 
 function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensity: string): WorkoutStep {
   return {
+    name: stepName(intensity, `${hrLow}-${hrHigh} bpm`),
     intensity: toFitIntensity(intensity),
     durationType: WKT_STEP_DURATION.TIME,
     durationValue: durationMs,
