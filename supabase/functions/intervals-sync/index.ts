@@ -21,7 +21,7 @@ type WorkoutInput = {
 };
 
 function formatWorkoutDescription(workout: WorkoutInput): string {
-  if (workout.rawDescription) {
+  if (workout.rawDescription && /\bpace\b/i.test(workout.rawDescription) && !/\b(?:hr|lthr|bpm)\b/i.test(workout.rawDescription)) {
     return workout.notes ? `${workout.rawDescription}\n\n${workout.notes}` : workout.rawDescription;
   }
 
@@ -252,6 +252,7 @@ serve(async (req) => {
         target: "PACE",
         moving_time: totalDuration,
         description: fullDescription,
+        workout_doc: {},
         ...(workout.fitFileBase64 && workout.fitFileName
           ? {
               filename: workout.fitFileName,
