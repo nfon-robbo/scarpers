@@ -16,6 +16,7 @@ interface PlanOverviewProps {
   raceDate?: Date;
   completedDates?: Set<string>;
   linkedActivities?: Record<string, any>;
+  headerAction?: React.ReactNode;
 }
 
 /** Circular progress gauge (SVG) */
