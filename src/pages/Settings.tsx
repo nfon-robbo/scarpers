@@ -97,9 +97,50 @@ const defaultSchedule: SyncSchedule = {
 const Settings = () => {
   const { units, setUnit } = useUnits();
   const { user } = useAuth();
+  const { profile, refresh: refreshProfile } = useProfile();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Personal details
+  const [personal, setPersonal] = useState({
+    sex: "",
+    date_of_birth: "",
+    height_cm: "",
+    weight_kg: "",
+  });
+  const [savingPersonal, setSavingPersonal] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setPersonal({
+        sex: profile.sex ?? "",
+        date_of_birth: profile.date_of_birth ?? "",
+        height_cm: profile.height_cm != null ? String(profile.height_cm) : "",
+        weight_kg: profile.weight_kg != null ? String(profile.weight_kg) : "",
+      });
+    }
+  }, [profile]);
+
+  const savePersonal = async () => {
+    if (!user) return;
+    setSavingPersonal(true);
+    try {
+      const { error } = await supabase.from("profiles").update({
+        sex: personal.sex || null,
+        date_of_birth: personal.date_of_birth || null,
+        height_cm: personal.height_cm ? Number(personal.height_cm) : null,
+        weight_kg: personal.weight_kg ? Number(personal.weight_kg) : null,
+      }).eq("user_id", user.id);
+      if (error) throw error;
+      toast({ title: "Personal details saved" });
+      refreshProfile();
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingPersonal(false);
+    }
+  };
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-health-sleep`;
 
