@@ -1157,9 +1157,9 @@ const TrainingPlanPage = () => {
           </Card>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <FeatureCard icon={Target} title="Season Strategy" desc="12-24 week macro-cycle with race anchors and phase architecture" />
-            <FeatureCard icon={Layers} title="4-Week Block" desc="28-day detailed plan with daily workouts, zones, and targets" />
-            <FeatureCard icon={Clock} title="Periodization" desc="Build weeks + recovery week with progressive overload" />
+            <FeatureCard icon={Target} title="Tailored to You" desc="Built around your goals, experience, and weekly availability" />
+            <FeatureCard icon={Layers} title="Fully Personalised" desc="Daily workouts adapted to your fitness, recovery, and schedule" />
+            <FeatureCard icon={Clock} title="Smart Progression" desc="Build and recovery balanced around your race date" />
           </div>
         </>
       )}
