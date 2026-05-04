@@ -440,14 +440,20 @@ export default function PlanDayList({
                                     <Icon className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
-                                    <div className="px-3 py-2 text-center">
-                                      <p className="text-base font-bold leading-tight">{step.duration}</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">Time (mm:ss)</p>
-                                    </div>
-                                    <div className="px-3 py-2 text-center">
-                                      <p className="text-base font-bold leading-tight">{step.pace}</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">Pace (min/km)</p>
-                                    </div>
+                                    <EditableStat
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? step.duration}
+                                      label="Time (mm:ss)"
+                                      placeholder="mm:ss"
+                                      onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
+                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
+                                    />
+                                    <EditableStat
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? step.pace}
+                                      label="Pace (min/km)"
+                                      placeholder="m:ss"
+                                      onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
+                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                    />
                                   </div>
                                 </div>
                               </div>
