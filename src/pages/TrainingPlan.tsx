@@ -83,7 +83,9 @@ function paceForSegment(seg: ParsedSegment, intensity: string): string {
   const txt = `${seg.segment} ${seg.duration} ${seg.target} ${seg.notes || ""}`.toLowerCase();
   const explicit = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
   if (explicit) return `${explicit[1]}/km`;
-  if (/walk|recovery|rest/.test(txt) || /warmup|cooldown/i.test(intensity)) return WALK_PACE;
+  if (/recovery|rest/i.test(intensity) || /recovery|rest/.test(txt)) return WALK_PACE;
+  if (/warmup|cooldown/i.test(intensity)) return /walk/.test(txt) ? WALK_PACE : "6:27/km";
+  if (/walk/.test(txt) && !/run|interval|tempo|stride|fast/.test(txt)) return WALK_PACE;
   if (/z5|vo2|sprint|fast/.test(txt)) return "4:30/km";
   if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
   if (/z3|tempo|steady/.test(txt)) return "5:30/km";
