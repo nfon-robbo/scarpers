@@ -37,7 +37,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   function fmtDur(secs: number): string {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
-    if (m > 0 && s > 0) return `${m}m${s}s`;
+    if (m > 0 && s > 0) return `${m}m${s}`;
     if (m > 0) return `${m}m`;
     return `${s}s`;
   }
@@ -279,6 +279,7 @@ serve(async (req) => {
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
         description: fullDescription,
+        workout_doc: {},
         ...(workout.fitFileBase64 && workout.fitFileName
           ? {
               filename: workout.fitFileName,
