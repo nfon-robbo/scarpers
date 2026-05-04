@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS unit_height TEXT NOT NULL DEFAULT 'cm';
