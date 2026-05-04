@@ -952,7 +952,7 @@ const TrainingPlanPage = () => {
         <p className="text-sm text-muted-foreground">
           {letAIDecide
             ? "Full fitness assessment + complete plan to race day"
-            : "Season strategy + detailed 4-week periodized plan"
+            : "Your personal season strategy and tailored training plan"
           }
         </p>
         {content && !loading && (
