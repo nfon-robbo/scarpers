@@ -261,6 +261,7 @@ const Dashboard = () => {
       .from("training_plans")
       .select("content, start_date, training_days")
       .eq("user_id", user.id)
+      .eq("archived", false)
       .order("created_at", { ascending: false })
       .limit(1)
       .then(({ data }) => {
