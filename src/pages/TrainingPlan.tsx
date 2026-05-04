@@ -1255,10 +1255,12 @@ const TrainingPlanPage = () => {
                 </Popover>
               }
             />
-            <PlanCalendarView
+            <PlanDayList
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
+              planEndDate={raceDate}
               completedDates={completedDates}
+              onMoveWorkout={moveWorkoutDate}
             />
           </>
         )}
