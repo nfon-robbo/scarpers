@@ -75,7 +75,9 @@ function toFitIntensity(intensity: string): string {
   const normalized = intensity.toLowerCase();
   if (normalized === "warmup") return INTENSITY.WARMUP;
   if (normalized === "cooldown") return INTENSITY.COOLDOWN;
-  if (normalized === "rest" || normalized === "recovery") return INTENSITY.REST;
+  if (normalized === "recovery") return INTENSITY.RECOVERY;
+  if (normalized === "rest") return INTENSITY.REST;
+  if (normalized === "interval") return "interval";
   return INTENSITY.ACTIVE;
 }
 
