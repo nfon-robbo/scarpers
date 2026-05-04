@@ -274,6 +274,7 @@ serve(async (req) => {
         name: workout.name,
         type: "Run",
         target: "PACE",
+        targets: ["PACE"],
         moving_time: totalDuration,
         time_target: totalDuration,
         ...(totalDistance > 0 ? { distance: Math.round(totalDistance), distance_target: Math.round(totalDistance) } : {}),
