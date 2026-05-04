@@ -222,6 +222,22 @@ export default function PlanDayList({
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const touchSourceRef = useRef<string | null>(null);
+  // Per-workout overrides: { [workoutKey]: { [stepIdx]: { duration?, pace? } } }
+  const [overrides, setOverrides] = useState<Record<string, Record<number, { duration?: string; pace?: string }>>>({});
+
+  const workoutKey = (w: ParsedWorkout) =>
+    w.dateObj ? format(w.dateObj, "yyyy-MM-dd") : w.date;
+
+  const setStepOverride = (w: ParsedWorkout, idx: number, field: "duration" | "pace", value: string) => {
+    const key = workoutKey(w);
+    setOverrides((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        [idx]: { ...((prev[key] || {})[idx] || {}), [field]: value },
+      },
+    }));
+  };
 
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
