@@ -16,6 +16,7 @@ interface PlanOverviewProps {
   raceDate?: Date;
   completedDates?: Set<string>;
   linkedActivities?: Record<string, any>;
+  headerAction?: React.ReactNode;
 }
 
 /** Circular progress gauge (SVG) */
@@ -86,6 +87,7 @@ export default function PlanOverview({
   raceDate,
   completedDates = new Set(),
   linkedActivities = {},
+  headerAction,
 }: PlanOverviewProps) {
   const today = new Date();
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
@@ -238,6 +240,7 @@ export default function PlanOverview({
                 </p>
               )}
             </div>
+            {headerAction && <div className="shrink-0">{headerAction}</div>}
           </div>
         </div>
 
