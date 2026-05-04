@@ -159,11 +159,12 @@ function expandSegments(
     }
 
     if (isWarmup) {
+      const isWalkWarmup = /walk/i.test(seg.duration) || /walk/i.test(seg.segment) || /walk/i.test(seg.notes || "");
       steps.push({
         kind: "walk",
-        label: "Warm Up - Walk",
+        label: isWalkWarmup ? "Warm Up - Walk" : "Warm Up",
         duration: formatTime(seg.duration),
-        pace: paceForZone(seg.hrZone, seg.segment),
+        pace: isWalkWarmup ? "9:57" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
       });
       // If the table has no main interval row, inject the fallback spec straight after warm-up
       if (fallbackSpec && !mainEmitted) {
@@ -175,11 +176,12 @@ function expandSegments(
       if (fallbackSpec && !mainEmitted) {
         emitIntervalBlock(fallbackSpec, seg.hrZone, "Run", seg.notes);
       }
+      const isWalkCooldown = /walk/i.test(seg.duration) || /walk/i.test(seg.segment) || /walk/i.test(seg.notes || "");
       steps.push({
         kind: "walk",
-        label: "Cool Down - Walk",
+        label: isWalkCooldown ? "Cool Down - Walk" : "Cool Down",
         duration: formatTime(seg.duration),
-        pace: paceForZone(seg.hrZone, seg.segment),
+        pace: isWalkCooldown ? "9:57" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
       });
     } else if (isWalk) {
       walkIdx++;
