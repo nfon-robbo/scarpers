@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useUnits, UnitPreferences } from "@/hooks/useUnits";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnitOption<K extends keyof UnitPreferences> {
@@ -95,9 +97,50 @@ const defaultSchedule: SyncSchedule = {
 const Settings = () => {
   const { units, setUnit } = useUnits();
   const { user } = useAuth();
+  const { profile, refresh: refreshProfile } = useProfile();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Personal details
+  const [personal, setPersonal] = useState({
+    sex: "",
+    date_of_birth: "",
+    height_cm: "",
+    weight_kg: "",
+  });
+  const [savingPersonal, setSavingPersonal] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setPersonal({
+        sex: profile.sex ?? "",
+        date_of_birth: profile.date_of_birth ?? "",
+        height_cm: profile.height_cm != null ? String(profile.height_cm) : "",
+        weight_kg: profile.weight_kg != null ? String(profile.weight_kg) : "",
+      });
+    }
+  }, [profile]);
+
+  const savePersonal = async () => {
+    if (!user) return;
+    setSavingPersonal(true);
+    try {
+      const { error } = await supabase.from("profiles").update({
+        sex: personal.sex || null,
+        date_of_birth: personal.date_of_birth || null,
+        height_cm: personal.height_cm ? Number(personal.height_cm) : null,
+        weight_kg: personal.weight_kg ? Number(personal.weight_kg) : null,
+      }).eq("user_id", user.id);
+      if (error) throw error;
+      toast({ title: "Personal details saved" });
+      refreshProfile();
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingPersonal(false);
+    }
+  };
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-health-sleep`;
 
@@ -215,6 +258,73 @@ const Settings = () => {
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1">Customize how your data is displayed</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Personal Details
+          </CardTitle>
+          <CardDescription>
+            Used to personalise your AI training plan (HR zones, pacing, calories)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sex">Sex</Label>
+              <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
+                <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other / prefer not to say</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dob">Date of birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={personal.date_of_birth}
+                onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="height">Height (cm)</Label>
+              <Input
+                id="height"
+                type="number"
+                inputMode="decimal"
+                min="50"
+                max="250"
+                value={personal.height_cm}
+                onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                inputMode="decimal"
+                min="20"
+                max="300"
+                step="0.1"
+                value={personal.weight_kg}
+                onChange={(e) => setPersonal((p) => ({ ...p, weight_kg: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
+              {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              {savingPersonal ? "Saving..." : "Save Details"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

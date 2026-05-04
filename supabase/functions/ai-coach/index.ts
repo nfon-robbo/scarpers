@@ -616,8 +616,16 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed.`
         : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery. Every single week from week 1 to week ${weeks} must be detailed.`;
 
+      const ageYears = profile?.date_of_birth
+        ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
+        : null;
+
       systemPrompt = `══ ATHLETE ══
 Name: ${profile?.name || "Athlete"}
+Sex: ${profile?.sex || "not specified"}
+Age: ${ageYears ?? "not specified"}
+Height: ${profile?.height_cm ? `${profile.height_cm} cm` : "not specified"}
+Weight: ${profile?.weight_kg ? `${profile.weight_kg} kg` : "not specified"}
 Experience: ${profile?.experience_level || "intermediate"}
 Goal: ${profile?.training_goals || "complete the race strong"}
 Race: ${raceLabel} on ${race_date && race_date !== "ai-recommend" ? race_date : "TBD (you decide)"}

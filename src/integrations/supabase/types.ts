@@ -263,11 +263,14 @@ export type Database = {
         Row: {
           athlete_context: string | null
           created_at: string
+          date_of_birth: string | null
           experience_level: string | null
+          height_cm: number | null
           id: string
           name: string | null
           onboarding_completed: boolean
           primary_sport: string | null
+          sex: string | null
           training_goals: string | null
           unit_distance: string
           unit_elevation: string
@@ -276,15 +279,19 @@ export type Database = {
           unit_weight: string
           updated_at: string
           user_id: string
+          weight_kg: number | null
         }
         Insert: {
           athlete_context?: string | null
           created_at?: string
+          date_of_birth?: string | null
           experience_level?: string | null
+          height_cm?: number | null
           id?: string
           name?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
+          sex?: string | null
           training_goals?: string | null
           unit_distance?: string
           unit_elevation?: string
@@ -293,15 +300,19 @@ export type Database = {
           unit_weight?: string
           updated_at?: string
           user_id: string
+          weight_kg?: number | null
         }
         Update: {
           athlete_context?: string | null
           created_at?: string
+          date_of_birth?: string | null
           experience_level?: string | null
+          height_cm?: number | null
           id?: string
           name?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
+          sex?: string | null
           training_goals?: string | null
           unit_distance?: string
           unit_elevation?: string
@@ -310,6 +321,7 @@ export type Database = {
           unit_weight?: string
           updated_at?: string
           user_id?: string
+          weight_kg?: number | null
         }
         Relationships: []
       }
