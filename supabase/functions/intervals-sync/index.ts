@@ -30,10 +30,6 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
 }
 
 function formatWorkoutDescription(workout: WorkoutInput): string {
-  if (workout.rawDescription && /\bpace\b/i.test(workout.rawDescription) && !/\b(?:hr|lthr|bpm)\b/i.test(workout.rawDescription)) {
-    return workout.notes ? `${workout.rawDescription}\n\n${workout.notes}` : workout.rawDescription;
-  }
-
   function fmtDur(secs: number): string {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
