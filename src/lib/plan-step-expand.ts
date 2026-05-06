@@ -123,10 +123,43 @@ function detectIntervalSpec(text: string): { reps: number; on: string; off: stri
  * row contains its own spec (e.g. plans imported from a `~~~intervals` block
  * where each rep appears as its own row already).
  */
+export interface ExpandOptions {
+  /** User-supplied goal finish time, e.g. "30:00" or "1:45:00". */
+  goalTime?: string;
+  /** Race distance label, e.g. "5K", "10K", "Half Marathon", "Marathon". */
+  raceDistance?: string;
+}
+
+/** Parse race distance label → kilometres. */
+function raceDistanceToKm(label: string): number | null {
+  if (!label) return null;
+  const s = label.toLowerCase();
+  if (/half\s*marathon/.test(s)) return 21.0975;
+  if (/^marathon|\bmarathon\b/.test(s)) return 42.195;
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(k|km|mi|mile)/);
+  if (m) {
+    const n = parseFloat(m[1]);
+    return /mi|mile/.test(m[2]) ? n * 1.60934 : n;
+  }
+  return null;
+}
+
+/** Parse "30:00" or "1:45:00" or "1h45" → seconds. */
+function goalTimeToSeconds(t: string): number | null {
+  if (!t) return null;
+  const s = t.trim();
+  const hms = s.match(/^(\d+):(\d{1,2}):(\d{2})$/);
+  if (hms) return parseInt(hms[1]) * 3600 + parseInt(hms[2]) * 60 + parseInt(hms[3]);
+  const ms = s.match(/^(\d{1,3}):(\d{2})$/);
+  if (ms) return parseInt(ms[1]) * 60 + parseInt(ms[2]);
+  return null;
+}
+
 export function expandWorkoutSteps(
   segments: ParsedSegment[],
   workoutTitle: string,
   rawText: string,
+  options: ExpandOptions = {},
 ): ExpandedStep[] {
   const out: ExpandedStep[] = [];
 
@@ -134,27 +167,35 @@ export function expandWorkoutSteps(
   // the AI may have appended and emit a single step at goal pace.
   const isRaceDay = /race\s*day|🏁/i.test(`${workoutTitle} ${rawText}`);
   if (isRaceDay) {
-    // Pick the longest non-warmup/cooldown segment as the "race" step. Otherwise
-    // synthesise one from the title (e.g. "5K" / "10K" / "Half Marathon").
-    const candidates = segments.filter((s) => !/warm|cool|rest|recover/i.test(s.segment));
-    const ref = candidates[0] || segments[0];
+    const ref = segments.find((s) => !/warm|cool|rest|recover/i.test(s.segment)) || segments[0];
+
+    // 1) Prefer the user's goal time + race distance for an exact target pace.
+    let pace: string | null = null;
     let durSec = 0;
-    let pace = ref ? paceForSegment(ref, "Active") : "5:00/km";
-    // Prefer an explicit goal time / pace mentioned in the title or notes.
-    const goalPaceMatch = `${workoutTitle} ${rawText}`.match(/(\d{1,2}:\d{2})\s*\/\s*km/i);
-    if (goalPaceMatch) pace = `${goalPaceMatch[1]}/km`;
-    // Distance from title for duration.
-    const distMatch = workoutTitle.match(/(\d+(?:\.\d+)?)\s*k(?:m)?\b|half\s*marathon|marathon/i);
-    let km = 0;
-    if (distMatch) {
-      if (/half\s*marathon/i.test(distMatch[0])) km = 21.0975;
-      else if (/^marathon/i.test(distMatch[0])) km = 42.195;
-      else km = parseFloat(distMatch[1] || "0");
+    const km = raceDistanceToKm(options.raceDistance || workoutTitle) ?? raceDistanceToKm(workoutTitle);
+    const goalSec = goalTimeToSeconds(options.goalTime || "");
+    if (km && goalSec) {
+      const paceSecPerKm = Math.round(goalSec / km);
+      pace = `${Math.floor(paceSecPerKm / 60)}:${String(paceSecPerKm % 60).padStart(2, "0")}/km`;
+      durSec = goalSec;
     }
-    const paceSec = paceToSeconds(pace);
-    if (km && paceSec) durSec = Math.round(km * paceSec);
+
+    // 2) Fallback: explicit pace mentioned in title/notes.
+    if (!pace) {
+      const goalPaceMatch = `${workoutTitle} ${rawText}`.match(/(\d{1,2}:\d{2})\s*\/\s*km/i);
+      if (goalPaceMatch) pace = `${goalPaceMatch[1]}/km`;
+    }
+
+    // 3) Final fallback: derived from segment.
+    if (!pace) pace = ref ? paceForSegment(ref, "Active") : "5:00/km";
+
+    if (!durSec) {
+      const paceSec = paceToSeconds(pace);
+      if (km && paceSec) durSec = Math.round(km * paceSec);
+    }
     if (!durSec && ref) durSec = parseDurationSeconds(ref.duration);
     if (!durSec) durSec = 1800;
+
     const hrZone = ref ? normalizeHrZone(ref.hrZone) : "Z4";
     const { low, high } = hrZoneToBpm(hrZone);
     out.push({
