@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { MessageCircle, Send, Loader2, X, Minimize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { streamAICoach } from "@/lib/ai-stream";
 
 interface Message {
   role: "user" | "assistant";
