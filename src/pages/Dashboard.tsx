@@ -496,18 +496,29 @@ const Dashboard = () => {
             {/* Today's Workout */}
             <Card className="glass border-border/30">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold">Today's Run</CardTitle>
+                <CardTitle className="text-sm font-semibold">
+                  {todaysWorkout?.isNext ? "Next Run" : "Today's Run"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 {todaysWorkout ? (
                   <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-primary">{todaysWorkout[0]}</p>
-                    {todaysWorkout.slice(1, 5).map((line, i) => (
-                      <p key={i} className="text-xs text-muted-foreground leading-tight">{line}</p>
+                    {todaysWorkout.isNext && todaysWorkout.workout.dateObj && (
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {format(todaysWorkout.workout.dateObj, "EEE d MMM")}
+                      </p>
+                    )}
+                    <p className="text-xs font-semibold text-primary">
+                      {todaysWorkout.workout.title.replace(/\s*\(Total:.*?\)/, "")}
+                    </p>
+                    {todaysWorkout.workout.segments.slice(0, 4).map((s, i) => (
+                      <p key={i} className="text-xs text-muted-foreground leading-tight">
+                        {s.segment}: {s.duration}{s.target && s.target !== "—" ? ` @ ${s.target}` : ""}
+                      </p>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">No workout scheduled today. Enjoy your rest day! 🧘</p>
+                  <p className="text-xs text-muted-foreground">No upcoming workouts. Enjoy your rest! 🧘</p>
                 )}
                 <Button
                   variant="ghost"
