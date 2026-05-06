@@ -139,16 +139,29 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
     try {
       if (lower.endsWith(".zip")) {
         const r = await parseZipFile(file);
-        activities.push(...r.activities);
+        if (r.activities.length === 0) {
+          // ZIP of workout-definition FIT files (no sessions/records) — stub each
+          const zipNames = await listFitNamesInZip(file);
+          for (const name of zipNames) activities.push(stubActivity(name));
+        } else {
+          activities.push(...r.activities);
+        }
         errors.push(...r.errors);
       } else if (lower.endsWith(".fit")) {
         const buf = await file.arrayBuffer();
         const parsed = await parseFitBuffer(buf, file.name);
-        activities.push(...parsed);
+        if (parsed.length === 0) {
+          // Workout-definition FIT (no session/records) — keep it as a stub
+          activities.push(stubActivity(file.name));
+        } else {
+          activities.push(...parsed);
+        }
       } else {
         errors.push(`Skipped unsupported file: ${file.name}`);
       }
     } catch (e: any) {
+      // Even on parse error, keep the file as a stub so the user can place it
+      if (lower.endsWith(".fit")) activities.push(stubActivity(file.name));
       errors.push(e?.message || `Failed to parse ${file.name}`);
     }
   }
