@@ -391,36 +391,6 @@ const AIChatbot = () => {
                       </div>
                     </div>
                   )}
-                  {showUndo && lastUndo && (
-                    <div className="mt-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        disabled={loading}
-                        onClick={async () => {
-                          setLoading(true);
-                          const { error } = await supabase
-                            .from("training_plans")
-                            .update({ content: lastUndo.prevContent })
-                            .eq("id", lastUndo.planId);
-                          setLoading(false);
-                          if (error) {
-                            toast({ title: "Undo failed", description: error.message, variant: "destructive" });
-                            return;
-                          }
-                          toast({ title: "Reverted", description: `Restored your ${lastUndo.dateUk} session.` });
-                          setMessages(prev => [...prev, {
-                            role: "assistant",
-                            content: `↩️ Reverted — your **${lastUndo.dateUk}** session is back to what it was. Reload the Training Plan page to see it.`,
-                          }]);
-                          setLastUndo(null);
-                        }}
-                      >
-                        ↩️ Undo last change
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
             );
