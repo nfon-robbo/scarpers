@@ -34,19 +34,52 @@ function extractDistance(w: ParsedWorkout): string | null {
   return m ? `${m[1]}km` : null;
 }
 
-function extractDuration(w: ParsedWorkout): string | null {
-  const txt = `${w.title} ${w.rawText}`;
-  const m = txt.match(/(\d+)\s*min/i) || txt.match(/Total:\s*(\d+)/i);
-  if (m) {
-    const mins = parseInt(m[1], 10);
-    if (mins >= 60) {
-      const h = Math.floor(mins / 60);
-      const r = mins % 60;
-      return r ? `${h}h ${r}min` : `${h}h`;
+// Sum total seconds across all segments of a workout (handles "5 min", "30 sec", "1:30", "MM:SS", "Nx M min")
+function sumSegmentSeconds(w: ParsedWorkout): number {
+  let total = 0;
+  for (const seg of w.segments || []) {
+    const d = (seg.duration || "").trim();
+    if (!d) continue;
+    // "N x M min/sec" pattern
+    const reps = d.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
+    if (reps) {
+      const n = parseInt(reps[1], 10);
+      const v = parseFloat(reps[2]);
+      const unit = reps[3].toLowerCase();
+      total += n * (unit.startsWith("s") ? v : v * 60);
+      continue;
     }
-    return `~${mins}min`;
+    // "MM:SS" or "M:SS"
+    const colon = d.match(/^(\d{1,3}):(\d{2})$/);
+    if (colon) { total += parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10); continue; }
+    // "5 min" / "5.5 min"
+    const min = d.match(/(\d+(?:\.\d+)?)\s*min/i);
+    if (min) { total += parseFloat(min[1]) * 60; continue; }
+    // "30 sec" / "30s"
+    const sec = d.match(/(\d+(?:\.\d+)?)\s*(?:sec|s)\b/i);
+    if (sec) { total += parseFloat(sec[1]); continue; }
   }
-  return null;
+  return Math.round(total);
+}
+
+function extractDuration(w: ParsedWorkout): string | null {
+  // Prefer summing actual segments so the calendar list matches the workout detail view
+  const segSecs = sumSegmentSeconds(w);
+  let mins: number | null = null;
+  if (segSecs > 0) {
+    mins = Math.round(segSecs / 60);
+  } else {
+    const txt = `${w.title} ${w.rawText}`;
+    const m = txt.match(/(\d+)\s*min/i) || txt.match(/Total:\s*(\d+)/i);
+    if (m) mins = parseInt(m[1], 10);
+  }
+  if (mins == null) return null;
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    const r = mins % 60;
+    return r ? `${h}h ${r}min` : `${h}h`;
+  }
+  return `~${mins}min`;
 }
 
 function workoutAccent(title: string): string {
