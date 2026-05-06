@@ -248,15 +248,23 @@ const Activities = () => {
                   </div>
 
                   {/* Expanded detail view */}
-                  {isExpanded && (
+                  {isExpanded && (() => {
+                    const raw = rawDataById[a.id];
+                    const isLoadingRaw = loadingRawId === a.id;
+                    return (
                     <div className="mt-4 pt-4 border-t border-border space-y-4">
+                      {isLoadingRaw && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading details…
+                        </div>
+                      )}
                       {/* GPS Route Map or single-point map */}
-                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 2 ? (
+                      {raw?.gps_track && Array.isArray(raw.gps_track) && raw.gps_track.length >= 2 ? (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> Route Map
                           </p>
-                          <ActivityMap track={a.raw_data.gps_track} />
+                          <ActivityMap track={raw.gps_track} />
                         </div>
                       ) : a.latitude && a.longitude && Math.abs(a.latitude) > 0.01 && Math.abs(a.longitude) > 0.01 ? (
                         <div>
@@ -268,9 +276,9 @@ const Activities = () => {
                       ) : null}
 
                       {/* Performance Charts */}
-                      {a.raw_data?.gps_track && Array.isArray(a.raw_data.gps_track) && a.raw_data.gps_track.length >= 10 && (
+                      {raw?.gps_track && Array.isArray(raw.gps_track) && raw.gps_track.length >= 10 && (
                         <ActivityCharts
-                          track={a.raw_data.gps_track}
+                          track={raw.gps_track}
                           avgHR={a.avg_heart_rate}
                           maxHR={a.max_heart_rate}
                         />
@@ -288,7 +296,7 @@ const Activities = () => {
                         <DetailField label="Max Power" value={a.max_power ? `${Math.round(a.max_power)} W` : null} />
                         <DetailField label="Avg Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)} rpm` : null} />
                         <DetailField label="Steps" value={(() => {
-                          const stepLen = a.raw_data?.avg_step_length;
+                          const stepLen = raw?.avg_step_length;
                           if (stepLen && a.distance_meters) return `${Math.round(a.distance_meters / (stepLen / 1000))}`;
                           if (a.avg_cadence && a.duration_seconds) return `${Math.round(a.avg_cadence * (a.duration_seconds / 60))}`;
                           return null;
@@ -303,16 +311,17 @@ const Activities = () => {
                       </div>
 
                       {/* Raw FIT data */}
-                      {a.raw_data && typeof a.raw_data === "object" && Object.keys(a.raw_data).length > 0 && (
+                      {raw && typeof raw === "object" && Object.keys(raw).length > 0 && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Raw FIT File Data</p>
                           <div className="rounded-lg bg-muted/50 p-4 overflow-auto max-h-96">
-                            <RawDataDisplay data={a.raw_data} />
+                            <RawDataDisplay data={raw} />
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </CardContent>
               </Card>
             );
