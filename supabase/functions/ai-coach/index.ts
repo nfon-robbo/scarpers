@@ -348,6 +348,12 @@ BREVITY RULES (strict):
 - Reference specific data points (dates, paces, HR, sleep scores) but keep each bullet to one line
 - Be practical and actionable — no filler or preamble
 
+RECOMMENDATION ACTIONS:
+- WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with this exact marker on its own line:
+  [[ACTION:recommendation]]
+- Do NOT include the marker for general advice, education, or questions that don't change the plan.
+- Never wrap the marker in code fences. Always plain text on the last line.
+
 ${athleteContext}
 
 ${dataContext}`;
