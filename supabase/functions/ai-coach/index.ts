@@ -583,7 +583,8 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         const s = Math.round(secPerKm % 60).toString().padStart(2, "0");
         return `${m}:${s}`;
       };
-      const paceFromMps = (mps: number) => 1000 / mps;
+      // NOTE: activities.avg_speed is stored in km/h (not m/s). 60 / kmh = min/km.
+      const paceFromMps = (kmh: number) => (60 / kmh) * 60; // returns seconds per km
       // Z2 (HR-filtered) pace if we have it
       const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
       const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
