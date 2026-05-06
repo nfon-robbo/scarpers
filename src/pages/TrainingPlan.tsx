@@ -305,12 +305,20 @@ const TrainingPlanPage = () => {
 
   useEffect(() => { fetchLinkedActivities(); }, [fetchLinkedActivities]);
 
-  // Re-fetch when window regains focus (e.g. after linking activity on another page)
+  // Re-fetch when window regains focus (e.g. after linking activity on another page,
+  // or after the AI chat / undo button updates the plan content).
   useEffect(() => {
-    const onFocus = () => { fetchLinkedActivities(); };
+    const onFocus = () => { fetchLinkedActivities(); loadSavedPlan(); };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [fetchLinkedActivities]);
+  }, [fetchLinkedActivities, loadSavedPlan]);
+
+  // Also re-fetch the plan whenever any chat-driven undo/edit fires.
+  useEffect(() => {
+    const onPlanChange = () => { loadSavedPlan(); };
+    window.addEventListener("plan-undo-changed", onPlanChange);
+    return () => window.removeEventListener("plan-undo-changed", onPlanChange);
+  }, [loadSavedPlan]);
 
   const savePlan = async (planContent: string) => {
     if (!user) return;
