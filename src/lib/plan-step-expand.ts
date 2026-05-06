@@ -82,6 +82,25 @@ function paceForSegment(seg: ParsedSegment, intensity: string): string {
   return "6:27/km";
 }
 
+/** Parse "M:SS/km" → seconds-per-km. Returns null if unparseable. */
+function paceToSeconds(pace: string): number | null {
+  const m = pace.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/**
+ * Walk/run ramp sessions must use conversational easy paces. The AI
+ * occasionally injects race-derived targets (e.g. 2:45/km, 3:05/km) which are
+ * dangerous and unrealistic. Clamp anything faster than 5:30/km to 6:00/km.
+ */
+function clampWalkRunPace(pace: string): string {
+  const secs = paceToSeconds(pace);
+  if (secs == null) return pace;
+  if (secs < 330) return "6:00/km"; // < 5:30/km
+  return pace;
+}
+
 export function normalizePaceInput(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return trimmed;
@@ -130,6 +149,12 @@ export function expandWorkoutSteps(
     : null;
   let mainInjected = false;
 
+  // Walk/run ramp sessions: clamp absurd race-paces. Detect from title or text.
+  const isWalkRun = /walk\s*[\/-]\s*run|run\s*[\/-]\s*walk|walk\/run|run\/walk/i.test(
+    `${workoutTitle} ${rawText}`,
+  );
+  const maybeClamp = (pace: string) => (isWalkRun ? clampWalkRunPace(pace) : pace);
+
   const pushStep = (s: Omit<ExpandedStep, "label"> & { label?: string }, label: string) => {
     out.push({ ...s, label } as ExpandedStep);
   };
@@ -140,7 +165,7 @@ export function expandWorkoutSteps(
     const bpm = hrZoneToBpm(hr);
     const restZone = `Z${Math.max(1, parseInt(hr.match(/Z(\d)/i)?.[1] || "2", 10) - 1)}`;
     const restBpm = hrZoneToBpm(restZone);
-    const workPace = refSeg ? paceForSegment(refSeg, "Interval") : "6:27/km";
+    const workPace = maybeClamp(refSeg ? paceForSegment(refSeg, "Interval") : "6:27/km");
     const onSec = parseDurationSeconds(fallback.on);
     const offSec = parseDurationSeconds(fallback.off);
     for (let i = 0; i < fallback.reps; i++) {
@@ -180,7 +205,7 @@ export function expandWorkoutSteps(
       const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
       const restZone = `Z${Math.max(1, workZoneNumber - 1)}`;
       const restBpm = hrZoneToBpm(restZone);
-      const workPace = paceForSegment(seg, "Interval");
+      const workPace = maybeClamp(paceForSegment(seg, "Interval"));
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
@@ -200,7 +225,7 @@ export function expandWorkoutSteps(
       const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60;
       const restZone = "Z1";
       const restBpm = hrZoneToBpm(restZone);
-      const workPace = paceForSegment(seg, "Interval");
+      const workPace = maybeClamp(paceForSegment(seg, "Interval"));
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
@@ -213,7 +238,7 @@ export function expandWorkoutSteps(
 
     // Plain segment: emit one step.
     const duration = parseDurationSeconds(seg.duration);
-    const pace = paceForSegment(seg, intensity);
+    const pace = intensity === "Interval" || intensity === "Active" ? maybeClamp(paceForSegment(seg, intensity)) : paceForSegment(seg, intensity);
     let label: string;
     if (isWarmup) label = "Warm Up";
     else if (isCooldown) label = "Cool Down";
