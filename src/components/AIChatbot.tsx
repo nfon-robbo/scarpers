@@ -328,12 +328,17 @@ const AIChatbot = () => {
             const legacyMatch = msg.role === "assistant"
               ? /\[\[ACTION:recommendation\]\]/.test(msg.content)
               : false;
+            const hasUndo = msg.role === "assistant" && /\[\[UNDO\]\]/.test(msg.content);
             const hasAction = !!dayMatch || planMatch || legacyMatch;
-            const cleaned = hasAction
-              ? msg.content.replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "").trim()
+            const cleaned = (hasAction || hasUndo)
+              ? msg.content
+                  .replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "")
+                  .replace(/\[\[UNDO\]\]/g, "")
+                  .trim()
               : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const showActions = hasAction && isLastAssistant && !loading;
+            const showUndo = hasUndo && isLastAssistant && !loading && !!lastUndo;
             const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
               ? { kind: "day", dateUk: dayMatch[1] }
               : { kind: "plan" };
