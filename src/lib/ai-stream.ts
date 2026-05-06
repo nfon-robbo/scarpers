@@ -45,6 +45,8 @@ export async function streamAICoach({
     const body: Record<string, unknown> = { type };
     if (raceDistance) body.race_distance = raceDistance;
     if (goalTime) body.goal_time = goalTime;
+    if (currentPaceMin) body.current_pace_min = currentPaceMin;
+    if (currentPaceMax) body.current_pace_max = currentPaceMax;
     if (trainingDays) body.training_days = trainingDays;
     if (startDate) body.start_date = startDate;
     if (raceDate) body.race_date = raceDate;
