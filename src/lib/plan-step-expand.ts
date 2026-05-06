@@ -238,7 +238,7 @@ export function expandWorkoutSteps(
 
     // Plain segment: emit one step.
     const duration = parseDurationSeconds(seg.duration);
-    const pace = paceForSegment(seg, intensity);
+    const pace = intensity === "Interval" || intensity === "Active" ? maybeClamp(paceForSegment(seg, intensity)) : paceForSegment(seg, intensity);
     let label: string;
     if (isWarmup) label = "Warm Up";
     else if (isCooldown) label = "Cool Down";
