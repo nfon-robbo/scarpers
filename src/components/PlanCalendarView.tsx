@@ -105,8 +105,27 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
     return "bg-primary/10 text-primary border-primary/20";
   }
 
-  // Duration from segments
+  // Duration: sum from segments so calendar matches workout detail
   function totalDuration(w: ParsedWorkout): string | null {
+    let total = 0;
+    for (const seg of w.segments || []) {
+      const d = (seg.duration || "").trim();
+      if (!d) continue;
+      const reps = d.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
+      if (reps) {
+        const n = parseInt(reps[1], 10);
+        const v = parseFloat(reps[2]);
+        total += n * (reps[3].toLowerCase().startsWith("s") ? v : v * 60);
+        continue;
+      }
+      const colon = d.match(/^(\d{1,3}):(\d{2})$/);
+      if (colon) { total += parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10); continue; }
+      const min = d.match(/(\d+(?:\.\d+)?)\s*min/i);
+      if (min) { total += parseFloat(min[1]) * 60; continue; }
+      const sec = d.match(/(\d+(?:\.\d+)?)\s*(?:sec|s)\b/i);
+      if (sec) { total += parseFloat(sec[1]); continue; }
+    }
+    if (total > 0) return `${Math.round(total / 60)}m`;
     const match = w.title.match(/(\d+)\s*min/i);
     if (match) return `${match[1]}m`;
     const totalMatch = w.title.match(/Total:\s*(\d+)\s*min/i);
