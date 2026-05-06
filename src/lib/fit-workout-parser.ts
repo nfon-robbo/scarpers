@@ -297,71 +297,62 @@ export function fitWorkoutToIntervalsText(w: FitWorkout): string {
   const steps = w.steps;
   if (!steps.length) return "";
 
-  // Build a map messageIndex -> step
-  const lines: string[] = [];
+  type Line = { kind: "step"; intensity: number; text: string; sig: string } | { kind: "section"; text: string };
+  const flat: Line[] = [];
 
+  for (const s of steps) {
+    // FIT explicit repeat markers — handle by expansion (rare in workout files).
+    if (s.durationType === 6 || s.durationType === 7 || s.durationType === 8) continue;
+
+    const dur = fmtDuration(s.durationType, s.durationValue);
+    const tgt = fmtTarget(s);
+    const text = `- ${dur}${tgt ? " " + tgt : ""}`.trim();
+    const sig = `${s.intensity ?? 0}|${dur}|${tgt}`;
+    flat.push({ kind: "step", intensity: s.intensity ?? 0, text, sig });
+  }
+
+  // Detect repeating pair pattern starting after warmup, before cooldown.
+  // Strategy: find longest run of alternating two-step blocks with same signatures.
+  const out: string[] = [];
   let i = 0;
-  while (i < steps.length) {
-    const step = steps[i];
+  while (i < flat.length) {
+    const cur = flat[i];
 
-    // Repeat marker?
-    if (step.durationType === 6 || step.durationType === 7 || step.durationType === 8) {
-      const reps = step.durationValue ?? 1;
-      const jumpTo = step.targetValue ?? 0;
-      // Collect prior steps from jumpTo..i-1
-      const block: FitWorkoutStep[] = [];
-      for (let j = 0; j < steps.length; j++) {
-        const s = steps[j];
-        if (s.messageIndex != null && s.messageIndex >= jumpTo && j < i) {
-          block.push(s);
-        }
+    // Try to detect a repeating block of size 1 or 2 starting here
+    let blockSize = 0;
+    let reps = 0;
+    for (const size of [2, 1]) {
+      if (i + size * 2 > flat.length) continue;
+      const sigs = flat.slice(i, i + size).map((s) => s.sig).join("||");
+      let r = 1;
+      while (i + (r + 1) * size <= flat.length) {
+        const next = flat.slice(i + r * size, i + (r + 1) * size).map((s) => s.sig).join("||");
+        if (next === sigs) r += 1; else break;
       }
-      // Remove the previously-emitted lines for this block — we re-emit under Nx header.
-      // Easier: when we encounter a repeat, drop the lines we already emitted for that range
-      // and re-emit them inside the repeat group.
-      const linesToDrop = block.length;
-      for (let k = 0; k < linesToDrop; k++) {
-        // also drop section headers preceding the block if they belong to it
-        if (lines.length && lines[lines.length - 1].startsWith("- ")) lines.pop();
-        else break;
-      }
-      lines.push("");
-      lines.push(`${reps}x`);
-      for (const b of block) {
-        const dur = fmtDuration(b.durationType, b.durationValue);
-        const tgt = fmtTarget(b);
-        lines.push(`- ${dur}${tgt ? " " + tgt : ""}`.trim());
-      }
-      lines.push("");
-      i += 1;
+      if (r >= 2) { blockSize = size; reps = r; break; }
+    }
+
+    if (blockSize > 0 && reps >= 2) {
+      if (out.length && out[out.length - 1] !== "") out.push("");
+      out.push(`${reps}x`);
+      for (let k = 0; k < blockSize; k++) out.push(flat[i + k].text);
+      out.push("");
+      i += blockSize * reps;
       continue;
     }
 
-    // Regular step
-    const dur = fmtDuration(step.durationType, step.durationValue);
-    const tgt = fmtTarget(step);
-    const intensityLabel = INTENSITY_LABEL[step.intensity ?? 0] || "Active";
-
-    // Emit a section header for warmup/cooldown/recovery transitions
-    const headerLabel =
-      step.intensity === 2 ? "Warmup" :
-      step.intensity === 3 ? "Cooldown" :
-      step.intensity === 4 ? "Recovery" :
-      step.intensity === 1 ? "Recovery" : null;
-
-    if (headerLabel) {
-      const last = lines[lines.length - 1];
-      if (last !== headerLabel) {
-        if (lines.length && lines[lines.length - 1] !== "") lines.push("");
-        lines.push(headerLabel);
-      }
+    // Section header for warmup/cooldown
+    const header =
+      cur.intensity === 2 ? "Warmup" :
+      cur.intensity === 3 ? "Cooldown" : null;
+    if (header) {
+      if (out.length && out[out.length - 1] !== "") out.push("");
+      if (out[out.length - 1] !== header) out.push(header);
     }
-
-    lines.push(`- ${dur}${tgt ? " " + tgt : ""}`.trim());
+    out.push(cur.text);
     i += 1;
   }
 
-  // Trim trailing blanks
-  while (lines.length && lines[lines.length - 1] === "") lines.pop();
-  return lines.join("\n");
+  while (out.length && out[out.length - 1] === "") out.pop();
+  return out.join("\n");
 }
