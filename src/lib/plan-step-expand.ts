@@ -165,7 +165,7 @@ export function expandWorkoutSteps(
     const bpm = hrZoneToBpm(hr);
     const restZone = `Z${Math.max(1, parseInt(hr.match(/Z(\d)/i)?.[1] || "2", 10) - 1)}`;
     const restBpm = hrZoneToBpm(restZone);
-    const workPace = refSeg ? paceForSegment(refSeg, "Interval") : "6:27/km";
+    const workPace = maybeClamp(refSeg ? paceForSegment(refSeg, "Interval") : "6:27/km");
     const onSec = parseDurationSeconds(fallback.on);
     const offSec = parseDurationSeconds(fallback.off);
     for (let i = 0; i < fallback.reps; i++) {
