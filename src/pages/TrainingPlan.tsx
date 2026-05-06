@@ -33,7 +33,7 @@ interface ApiStep {
   pace?: string;
 }
 
-const WALK_PACE = "9:57/km";
+const WALK_PACE = "13:00/km";
 
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);

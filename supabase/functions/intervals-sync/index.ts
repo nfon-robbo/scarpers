@@ -73,7 +73,7 @@ function paceTarget(step: WorkoutStep): string {
     return "";
   }
   if (step.pace) return paceRange(step.pace);
-  if (normalized === "recovery" || normalized === "rest") return paceRange("9:57/km");
+  if (normalized === "recovery" || normalized === "rest") return paceRange("13:00/km");
   if (normalized === "interval") return paceRange("5:00/km");
   return paceRange("6:27/km");
 }
