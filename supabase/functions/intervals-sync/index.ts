@@ -193,9 +193,9 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
 
   function fmtStep(step: WorkoutStep): string {
     // intervals.icu native syntax: "- <duration> <pace-range>/km"
-    // No cue words, no section headers — those break the Garmin export
-    // and cause "no target" on the watch.
-    return `- ${fmtDur(step.duration)} ${paceTarget(step)}`;
+    // Warm-up / cool-down may have no pace target — emit just the duration.
+    const pace = paceTarget(step);
+    return pace ? `- ${fmtDur(step.duration)} ${pace}` : `- ${fmtDur(step.duration)}`;
   }
 
   const lines: string[] = [];
