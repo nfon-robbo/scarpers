@@ -101,11 +101,12 @@ function structuredStep(step: WorkoutStep, forcedType?: "INTERVAL_ACTIVE" | "INT
             ? "INTERVAL_ACTIVE"
             : "ACTIVE");
 
+  const target = paceTarget(step);
   return {
     type,
     duration: Math.max(1, Math.round(step.duration)),
     durationType: "TIME",
-    target: paceTarget(step),
+    ...(target ? { target } : {}),
   };
 }
 
