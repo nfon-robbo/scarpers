@@ -241,6 +241,37 @@ const Settings = () => {
   const [archivedPlans, setArchivedPlans] = useState<ArchivedPlan[]>([]);
   const [planActionId, setPlanActionId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ArchivedPlan | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const bulkDeletePlans = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase.from("training_plans").delete().in("id", ids);
+      if (error) throw error;
+      toast({ title: `Deleted ${ids.length} plan${ids.length === 1 ? "" : "s"}` });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      await loadArchivedPlans();
+    } catch (e: any) {
+      toast({ title: "Bulk delete failed", description: e.message, variant: "destructive" });
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+    }
+  };
 
   const loadArchivedPlans = async () => {
     if (!user) return;
