@@ -845,7 +845,7 @@ const TrainingPlanPage = () => {
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
         const overridesForWorkout = stepOverrides[dateStr] || {};
-        const expanded = expandWorkoutSteps(w.segments, w.title, w.rawText ?? "");
+        const expanded = expandWorkoutSteps(w.segments, w.title, w.rawText ?? "", { goalTime, raceDistance });
         const steps = expanded.map((step, idx) => ({
           duration: overridesForWorkout[idx]?.duration ? sharedParseDuration(overridesForWorkout[idx].duration!) : step.duration,
           hrLow: step.hrLow,
