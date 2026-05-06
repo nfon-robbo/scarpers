@@ -9,6 +9,7 @@ import { MessageCircle, Send, Loader2, X, Minimize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
+import { pushUndoEntry } from "@/lib/plan-undo-history";
 
 interface Message {
   role: "user" | "assistant";
