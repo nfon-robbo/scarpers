@@ -17,6 +17,7 @@ import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
+import SupabaseErrorBanner from "./components/SupabaseErrorBanner";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <SupabaseErrorBanner />
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
