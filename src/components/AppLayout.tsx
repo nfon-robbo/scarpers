@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import AIChatbot from "@/components/AIChatbot";
+import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
 import {
   Activity,
@@ -192,6 +193,7 @@ const AppLayout = () => {
       </main>
 
       <AIChatbot />
+      <BackendHealthIndicator />
     </div>
   );
 };
