@@ -63,15 +63,27 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
 }
 
 function extractDuration(w: ParsedWorkout): string | null {
-  // Prefer summing actual segments so the calendar list matches the workout detail view
-  const segSecs = sumSegmentSeconds(w);
+  // If any segment is distance-based (km/mi), the segment-sum will undercount
+  // (e.g. a 5km race leg has no time value). Prefer the workout's stated total in that case.
+  const hasDistanceSeg = (w.segments || []).some((s) =>
+    /\d+(?:\.\d+)?\s*(km|mi|m)\b/i.test(s.duration || "")
+  );
+  const txt = `${w.title} ${w.rawText}`;
+  const totalMatch =
+    txt.match(/Total:\s*~?\s*(\d+)\s*min/i) ||
+    txt.match(/~?\s*(\d+)\s*min\s*total/i);
+
   let mins: number | null = null;
-  if (segSecs > 0) {
-    mins = Math.round(segSecs / 60);
+  if (hasDistanceSeg && totalMatch) {
+    mins = parseInt(totalMatch[1], 10);
   } else {
-    const txt = `${w.title} ${w.rawText}`;
-    const m = txt.match(/(\d+)\s*min/i) || txt.match(/Total:\s*(\d+)/i);
-    if (m) mins = parseInt(m[1], 10);
+    const segSecs = sumSegmentSeconds(w);
+    if (segSecs > 0) {
+      mins = Math.round(segSecs / 60);
+    } else {
+      const m = totalMatch || txt.match(/(\d+)\s*min/i);
+      if (m) mins = parseInt(m[1], 10);
+    }
   }
   if (mins == null) return null;
   if (mins >= 60) {
