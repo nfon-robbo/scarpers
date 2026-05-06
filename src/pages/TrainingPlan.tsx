@@ -1163,6 +1163,33 @@ const TrainingPlanPage = () => {
               </>
             )}
           </Button>
+          <input
+            ref={fitInputRef}
+            type="file"
+            accept=".fit,.zip"
+            multiple
+            onChange={handleImportFit}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={loading || importing}
+            onClick={() => fitInputRef.current?.click()}
+          >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <FileUp className="w-4 h-4 mr-2" />
+                Import .fit / .zip
+              </>
+            )}
+          </Button>
         </div>
       )}
 
