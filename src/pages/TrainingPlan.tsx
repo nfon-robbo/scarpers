@@ -288,11 +288,12 @@ const TrainingPlanPage = () => {
       .insert({
         user_id: user.id,
         race_distance: raceDistance,
+        goal_time: goalTime || null,
         training_days: trainingDays,
         start_date: toLocalISODate(startDate),
         race_date: raceDateValue,
         content: planContent,
-      })
+      } as any)
       .select("id")
       .single();
 
