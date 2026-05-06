@@ -308,6 +308,18 @@ export default function PlanDayList({
     }));
   };
 
+  const resetStepOverride = (w: ParsedWorkout, idx: number) => {
+    const key = workoutKey(w);
+    setOverrides((prev) => {
+      const forKey = { ...(prev[key] || {}) };
+      delete forKey[idx];
+      const next = { ...prev };
+      if (Object.keys(forKey).length === 0) delete next[key];
+      else next[key] = forKey;
+      return next;
+    });
+  };
+
   // Load/persist overrides
   useEffect(() => {
     try {
