@@ -5,6 +5,8 @@ export async function streamAICoach({
   token,
   raceDistance,
   goalTime,
+  currentPaceMin,
+  currentPaceMax,
   trainingDays,
   startDate,
   raceDate,
@@ -23,6 +25,8 @@ export async function streamAICoach({
   token: string;
   raceDistance?: string;
   goalTime?: string;
+  currentPaceMin?: string;
+  currentPaceMax?: string;
   trainingDays?: string[];
   startDate?: string;
   raceDate?: string;
