@@ -148,11 +148,21 @@ function activitiesToMarkdown(activities: ParsedActivity[]): string {
     const dist = formatDistance(a.distance_meters);
     const pace = formatPace(a.avg_speed);
     const hr = a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm avg` : "";
+    const intervalsText = ((a.raw_data as any) || {}).intervals_text as string | undefined;
 
-    lines.push("| Segment | Duration | Target | HR Zone | Notes |");
-    lines.push("|---------|----------|--------|---------|-------|");
-    lines.push(`| Main | ${dur || "—"} | ${[dist, pace].filter(Boolean).join(" @ ") || "—"} | ${hr || "—"} | Imported from ${a.source_file} |`);
-    lines.push("");
+    if (intervalsText) {
+      // Structured workout — emit as a fenced ~~~intervals block (rest of the
+      // app uses this exact syntax for intervals.icu sync).
+      lines.push("~~~intervals");
+      lines.push(intervalsText);
+      lines.push("~~~");
+      lines.push("");
+    } else {
+      lines.push("| Segment | Duration | Target | HR Zone | Notes |");
+      lines.push("|---------|----------|--------|---------|-------|");
+      lines.push(`| Main | ${dur || "—"} | ${[dist, pace].filter(Boolean).join(" @ ") || "—"} | ${hr || "—"} | Imported from ${a.source_file} |`);
+      lines.push("");
+    }
   }
 
   return lines.join("\n");
