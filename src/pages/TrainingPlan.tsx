@@ -1356,7 +1356,7 @@ const TrainingPlanPage = () => {
                 <div className="flex items-center gap-2 max-w-[360px]">
                   <Input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="text"
                     placeholder="e.g. 7:00"
                     value={currentPaceMin}
                     onChange={(e) => setCurrentPaceMin(e.target.value)}
@@ -1365,7 +1365,7 @@ const TrainingPlanPage = () => {
                   <span className="text-muted-foreground text-sm">to</span>
                   <Input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="text"
                     placeholder="e.g. 7:30"
                     value={currentPaceMax}
                     onChange={(e) => setCurrentPaceMax(e.target.value)}
