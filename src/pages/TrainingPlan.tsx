@@ -1356,7 +1356,7 @@ const TrainingPlanPage = () => {
                 <div className="flex items-center gap-2 max-w-[360px]">
                   <Input
                     type="text"
-                    inputMode="numeric"
+                    inputMode="text"
                     placeholder="e.g. 7:00"
                     value={currentPaceMin}
                     onChange={(e) => setCurrentPaceMin(e.target.value)}
