@@ -329,46 +329,46 @@ const Dashboard = () => {
   // Weekly progress (Mon–Sun, based on the actual training plan)
   const weeklyProgress = useMemo(() => {
     const now = new Date();
-    // Start of week = Monday 00:00
     const startOfWeek = new Date(now);
-    const dow = now.getDay(); // 0=Sun..6=Sat
+    const dow = now.getDay();
     const diffToMon = dow === 0 ? -6 : 1 - dow;
     startOfWeek.setDate(now.getDate() + diffToMon);
     startOfWeek.setHours(0, 0, 0, 0);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
-
     const lastWeekStart = new Date(startOfWeek);
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
     const inRange = (d: Date, s: Date, e: Date) => d >= s && d < e;
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-    const thisWeekActivities = activities.filter(
-      (a) => a.start_time && inRange(new Date(a.start_time), startOfWeek, endOfWeek)
-    );
-    const lastWeekActivities = activities.filter(
-      (a) => a.start_time && inRange(new Date(a.start_time), lastWeekStart, startOfWeek)
-    );
+    // Activity dates (yyyy-mm-dd) this week and last week
+    const activityDatesThisWeek = new Set<string>();
+    let lastWeekActivityCount = 0;
+    for (const a of activities) {
+      if (!a.start_time) continue;
+      const d = new Date(a.start_time);
+      if (inRange(d, startOfWeek, endOfWeek)) activityDatesThisWeek.add(ymd(d));
+      else if (inRange(d, lastWeekStart, startOfWeek)) lastWeekActivityCount++;
+    }
 
-    // Count planned (non-rest) workouts this week from the parsed plan
-    let plannedThisWeek = 0;
+    // Planned (non-rest) workouts this week from the parsed plan
+    let plannedDates: string[] = [];
     if (plan?.content) {
       const workouts = parseWorkoutsFromPlan(plan.content);
-      plannedThisWeek = workouts.filter(
-        (w) => w.dateObj && inRange(w.dateObj, startOfWeek, endOfWeek) && !/rest/i.test(w.title)
-      ).length;
+      plannedDates = workouts
+        .filter((w) => w.dateObj && inRange(w.dateObj, startOfWeek, endOfWeek) && !/rest/i.test(w.title))
+        .map((w) => ymd(w.dateObj!));
     }
-    if (plannedThisWeek === 0 && plan?.training_days) {
-      plannedThisWeek = plan.training_days.length;
-    }
-    if (plannedThisWeek === 0) plannedThisWeek = 3;
 
-    const completed = Math.min(thisWeekActivities.length, plannedThisWeek);
+    const planned = plannedDates.length;
+    // Completed = a planned workout date that has at least one activity logged on that day
+    const completed = plannedDates.filter((d) => activityDatesThisWeek.has(d)).length;
 
     return {
       completed,
-      planned: plannedThisWeek,
-      delta: thisWeekActivities.length - lastWeekActivities.length,
+      planned,
+      delta: activityDatesThisWeek.size - lastWeekActivityCount,
     };
   }, [activities, plan]);
 
