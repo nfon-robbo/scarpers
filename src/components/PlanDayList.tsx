@@ -20,6 +20,8 @@ interface PlanDayListProps {
   onMoveWorkout?: (fromDate: string, toDate: string) => void;
   onSyncWorkout?: () => void | Promise<void>;
   syncing?: boolean;
+  goalTime?: string;
+  raceDistance?: string;
 }
 
 function shortLabel(title: string): string {
@@ -286,6 +288,8 @@ export default function PlanDayList({
   onMoveWorkout,
   onSyncWorkout,
   syncing = false,
+  goalTime,
+  raceDistance,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
@@ -502,7 +506,7 @@ export default function PlanDayList({
                 (() => {
                   const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
                   const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
-                  const expanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "");
+                  const expanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
                   return (
                     <div className="relative mt-2 pl-2">
                       {/* Vertical dotted spine */}
