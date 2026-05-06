@@ -312,9 +312,25 @@ const AIChatbot = () => {
           )}
           {messages.map((msg, i) => {
             const hasAction = msg.role === "assistant" && /\[\[ACTION:recommendation\]\]/.test(msg.content);
-            const cleaned = hasAction ? msg.content.replace(/\[\[ACTION:recommendation\]\]/g, "").trim() : msg.content;
+            const dayMatch = msg.role === "assistant"
+              ? msg.content.match(/\[\[ACTION:day:(\d{1,2}\/\d{1,2}\/\d{4})\]\]/)
+              : null;
+            const planMatch = msg.role === "assistant"
+              ? /\[\[ACTION:plan\]\]/.test(msg.content)
+              : false;
+            // Backwards-compatible legacy marker.
+            const legacyMatch = msg.role === "assistant"
+              ? /\[\[ACTION:recommendation\]\]/.test(msg.content)
+              : false;
+            const hasAction = !!dayMatch || planMatch || legacyMatch;
+            const cleaned = hasAction
+              ? msg.content.replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "").trim()
+              : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const showActions = hasAction && isLastAssistant && !loading;
+            const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
+              ? { kind: "day", dateUk: dayMatch[1] }
+              : { kind: "plan" };
             return (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
@@ -330,26 +346,33 @@ const AIChatbot = () => {
                     cleaned
                   )}
                   {showActions && (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-8 text-xs"
-                        disabled={loading}
-                        onClick={() => applyChange(cleaned)}
-                      >
-                        Make the change
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 h-8 text-xs"
-                        disabled={loading}
-                        onClick={() => {
-                          setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
-                        }}
-                      >
-                        Keep as it is
-                      </Button>
+                    <div className="mt-3 space-y-2">
+                      {scope.kind === "day" && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Affects only your <strong>{scope.dateUk}</strong> session.
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => applyChange(cleaned, scope)}
+                        >
+                          Make the change
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => {
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                          }}
+                        >
+                          Keep as it is
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
