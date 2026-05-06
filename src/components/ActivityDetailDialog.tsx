@@ -88,10 +88,8 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     const poly = data?.raw_data?.map_polyline;
     if (typeof poly === "string" && poly.length > 0) {
       try {
-        // Lazy require to avoid circulars
-        const { decodePolyline } = require("@/lib/polyline");
         const pts = decodePolyline(poly);
-        return pts.map(([lat, lng]: [number, number]) => ({ lat, lng }));
+        return pts.map(([lat, lng]) => ({ lat, lng }));
       } catch {
         return [];
       }
