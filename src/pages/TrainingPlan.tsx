@@ -993,10 +993,23 @@ const TrainingPlanPage = () => {
       const { generatePlanDocx, downloadBlob } = await import("@/lib/plan-docx");
       const blob = await generatePlanDocx(workouts, raceDistance);
       const result = await downloadBlob(blob, "training-plan.docx");
-      if (result === "shared") {
-        toast({ title: "Plan shared", description: "Saved via your device's share sheet." });
+      const openAction = (
+        <ToastAction altText="Open" onClick={() => window.open(result.url, "_blank", "noopener")}>
+          Open
+        </ToastAction>
+      );
+      if (result.status === "shared") {
+        toast({
+          title: "Plan shared",
+          description: "Saved via your device's share sheet.",
+          action: openAction,
+        });
       } else {
-        toast({ title: "Word document downloaded!", description: "Check your Downloads folder or notification shade." });
+        toast({
+          title: "Word document downloaded!",
+          description: "Tap Open to view it now, or check your Downloads folder.",
+          action: openAction,
+        });
       }
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message || String(e), variant: "destructive" });
