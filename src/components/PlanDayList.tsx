@@ -347,6 +347,82 @@ function EditableStat({
   );
 }
 
+function AddStepForm({ onAdd }: { onAdd: (s: CustomStep) => void }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<CustomStepKind>("warmup");
+  const [label, setLabel] = useState("Warm-up");
+  const [duration, setDuration] = useState("10:00");
+  const [pace, setPace] = useState("");
+
+  const applyKind = (k: CustomStepKind) => {
+    setKind(k);
+    const d = defaultsFor(k);
+    setLabel(d.label);
+    setDuration(d.duration);
+    setPace(d.pace ?? "");
+  };
+
+  const submit = () => {
+    if (!duration.trim()) return;
+    onAdd({
+      id: crypto.randomUUID(),
+      kind,
+      label: label.trim() || defaultsFor(kind).label,
+      duration: duration.trim(),
+      pace: kind === "warmup" || kind === "cooldown" ? undefined : (pace.trim() || undefined),
+    });
+    setOpen(false);
+    applyKind("warmup");
+  };
+
+  if (!open) {
+    return (
+      <Button variant="outline" size="sm" className="w-full" onClick={() => setOpen(true)}>
+        <Plus className="w-4 h-4 mr-1" /> Add step
+      </Button>
+    );
+  }
+
+  const showPace = kind !== "warmup" && kind !== "cooldown";
+  const kinds: { v: CustomStepKind; l: string }[] = [
+    { v: "warmup", l: "Warm-up" },
+    { v: "rep", l: "Rep" },
+    { v: "cooldown", l: "Cool-down" },
+    { v: "custom", l: "Custom" },
+  ];
+
+  return (
+    <div className="rounded-xl border bg-card p-3 space-y-2">
+      <div className="grid grid-cols-4 gap-1">
+        {kinds.map((k) => (
+          <button
+            key={k.v}
+            type="button"
+            onClick={() => applyKind(k.v)}
+            className={cn(
+              "text-xs py-1.5 rounded-md border transition-colors",
+              kind === k.v ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"
+            )}
+          >
+            {k.l}
+          </button>
+        ))}
+      </div>
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label" className="h-8 text-sm" />
+      <div className="flex gap-2">
+        <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="mm:ss" className="h-8 text-sm" />
+        {showPace && (
+          <Input value={pace} onChange={(e) => setPace(e.target.value)} placeholder="Pace m:ss/km (optional)" className="h-8 text-sm" />
+        )}
+      </div>
+      <div className="flex justify-end gap-1">
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button size="sm" className="h-7 px-2 text-xs" onClick={submit}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function PlanDayList({
   workouts,
   planStartDate,
