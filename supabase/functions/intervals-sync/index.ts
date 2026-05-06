@@ -184,45 +184,20 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
   }
 
-  function fmtTarget(step: WorkoutStep): string {
-    return ` ${paceTarget(step)}`;
-  }
-
-  // Cue text mirrors the Cooper/Garmin layout: warmup, run, walk, cooldown.
-  // Pace targets are kept explicit on every line so Garmin does not show "No Target".
-  function stepCue(step: WorkoutStep): string {
-    const normalized = step.intensity.toLowerCase();
-    if (normalized === "recovery" || normalized === "rest") return "Walk";
-    if (normalized === "warmup") return "Warmup";
-    if (normalized === "cooldown") return "Cooldown";
-    return "Run";
-  }
-
   function fmtStep(step: WorkoutStep): string {
-    return `- ${stepCue(step)} ${fmtDur(step.duration)}${fmtTarget(step)}`;
+    // intervals.icu native syntax: "- <duration> <pace-range>/km"
+    // No cue words, no section headers — those break the Garmin export
+    // and cause "no target" on the watch.
+    return `- ${fmtDur(step.duration)} ${paceTarget(step)}`;
   }
 
   const lines: string[] = [];
   let i = 0;
-  let prevIntensity = "";
 
   while (i < workout.steps.length) {
     const step = workout.steps[i];
 
-    if (step.intensity === "Warmup") {
-      if (prevIntensity !== "Warmup") lines.push("Warmup");
-      lines.push(fmtStep(step));
-      prevIntensity = "Warmup";
-      i += 1;
-    } else if (step.intensity === "Cooldown") {
-      if (prevIntensity !== "Cooldown") {
-        lines.push("");
-        lines.push("Cooldown");
-      }
-      lines.push(fmtStep(step));
-      prevIntensity = "Cooldown";
-      i += 1;
-    } else if (step.intensity === "Interval") {
+    if (step.intensity === "Interval") {
       let reps = 0;
       let j = i;
       const workDur = step.duration;
@@ -243,28 +218,16 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       }
 
       if (reps > 1) {
-        lines.push("");
         lines.push(`${reps}x`);
         lines.push(fmtStep(workStep));
         if (restDur > 0 && restStep) lines.push(fmtStep(restStep));
         i = j;
       } else {
-        if (prevIntensity !== "Active") {
-          lines.push("");
-          lines.push("Run");
-        }
         lines.push(fmtStep(step));
         i += 1;
       }
-
-      prevIntensity = "Active";
     } else {
-      if (prevIntensity !== "Active") {
-        lines.push("");
-        lines.push("Run");
-      }
       lines.push(fmtStep(step));
-      prevIntensity = "Active";
       i += 1;
     }
   }
