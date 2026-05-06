@@ -278,6 +278,29 @@ serve(async (req) => {
       "Content-Type": "application/json",
     };
 
+    // Ensure a Run threshold_pace is set on intervals.icu. Without it, the
+    // Garmin export silently strips all pace targets and the watch shows
+    // "No Target" — regardless of workout description syntax.
+    try {
+      const settingsResp = await fetch(`${baseUrl}/sport-settings`, { headers: authHeaders });
+      if (settingsResp.ok) {
+        const allSettings = await settingsResp.json();
+        const runSettings = Array.isArray(allSettings)
+          ? allSettings.find((s: { types?: string[] }) => Array.isArray(s.types) && s.types.includes("Run"))
+          : null;
+        if (runSettings && (runSettings.threshold_pace == null || runSettings.threshold_pace === 0)) {
+          await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
+            method: "PUT",
+            headers: authHeaders,
+            body: JSON.stringify({ threshold_pace: 3.03 }),
+          });
+          console.log("Set default Run threshold_pace=3.03 m/s on intervals.icu");
+        }
+      }
+    } catch (e) {
+      console.error("Failed to verify/set threshold_pace:", e);
+    }
+
     // Delete-only mode: remove all planned workouts in range
     if (deleteRange) {
       try {
