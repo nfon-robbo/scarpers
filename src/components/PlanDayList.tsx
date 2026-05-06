@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ interface PlanDayListProps {
   planEndDate?: Date;
   completedDates?: Set<string>;
   onMoveWorkout?: (fromDate: string, toDate: string) => void;
+  onSyncWorkout?: () => void | Promise<void>;
+  syncing?: boolean;
 }
 
 function shortLabel(title: string): string {
@@ -282,6 +284,8 @@ export default function PlanDayList({
   planEndDate,
   completedDates = new Set(),
   onMoveWorkout,
+  onSyncWorkout,
+  syncing = false,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
@@ -524,6 +528,22 @@ export default function PlanDayList({
                                       isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
                                     />
                                   </div>
+                                  {(() => {
+                                    const ov = overrides[workoutKey(selectedWorkout)]?.[i];
+                                    const isModified = !!(ov?.duration || ov?.pace);
+                                    if (!isModified || !onSyncWorkout) return null;
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); onSyncWorkout(); }}
+                                        disabled={syncing}
+                                        title="Sync this change to intervals.icu"
+                                        className="flex items-center justify-center px-3 bg-primary/10 hover:bg-primary/20 transition-colors border-l text-primary disabled:opacity-50"
+                                      >
+                                        {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
