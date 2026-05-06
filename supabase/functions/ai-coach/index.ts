@@ -775,7 +775,7 @@ After all weekly sessions, append:
 **RACE DAY STRATEGY**
 - Mile-by-mile splits (conservative start, build, finish strong)
 - HR targets per mile
-- Warm-up protocol (10min jog Z2 + 4×20sec strides)
+- Warm-up protocol (5min jog Z2 + 4×20sec strides)
 - Fueling (if race >60min)
 
 **STRENGTH CIRCUIT** (2x/week)
