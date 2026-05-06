@@ -139,7 +139,8 @@ const AIChatbot = () => {
           const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
 
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.`);
+          setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.\n\n[[UNDO]]`);
           toast({ title: "Workout updated", description: scope.dateUk });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
