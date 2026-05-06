@@ -191,8 +191,8 @@ export function expandWorkoutSteps(
       continue;
     }
 
-    // Inline "Nx Awork" without rest
-    const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
+    // Inline "Nx Awork" without rest (accept both ASCII x and Unicode ×)
+    const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
     if (simpleRepeatMatch) {
       const reps = parseInt(simpleRepeatMatch[1], 10);
       const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
