@@ -190,15 +190,37 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
   const activities: ParsedActivity[] = [];
   const errors: string[] = [];
 
+  const tryParseWorkoutBuf = (buf: ArrayBuffer, name: string): ParsedActivity | null => {
+    try {
+      const w = parseFitWorkout(buf);
+      if (w && w.steps.length) {
+        const txt = fitWorkoutToIntervalsText(w);
+        return stubActivity(name, { workout: w, intervalsText: txt });
+      }
+    } catch { /* fall through */ }
+    return null;
+  };
+
   for (const file of files) {
     const lower = file.name.toLowerCase();
     try {
       if (lower.endsWith(".zip")) {
         const r = await parseZipFile(file);
         if (r.activities.length === 0) {
-          // ZIP of workout-definition FIT files (no sessions/records) — stub each
-          const zipNames = await listFitNamesInZip(file);
-          for (const name of zipNames) activities.push(stubActivity(name));
+          // Each entry is a workout-definition FIT — re-extract and parse steps
+          const zip = await JSZip.loadAsync(file);
+          const entries: { name: string; buf: ArrayBuffer }[] = [];
+          await Promise.all(
+            Object.keys(zip.files).map(async (k) => {
+              const entry = zip.files[k];
+              if (!entry.dir && k.toLowerCase().endsWith(".fit")) {
+                entries.push({ name: k, buf: await entry.async("arraybuffer") });
+              }
+            })
+          );
+          for (const e of entries) {
+            activities.push(tryParseWorkoutBuf(e.buf, e.name) || stubActivity(e.name));
+          }
         } else {
           activities.push(...r.activities);
         }
@@ -207,8 +229,7 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
         const buf = await file.arrayBuffer();
         const parsed = await parseFitBuffer(buf, file.name);
         if (parsed.length === 0) {
-          // Workout-definition FIT (no session/records) — keep it as a stub
-          activities.push(stubActivity(file.name));
+          activities.push(tryParseWorkoutBuf(buf, file.name) || stubActivity(file.name));
         } else {
           activities.push(...parsed);
         }
@@ -216,7 +237,6 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
         errors.push(`Skipped unsupported file: ${file.name}`);
       }
     } catch (e: any) {
-      // Even on parse error, keep the file as a stub so the user can place it
       if (lower.endsWith(".fit")) activities.push(stubActivity(file.name));
       errors.push(e?.message || `Failed to parse ${file.name}`);
     }
