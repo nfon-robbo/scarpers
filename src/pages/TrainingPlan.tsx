@@ -185,6 +185,8 @@ const TrainingPlanPage = () => {
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
+  const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
+  const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
@@ -434,6 +436,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       goalTime,
+      currentPaceMin,
+      currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(newStart),
       raceDate: toLocalISODate(newEnd),
@@ -497,6 +501,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       goalTime,
+      currentPaceMin,
+      currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(startDate),
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
@@ -545,6 +551,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       goalTime,
+      currentPaceMin,
+      currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(startDate),
       currentPlan: originalPlan,
@@ -586,6 +594,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       goalTime,
+      currentPaceMin,
+      currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(startDate),
       currentPlan: originalPlanBeforeReview,
@@ -637,6 +647,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       raceDistance,
       goalTime,
+      currentPaceMin,
+      currentPaceMax,
       currentPlan: postAnalysisPlanContent,
       onDelta: (text) => {
         accumulated += text;
@@ -1278,6 +1290,32 @@ const TrainingPlanPage = () => {
                 <p className="text-xs text-muted-foreground">
                   Target finish time — the AI will build pace targets and intervals around hitting this.
                 </p>
+              </div>
+              <div className="space-y-2 rounded-lg border border-border/50 p-4 bg-muted/20">
+                <Label className="text-sm font-medium">Current Easy Run Pace <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  If you know your current easy/Z2 pace, enter the range here (min:sec per km). The plan will start at this pace and gradually progress toward your goal. Leave blank and we'll estimate from your Strava history.
+                </p>
+                <div className="flex items-center gap-2 max-w-[360px]">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 7:00"
+                    value={currentPaceMin}
+                    onChange={(e) => setCurrentPaceMin(e.target.value)}
+                    className="text-center"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 7:30"
+                    value={currentPaceMax}
+                    onChange={(e) => setCurrentPaceMax(e.target.value)}
+                    className="text-center"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
