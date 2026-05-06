@@ -1,12 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
 import { expandWorkoutSteps } from "@/lib/plan-step-expand";
+import {
+  loadCustomSteps, saveCustomSteps, defaultsFor, customToExpanded,
+  type CustomStep, type CustomStepKind, type CustomStepsMap,
+} from "@/lib/plan-custom-steps";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -62,7 +66,7 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
   return Math.round(total);
 }
 
-function extractDuration(w: ParsedWorkout): string | null {
+function extractDuration(w: ParsedWorkout, customExtraSecs = 0): string | null {
   const txt = `${w.title} ${w.rawText}`;
 
   // Race day: detail view shows ONLY the race effort (warm-up/cool-down stripped).
@@ -103,7 +107,9 @@ function extractDuration(w: ParsedWorkout): string | null {
       if (m) mins = parseInt(m[1], 10);
     }
   }
+  if (mins == null && customExtraSecs > 0) mins = 0;
   if (mins == null) return null;
+  mins += Math.round(customExtraSecs / 60);
   if (mins >= 60) {
     const h = Math.floor(mins / 60);
     const r = mins % 60;
@@ -343,6 +349,82 @@ function EditableStat({
   );
 }
 
+function AddStepForm({ onAdd }: { onAdd: (s: CustomStep) => void }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<CustomStepKind>("warmup");
+  const [label, setLabel] = useState("Warm-up");
+  const [duration, setDuration] = useState("10:00");
+  const [pace, setPace] = useState("");
+
+  const applyKind = (k: CustomStepKind) => {
+    setKind(k);
+    const d = defaultsFor(k);
+    setLabel(d.label);
+    setDuration(d.duration);
+    setPace(d.pace ?? "");
+  };
+
+  const submit = () => {
+    if (!duration.trim()) return;
+    onAdd({
+      id: crypto.randomUUID(),
+      kind,
+      label: label.trim() || defaultsFor(kind).label,
+      duration: duration.trim(),
+      pace: kind === "warmup" || kind === "cooldown" ? undefined : (pace.trim() || undefined),
+    });
+    setOpen(false);
+    applyKind("warmup");
+  };
+
+  if (!open) {
+    return (
+      <Button variant="outline" size="sm" className="w-full" onClick={() => setOpen(true)}>
+        <Plus className="w-4 h-4 mr-1" /> Add step
+      </Button>
+    );
+  }
+
+  const showPace = kind !== "warmup" && kind !== "cooldown";
+  const kinds: { v: CustomStepKind; l: string }[] = [
+    { v: "warmup", l: "Warm-up" },
+    { v: "rep", l: "Rep" },
+    { v: "cooldown", l: "Cool-down" },
+    { v: "custom", l: "Custom" },
+  ];
+
+  return (
+    <div className="rounded-xl border bg-card p-3 space-y-2">
+      <div className="grid grid-cols-4 gap-1">
+        {kinds.map((k) => (
+          <button
+            key={k.v}
+            type="button"
+            onClick={() => applyKind(k.v)}
+            className={cn(
+              "text-xs py-1.5 rounded-md border transition-colors",
+              kind === k.v ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"
+            )}
+          >
+            {k.l}
+          </button>
+        ))}
+      </div>
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label" className="h-8 text-sm" />
+      <div className="flex gap-2">
+        <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="mm:ss" className="h-8 text-sm" />
+        {showPace && (
+          <Input value={pace} onChange={(e) => setPace(e.target.value)} placeholder="Pace m:ss/km (optional)" className="h-8 text-sm" />
+        )}
+      </div>
+      <div className="flex justify-end gap-1">
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button size="sm" className="h-7 px-2 text-xs" onClick={submit}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function PlanDayList({
   workouts,
   planStartDate,
@@ -399,6 +481,26 @@ export default function PlanDayList({
       localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
     } catch {}
   }, [overrides]);
+
+  // Custom user-added steps (warm-up / rep / cool-down / custom).
+  // Stored locally; appended after AI steps both in UI and on Intervals.icu sync.
+  const [customSteps, setCustomSteps] = useState<CustomStepsMap>({});
+  useEffect(() => { setCustomSteps(loadCustomSteps()); }, []);
+  useEffect(() => { saveCustomSteps(customSteps); }, [customSteps]);
+
+  const addCustomStep = (w: ParsedWorkout, step: CustomStep) => {
+    const key = workoutKey(w);
+    setCustomSteps((prev) => ({ ...prev, [key]: [...(prev[key] || []), step] }));
+  };
+  const removeCustomStep = (w: ParsedWorkout, id: string) => {
+    const key = workoutKey(w);
+    setCustomSteps((prev) => {
+      const list = (prev[key] || []).filter((s) => s.id !== id);
+      const next = { ...prev };
+      if (list.length) next[key] = list; else delete next[key];
+      return next;
+    });
+  };
 
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
@@ -526,11 +628,25 @@ export default function PlanDayList({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{shortLabel(workout.title)}</p>
-                          {(extractDuration(workout) || extractDistance(workout)) && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {[extractDuration(workout), extractDistance(workout)].filter(Boolean).join(" • ")}
-                            </p>
-                          )}
+                          {(() => {
+                            const customs = customSteps[workoutKey(workout)] || [];
+                            const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
+                            const extraSecs = isRace ? 0 : customs.reduce((acc, s) => {
+                              const m = s.duration.match(/^(\d{1,3}):(\d{2})$/);
+                              if (m) return acc + parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                              const min = s.duration.match(/(\d+(?:\.\d+)?)\s*min/i);
+                              if (min) return acc + Math.round(parseFloat(min[1]) * 60);
+                              return acc;
+                            }, 0);
+                            const dur = extractDuration(workout, extraSecs);
+                            const dist = extractDistance(workout);
+                            if (!dur && !dist) return null;
+                            return (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {[dur, dist].filter(Boolean).join(" • ")}
+                              </p>
+                            );
+                          })()}
                         </div>
                         {isCompleted && (
                           <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
@@ -569,36 +685,53 @@ export default function PlanDayList({
                 (() => {
                   const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
                   const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
-                  const expanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
+                  const aiExpanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
+                  const myCustom = customSteps[workoutKey(selectedWorkout)] || [];
+                  const customExpanded = customToExpanded(myCustom);
+                  const combined = [...aiExpanded, ...customExpanded];
                   return (
                     <div className="relative mt-2 pl-2">
                       {/* Vertical dotted spine */}
                       <div className="absolute left-[18px] top-3 bottom-3 border-l-2 border-dotted border-muted-foreground/30" />
                       <div className="space-y-3">
-                        {expanded.map((step, i) => {
+                        {combined.map((step, i) => {
                           const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
                           const isWarmCool = step.intensity === "Warmup" || step.intensity === "Cooldown";
                           const Icon = isWalk ? PersonStanding : Footprints;
                           const durStr = fmtTime(step.duration);
                           const paceStr = fmtPace(step.pace);
+                          const customIdx = i - aiExpanded.length;
+                          const isCustom = customIdx >= 0;
+                          const customRef = isCustom ? myCustom[customIdx] : null;
                           return (
                             <div key={i} className="relative flex items-start gap-3">
                               <div className="relative z-10 shrink-0 w-9 h-9 rounded-full bg-background border-2 border-muted-foreground/30 flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0 space-y-1.5 pt-1">
-                                <p className="text-sm font-semibold leading-none">{step.label}</p>
+                                <p className="text-sm font-semibold leading-none flex items-center gap-2">
+                                  {step.label}
+                                  {isCustom && (
+                                    <span className="text-[10px] uppercase tracking-wide bg-primary/15 text-primary px-1.5 py-0.5 rounded">Custom</span>
+                                  )}
+                                </p>
                                 <div className="flex items-stretch rounded-xl border bg-card overflow-hidden">
                                   <div className="flex items-center justify-center w-12 bg-primary/10 shrink-0">
                                     <Icon className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
                                     <EditableStat
-                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr}
+                                      value={isCustom ? durStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr)}
                                       label="Time (mm:ss)"
                                       placeholder="mm:ss"
-                                      onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
-                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
+                                      onSave={(v) => isCustom && customRef
+                                        ? setCustomSteps((prev) => {
+                                            const key = workoutKey(selectedWorkout);
+                                            const list = (prev[key] || []).map((s) => s.id === customRef.id ? { ...s, duration: v } : s);
+                                            return { ...prev, [key]: list };
+                                          })
+                                        : setStepOverride(selectedWorkout, i, "duration", v)}
+                                      isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
                                     />
                                     {isWarmCool ? (
                                       <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
@@ -607,15 +740,30 @@ export default function PlanDayList({
                                       </div>
                                     ) : (
                                       <EditableStat
-                                        value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr}
+                                        value={isCustom ? paceStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr)}
                                         label="Pace (min/km)"
                                         placeholder="m:ss"
-                                        onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
-                                        isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                        onSave={(v) => isCustom && customRef
+                                          ? setCustomSteps((prev) => {
+                                              const key = workoutKey(selectedWorkout);
+                                              const list = (prev[key] || []).map((s) => s.id === customRef.id ? { ...s, pace: v } : s);
+                                              return { ...prev, [key]: list };
+                                            })
+                                          : setStepOverride(selectedWorkout, i, "pace", v)}
+                                        isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
                                       />
                                     )}
                                   </div>
-                                  {(() => {
+                                  {isCustom && customRef ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); removeCustomStep(selectedWorkout, customRef.id); }}
+                                      title="Remove this custom step"
+                                      className="flex items-center justify-center px-3 bg-destructive/10 hover:bg-destructive/20 transition-colors border-l text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  ) : (() => {
                                     const ov = overrides[workoutKey(selectedWorkout)]?.[i];
                                     const isModified = !!(ov?.duration || ov?.pace);
                                     if (!isModified) return null;
@@ -635,6 +783,10 @@ export default function PlanDayList({
                             </div>
                           );
                         })}
+                      </div>
+
+                      <div className="mt-4 pl-12">
+                        <AddStepForm onAdd={(s) => addCustomStep(selectedWorkout, s)} />
                       </div>
                     </div>
                   );
