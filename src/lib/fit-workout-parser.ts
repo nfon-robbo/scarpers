@@ -297,18 +297,16 @@ export function fitWorkoutToIntervalsText(w: FitWorkout): string {
   const steps = w.steps;
   if (!steps.length) return "";
 
-  type Line = { kind: "step"; intensity: number; text: string; sig: string } | { kind: "section"; text: string };
-  const flat: Line[] = [];
+  type FlatStep = { intensity: number; text: string; sig: string };
+  const flat: FlatStep[] = [];
 
   for (const s of steps) {
-    // FIT explicit repeat markers — handle by expansion (rare in workout files).
     if (s.durationType === 6 || s.durationType === 7 || s.durationType === 8) continue;
-
     const dur = fmtDuration(s.durationType, s.durationValue);
     const tgt = fmtTarget(s);
     const text = `- ${dur}${tgt ? " " + tgt : ""}`.trim();
     const sig = `${s.intensity ?? 0}|${dur}|${tgt}`;
-    flat.push({ kind: "step", intensity: s.intensity ?? 0, text, sig });
+    flat.push({ intensity: s.intensity ?? 0, text, sig });
   }
 
   // Detect repeating pair pattern starting after warmup, before cooldown.
