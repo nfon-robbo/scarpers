@@ -117,13 +117,25 @@ export async function generatePlanDocx(workouts: ParsedWorkout[], raceDistance?:
   return await Packer.toBlob(doc);
 }
 
-export async function downloadBlob(blob: Blob, filename: string): Promise<"shared" | "downloaded"> {
+export type DownloadResult = {
+  status: "shared" | "downloaded";
+  /** Blob URL that can be opened in a new tab to view the file. Revoke when done. */
+  url: string;
+  revoke: () => void;
+};
+
+export async function downloadBlob(blob: Blob, filename: string): Promise<DownloadResult> {
   // Ensure correct MIME type so Android (Samsung Internet/Chrome) recognizes it as a downloadable file
   const docxBlob = blob.type
     ? blob
     : new Blob([blob], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       });
+
+  const url = URL.createObjectURL(docxBlob);
+  // Keep the URL alive long enough for the user to tap "Open" from the toast
+  const revoke = () => URL.revokeObjectURL(url);
+  setTimeout(revoke, 5 * 60 * 1000); // 5 min safety net
 
   // Prefer the native share/save sheet on mobile so user can pick where the file goes
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -132,22 +144,20 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<"share
   if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename });
-      return "shared";
+      return { status: "shared", url, revoke };
     } catch (err) {
       // User cancelled or share failed — fall back to download link
     }
   }
 
-  const url = URL.createObjectURL(docxBlob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.rel = "noopener";
-  // Some Android browsers require target=_blank for the download attribute to trigger
   a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  return "downloaded";
+  return { status: "downloaded", url, revoke };
 }
+
