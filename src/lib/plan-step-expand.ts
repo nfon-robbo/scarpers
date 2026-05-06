@@ -129,6 +129,46 @@ export function expandWorkoutSteps(
   rawText: string,
 ): ExpandedStep[] {
   const out: ExpandedStep[] = [];
+
+  // Race day = one continuous race effort. Strip any warm-up / walk-run intervals
+  // the AI may have appended and emit a single step at goal pace.
+  const isRaceDay = /race\s*day|🏁/i.test(`${workoutTitle} ${rawText}`);
+  if (isRaceDay) {
+    // Pick the longest non-warmup/cooldown segment as the "race" step. Otherwise
+    // synthesise one from the title (e.g. "5K" / "10K" / "Half Marathon").
+    const candidates = segments.filter((s) => !/warm|cool|rest|recover/i.test(s.segment));
+    const ref = candidates[0] || segments[0];
+    let durSec = 0;
+    let pace = ref ? paceForSegment(ref, "Active") : "5:00/km";
+    // Prefer an explicit goal time / pace mentioned in the title or notes.
+    const goalPaceMatch = `${workoutTitle} ${rawText}`.match(/(\d{1,2}:\d{2})\s*\/\s*km/i);
+    if (goalPaceMatch) pace = `${goalPaceMatch[1]}/km`;
+    // Distance from title for duration.
+    const distMatch = workoutTitle.match(/(\d+(?:\.\d+)?)\s*k(?:m)?\b|half\s*marathon|marathon/i);
+    let km = 0;
+    if (distMatch) {
+      if (/half\s*marathon/i.test(distMatch[0])) km = 21.0975;
+      else if (/^marathon/i.test(distMatch[0])) km = 42.195;
+      else km = parseFloat(distMatch[1] || "0");
+    }
+    const paceSec = paceToSeconds(pace);
+    if (km && paceSec) durSec = Math.round(km * paceSec);
+    if (!durSec && ref) durSec = parseDurationSeconds(ref.duration);
+    if (!durSec) durSec = 1800;
+    const hrZone = ref ? normalizeHrZone(ref.hrZone) : "Z4";
+    const { low, high } = hrZoneToBpm(hrZone);
+    out.push({
+      duration: durSec,
+      hrLow: low,
+      hrHigh: high,
+      hrZone,
+      intensity: "Active",
+      pace,
+      label: "🏁 Race",
+    });
+    return out;
+  }
+
   let runIdx = 0;
   let walkIdx = 0;
 
