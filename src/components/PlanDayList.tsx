@@ -510,6 +510,7 @@ export default function PlanDayList({
                       <div className="space-y-3">
                         {expanded.map((step, i) => {
                           const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
+                          const isWarmCool = step.intensity === "Warmup" || step.intensity === "Cooldown";
                           const Icon = isWalk ? PersonStanding : Footprints;
                           const durStr = fmtTime(step.duration);
                           const paceStr = fmtPace(step.pace);
@@ -532,13 +533,20 @@ export default function PlanDayList({
                                       onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
                                       isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
                                     />
-                                    <EditableStat
-                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr}
-                                      label="Pace (min/km)"
-                                      placeholder="m:ss"
-                                      onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
-                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
-                                    />
+                                    {isWarmCool ? (
+                                      <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
+                                        <p className="text-base font-bold leading-tight text-muted-foreground">—</p>
+                                        <p className="text-[10px] text-muted-foreground mt-0.5">No pace</p>
+                                      </div>
+                                    ) : (
+                                      <EditableStat
+                                        value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr}
+                                        label="Pace (min/km)"
+                                        placeholder="m:ss"
+                                        onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
+                                        isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                      />
+                                    )}
                                   </div>
                                   {(() => {
                                     const ov = overrides[workoutKey(selectedWorkout)]?.[i];
