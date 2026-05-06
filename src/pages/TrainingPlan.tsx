@@ -151,9 +151,11 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
     const steps: ApiStep[] = [];
     for (let i = 0; i < reps; i++) {
       steps.push({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace });
-      if (i < reps - 1 || restMatch) {
-        steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery", pace: restPace });
-      }
+      // Always emit a recovery step after every rep so step indices match the UI's
+      // expandSegments() output exactly. PlanDayList relies on positional indices
+      // when applying user overrides — drop one walk and the cool-down override
+      // lands on the wrong step.
+      steps.push({ duration: restDuration, hrLow: restHr.low, hrHigh: restHr.high, hrZone: restZone, intensity: "Recovery", pace: restPace });
     }
     return steps;
   }
