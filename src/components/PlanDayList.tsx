@@ -484,17 +484,21 @@ export default function PlanDayList({
 
               {selectedWorkout.segments.length > 0 ? (
                 (() => {
-                  const steps = expandSegments(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "");
+                  const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+                  const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
+                  const expanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "");
                   return (
                     <div className="relative mt-2 pl-2">
                       {/* Vertical dotted spine */}
                       <div className="absolute left-[18px] top-3 bottom-3 border-l-2 border-dotted border-muted-foreground/30" />
                       <div className="space-y-3">
-                        {steps.map((step, i) => {
-                          const Icon = step.kind === "run" ? Footprints : PersonStanding;
+                        {expanded.map((step, i) => {
+                          const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
+                          const Icon = isWalk ? PersonStanding : Footprints;
+                          const durStr = fmtTime(step.duration);
+                          const paceStr = fmtPace(step.pace);
                           return (
                             <div key={i} className="relative flex items-start gap-3">
-                              {/* Step number bubble */}
                               <div className="relative z-10 shrink-0 w-9 h-9 rounded-full bg-background border-2 border-muted-foreground/30 flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                 {i + 1}
                               </div>
@@ -506,14 +510,14 @@ export default function PlanDayList({
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
                                     <EditableStat
-                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? step.duration}
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr}
                                       label="Time (mm:ss)"
                                       placeholder="mm:ss"
                                       onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
                                       isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
                                     />
                                     <EditableStat
-                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? step.pace}
+                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr}
                                       label="Pace (min/km)"
                                       placeholder="m:ss"
                                       onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
