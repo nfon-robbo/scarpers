@@ -9,6 +9,7 @@ import { MessageCircle, Send, Loader2, X, Minimize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
+import { pushUndoEntry } from "@/lib/plan-undo-history";
 
 interface Message {
   role: "user" | "assistant";
@@ -138,9 +139,10 @@ const AIChatbot = () => {
           if (idx === -1) { finishWith("⚠️ Couldn't locate the workout in your plan."); return; }
           const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
 
+          pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.\n\n[[UNDO]]`);
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Use the **Undo** button at the top of the Training Plan to revert.`);
           toast({ title: "Workout updated", description: scope.dateUk });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
@@ -164,15 +166,18 @@ const AIChatbot = () => {
       onDone: async () => {
         if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
         await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
-        await supabase.from("training_plans").insert({
+        const { data: inserted } = await supabase.from("training_plans").insert({
           user_id: session.user.id,
           race_distance: plan.race_distance,
           goal_time: plan.goal_time,
           training_days: plan.training_days,
           start_date: plan.start_date,
           content: revised,
-        } as any);
-        finishWith("✅ Done — your plan has been updated. Reload the Training Plan page to see the new sessions.");
+        } as any).select("id").maybeSingle();
+        if (inserted?.id) {
+          pushUndoEntry(inserted.id, plan.content!, "full plan rewrite");
+        }
+        finishWith("✅ Done — your plan has been updated. Use the **Undo** button at the top of the Training Plan to revert.");
         toast({ title: "Plan updated", description: "AI coach applied the change." });
       },
       onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
@@ -384,36 +389,6 @@ const AIChatbot = () => {
                           Keep as it is
                         </Button>
                       </div>
-                    </div>
-                  )}
-                  {showUndo && lastUndo && (
-                    <div className="mt-3">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        disabled={loading}
-                        onClick={async () => {
-                          setLoading(true);
-                          const { error } = await supabase
-                            .from("training_plans")
-                            .update({ content: lastUndo.prevContent })
-                            .eq("id", lastUndo.planId);
-                          setLoading(false);
-                          if (error) {
-                            toast({ title: "Undo failed", description: error.message, variant: "destructive" });
-                            return;
-                          }
-                          toast({ title: "Reverted", description: `Restored your ${lastUndo.dateUk} session.` });
-                          setMessages(prev => [...prev, {
-                            role: "assistant",
-                            content: `↩️ Reverted — your **${lastUndo.dateUk}** session is back to what it was. Reload the Training Plan page to see it.`,
-                          }]);
-                          setLastUndo(null);
-                        }}
-                      >
-                        ↩️ Undo last change
-                      </Button>
                     </div>
                   )}
                 </div>

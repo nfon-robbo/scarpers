@@ -11,7 +11,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp, Undo2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -23,6 +23,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
+import { popUndoEntry, getUndoCount, peekUndoEntry } from "@/lib/plan-undo-history";
 
 interface ApiStep {
   duration: number;
@@ -183,6 +184,41 @@ const TrainingPlanPage = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
+  const [undoCount, setUndoCount] = useState(0);
+
+  // Track undo stack size for the active plan; refresh when chat pushes/pops entries.
+  useEffect(() => {
+    const refresh = () => setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+    refresh();
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.planId === savedPlanId) refresh();
+    };
+    window.addEventListener("plan-undo-changed", onChange);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("plan-undo-changed", onChange);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [savedPlanId]);
+
+  const handleUndo = useCallback(async () => {
+    if (!savedPlanId || !user) return;
+    const peek = peekUndoEntry(savedPlanId);
+    if (!peek) return;
+    const entry = popUndoEntry(savedPlanId);
+    if (!entry) return;
+    const { error } = await supabase
+      .from("training_plans")
+      .update({ content: entry.prevContent })
+      .eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Undo failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setContent(entry.prevContent);
+    toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
+  }, [savedPlanId, user, toast]);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
@@ -1054,6 +1090,19 @@ const TrainingPlanPage = () => {
           </h1>
           {content && !loading && (
             <div className="flex items-center gap-2 shrink-0">
+              {undoCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUndo}
+                  className="gap-2"
+                  title={`Undo last change (${undoCount} step${undoCount === 1 ? "" : "s"} available)`}
+                >
+                  <Undo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Undo</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{undoCount}</span>
+                </Button>
+              )}
               <Button
                 variant="default"
                 size="sm"
