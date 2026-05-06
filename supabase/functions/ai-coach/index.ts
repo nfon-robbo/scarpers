@@ -364,6 +364,12 @@ RECOMMENDATION ACTIONS:
 - Do NOT include any marker for general advice, education, or questions that don't change the plan.
 - Never wrap the marker in code fences. Always plain text on the last line.
 
+CONVERSATION CONTEXT (CRITICAL):
+- The earlier messages in this conversation are real prior turns. Use them.
+- If the user gives a follow-up like "add another rep", "remove a rep", "make it shorter", "swap it for an easy run", or any modification WITHOUT naming a date, it refers to the SAME workout that was last discussed in this conversation (the most recent [[ACTION:day:DD/MM/YYYY]] you produced, or the workout date the user explicitly named most recently).
+- In that case, reuse that exact same DD/MM/YYYY in your [[ACTION:day:...]] marker. Do NOT pick a different date and do NOT say "couldn't find a workout" — just apply the change to the remembered session.
+- Only switch to a different date if the user explicitly names a new date or session.
+
 ${athleteContext}
 
 ${dataContext}`;
