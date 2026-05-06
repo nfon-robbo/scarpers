@@ -7,7 +7,46 @@
  * workout placed on the date encoded in its start_time.
  */
 
+import JSZip from "jszip";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "./fit-parser";
+
+function stubActivity(fileName: string): ParsedActivity {
+  return {
+    activity_type: "workout",
+    start_time: null,
+    duration_seconds: null,
+    distance_meters: null,
+    avg_heart_rate: null,
+    max_heart_rate: null,
+    avg_speed: null,
+    max_speed: null,
+    avg_power: null,
+    max_power: null,
+    avg_cadence: null,
+    total_ascent: null,
+    total_descent: null,
+    calories: null,
+    avg_temperature: null,
+    training_effect: null,
+    training_load: null,
+    source_file: fileName,
+    gps_track: [],
+    raw_data: { stub: true },
+  };
+}
+
+async function listFitNamesInZip(file: File): Promise<string[]> {
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const names: string[] = [];
+    zip.forEach((path, entry) => {
+      if (!entry.dir && path.toLowerCase().endsWith(".fit")) names.push(path);
+    });
+    return names;
+  } catch {
+    return [];
+  }
+}
 
 interface FitPlanImportResult {
   markdown: string;
@@ -139,16 +178,29 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
     try {
       if (lower.endsWith(".zip")) {
         const r = await parseZipFile(file);
-        activities.push(...r.activities);
+        if (r.activities.length === 0) {
+          // ZIP of workout-definition FIT files (no sessions/records) — stub each
+          const zipNames = await listFitNamesInZip(file);
+          for (const name of zipNames) activities.push(stubActivity(name));
+        } else {
+          activities.push(...r.activities);
+        }
         errors.push(...r.errors);
       } else if (lower.endsWith(".fit")) {
         const buf = await file.arrayBuffer();
         const parsed = await parseFitBuffer(buf, file.name);
-        activities.push(...parsed);
+        if (parsed.length === 0) {
+          // Workout-definition FIT (no session/records) — keep it as a stub
+          activities.push(stubActivity(file.name));
+        } else {
+          activities.push(...parsed);
+        }
       } else {
         errors.push(`Skipped unsupported file: ${file.name}`);
       }
     } catch (e: any) {
+      // Even on parse error, keep the file as a stub so the user can place it
+      if (lower.endsWith(".fit")) activities.push(stubActivity(file.name));
       errors.push(e?.message || `Failed to parse ${file.name}`);
     }
   }
