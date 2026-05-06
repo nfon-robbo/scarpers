@@ -23,6 +23,7 @@ const AIChatbot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -138,7 +139,8 @@ const AIChatbot = () => {
           const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
 
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.`);
+          setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.\n\n[[UNDO]]`);
           toast({ title: "Workout updated", description: scope.dateUk });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
@@ -326,12 +328,17 @@ const AIChatbot = () => {
             const legacyMatch = msg.role === "assistant"
               ? /\[\[ACTION:recommendation\]\]/.test(msg.content)
               : false;
+            const hasUndo = msg.role === "assistant" && /\[\[UNDO\]\]/.test(msg.content);
             const hasAction = !!dayMatch || planMatch || legacyMatch;
-            const cleaned = hasAction
-              ? msg.content.replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "").trim()
+            const cleaned = (hasAction || hasUndo)
+              ? msg.content
+                  .replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "")
+                  .replace(/\[\[UNDO\]\]/g, "")
+                  .trim()
               : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const showActions = hasAction && isLastAssistant && !loading;
+            const showUndo = hasUndo && isLastAssistant && !loading && !!lastUndo;
             const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
               ? { kind: "day", dateUk: dayMatch[1] }
               : { kind: "plan" };
@@ -377,6 +384,36 @@ const AIChatbot = () => {
                           Keep as it is
                         </Button>
                       </div>
+                    </div>
+                  )}
+                  {showUndo && lastUndo && (
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={loading}
+                        onClick={async () => {
+                          setLoading(true);
+                          const { error } = await supabase
+                            .from("training_plans")
+                            .update({ content: lastUndo.prevContent })
+                            .eq("id", lastUndo.planId);
+                          setLoading(false);
+                          if (error) {
+                            toast({ title: "Undo failed", description: error.message, variant: "destructive" });
+                            return;
+                          }
+                          toast({ title: "Reverted", description: `Restored your ${lastUndo.dateUk} session.` });
+                          setMessages(prev => [...prev, {
+                            role: "assistant",
+                            content: `↩️ Reverted — your **${lastUndo.dateUk}** session is back to what it was. Reload the Training Plan page to see it.`,
+                          }]);
+                          setLastUndo(null);
+                        }}
+                      >
+                        ↩️ Undo last change
+                      </Button>
                     </div>
                   )}
                 </div>
