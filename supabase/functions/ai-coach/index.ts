@@ -622,9 +622,22 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         ? `The first workout MUST be on ${planStart} (${startDayName}).`
         : `IMPORTANT: The first workout MUST be on ${planStart} (${startDayName}) — even though ${startDayName} is NOT in the regular training days list. Treat the start date as a one-off extra session. From the day AFTER ${planStart} onwards, only schedule workouts on: ${daysStr}.`;
 
+      const raceDateUKFmt = race_date && race_date !== "ai-recommend"
+        ? (() => { const [ry, rm, rd] = (race_date as string).split("-"); return `${rd}/${rm}/${ry}`; })()
+        : null;
+      const raceDayName = race_date && race_date !== "ai-recommend"
+        ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
+        : null;
+
       const planLengthInstruction = isAIDecide
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed. ${firstWorkoutRule}`
-        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart}. ${firstWorkoutRule} After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery. Every single week from week 1 to week ${weeks} must be detailed.`;
+        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKFmt}).
+${firstWorkoutRule}
+After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery.
+Every single week from week 1 to week ${weeks} must be detailed.
+
+⚠️ CRITICAL — RACE DAY IS MANDATORY:
+The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}), regardless of whether ${raceDayName} is in the regular training days list. Label it "🏁 RACE DAY — ${raceLabel}" and include the race-day execution plan (warm-up, pacing strategy, fuelling, mile/km splits to hit ${goal_time || "goal time"}). Do NOT stop the plan before this date. The week containing the race must run from its Monday all the way through to ${race_date} inclusive.`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
@@ -894,7 +907,7 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
     const { callAI } = await import("../_shared/ai.ts");
     const response = await callAI({
       stream: true,
-      maxTokens: 16000,
+      maxTokens: type === "training-plan" || type === "plan-adjust" ? 32000 : 16000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
