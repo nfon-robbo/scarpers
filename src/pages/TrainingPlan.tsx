@@ -954,7 +954,44 @@ const TrainingPlanPage = () => {
     }
   };
 
-  const showConfig = !content && !loading;
+  const handleImportFit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length || !user) return;
+
+    const valid = files.filter(f => /\.(fit|zip)$/i.test(f.name));
+    if (valid.length === 0) {
+      toast({ title: "Invalid files", description: "Please select .fit files or a .zip archive.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const result = await importFitPlan(valid);
+      setRaceDistance(result.raceDistance);
+      setTrainingDays(result.trainingDays);
+      setStartDate(new Date(result.startDate));
+      setRaceDate(new Date(result.endDate));
+      setLetAIDecide(false);
+      setContent(result.markdown);
+      await savePlan(result.markdown);
+
+      toast({
+        title: `Imported ${result.workoutCount} workouts!`,
+        description: result.errors.length
+          ? `Some files couldn't be parsed (${result.errors.length}).`
+          : `Plan from ${result.startDate} to ${result.endDate}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Could not parse the FIT files.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   if (initialLoading) {
     return (
