@@ -656,8 +656,10 @@ Progressive structure across the 10 sessions (adapt run/walk durations and rep c
 For EACH of the 10 sessions:
 - Title MUST start with "Walk/Run Intervals:" e.g. "Walk/Run Intervals: 10 × 1min (Total: 30min)"
 - Markdown table with a warm-up walk row, the structured interval rep block row(s), and a cool-down walk row
+- The interval row's Duration column MUST use the format "N × Xmin run / Ymin walk" (ASCII "x" is also fine) so the watch can expand the reps. Example: "10 × 1min run / 1min walk"
 - Run intensity stays in Z1-Z2 (HR < ${Math.round(maxHr * 0.75)} bpm). NO Z3+ work in these 10 sessions
 - Walk recoveries in Z1
+- Target column MUST include BOTH the HR range AND an explicit pace range in min/km, based on the athlete's actual Z2 pace (${z2Pace}/km). Run pace target: roughly Z2 pace ± 30s (e.g. if Z2 is 7:00/km use "7:00-7:30/km"). Walk pace: 9:00-10:00/km. NEVER omit the pace — without it the watch defaults to a generic 6:27/km which is too fast for a beginner.
 - Music BPM target on every running segment (🎵 150 BPM walking, 🎵 155 BPM easy run)
 - Notes column must briefly reference WHY this fits THIS athlete (their injury, layoff length, or beginner status)
 - If athlete has an injury, add a short form/safety cue tied to that injury
