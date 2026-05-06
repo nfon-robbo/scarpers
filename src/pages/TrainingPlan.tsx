@@ -1073,6 +1073,10 @@ const TrainingPlanPage = () => {
                   <FileDown className="w-4 h-4 mr-2" />
                   Export calendar (.ics)
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportDocx}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export plan (Word .docx)
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
                   <RotateCcw className="w-4 h-4 mr-2" />
