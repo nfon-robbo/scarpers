@@ -1091,6 +1091,26 @@ const TrainingPlanPage = () => {
               {dayAdjusting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sun className="w-4 h-4 mr-2" />}
               {dayAdjusting ? "Assessing..." : "Assess Day Ahead"}
             </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="w-full sm:w-auto" variant="outline" disabled={syncing || reviewing || dayAdjusting || loading}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Regenerate Plan
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regenerate plan?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will archive your current plan and generate a new one using the same race distance, training days, start date and race date. Your latest fitness data will be used.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => generatePlan()}>Regenerate</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </div>
