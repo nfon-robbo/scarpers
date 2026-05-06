@@ -112,6 +112,24 @@ function activitiesToMarkdown(activities: ParsedActivity[]): string {
   return lines.join("\n");
 }
 
+// Try to pull a YYYY-MM-DD or DD-MM-YYYY date out of a filename
+function extractDateFromName(name: string): Date | null {
+  const base = name.replace(/^.*[\\/]/, "");
+  // ISO: 2026-04-21 or 20260421
+  let m = base.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (!isNaN(d.getTime())) return d;
+  }
+  // DD-MM-YYYY or DD_MM_YYYY
+  m = base.match(/(\d{1,2})[-_.](\d{1,2})[-_.](20\d{2})/);
+  if (m) {
+    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
 export async function importFitPlan(files: File[]): Promise<FitPlanImportResult> {
   const activities: ParsedActivity[] = [];
   const errors: string[] = [];
@@ -135,26 +153,56 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
     }
   }
 
-  // Keep only activities with a usable start_time, then sort chronologically
-  const dated = activities
-    .filter((a) => !!a.start_time)
-    .sort((a, b) => new Date(a.start_time!).getTime() - new Date(b.start_time!).getTime());
-
-  if (dated.length === 0) {
+  if (activities.length === 0) {
     throw new Error(
       errors.length
-        ? `No workouts with dates were found. ${errors[0]}`
-        : "No workouts with dates were found in the FIT files."
+        ? `No workouts could be parsed. ${errors[0]}`
+        : "No workouts were found in the selected files."
     );
   }
 
-  const markdown = activitiesToMarkdown(dated);
-  const startDate = toIso(new Date(dated[0].start_time!));
-  const endDate = toIso(new Date(dated[dated.length - 1].start_time!));
+  // Fill missing start_times from the source filename when possible
+  for (const a of activities) {
+    if (!a.start_time) {
+      const fromName = extractDateFromName(a.source_file || "");
+      if (fromName) {
+        // Use noon to avoid TZ edge cases
+        fromName.setHours(12, 0, 0, 0);
+        a.start_time = fromName.toISOString();
+      }
+    }
+  }
+
+  const dated = activities.filter((a) => !!a.start_time);
+  const undated = activities.filter((a) => !a.start_time);
+
+  // Place undated workouts on consecutive days starting the day after the latest
+  // dated workout (or today if none). Users can move them via the existing UI.
+  let cursor = new Date();
+  cursor.setHours(12, 0, 0, 0);
+  if (dated.length) {
+    const maxTs = Math.max(...dated.map((a) => new Date(a.start_time!).getTime()));
+    cursor = new Date(maxTs);
+    cursor.setDate(cursor.getDate() + 1);
+    cursor.setHours(12, 0, 0, 0);
+  }
+  for (const a of undated) {
+    a.start_time = cursor.toISOString();
+    cursor = new Date(cursor);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const all = [...dated, ...undated].sort(
+    (a, b) => new Date(a.start_time!).getTime() - new Date(b.start_time!).getTime()
+  );
+
+  const markdown = activitiesToMarkdown(all);
+  const startDate = toIso(new Date(all[0].start_time!));
+  const endDate = toIso(new Date(all[all.length - 1].start_time!));
 
   // Infer training days from weekday frequency
   const dayCounts: Record<string, number> = {};
-  for (const a of dated) {
+  for (const a of all) {
     const name = DAY_NAMES_SHORT[new Date(a.start_time!).getDay()];
     dayCounts[name] = (dayCounts[name] || 0) + 1;
   }
@@ -165,16 +213,22 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
     .sort((a, b) => DAY_NAMES_SHORT.indexOf(a) - DAY_NAMES_SHORT.indexOf(b));
 
   // Best-effort race distance guess from longest activity
-  const longest = [...dated].sort((a, b) => (b.distance_meters || 0) - (a.distance_meters || 0))[0];
+  const longest = [...all].sort((a, b) => (b.distance_meters || 0) - (a.distance_meters || 0))[0];
   const longestKm = (longest?.distance_meters || 0) / 1000;
   let raceDistance = "5k";
   if (longestKm >= 35) raceDistance = "marathon";
   else if (longestKm >= 18) raceDistance = "half-marathon";
   else if (longestKm >= 9) raceDistance = "10k";
 
+  if (undated.length) {
+    errors.unshift(
+      `${undated.length} workout(s) had no date — placed on consecutive days starting ${toIso(new Date(undated[0].start_time!))}. Tap a workout to reschedule.`
+    );
+  }
+
   return {
     markdown,
-    workoutCount: dated.length,
+    workoutCount: all.length,
     startDate,
     endDate,
     raceDistance,
