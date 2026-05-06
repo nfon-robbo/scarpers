@@ -218,9 +218,12 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       }
 
       if (reps > 1) {
+        // intervals.icu requires a blank line before and after every repeat block.
+        if (lines.length > 0 && lines[lines.length - 1] !== "") lines.push("");
         lines.push(`${reps}x`);
         lines.push(fmtStep(workStep));
         if (restDur > 0 && restStep) lines.push(fmtStep(restStep));
+        lines.push("");
         i = j;
       } else {
         lines.push(fmtStep(step));
