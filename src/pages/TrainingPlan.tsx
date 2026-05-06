@@ -994,22 +994,35 @@ const TrainingPlanPage = () => {
       const { generatePlanDocx, downloadBlob } = await import("@/lib/plan-docx");
       const blob = await generatePlanDocx(workouts, raceDistance);
       const result = await downloadBlob(blob, "training-plan.docx");
-      const openAction = (
-        <ToastAction altText="Open" onClick={() => window.open(result.url, "_blank", "noopener")}>
-          Open
+
+      const triggerSave = () => {
+        // Re-trigger a real file download so Android routes it to Downloads,
+        // where the OS will offer "Open with Word/Docs" from the notification.
+        const a = document.createElement("a");
+        a.href = result.url;
+        a.download = "training-plan.docx";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      const saveAction = (
+        <ToastAction altText="Save to device" onClick={triggerSave}>
+          Save to device
         </ToastAction>
       );
+
       if (result.status === "shared") {
         toast({
           title: "Plan shared",
           description: "Saved via your device's share sheet.",
-          action: openAction,
         });
       } else {
         toast({
-          title: "Word document downloaded!",
-          description: "Tap Open to view it now, or check your Downloads folder.",
-          action: openAction,
+          title: "Word document ready",
+          description: "Tap Save to download it to your device, then open from Downloads.",
+          action: saveAction,
         });
       }
     } catch (e: any) {
