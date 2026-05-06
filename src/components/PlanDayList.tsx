@@ -63,12 +63,30 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
 }
 
 function extractDuration(w: ParsedWorkout): string | null {
+  const txt = `${w.title} ${w.rawText}`;
+
+  // Race day: detail view shows ONLY the race effort (warm-up/cool-down stripped).
+  // Match it: extract just the race leg's time.
+  const isRaceDay = /race\s*day|🏁/i.test(txt);
+  if (isRaceDay) {
+    const raceSeg = (w.segments || []).find(
+      (s) => !/warm|cool|rest|recover|stride/i.test(s.segment || "")
+    );
+    const raceTxt = `${raceSeg?.duration || ""} ${raceSeg?.notes || ""} ${raceSeg?.segment || ""}`;
+    const colon = raceTxt.match(/(\d{1,3}):(\d{2})/);
+    if (colon) {
+      const mins = Math.round((parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10)) / 60);
+      return `~${mins}min`;
+    }
+    const minMatch = raceTxt.match(/(\d+(?:\.\d+)?)\s*min/i);
+    if (minMatch) return `~${Math.round(parseFloat(minMatch[1]))}min`;
+  }
+
   // If any segment is distance-based (km/mi/"5K") with no embedded time, the segment-sum
   // will undercount. Prefer the workout's stated total in that case.
   const hasDistanceSeg = (w.segments || []).some((s) =>
     /\d+(?:\.\d+)?\s*(km|mi|k)\b/i.test(s.duration || "") && !/\d{1,3}:\d{2}/.test(s.duration || "")
   );
-  const txt = `${w.title} ${w.rawText}`;
   const totalMatch =
     txt.match(/Total:\s*~?\s*(\d+)\s*min/i) ||
     txt.match(/~?\s*(\d+)\s*min\s*total/i);
