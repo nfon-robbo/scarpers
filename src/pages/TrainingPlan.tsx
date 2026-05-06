@@ -1478,6 +1478,8 @@ const TrainingPlanPage = () => {
               onMoveWorkout={moveWorkoutDate}
               onSyncWorkout={() => handleSyncToIntervals(true)}
               syncing={syncing}
+              goalTime={goalTime}
+              raceDistance={raceDistance}
             />
           </>
         )}
