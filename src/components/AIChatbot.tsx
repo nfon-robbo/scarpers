@@ -386,6 +386,65 @@ const AIChatbot = () => {
                       </div>
                     </div>
                   )}
+                  {showUndo && lastUndo && (
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={loading}
+                        onClick={async () => {
+                          setLoading(true);
+                          const { error } = await supabase
+                            .from("training_plans")
+                            .update({ content: lastUndo.prevContent })
+                            .eq("id", lastUndo.planId);
+                          setLoading(false);
+                          if (error) {
+                            toast({ title: "Undo failed", description: error.message, variant: "destructive" });
+                            return;
+                          }
+                          toast({ title: "Reverted", description: `Restored your ${lastUndo.dateUk} session.` });
+                          setMessages(prev => [...prev, {
+                            role: "assistant",
+                            content: `↩️ Reverted — your **${lastUndo.dateUk}** session is back to what it was. Reload the Training Plan page to see it.`,
+                          }]);
+                          setLastUndo(null);
+                        }}
+                      >
+                        ↩️ Undo last change
+                      </Button>
+                    </div>
+                  )}
+                    <div className="mt-3 space-y-2">
+                      {scope.kind === "day" && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Affects only your <strong>{scope.dateUk}</strong> session.
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => applyChange(cleaned, scope)}
+                        >
+                          Make the change
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => {
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                          }}
+                        >
+                          Keep as it is
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
