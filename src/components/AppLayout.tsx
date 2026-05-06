@@ -22,10 +22,10 @@ import { useState } from "react";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/training-plan", icon: Calendar, label: "Plan" },
   { to: "/upload", icon: Upload, label: "Import" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/insights", icon: Brain, label: "Insights" },
-  { to: "/training-plan", icon: Calendar, label: "Plan" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
