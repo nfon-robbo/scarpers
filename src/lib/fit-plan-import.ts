@@ -7,7 +7,46 @@
  * workout placed on the date encoded in its start_time.
  */
 
+import JSZip from "jszip";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "./fit-parser";
+
+function stubActivity(fileName: string): ParsedActivity {
+  return {
+    activity_type: "workout",
+    start_time: null,
+    duration_seconds: null,
+    distance_meters: null,
+    avg_heart_rate: null,
+    max_heart_rate: null,
+    avg_speed: null,
+    max_speed: null,
+    avg_power: null,
+    max_power: null,
+    avg_cadence: null,
+    total_ascent: null,
+    total_descent: null,
+    calories: null,
+    avg_temperature: null,
+    training_effect: null,
+    training_load: null,
+    source_file: fileName,
+    gps_track: [],
+    raw_data: { stub: true },
+  };
+}
+
+async function listFitNamesInZip(file: File): Promise<string[]> {
+  try {
+    const zip = await JSZip.loadAsync(file);
+    const names: string[] = [];
+    zip.forEach((path, entry) => {
+      if (!entry.dir && path.toLowerCase().endsWith(".fit")) names.push(path);
+    });
+    return names;
+  } catch {
+    return [];
+  }
+}
 
 interface FitPlanImportResult {
   markdown: string;
