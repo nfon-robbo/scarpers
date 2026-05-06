@@ -202,7 +202,11 @@ const AIChatbot = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ type: "chat", messages: text }),
+        body: JSON.stringify({
+          type: "chat",
+          messages: text,
+          history: [...messages, userMsg].slice(-20).map(m => ({ role: m.role, content: m.content })),
+        }),
       });
 
       if (!resp.ok) {
