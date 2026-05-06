@@ -884,6 +884,7 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
     const { callAI } = await import("../_shared/ai.ts");
     const response = await callAI({
       stream: true,
+      maxTokens: 16000,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
