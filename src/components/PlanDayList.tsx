@@ -107,7 +107,9 @@ function extractDuration(w: ParsedWorkout, customExtraSecs = 0): string | null {
       if (m) mins = parseInt(m[1], 10);
     }
   }
+  if (mins == null && customExtraSecs > 0) mins = 0;
   if (mins == null) return null;
+  mins += Math.round(customExtraSecs / 60);
   if (mins >= 60) {
     const h = Math.floor(mins / 60);
     const r = mins % 60;
