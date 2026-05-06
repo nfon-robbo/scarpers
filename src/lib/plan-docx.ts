@@ -117,7 +117,7 @@ export async function generatePlanDocx(workouts: ParsedWorkout[], raceDistance?:
   return await Packer.toBlob(doc);
 }
 
-export async function downloadBlob(blob: Blob, filename: string) {
+export async function downloadBlob(blob: Blob, filename: string): Promise<"shared" | "downloaded"> {
   // Ensure correct MIME type so Android (Samsung Internet/Chrome) recognizes it as a downloadable file
   const docxBlob = blob.type
     ? blob
@@ -132,7 +132,7 @@ export async function downloadBlob(blob: Blob, filename: string) {
   if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename });
-      return;
+      return "shared";
     } catch (err) {
       // User cancelled or share failed — fall back to download link
     }
@@ -149,4 +149,5 @@ export async function downloadBlob(blob: Blob, filename: string) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return "downloaded";
 }
