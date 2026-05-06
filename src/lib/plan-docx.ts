@@ -149,4 +149,5 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<"share
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return "downloaded";
 }
