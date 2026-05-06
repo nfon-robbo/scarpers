@@ -35,6 +35,83 @@ const AIChatbot = () => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
+  const applyChange = useCallback(async (recommendationText: string) => {
+    if (loading) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      toast({ title: "Please sign in", variant: "destructive" });
+      return;
+    }
+    // Load the active plan for this user.
+    const { data: plan } = await supabase
+      .from("training_plans")
+      .select("id, content, race_distance, goal_time, training_days, start_date")
+      .eq("user_id", session.user.id)
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!plan?.content) {
+      toast({ title: "No active plan", description: "Generate a training plan first.", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    setMessages(prev => [...prev, { role: "assistant", content: "✏️ Applying the change to your plan…" }]);
+
+    let revised = "";
+    streamAICoach({
+      type: "plan-adjust",
+      token: session.access_token,
+      raceDistance: plan.race_distance || undefined,
+      goalTime: plan.goal_time || undefined,
+      trainingDays: (plan.training_days as string[] | null) || undefined,
+      startDate: plan.start_date || undefined,
+      currentPlan: plan.content,
+      adjustment: "apply",
+      reviewText: recommendationText,
+      onDelta: (t) => { revised += t; },
+      onDone: async () => {
+        if (revised.trim()) {
+          // Archive old plan, save new one with same metadata.
+          await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
+          await supabase.from("training_plans").insert({
+            user_id: session.user.id,
+            race_distance: plan.race_distance,
+            goal_time: plan.goal_time,
+            training_days: plan.training_days,
+            start_date: plan.start_date,
+            content: revised,
+          } as any);
+          setMessages(prev => {
+            const copy = [...prev];
+            copy[copy.length - 1] = {
+              role: "assistant",
+              content: "✅ Done — your plan has been updated. Reload the Training Plan page to see the new sessions.",
+            };
+            return copy;
+          });
+          toast({ title: "Plan updated", description: "AI coach applied the change." });
+        } else {
+          setMessages(prev => {
+            const copy = [...prev];
+            copy[copy.length - 1] = { role: "assistant", content: "⚠️ Couldn't apply the change — please try again." };
+            return copy;
+          });
+        }
+        setLoading(false);
+      },
+      onError: (err) => {
+        setMessages(prev => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: "assistant", content: `⚠️ Couldn't apply the change: ${err}` };
+          return copy;
+        });
+        setLoading(false);
+      },
+    });
+  }, [loading, toast]);
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
