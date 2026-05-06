@@ -629,15 +629,45 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
         : null;
 
+      // Build the EXACT list of required workout dates so the model cannot stop early
+      // or round to a week boundary. Includes every training-day-of-week between
+      // start and race, the start date itself, and the race date itself.
+      const dayShortToFull: Record<string, string> = {
+        mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday",
+        fri: "Friday", sat: "Saturday", sun: "Sunday",
+      };
+      const trainingDayNames = (training_days as string[] | undefined || []).map((d) => {
+        const k = d.slice(0, 3).toLowerCase();
+        return dayShortToFull[k] || d;
+      });
+      const requiredDates: string[] = [];
+      if (race_date && race_date !== "ai-recommend") {
+        const start = new Date(planStart + "T00:00:00");
+        const end = new Date(race_date + "T00:00:00");
+        for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
+          const iso = d.toISOString().slice(0, 10);
+          const dayName = d.toLocaleDateString("en-GB", { weekday: "long" });
+          const isStart = iso === planStart;
+          const isRace = iso === race_date;
+          const isTrainingDay = trainingDayNames.includes(dayName);
+          if (isStart || isRace || isTrainingDay) {
+            const tag = isRace ? " ← 🏁 RACE DAY" : isStart ? " ← FIRST WORKOUT" : "";
+            requiredDates.push(`- ${iso} (${dayName})${tag}`);
+          }
+        }
+      }
+      const requiredDatesBlock = requiredDates.length
+        ? `\n\n══ MANDATORY WORKOUT DATES — EVERY ONE OF THESE MUST APPEAR IN THE PLAN ══\n${requiredDates.join("\n")}\n\nThe plan is INCOMPLETE and INVALID if any of the dates above is missing. Do not stop until you have written a workout entry for every single date in this list. The very last entry in the plan MUST be ${race_date} (race day).`
+        : "";
+
       const planLengthInstruction = isAIDecide
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed. ${firstWorkoutRule}`
-        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKFmt}).
+        : `Generate the COMPLETE plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKFmt}).
 ${firstWorkoutRule}
 After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery.
-Every single week from week 1 to week ${weeks} must be detailed.
 
 ⚠️ CRITICAL — RACE DAY IS MANDATORY:
-The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}), regardless of whether ${raceDayName} is in the regular training days list. Label it "🏁 RACE DAY — ${raceLabel}" and include the race-day execution plan (warm-up, pacing strategy, fuelling, mile/km splits to hit ${goal_time || "goal time"}). Do NOT stop the plan before this date. The week containing the race must run from its Monday all the way through to ${race_date} inclusive.`;
+The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}), regardless of whether ${raceDayName} is in the regular training days list. Label it "🏁 RACE DAY — ${raceLabel}" and include the race-day execution plan (warm-up, pacing strategy, fuelling, mile/km splits to hit ${goal_time || "goal time"}). Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary.${requiredDatesBlock}`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
