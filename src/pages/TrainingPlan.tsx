@@ -918,6 +918,21 @@ const TrainingPlanPage = () => {
     toast({ title: "Calendar downloaded!" });
   };
 
+  const handleExportDocx = async () => {
+    const workouts = parseWorkoutsFromPlan(content);
+    if (workouts.length === 0) {
+      toast({ title: "No workouts found", variant: "destructive" });
+      return;
+    }
+    try {
+      const { generatePlanDocx, downloadBlob } = await import("@/lib/plan-docx");
+      const blob = await generatePlanDocx(workouts, raceDistance);
+      downloadBlob(blob, "training-plan.docx");
+      toast({ title: "Word document downloaded!" });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e?.message || String(e), variant: "destructive" });
+    }
+  };
   const handleImportDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -1057,6 +1072,10 @@ const TrainingPlanPage = () => {
                 <DropdownMenuItem onClick={handleExportIcs}>
                   <FileDown className="w-4 h-4 mr-2" />
                   Export calendar (.ics)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportDocx}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Export plan (Word .docx)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
