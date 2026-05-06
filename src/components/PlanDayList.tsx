@@ -628,11 +628,25 @@ export default function PlanDayList({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{shortLabel(workout.title)}</p>
-                          {(extractDuration(workout) || extractDistance(workout)) && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {[extractDuration(workout), extractDistance(workout)].filter(Boolean).join(" • ")}
-                            </p>
-                          )}
+                          {(() => {
+                            const customs = customSteps[workoutKey(workout)] || [];
+                            const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
+                            const extraSecs = isRace ? 0 : customs.reduce((acc, s) => {
+                              const m = s.duration.match(/^(\d{1,3}):(\d{2})$/);
+                              if (m) return acc + parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                              const min = s.duration.match(/(\d+(?:\.\d+)?)\s*min/i);
+                              if (min) return acc + Math.round(parseFloat(min[1]) * 60);
+                              return acc;
+                            }, 0);
+                            const dur = extractDuration(workout, extraSecs);
+                            const dist = extractDistance(workout);
+                            if (!dur && !dist) return null;
+                            return (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {[dur, dist].filter(Boolean).join(" • ")}
+                              </p>
+                            );
+                          })()}
                         </div>
                         {isCompleted && (
                           <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
