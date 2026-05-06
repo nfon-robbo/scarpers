@@ -717,7 +717,8 @@ ${firstWorkoutRule}
 After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery.
 
 ⚠️ CRITICAL — RACE DAY IS MANDATORY:
-The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}), regardless of whether ${raceDayName} is in the regular training days list. Label it "🏁 RACE DAY — ${raceLabel}" and include the race-day execution plan (warm-up, pacing strategy, fuelling, mile/km splits to hit ${goal_time || "goal time"}). Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary.${requiredDatesBlock}`;
+The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}). Label it "🏁 RACE DAY — ${raceLabel}".
+RACE DAY IS THE RACE ONLY — it is a single continuous effort over the full race distance (${raceLabel}) at goal pace${goal_time ? ` to hit ${goal_time}` : ""}. Do NOT prescribe walk/run intervals, do NOT split it into sets, do NOT add training intervals on race day. A short pre-race routine (light jog warm-up + strides + fuelling/pacing notes) may be described in the notes column, but the workout itself must be ONE entry: the race. Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary.${requiredDatesBlock}`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
