@@ -254,6 +254,50 @@ const Settings = () => {
 
   useEffect(() => { loadArchivedPlans(); }, [user]);
 
+  // Admin: AI provider settings
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
+  const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
+  const [savingAi, setSavingAi] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!user) return;
+      const { data: roleRow } = await supabase
+        .from("user_roles" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!roleRow);
+      const { data: settings } = await supabase
+        .from("app_settings" as any)
+        .select("ai_provider, claude_model")
+        .eq("id", 1)
+        .maybeSingle();
+      if (settings) {
+        setAiProvider(((settings as any).ai_provider as "lovable" | "claude") ?? "lovable");
+        setClaudeModel((settings as any).claude_model ?? "claude-haiku-4-5");
+      }
+    })();
+  }, [user]);
+
+  const saveAiSettings = async () => {
+    setSavingAi(true);
+    try {
+      const { error } = await supabase
+        .from("app_settings" as any)
+        .update({ ai_provider: aiProvider, claude_model: claudeModel, updated_at: new Date().toISOString() })
+        .eq("id", 1);
+      if (error) throw error;
+      toast({ title: "AI provider updated", description: `Now using ${aiProvider === "claude" ? `Claude (${claudeModel})` : "Lovable AI"} site-wide` });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingAi(false);
+    }
+  };
+
   const resumePlan = async (plan: ArchivedPlan) => {
     if (!user) return;
     setPlanActionId(plan.id);
