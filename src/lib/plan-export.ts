@@ -147,6 +147,14 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
         intervalsText = intervalsMatch[1].trim();
       }
 
+      // If we found a ~~~intervals block but no table segments, parse the
+      // block into structured segments so the UI step list and the sync
+      // payload reflect the actual prescribed durations & paces.
+      if (intervalsText && segments.length === 0) {
+        const parsed = parseIntervalsBlock(intervalsText);
+        if (parsed.length) segments.push(...parsed);
+      }
+
       workouts.push({
         date: dateStr,
         dateObj,
@@ -161,6 +169,65 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
   }
 
   return workouts;
+}
+
+/**
+ * Parse an intervals.icu native workout block into ParsedSegments.
+ * Handles section headers (Warmup / Cooldown / Nx repeat blocks) and
+ * step lines like "- 5m 9:00/km-9:30/km Pace" or "- 1m 7:00-7:30/km".
+ */
+function parseIntervalsBlock(text: string): ParsedSegment[] {
+  const out: ParsedSegment[] = [];
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  let section: "warmup" | "cooldown" | "main" = "main";
+  let pendingReps = 1;
+  let repeatBuffer: ParsedSegment[] | null = null;
+
+  const flushRepeat = () => {
+    if (repeatBuffer && pendingReps > 1) {
+      for (let r = 0; r < pendingReps; r++) out.push(...repeatBuffer.map((s) => ({ ...s })));
+    } else if (repeatBuffer) {
+      out.push(...repeatBuffer);
+    }
+    repeatBuffer = null;
+    pendingReps = 1;
+  };
+
+  for (const line of lines) {
+    if (/^warm\s*up/i.test(line)) { flushRepeat(); section = "warmup"; continue; }
+    if (/^cool\s*down/i.test(line)) { flushRepeat(); section = "cooldown"; continue; }
+    const repMatch = line.match(/^(\d+)\s*x\s*$/i);
+    if (repMatch) {
+      flushRepeat();
+      pendingReps = parseInt(repMatch[1], 10);
+      section = "main";
+      repeatBuffer = [];
+      continue;
+    }
+    const stepMatch = line.match(/^-\s*(\d+(?:\.\d+)?)\s*(m|min|s|sec|h|hr)\b\s*(.*)$/i);
+    if (!stepMatch) continue;
+    const num = parseFloat(stepMatch[1]);
+    const unit = stepMatch[2].toLowerCase();
+    let durationStr: string;
+    if (unit.startsWith("h")) durationStr = `${num} h`;
+    else if (unit.startsWith("s")) durationStr = `${num} sec`;
+    else durationStr = `${num} min`;
+    const target = stepMatch[3].trim();
+
+    let segName: string;
+    if (repeatBuffer) {
+      // Inside an Nx block: alternate run / recovery
+      segName = repeatBuffer.length % 2 === 0 ? "Main" : "Recovery";
+    } else if (section === "warmup") segName = "Warm-up";
+    else if (section === "cooldown") segName = "Cool-down";
+    else segName = "Main";
+
+    const seg: ParsedSegment = { segment: segName, duration: durationStr, target, hrZone: "", notes: "" };
+    if (repeatBuffer) repeatBuffer.push(seg);
+    else out.push(seg);
+  }
+  flushRepeat();
+  return out;
 }
 
 
