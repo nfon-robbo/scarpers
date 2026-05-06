@@ -201,34 +201,44 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     const step = workout.steps[i];
 
     if (step.intensity === "Interval") {
-      let reps = 0;
-      let j = i;
-      const workDur = step.duration;
+      // Only collapse into "Nx" when consecutive work+rest pairs are IDENTICAL
+      // (same work duration, work pace, rest duration, rest pace). If any rep
+      // diverges (e.g. user overrode Run 2's pace) emit steps individually so
+      // the per-rep edits actually reach Garmin.
       const workStep = step;
-      let restDur = 0;
-      let restStep: WorkoutStep | undefined;
+      const restStep = workout.steps[i + 1];
+      const hasRest = restStep && (restStep.intensity === "Recovery" || restStep.intensity === "Rest");
+      const workPace = paceTarget(workStep);
+      const restPace = hasRest ? paceTarget(restStep) : "";
 
-      while (j < workout.steps.length && workout.steps[j].intensity === "Interval" && workout.steps[j].duration === workDur) {
-        reps += 1;
-        if (j + 1 < workout.steps.length && (workout.steps[j + 1].intensity === "Recovery" || workout.steps[j + 1].intensity === "Rest")) {
-          restDur = workout.steps[j + 1].duration;
-          restStep = workout.steps[j + 1];
+      let reps = 1;
+      let j = i + (hasRest ? 2 : 1);
+      while (j < workout.steps.length) {
+        const nextWork = workout.steps[j];
+        const nextRest = workout.steps[j + 1];
+        if (nextWork?.intensity !== "Interval") break;
+        if (nextWork.duration !== workStep.duration) break;
+        if (paceTarget(nextWork) !== workPace) break;
+        if (hasRest) {
+          if (!nextRest || (nextRest.intensity !== "Recovery" && nextRest.intensity !== "Rest")) break;
+          if (nextRest.duration !== restStep!.duration) break;
+          if (paceTarget(nextRest) !== restPace) break;
           j += 2;
         } else {
           j += 1;
-          break;
         }
+        reps += 1;
       }
 
       if (reps > 1) {
-        // intervals.icu requires a blank line before and after every repeat block.
         if (lines.length > 0 && lines[lines.length - 1] !== "") lines.push("");
         lines.push(`${reps}x`);
         lines.push(fmtStep(workStep));
-        if (restDur > 0 && restStep) lines.push(fmtStep(restStep));
+        if (hasRest && restStep) lines.push(fmtStep(restStep));
         lines.push("");
         i = j;
       } else {
+        // Singleton (or first of a heterogeneous run) — emit just this work step.
         lines.push(fmtStep(step));
         i += 1;
       }
