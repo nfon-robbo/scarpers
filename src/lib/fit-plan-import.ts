@@ -109,6 +109,8 @@ function formatPace(speedKmh: number | null): string {
 }
 
 function workoutTitle(a: ParsedActivity): string {
+  const raw = (a.raw_data as any) || {};
+  if (raw.workout_name) return String(raw.workout_name);
   const sport = a.activity_type ? a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1) : "Workout";
   const parts: string[] = [];
   const dist = formatDistance(a.distance_meters);
