@@ -992,8 +992,12 @@ const TrainingPlanPage = () => {
     try {
       const { generatePlanDocx, downloadBlob } = await import("@/lib/plan-docx");
       const blob = await generatePlanDocx(workouts, raceDistance);
-      downloadBlob(blob, "training-plan.docx");
-      toast({ title: "Word document downloaded!" });
+      const result = await downloadBlob(blob, "training-plan.docx");
+      if (result === "shared") {
+        toast({ title: "Plan shared", description: "Saved via your device's share sheet." });
+      } else {
+        toast({ title: "Word document downloaded!", description: "Check your Downloads folder or notification shade." });
+      }
     } catch (e: any) {
       toast({ title: "Export failed", description: e?.message || String(e), variant: "destructive" });
     }
