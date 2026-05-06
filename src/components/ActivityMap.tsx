@@ -14,16 +14,19 @@ interface GpsPoint {
 interface Props {
   track: GpsPoint[];
   className?: string;
+  /** Enable scroll-wheel zoom and full pan/zoom UX (use inside a dialog/detail view). */
+  interactive?: boolean;
+  /** Map height in px. Defaults to 300, or 420 when interactive. */
+  height?: number;
 }
 
-const ActivityMap = ({ track, className = "" }: Props) => {
+const ActivityMap = ({ track, className = "", interactive = false, height }: Props) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || track.length < 1) return;
 
-    // Clean up previous instance
     if (mapInstance.current) {
       mapInstance.current.remove();
       mapInstance.current = null;
@@ -32,7 +35,12 @@ const ActivityMap = ({ track, className = "" }: Props) => {
     const map = L.map(mapRef.current, {
       zoomControl: true,
       attributionControl: true,
-      scrollWheelZoom: false,
+      scrollWheelZoom: interactive,
+      doubleClickZoom: true,
+      dragging: true,
+      touchZoom: true,
+      boxZoom: interactive,
+      keyboard: interactive,
     });
 
     mapInstance.current = map;
@@ -52,37 +60,44 @@ const ActivityMap = ({ track, className = "" }: Props) => {
       return;
     }
 
-    const markerIcon = L.divIcon({
-      html: '<div style="width:12px;height:12px;background:hsl(152,60%,36%);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-      className: "",
-    });
+    const makePin = (color: string, letter?: string) =>
+      L.divIcon({
+        html: `<div style="
+          position:relative;width:22px;height:22px;
+          background:${color};border:2px solid white;border-radius:50%;
+          box-shadow:0 2px 6px rgba(0,0,0,0.4);
+          display:flex;align-items:center;justify-content:center;
+          font:700 11px/1 system-ui,sans-serif;color:white;">${letter ?? ""}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+        className: "",
+      });
 
     if (latlngs.length === 1) {
-      // Single point — show marker at zoom 15
-      L.marker(latlngs[0], { icon: markerIcon }).addTo(map);
+      L.marker(latlngs[0], { icon: makePin("hsl(152,60%,36%)") })
+        .addTo(map)
+        .bindTooltip("Location", { direction: "top", offset: [0, -10] });
       map.setView(latlngs[0] as L.LatLngExpression, 15);
     } else {
-      // Draw route polyline
       const polyline = L.polyline(latlngs, {
         color: "hsl(152, 60%, 36%)",
-        weight: 3,
+        weight: 4,
         opacity: 0.9,
       }).addTo(map);
 
-      L.marker(latlngs[0], { icon: markerIcon }).addTo(map);
+      L.marker(latlngs[0], { icon: makePin("hsl(152,60%,36%)", "S") })
+        .addTo(map)
+        .bindTooltip("Start", { direction: "top", offset: [0, -12] });
 
-      const endIcon = L.divIcon({
-        html: '<div style="width:12px;height:12px;background:hsl(0,72%,51%);border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>',
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
-        className: "",
-      });
-      L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map);
+      L.marker(latlngs[latlngs.length - 1], { icon: makePin("hsl(0,72%,51%)", "F") })
+        .addTo(map)
+        .bindTooltip("Finish", { direction: "top", offset: [0, -12] });
 
-      map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+      map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
     }
+
+    // Ensure map computes correct size after mount (important inside dialogs)
+    setTimeout(() => map.invalidateSize(), 0);
 
     return () => {
       if (mapInstance.current) {
@@ -90,7 +105,7 @@ const ActivityMap = ({ track, className = "" }: Props) => {
         mapInstance.current = null;
       }
     };
-  }, [track]);
+  }, [track, interactive]);
 
   if (track.length < 1) return null;
 
@@ -98,7 +113,7 @@ const ActivityMap = ({ track, className = "" }: Props) => {
     <div
       ref={mapRef}
       className={`rounded-lg overflow-hidden border border-border ${className}`}
-      style={{ height: 300 }}
+      style={{ height: height ?? (interactive ? 420 : 300) }}
     />
   );
 };
