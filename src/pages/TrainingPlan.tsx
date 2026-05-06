@@ -20,6 +20,7 @@ import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { importDocxPlan } from "@/lib/docx-plan-import";
+import { importFitPlan } from "@/lib/fit-plan-import";
 
 interface ApiStep {
   duration: number;
