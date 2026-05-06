@@ -326,31 +326,48 @@ const Dashboard = () => {
     };
   }, [activities]);
 
-  // Weekly progress
+  // Weekly progress (Mon–Sun, based on the actual training plan)
   const weeklyProgress = useMemo(() => {
     const now = new Date();
+    // Start of week = Monday 00:00
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
+    const dow = now.getDay(); // 0=Sun..6=Sat
+    const diffToMon = dow === 0 ? -6 : 1 - dow;
+    startOfWeek.setDate(now.getDate() + diffToMon);
     startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-    const thisWeekActivities = activities.filter(
-      (a) => a.start_time && new Date(a.start_time) >= startOfWeek
-    );
     const lastWeekStart = new Date(startOfWeek);
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    const inRange = (d: Date, s: Date, e: Date) => d >= s && d < e;
+
+    const thisWeekActivities = activities.filter(
+      (a) => a.start_time && inRange(new Date(a.start_time), startOfWeek, endOfWeek)
+    );
     const lastWeekActivities = activities.filter(
-      (a) => a.start_time && new Date(a.start_time) >= lastWeekStart && new Date(a.start_time) < startOfWeek
+      (a) => a.start_time && inRange(new Date(a.start_time), lastWeekStart, startOfWeek)
     );
 
-    // Try to get planned workouts from training plan
-    let plannedThisWeek = 3; // default
-    if (plan?.training_days) {
+    // Count planned (non-rest) workouts this week from the parsed plan
+    let plannedThisWeek = 0;
+    if (plan?.content) {
+      const workouts = parseWorkoutsFromPlan(plan.content);
+      plannedThisWeek = workouts.filter(
+        (w) => w.dateObj && inRange(w.dateObj, startOfWeek, endOfWeek) && !/rest/i.test(w.title)
+      ).length;
+    }
+    if (plannedThisWeek === 0 && plan?.training_days) {
       plannedThisWeek = plan.training_days.length;
     }
+    if (plannedThisWeek === 0) plannedThisWeek = 3;
+
+    const completed = Math.min(thisWeekActivities.length, plannedThisWeek);
 
     return {
-      completed: thisWeekActivities.length,
-      planned: Math.max(plannedThisWeek, thisWeekActivities.length),
+      completed,
+      planned: plannedThisWeek,
       delta: thisWeekActivities.length - lastWeekActivities.length,
     };
   }, [activities, plan]);
