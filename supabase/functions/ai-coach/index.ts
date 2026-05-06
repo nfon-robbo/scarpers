@@ -577,15 +577,51 @@ Generate the complete revised ${raceLabel} training plan based on the review and
       // Recent run stats
       const runs = (activities || []).filter((a: any) => /run/i.test(a.activity_type || ""));
       const longestRun = runs.length ? Math.max(...runs.map((a: any) => (a.distance_meters || 0) / 1000)).toFixed(1) : "N/A";
-      // Z2 pace estimate: avg pace of runs with avg_hr in Z2 range
-      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
-      const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
-      const z2Pace = z2PaceMps ? (() => {
-        const secPerKm = 1000 / z2PaceMps;
+      // ===== Pace anchors derived from THIS user's actual runs =====
+      const fmtPace = (secPerKm: number): string => {
         const m = Math.floor(secPerKm / 60);
         const s = Math.round(secPerKm % 60).toString().padStart(2, "0");
         return `${m}:${s}`;
-      })() : "N/A";
+      };
+      // NOTE: activities.avg_speed is stored in km/h (not m/s). 60 / kmh = min/km.
+      const paceFromMps = (kmh: number) => (60 / kmh) * 60; // returns seconds per km
+      // Z2 (HR-filtered) pace if we have it
+      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
+      const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
+      // Average pace across ALL runs with speed (fallback when HR data is sparse)
+      const allPacedRuns = runs.filter((a: any) => a.avg_speed && Number(a.avg_speed) > 0);
+      const avgRunMps = allPacedRuns.length ? avg(allPacedRuns.map((a: any) => Number(a.avg_speed))) : null;
+      // Slowest 25% (a proxy for true easy pace) across all runs
+      const sortedSlow = [...allPacedRuns].sort((a: any, b: any) => Number(a.avg_speed) - Number(b.avg_speed));
+      const slowSlice = sortedSlow.slice(0, Math.max(1, Math.floor(sortedSlow.length / 4)));
+      const easyMps = slowSlice.length ? avg(slowSlice.map((a: any) => Number(a.avg_speed))) : null;
+
+      // Map experience level to a safe default easy pace when we have ZERO run data.
+      const expLevelLower = (profile?.experience_level || "intermediate").toLowerCase();
+      const fallbackByLevel = (lvl: string): { easy: string; label: string } => {
+        if (/begin|novice|new/.test(lvl)) return { easy: "7:30", label: "Beginner default (no run history)" };
+        if (/elite|advanced|expert/.test(lvl)) return { easy: "5:00", label: "Elite default (no run history)" };
+        return { easy: "6:30", label: "Intermediate default (no run history)" };
+      };
+
+      // Choose the authoritative easy/Z2 pace: prefer HR-filtered Z2, then slowest-25%, then overall avg, then experience fallback.
+      let z2Pace: string;
+      let z2PaceSource: string;
+      if (z2PaceMps) {
+        z2Pace = fmtPace(paceFromMps(z2PaceMps));
+        z2PaceSource = `derived from ${z2Runs.length} HR-Z2 runs`;
+      } else if (easyMps) {
+        z2Pace = fmtPace(paceFromMps(easyMps));
+        z2PaceSource = `slowest-25% of ${allPacedRuns.length} recent runs (HR data sparse, used as easy-pace proxy)`;
+      } else if (avgRunMps) {
+        z2Pace = fmtPace(paceFromMps(avgRunMps) + 30); // add 30s/km cushion to avg → easy
+        z2PaceSource = `avg of ${allPacedRuns.length} runs + 30s/km cushion`;
+      } else {
+        const fb = fallbackByLevel(expLevelLower);
+        z2Pace = fb.easy;
+        z2PaceSource = fb.label;
+      }
+      const avgRunPace = avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A";
 
       // ACWR (acute:chronic workload ratio) from training load
       const today = new Date();
@@ -767,9 +803,21 @@ Injury History: ${profile?.athlete_context || "none reported"}
 Current Niggles: ${profile?.athlete_context || "none reported"}
 
 ══ RECENT PERFORMANCE ══
-Easy Run Pace (Z2): ${z2Pace}/km
+Avg pace across recent runs: ${avgRunPace}/km
+🔒 ANCHOR EASY PACE (Z2): ${z2Pace}/km — source: ${z2PaceSource}
 Long Run: ${longestRun} km
 (Recent 5K time and tempo pace: derive from activity history above)
+
+══ MANDATORY PACE RULES ══
+EVERY pace you prescribe MUST be derived from the ANCHOR EASY PACE above (${z2Pace}/km), NOT from generic textbook values, and NOT from a fixed 6:00/km default.
+Use these offsets relative to the anchor:
+- Easy / Recovery / Z2 continuous: ${z2Pace}/km (± 15s)
+- Long run: ${z2Pace}/km to ${z2Pace}/km + 30s
+- Steady / Z3 tempo: anchor − 30 to 45s/km
+- Threshold / Z4: anchor − 60 to 75s/km
+- VO2max / Z5 reps: anchor − 90 to 110s/km
+- Walk recovery: 9:00-10:00/km
+Across the plan the easy-pace anchor should gradually improve toward the goal race pace as fitness builds, but NEVER prescribe an easy run faster than the current anchor in week 1. Forbidden: prescribing a 6:00/km easy run when the anchor is 7:30/km. Forbidden: ignoring the anchor and using race-pace-derived numbers for easy runs.
 
 ══ COACHING TASK ══
 You are an elite running coach with 35 years of experience, training beginners to olympic gold medalists to be the best runner they can be. Generate a ${weeks}-week periodized training plan. Be concise, specific, coach-like.${walkRunBlock}
