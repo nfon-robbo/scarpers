@@ -1356,7 +1356,7 @@ const TrainingPlanPage = () => {
                       {format(new Date(), "dd MMM yyyy")}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" side="bottom" className="w-auto p-4 space-y-4 z-50">
+                  <PopoverContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="w-[min(92vw,360px)] max-h-[80vh] overflow-y-auto p-4 space-y-4 z-50">
                     <div className="space-y-2">
                       <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
                       <CalendarComponent
