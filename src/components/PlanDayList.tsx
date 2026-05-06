@@ -119,8 +119,13 @@ function expandSegments(
   let walkIdx = 0;
   let mainEmitted = false;
 
-  // Pre-compute fallback interval spec from the workout title or full raw text
-  const fallbackSpec = detectIntervalSpec(workoutTitle) || detectIntervalSpec(rawText);
+  // Pre-compute fallback interval spec from the workout title or full raw text.
+  // Only use fallback if NO segment row contains its own interval spec — otherwise
+  // we'd emit the reps twice (once after warm-up, once from the main row).
+  const segHasOwnSpec = segments.some(
+    (s) => detectIntervalSpec(s.duration) || (/main|interval|rep|work/i.test(s.segment) && detectIntervalSpec(s.segment + " " + (s.notes || ""))),
+  );
+  const fallbackSpec = segHasOwnSpec ? null : (detectIntervalSpec(workoutTitle) || detectIntervalSpec(rawText));
 
   const emitIntervalBlock = (spec: { reps: number; on: string; off: string }, hrZone: string, segText: string, notes?: string) => {
     for (let i = 0; i < spec.reps; i++) {
