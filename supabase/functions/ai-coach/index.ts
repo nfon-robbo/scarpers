@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    const { type, race_distance, goal_time, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout, activity_summary, planned_workout } = reqBody;
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
@@ -677,6 +677,29 @@ Weight: ${profile?.weight_kg ? `${profile.weight_kg} kg` : "not specified"}
 Experience: ${profile?.experience_level || "intermediate"}
 Goal: ${profile?.training_goals || "complete the race strong"}
 Race: ${raceLabel} on ${race_date && race_date !== "ai-recommend" ? race_date : "TBD (you decide)"}
+${(() => {
+  if (!goal_time) return "Goal Time: not specified — train for general improvement at this distance";
+  // Compute target race pace per km from goal_time + race distance
+  const parts = String(goal_time).trim().split(":").map((x: string) => parseInt(x, 10));
+  let totalSec = 0;
+  if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+  const distKm = ({ "5k": 5, "10k": 10, "half-marathon": 21.0975, "marathon": 42.195 } as Record<string, number>)[race_distance as string] || 0;
+  if (!totalSec || !distKm) return `Goal Time: ${goal_time} — build the plan around hitting this finish time`;
+  const paceSec = Math.round(totalSec / distKm);
+  const pm = Math.floor(paceSec / 60), ps = paceSec % 60;
+  const racePace = `${pm}:${ps.toString().padStart(2, "0")}/km`;
+  // Derive training paces from race pace
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}/km`;
+  return `Goal Time: ${goal_time} → Required race pace: ${racePace}
+Derived training paces (use these as anchors when prescribing intervals/tempo/easy):
+- Race pace: ${racePace}
+- Threshold/Tempo: ${fmt(paceSec + 15)} (race pace + 15s/km)
+- VO2max (3-5min reps): ${fmt(Math.max(180, paceSec - 15))} (race pace - 15s/km)
+- Easy/Z2: ${fmt(paceSec + 75)} - ${fmt(paceSec + 105)} (race pace + 75-105s/km)
+- Long run: ${fmt(paceSec + 60)} - ${fmt(paceSec + 90)}
+CRITICAL: Every interval/tempo/race-pace workout MUST prescribe paces tied to this goal time. Do NOT default to generic paces. The whole plan must progressively prepare the athlete to sustain ${racePace} on race day.`;
+})()}
 Plan: ${weeks} weeks starting ${planStart}
 Training Days: ${(training_days as string[] | undefined)?.length || 4} (${daysStr})
 

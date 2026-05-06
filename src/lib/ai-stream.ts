@@ -4,6 +4,7 @@ export async function streamAICoach({
   type,
   token,
   raceDistance,
+  goalTime,
   trainingDays,
   startDate,
   raceDate,
@@ -21,6 +22,7 @@ export async function streamAICoach({
   type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review" | "post-plan-analysis";
   token: string;
   raceDistance?: string;
+  goalTime?: string;
   trainingDays?: string[];
   startDate?: string;
   raceDate?: string;
@@ -38,6 +40,7 @@ export async function streamAICoach({
   try {
     const body: Record<string, unknown> = { type };
     if (raceDistance) body.race_distance = raceDistance;
+    if (goalTime) body.goal_time = goalTime;
     if (trainingDays) body.training_days = trainingDays;
     if (startDate) body.start_date = startDate;
     if (raceDate) body.race_date = raceDate;

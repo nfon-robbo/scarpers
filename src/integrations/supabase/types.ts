@@ -519,6 +519,7 @@ export type Database = {
           archived: boolean
           content: string
           created_at: string
+          goal_time: string | null
           id: string
           race_date: string | null
           race_distance: string
@@ -530,6 +531,7 @@ export type Database = {
           archived?: boolean
           content: string
           created_at?: string
+          goal_time?: string | null
           id?: string
           race_date?: string | null
           race_distance: string
@@ -541,6 +543,7 @@ export type Database = {
           archived?: boolean
           content?: string
           created_at?: string
+          goal_time?: string | null
           id?: string
           race_date?: string | null
           race_distance?: string

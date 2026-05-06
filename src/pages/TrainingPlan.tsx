@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -183,6 +184,7 @@ const TrainingPlanPage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
+  const [goalTime, setGoalTime] = useState<string>("");
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
@@ -222,6 +224,7 @@ const TrainingPlanPage = () => {
         setContent(data.content);
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
+        setGoalTime((data as any).goal_time || "");
         setTrainingDays(data.training_days);
         setStartDate(parseLocalISODate(data.start_date));
         if (data.race_date && data.race_date !== "ai-recommend") {
@@ -285,11 +288,12 @@ const TrainingPlanPage = () => {
       .insert({
         user_id: user.id,
         race_distance: raceDistance,
+        goal_time: goalTime || null,
         training_days: trainingDays,
         start_date: toLocalISODate(startDate),
         race_date: raceDateValue,
         content: planContent,
-      })
+      } as any)
       .select("id")
       .single();
 
@@ -429,6 +433,7 @@ const TrainingPlanPage = () => {
       type: "training-plan",
       token: session.access_token,
       raceDistance,
+      goalTime,
       trainingDays,
       startDate: toLocalISODate(newStart),
       raceDate: toLocalISODate(newEnd),
@@ -491,6 +496,7 @@ const TrainingPlanPage = () => {
       type: "training-plan",
       token: session.access_token,
       raceDistance,
+      goalTime,
       trainingDays,
       startDate: toLocalISODate(startDate),
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
@@ -538,6 +544,7 @@ const TrainingPlanPage = () => {
       type: "plan-review",
       token: session.access_token,
       raceDistance,
+      goalTime,
       trainingDays,
       startDate: toLocalISODate(startDate),
       currentPlan: originalPlan,
@@ -578,6 +585,7 @@ const TrainingPlanPage = () => {
       type: "plan-adjust",
       token: session.access_token,
       raceDistance,
+      goalTime,
       trainingDays,
       startDate: toLocalISODate(startDate),
       currentPlan: originalPlanBeforeReview,
@@ -628,6 +636,7 @@ const TrainingPlanPage = () => {
       type: "post-plan-analysis",
       token: session.access_token,
       raceDistance,
+      goalTime,
       currentPlan: postAnalysisPlanContent,
       onDelta: (text) => {
         accumulated += text;
@@ -1257,6 +1266,19 @@ const TrainingPlanPage = () => {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Goal Time <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 30:00 or 1:45:00"
+                  value={goalTime}
+                  onChange={(e) => setGoalTime(e.target.value)}
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Target finish time — the AI will build pace targets and intervals around hitting this.
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
                 <div className="flex flex-wrap gap-2">
