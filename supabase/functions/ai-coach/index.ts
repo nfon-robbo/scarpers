@@ -629,7 +629,13 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         z2Pace = fb.easy;
         z2PaceSource = fb.label;
       }
-      const avgRunPace = avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A";
+      // When user supplies their current pace, ignore the historical average so the AI is not tempted to use it.
+      const avgRunPace = userPaceRange
+        ? `IGNORED — user supplied current easy pace (${userPaceRange}/km); use that instead`
+        : (avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A");
+      const userAnchorBlock = userPaceRange
+        ? `\n🚨 USER-SUPPLIED PACE OVERRIDE 🚨\nThe athlete has explicitly told us their current easy run pace is ${userPaceRange}/km.\nWeek 1 EVERY easy/Z2/recovery/long run MUST be prescribed at ${userPaceRange}/km — no faster, no slower.\nDo NOT fall back to historical averages, textbook paces, or goal-derived paces for week 1.\nProgress this anchor by no more than ~5-10 seconds/km per week toward the goal pace as fitness builds.\n`
+        : "";
 
       // ACWR (acute:chronic workload ratio) from training load
       const today = new Date();
@@ -815,16 +821,17 @@ Avg pace across recent runs: ${avgRunPace}/km
 🔒 ANCHOR EASY PACE (Z2): ${z2Pace}/km — source: ${z2PaceSource}
 Long Run: ${longestRun} km
 (Recent 5K time and tempo pace: derive from activity history above)
-
+${userAnchorBlock}
 ══ MANDATORY PACE RULES ══
-EVERY pace you prescribe MUST be derived from the ANCHOR EASY PACE above (${z2Pace}/km), NOT from generic textbook values, and NOT from a fixed 6:00/km default.
+EVERY pace you prescribe MUST be derived from the ANCHOR EASY PACE above (${z2Pace}/km), NOT from generic textbook values, NOT from a fixed 6:00/km default, and NOT from the historical average pace.
 Use these offsets relative to the anchor:
 - Easy / Recovery / Z2 continuous: ${z2Pace}/km (± 15s)
 - Long run: ${z2Pace}/km to ${z2Pace}/km + 30s
 - Steady / Z3 tempo: anchor − 30 to 45s/km
 - Threshold / Z4: anchor − 60 to 75s/km
 - VO2max / Z5 reps: anchor − 90 to 110s/km
-- Walk recovery: 9:00-10:00/km
+- Walk recovery: 12:30-13:30/km
+${userPaceRange ? `WEEK 1 RUN PACE IS LOCKED TO ${userPaceRange}/km. Do not use ${avgRunMps ? fmtPace(paceFromMps(avgRunMps)) + "/km" : "any other pace"} for week 1 easy runs under any circumstance.` : ""}
 Across the plan the easy-pace anchor should gradually improve toward the goal race pace as fitness builds, but NEVER prescribe an easy run faster than the current anchor in week 1. Forbidden: prescribing a 6:00/km easy run when the anchor is 7:30/km. Forbidden: ignoring the anchor and using race-pace-derived numbers for easy runs.
 
 ══ COACHING TASK ══
