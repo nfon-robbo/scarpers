@@ -123,192 +123,113 @@ const Activities = () => {
         </Card>
       ) : (
         <div className="space-y-3">
-          {activities.map((a) => {
-            const isExpanded = expandedId === a.id;
-            return (
-              <Card key={a.id} className="hover:shadow-sm transition-shadow">
-                <CardContent className="p-4">
-                  {/* Header row */}
-                  <div className="flex items-start justify-between gap-4">
-                    <button
-                      className="flex-1 text-left cursor-pointer"
-                      onClick={() => handleToggleExpand(a.id)}
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm">
-                          {a.start_time
-                            ? new Date(a.start_time).toLocaleDateString(undefined, {
-                                weekday: "short", year: "numeric", month: "short", day: "numeric",
-                              })
-                            : "Unknown date"}
-                        </span>
-                        {a.activity_type && (
-                          <Badge variant="secondary" className="capitalize text-xs">{a.activity_type}</Badge>
-                        )}
-                        {a.training_effect && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <span className="cursor-help">
-                                <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs text-xs">
-                              <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
-                              <p>{getTrainingEffectDescription(Number(a.training_effect))}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{a.source_file}</p>
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      {currentPlanId && (
+          {activities.map((a) => (
+            <Card key={a.id} className="hover:shadow-sm transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <button
+                    className="flex-1 text-left cursor-pointer"
+                    onClick={() => setOpenId(a.id)}
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">
+                        {a.start_time
+                          ? new Date(a.start_time).toLocaleDateString(undefined, {
+                              weekday: "short", year: "numeric", month: "short", day: "numeric",
+                            })
+                          : "Unknown date"}
+                      </span>
+                      {a.activity_type && (
+                        <Badge variant="secondary" className="capitalize text-xs">{a.activity_type}</Badge>
+                      )}
+                      {a.training_effect && (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1.5">
-                              <Checkbox
-                                checked={a.training_plan_id === currentPlanId}
-                                disabled={togglingPlan === a.id}
-                                onCheckedChange={() => togglePlanAllocation(a.id, a.training_plan_id === currentPlanId)}
-                              />
-                              <span className="text-xs text-muted-foreground">Plan</span>
-                            </div>
+                          <TooltipTrigger>
+                            <span className="cursor-help">
+                              <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
+                            </span>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs">
-                            {a.training_plan_id === currentPlanId
-                              ? "This activity is linked to your current training plan"
-                              : "Link this activity to your current training plan for progress review"}
+                          <TooltipContent side="bottom" className="max-w-xs text-xs">
+                            <p className="font-semibold mb-1">Training Effect ({Number(a.training_effect).toFixed(1)})</p>
+                            <p>{getTrainingEffectDescription(Number(a.training_effect))}</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {a.start_time && new Date(a.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete activity?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently remove this activity and its data. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteActivity(a.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              {deleting === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
-                  </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{a.source_file}</p>
+                  </button>
 
-                  {/* Summary metrics (always visible) */}
-                  <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 mt-3">
-                    <Metric icon={TrendingUp} label="Distance" value={fmt.distance(a.distance_meters ?? (a.avg_speed && a.duration_seconds ? (a.avg_speed / 3.6 * a.duration_seconds) : null))} />
-                    <Metric icon={Timer} label="Duration" value={fmtDuration(a.duration_seconds)} />
-                    <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)}` : null} unit="bpm" />
-                    <Metric icon={Heart} label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)}` : null} unit="bpm" />
-                    <Metric icon={TrendingUp} label="Speed" value={fmt.speed(a.avg_speed)} />
-                    <Metric icon={Zap} label="Power" value={a.avg_power ? `${Math.round(a.avg_power)}` : null} unit="W" />
-                    <Metric icon={Mountain} label="Ascent" value={fmt.elevation(a.total_ascent)} />
-                  </div>
-
-                  {/* Expanded detail view */}
-                  {isExpanded && (() => {
-                    const raw = rawDataById[a.id];
-                    const isLoadingRaw = loadingRawId === a.id;
-                    return (
-                    <div className="mt-4 pt-4 border-t border-border space-y-4">
-                      {isLoadingRaw && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading details…
-                        </div>
-                      )}
-                      {/* GPS Route Map or single-point map */}
-                      {raw?.gps_track && Array.isArray(raw.gps_track) && raw.gps_track.length >= 2 ? (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> Route Map
-                          </p>
-                          <ActivityMap track={raw.gps_track} />
-                        </div>
-                      ) : a.latitude && a.longitude && Math.abs(a.latitude) > 0.01 && Math.abs(a.longitude) > 0.01 ? (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> Location
-                          </p>
-                          <ActivityMap track={[{ lat: a.latitude, lng: a.longitude }]} />
-                        </div>
-                      ) : null}
-
-                      {/* Performance Charts */}
-                      {raw?.gps_track && Array.isArray(raw.gps_track) && raw.gps_track.length >= 10 && (
-                        <ActivityCharts
-                          track={raw.gps_track}
-                          avgHR={a.avg_heart_rate}
-                          maxHR={a.max_heart_rate}
-                        />
-                      )}
-
-                      {/* All parsed fields */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <DetailField label="Distance" value={fmt.distance(a.distance_meters)} />
-                        <DetailField label="Duration" value={fmtDuration(a.duration_seconds, true)} />
-                        <DetailField label="Avg Heart Rate" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm` : null} />
-                        <DetailField label="Max Heart Rate" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)} bpm` : null} />
-                        <DetailField label="Avg Speed" value={fmt.speed(a.avg_speed)} />
-                        <DetailField label="Max Speed" value={fmt.speed(a.max_speed)} />
-                        <DetailField label="Avg Power" value={a.avg_power ? `${Math.round(a.avg_power)} W` : null} />
-                        <DetailField label="Max Power" value={a.max_power ? `${Math.round(a.max_power)} W` : null} />
-                        <DetailField label="Avg Cadence" value={a.avg_cadence ? `${Math.round(a.avg_cadence)} rpm` : null} />
-                        <DetailField label="Steps" value={(() => {
-                          const stepLen = raw?.avg_step_length;
-                          if (stepLen && a.distance_meters) return `${Math.round(a.distance_meters / (stepLen / 1000))}`;
-                          if (a.avg_cadence && a.duration_seconds) return `${Math.round(a.avg_cadence * (a.duration_seconds / 60))}`;
-                          return null;
-                        })()} />
-                        <DetailField label="Total Ascent" value={fmt.elevation(a.total_ascent)} />
-                        <DetailField label="Total Descent" value={fmt.elevation(a.total_descent)} />
-                        <DetailField label="Calories" value={a.calories ? `${Math.round(a.calories)} kcal` : null} />
-                        <DetailField label="Avg Temperature" value={fmt.temperature(a.avg_temperature)} />
-                        <DetailField label="Training Effect" value={a.training_effect ? `${Number(a.training_effect).toFixed(1)}` : null} tooltip={a.training_effect ? getTrainingEffectDescription(Number(a.training_effect)) : undefined} />
-                        <DetailField label="Training Load" value={a.training_load ? `${Math.round(a.training_load)}` : null} />
-                        <DetailField label="Activity Type" value={a.activity_type || null} />
-                      </div>
-
-                      {/* Raw FIT data */}
-                      {raw && typeof raw === "object" && Object.keys(raw).length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Raw FIT File Data</p>
-                          <div className="rounded-lg bg-muted/50 p-4 overflow-auto max-h-96">
-                            <RawDataDisplay data={raw} />
+                  <div className="flex items-center gap-2">
+                    {currentPlanId && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox
+                              checked={a.training_plan_id === currentPlanId}
+                              disabled={togglingPlan === a.id}
+                              onCheckedChange={() => togglePlanAllocation(a.id, a.training_plan_id === currentPlanId)}
+                            />
+                            <span className="text-xs text-muted-foreground">Plan</span>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            );
-          })}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">
+                          {a.training_plan_id === currentPlanId
+                            ? "This activity is linked to your current training plan"
+                            : "Link this activity to your current training plan for progress review"}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {a.start_time && new Date(a.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete activity?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove this activity and its data. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteActivity(a.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleting === a.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+
+                {/* Summary metrics */}
+                <button
+                  className="grid grid-cols-3 sm:grid-cols-7 gap-3 mt-3 w-full text-left"
+                  onClick={() => setOpenId(a.id)}
+                >
+                  <Metric icon={TrendingUp} label="Distance" value={fmt.distance(a.distance_meters ?? (a.avg_speed && a.duration_seconds ? (a.avg_speed / 3.6 * a.duration_seconds) : null))} />
+                  <Metric icon={Timer} label="Duration" value={fmtDuration(a.duration_seconds)} />
+                  <Metric icon={Heart} label="Avg HR" value={a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)}` : null} unit="bpm" />
+                  <Metric icon={Heart} label="Max HR" value={a.max_heart_rate ? `${Math.round(a.max_heart_rate)}` : null} unit="bpm" />
+                  <Metric icon={TrendingUp} label="Speed" value={fmt.speed(a.avg_speed)} />
+                  <Metric icon={Zap} label="Power" value={a.avg_power ? `${Math.round(a.avg_power)}` : null} unit="W" />
+                  <Metric icon={Mountain} label="Ascent" value={fmt.elevation(a.total_ascent)} />
+                </button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
+
+      <ActivityDetailDialog activityId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 };
