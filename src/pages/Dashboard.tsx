@@ -378,30 +378,26 @@ const Dashboard = () => {
       });
   }, [activities]);
 
-  // Today's workout from plan
+  // Today's workout (or next upcoming) from plan
   const todaysWorkout = useMemo(() => {
     if (!plan?.content) return null;
-    const today = new Date();
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const todayName = dayNames[today.getDay()];
+    const workouts = parseWorkoutsFromPlan(plan.content).filter(w => w.dateObj);
+    if (workouts.length === 0) return null;
+    const today = startOfDay(new Date());
 
-    // Parse plan content for today's workout
-    const lines = plan.content.split("\n");
-    let capturing = false;
-    let workout: string[] = [];
+    const isRest = (w: typeof workouts[number]) => /rest/i.test(w.title);
 
-    for (const line of lines) {
-      if (line.toLowerCase().includes(todayName.toLowerCase()) || line.includes(today.toISOString().split("T")[0])) {
-        capturing = true;
-        continue;
-      }
-      if (capturing) {
-        if (line.match(/^(#{1,3}\s|---|\*\*Day)/)) break;
-        if (line.trim()) workout.push(line.trim());
-      }
+    const todays = workouts.find(w => isToday(w.dateObj!));
+    if (todays && !isRest(todays)) {
+      return { workout: todays, isNext: false };
     }
 
-    return workout.length > 0 ? workout.slice(0, 6) : null;
+    // Today is rest or no workout today → find next non-rest workout
+    const upcoming = workouts
+      .filter(w => isAfter(startOfDay(w.dateObj!), today) && !isRest(w))
+      .sort((a, b) => a.dateObj!.getTime() - b.dateObj!.getTime())[0];
+
+    return upcoming ? { workout: upcoming, isNext: true } : null;
   }, [plan]);
 
   // Latest resting HR
