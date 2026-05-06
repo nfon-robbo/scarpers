@@ -23,6 +23,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
+import { popUndoEntry, getUndoCount, peekUndoEntry } from "@/lib/plan-undo-history";
 
 interface ApiStep {
   duration: number;
