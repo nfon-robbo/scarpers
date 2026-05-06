@@ -9,10 +9,11 @@
 
 import JSZip from "jszip";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "./fit-parser";
+import { parseFitWorkout, fitWorkoutToIntervalsText, type FitWorkout } from "./fit-workout-parser";
 
-function stubActivity(fileName: string): ParsedActivity {
+function stubActivity(fileName: string, extras?: { workout?: FitWorkout | null; intervalsText?: string }): ParsedActivity {
   return {
-    activity_type: "workout",
+    activity_type: extras?.workout?.sport || "workout",
     start_time: null,
     duration_seconds: null,
     distance_meters: null,
@@ -31,7 +32,11 @@ function stubActivity(fileName: string): ParsedActivity {
     training_load: null,
     source_file: fileName,
     gps_track: [],
-    raw_data: { stub: true },
+    raw_data: {
+      stub: true,
+      workout_name: extras?.workout?.name || null,
+      intervals_text: extras?.intervalsText || null,
+    },
   };
 }
 
@@ -104,6 +109,8 @@ function formatPace(speedKmh: number | null): string {
 }
 
 function workoutTitle(a: ParsedActivity): string {
+  const raw = (a.raw_data as any) || {};
+  if (raw.workout_name) return String(raw.workout_name);
   const sport = a.activity_type ? a.activity_type.charAt(0).toUpperCase() + a.activity_type.slice(1) : "Workout";
   const parts: string[] = [];
   const dist = formatDistance(a.distance_meters);
@@ -141,30 +148,52 @@ function activitiesToMarkdown(activities: ParsedActivity[]): string {
     const dist = formatDistance(a.distance_meters);
     const pace = formatPace(a.avg_speed);
     const hr = a.avg_heart_rate ? `${Math.round(a.avg_heart_rate)} bpm avg` : "";
+    const intervalsText = ((a.raw_data as any) || {}).intervals_text as string | undefined;
 
-    lines.push("| Segment | Duration | Target | HR Zone | Notes |");
-    lines.push("|---------|----------|--------|---------|-------|");
-    lines.push(`| Main | ${dur || "—"} | ${[dist, pace].filter(Boolean).join(" @ ") || "—"} | ${hr || "—"} | Imported from ${a.source_file} |`);
-    lines.push("");
+    if (intervalsText) {
+      // Structured workout — emit as a fenced ~~~intervals block (rest of the
+      // app uses this exact syntax for intervals.icu sync).
+      lines.push("~~~intervals");
+      lines.push(intervalsText);
+      lines.push("~~~");
+      lines.push("");
+    } else {
+      lines.push("| Segment | Duration | Target | HR Zone | Notes |");
+      lines.push("|---------|----------|--------|---------|-------|");
+      lines.push(`| Main | ${dur || "—"} | ${[dist, pace].filter(Boolean).join(" @ ") || "—"} | ${hr || "—"} | Imported from ${a.source_file} |`);
+      lines.push("");
+    }
   }
 
   return lines.join("\n");
 }
 
-// Try to pull a YYYY-MM-DD or DD-MM-YYYY date out of a filename
+// Try to pull a date out of a filename. Supports YYYY-MM-DD, DD-MM-YYYY,
+// and "DDD_D_Mon_YYYY" (e.g. "Wed_6_May_2026").
 function extractDateFromName(name: string): Date | null {
-  const base = name.replace(/^.*[\\/]/, "");
-  // ISO: 2026-04-21 or 20260421
+  const base = name.replace(/^.*[\\/]/, "").replace(/\.fit$/i, "");
   let m = base.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/);
   if (m) {
     const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     if (!isNaN(d.getTime())) return d;
   }
-  // DD-MM-YYYY or DD_MM_YYYY
   m = base.match(/(\d{1,2})[-_.](\d{1,2})[-_.](20\d{2})/);
   if (m) {
     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
     if (!isNaN(d.getTime())) return d;
+  }
+  // "Wed_6_May_2026" or "6_May_2026"
+  const monthNames: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+    sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+  m = base.match(/(\d{1,2})[\s_-]+([A-Za-z]{3,})[\s_-]+(20\d{2})/);
+  if (m) {
+    const mo = monthNames[m[2].slice(0, 3).toLowerCase()];
+    if (mo !== undefined) {
+      const d = new Date(Number(m[3]), mo, Number(m[1]));
+      if (!isNaN(d.getTime())) return d;
+    }
   }
   return null;
 }
@@ -173,15 +202,37 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
   const activities: ParsedActivity[] = [];
   const errors: string[] = [];
 
+  const tryParseWorkoutBuf = (buf: ArrayBuffer, name: string): ParsedActivity | null => {
+    try {
+      const w = parseFitWorkout(buf);
+      if (w && w.steps.length) {
+        const txt = fitWorkoutToIntervalsText(w);
+        return stubActivity(name, { workout: w, intervalsText: txt });
+      }
+    } catch { /* fall through */ }
+    return null;
+  };
+
   for (const file of files) {
     const lower = file.name.toLowerCase();
     try {
       if (lower.endsWith(".zip")) {
         const r = await parseZipFile(file);
         if (r.activities.length === 0) {
-          // ZIP of workout-definition FIT files (no sessions/records) — stub each
-          const zipNames = await listFitNamesInZip(file);
-          for (const name of zipNames) activities.push(stubActivity(name));
+          // Each entry is a workout-definition FIT — re-extract and parse steps
+          const zip = await JSZip.loadAsync(file);
+          const entries: { name: string; buf: ArrayBuffer }[] = [];
+          await Promise.all(
+            Object.keys(zip.files).map(async (k) => {
+              const entry = zip.files[k];
+              if (!entry.dir && k.toLowerCase().endsWith(".fit")) {
+                entries.push({ name: k, buf: await entry.async("arraybuffer") });
+              }
+            })
+          );
+          for (const e of entries) {
+            activities.push(tryParseWorkoutBuf(e.buf, e.name) || stubActivity(e.name));
+          }
         } else {
           activities.push(...r.activities);
         }
@@ -190,8 +241,7 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
         const buf = await file.arrayBuffer();
         const parsed = await parseFitBuffer(buf, file.name);
         if (parsed.length === 0) {
-          // Workout-definition FIT (no session/records) — keep it as a stub
-          activities.push(stubActivity(file.name));
+          activities.push(tryParseWorkoutBuf(buf, file.name) || stubActivity(file.name));
         } else {
           activities.push(...parsed);
         }
@@ -199,7 +249,6 @@ export async function importFitPlan(files: File[]): Promise<FitPlanImportResult>
         errors.push(`Skipped unsupported file: ${file.name}`);
       }
     } catch (e: any) {
-      // Even on parse error, keep the file as a stub so the user can place it
       if (lower.endsWith(".fit")) activities.push(stubActivity(file.name));
       errors.push(e?.message || `Failed to parse ${file.name}`);
     }
