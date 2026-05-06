@@ -139,9 +139,10 @@ const AIChatbot = () => {
           if (idx === -1) { finishWith("⚠️ Couldn't locate the workout in your plan."); return; }
           const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
 
+          pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.\n\n[[UNDO]]`);
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Use the **Undo** button at the top of the Training Plan to revert.`);
           toast({ title: "Workout updated", description: scope.dateUk });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
