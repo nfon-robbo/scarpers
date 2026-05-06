@@ -1090,6 +1090,19 @@ const TrainingPlanPage = () => {
           </h1>
           {content && !loading && (
             <div className="flex items-center gap-2 shrink-0">
+              {undoCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUndo}
+                  className="gap-2"
+                  title={`Undo last change (${undoCount} step${undoCount === 1 ? "" : "s"} available)`}
+                >
+                  <Undo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Undo</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{undoCount}</span>
+                </Button>
+              )}
               <Button
                 variant="default"
                 size="sm"
