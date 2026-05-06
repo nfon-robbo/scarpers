@@ -156,20 +156,32 @@ function activitiesToMarkdown(activities: ParsedActivity[]): string {
   return lines.join("\n");
 }
 
-// Try to pull a YYYY-MM-DD or DD-MM-YYYY date out of a filename
+// Try to pull a date out of a filename. Supports YYYY-MM-DD, DD-MM-YYYY,
+// and "DDD_D_Mon_YYYY" (e.g. "Wed_6_May_2026").
 function extractDateFromName(name: string): Date | null {
-  const base = name.replace(/^.*[\\/]/, "");
-  // ISO: 2026-04-21 or 20260421
+  const base = name.replace(/^.*[\\/]/, "").replace(/\.fit$/i, "");
   let m = base.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/);
   if (m) {
     const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     if (!isNaN(d.getTime())) return d;
   }
-  // DD-MM-YYYY or DD_MM_YYYY
   m = base.match(/(\d{1,2})[-_.](\d{1,2})[-_.](20\d{2})/);
   if (m) {
     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
     if (!isNaN(d.getTime())) return d;
+  }
+  // "Wed_6_May_2026" or "6_May_2026"
+  const monthNames: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+    sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+  m = base.match(/(\d{1,2})[\s_-]+([A-Za-z]{3,})[\s_-]+(20\d{2})/);
+  if (m) {
+    const mo = monthNames[m[2].slice(0, 3).toLowerCase()];
+    if (mo !== undefined) {
+      const d = new Date(Number(m[3]), mo, Number(m[1]));
+      if (!isNaN(d.getTime())) return d;
+    }
   }
   return null;
 }
