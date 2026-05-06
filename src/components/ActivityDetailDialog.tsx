@@ -248,9 +248,9 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                             <MapPin className="w-3 h-3" /> {track.length >= 2 ? "Route" : "Location"}
                           </p>
                           {track.length >= 2 ? (
-                            <ActivityMap track={track} />
+                            <ActivityMap track={track} interactive />
                           ) : (
-                            <ActivityMap track={[{ lat: data.latitude!, lng: data.longitude! }]} />
+                            <ActivityMap track={[{ lat: data.latitude!, lng: data.longitude! }]} interactive height={300} />
                           )}
                         </CardContent>
                       </Card>
