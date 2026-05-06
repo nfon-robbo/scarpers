@@ -604,17 +604,25 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         return { easy: "6:30", label: "Intermediate default (no run history)" };
       };
 
-      // Choose the authoritative easy/Z2 pace: prefer HR-filtered Z2, then slowest-25%, then overall avg, then experience fallback.
+      // User-supplied pace range takes priority over everything else.
+      const userPaceMin = typeof current_pace_min === "string" && /^\d{1,2}:\d{2}$/.test(current_pace_min.trim()) ? current_pace_min.trim() : null;
+      const userPaceMax = typeof current_pace_max === "string" && /^\d{1,2}:\d{2}$/.test(current_pace_max.trim()) ? current_pace_max.trim() : null;
+      const userPaceRange = userPaceMin && userPaceMax ? `${userPaceMin}-${userPaceMax}` : (userPaceMin || userPaceMax);
+
+      // Choose the authoritative easy/Z2 pace: user-supplied → HR-filtered Z2 → slowest-25% → overall avg → experience fallback.
       let z2Pace: string;
       let z2PaceSource: string;
-      if (z2PaceMps) {
+      if (userPaceRange) {
+        z2Pace = userPaceRange + (userPaceMin && userPaceMax ? "" : "");
+        z2PaceSource = `user-supplied current easy pace (HARD ANCHOR — use this exact range for week 1, then progress gradually toward goal pace)`;
+      } else if (z2PaceMps) {
         z2Pace = fmtPace(paceFromMps(z2PaceMps));
         z2PaceSource = `derived from ${z2Runs.length} HR-Z2 runs`;
       } else if (easyMps) {
         z2Pace = fmtPace(paceFromMps(easyMps));
         z2PaceSource = `slowest-25% of ${allPacedRuns.length} recent runs (HR data sparse, used as easy-pace proxy)`;
       } else if (avgRunMps) {
-        z2Pace = fmtPace(paceFromMps(avgRunMps) + 30); // add 30s/km cushion to avg → easy
+        z2Pace = fmtPace(paceFromMps(avgRunMps) + 30);
         z2PaceSource = `avg of ${allPacedRuns.length} runs + 30s/km cushion`;
       } else {
         const fb = fallbackByLevel(expLevelLower);
