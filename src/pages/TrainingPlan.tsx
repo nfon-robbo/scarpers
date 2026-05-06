@@ -884,6 +884,8 @@ const TrainingPlanPage = () => {
       }
 
       const stepOverrides = JSON.parse(localStorage.getItem("plan-step-overrides") || "{}") as Record<string, Record<number, { duration?: string; pace?: string }>>;
+      const { loadCustomSteps, customToExpanded } = await import("@/lib/plan-custom-steps");
+      const customStepsMap = loadCustomSteps();
 
       // Convert parsed workouts to API format, expanding intervals
       const apiWorkouts = withSegments.map(w => {
@@ -892,7 +894,7 @@ const TrainingPlanPage = () => {
 
         const overridesForWorkout = stepOverrides[dateStr] || {};
         const expanded = expandWorkoutSteps(w.segments, w.title, w.rawText ?? "", { goalTime, raceDistance });
-        const steps = expanded.map((step, idx) => ({
+        const aiSteps = expanded.map((step, idx) => ({
           duration: overridesForWorkout[idx]?.duration ? sharedParseDuration(overridesForWorkout[idx].duration!) : step.duration,
           hrLow: step.hrLow,
           hrHigh: step.hrHigh,
@@ -900,6 +902,18 @@ const TrainingPlanPage = () => {
           intensity: step.intensity,
           pace: overridesForWorkout[idx]?.pace ? sharedNormalizePace(overridesForWorkout[idx].pace!) : step.pace,
         }));
+        // Append user-added custom steps (warm-up / rep / cool-down / custom).
+        // Same shape & syntax as AI steps so the Intervals.icu payload stays identical.
+        const customExpanded = customToExpanded(customStepsMap[dateStr] || []);
+        const customSteps = customExpanded.map((step) => ({
+          duration: step.duration,
+          hrLow: step.hrLow,
+          hrHigh: step.hrHigh,
+          hrZone: step.hrZone,
+          intensity: step.intensity,
+          pace: step.pace,
+        }));
+        const steps = [...aiSteps, ...customSteps];
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
         const notes = w.segments
           .map(s => s.notes?.trim())
