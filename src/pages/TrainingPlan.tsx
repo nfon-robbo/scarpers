@@ -185,6 +185,8 @@ const TrainingPlanPage = () => {
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
+  const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
+  const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
