@@ -1267,6 +1267,19 @@ const TrainingPlanPage = () => {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-sm font-medium">Goal Time <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 30:00 or 1:45:00"
+                  value={goalTime}
+                  onChange={(e) => setGoalTime(e.target.value)}
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Target finish time — the AI will build pace targets and intervals around hitting this.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
                 <div className="flex flex-wrap gap-2">
                   {DAYS_OF_WEEK.map((day) => (
