@@ -143,7 +143,7 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
           const zone = zoneMatch ? `Z${zoneMatch[1]}` : "Z2";
           const intervalMatch = title.match(/(\d+)\s*x\s*([\d.]+\s*(?:m|km|min|sec)\b)/i);
           if (intervalMatch) {
-            segments.push({ segment: "Warm-up", duration: "10 min", target: "easy", hrZone: "Z1", notes: "" });
+            segments.push({ segment: "Warm-up", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
             segments.push({ segment: "Main", duration: `${intervalMatch[1]} x ${intervalMatch[2]}`, target: "", hrZone: zone, notes: "" });
             segments.push({ segment: "Cool-down", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
           } else {
