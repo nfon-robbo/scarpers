@@ -151,7 +151,7 @@ const Activities = () => {
                   <div className="flex items-start justify-between gap-4">
                     <button
                       className="flex-1 text-left cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                      onClick={() => handleToggleExpand(a.id)}
                     >
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm">
