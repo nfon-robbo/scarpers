@@ -254,6 +254,50 @@ const Settings = () => {
 
   useEffect(() => { loadArchivedPlans(); }, [user]);
 
+  // Admin: AI provider settings
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
+  const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
+  const [savingAi, setSavingAi] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if (!user) return;
+      const { data: roleRow } = await supabase
+        .from("user_roles" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!roleRow);
+      const { data: settings } = await supabase
+        .from("app_settings" as any)
+        .select("ai_provider, claude_model")
+        .eq("id", 1)
+        .maybeSingle();
+      if (settings) {
+        setAiProvider(((settings as any).ai_provider as "lovable" | "claude") ?? "lovable");
+        setClaudeModel((settings as any).claude_model ?? "claude-haiku-4-5");
+      }
+    })();
+  }, [user]);
+
+  const saveAiSettings = async () => {
+    setSavingAi(true);
+    try {
+      const { error } = await supabase
+        .from("app_settings" as any)
+        .update({ ai_provider: aiProvider, claude_model: claudeModel, updated_at: new Date().toISOString() })
+        .eq("id", 1);
+      if (error) throw error;
+      toast({ title: "AI provider updated", description: `Now using ${aiProvider === "claude" ? `Claude (${claudeModel})` : "Lovable AI"} site-wide` });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingAi(false);
+    }
+  };
+
   const resumePlan = async (plan: ArchivedPlan) => {
     if (!user) return;
     setPlanActionId(plan.id);
@@ -410,6 +454,51 @@ const Settings = () => {
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1">Customize how your data is displayed</p>
       </div>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Gauge className="w-5 h-5" />
+              AI Provider <Badge variant="secondary">Admin</Badge>
+            </CardTitle>
+            <CardDescription>
+              Switch the AI engine used site-wide for plan generation, chat, reviews and insights.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Provider</Label>
+              <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as "lovable" | "claude")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lovable">Lovable AI (Gemini / GPT)</SelectItem>
+                  <SelectItem value="claude">Anthropic Claude</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {aiProvider === "claude" && (
+              <div className="space-y-2">
+                <Label>Claude model</Label>
+                <Select value={claudeModel} onValueChange={setClaudeModel}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (fast, cheap)</SelectItem>
+                    <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5 (balanced)</SelectItem>
+                    <SelectItem value="claude-opus-4-5">Claude Opus 4.5 (most capable)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button onClick={saveAiSettings} disabled={savingAi}>
+                {savingAi ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save provider
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

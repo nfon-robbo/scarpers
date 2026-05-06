@@ -41,20 +41,13 @@ Provide your analysis in this format:
 
 Keep it concise, evidence-based, and actionable. Reference sleep science where relevant.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a sleep science expert drawing on research from the National Sleep Foundation, Mayo Clinic, and leading sleep researchers like Matthew Walker (UC Berkeley). Be concise and evidence-based." },
-          { role: "user", content: prompt },
-        ],
-        stream: true,
-      }),
+    const { callAI } = await import("../_shared/ai.ts");
+    const response = await callAI({
+      stream: true,
+      messages: [
+        { role: "system", content: "You are a sleep science expert drawing on research from the National Sleep Foundation, Mayo Clinic, and leading sleep researchers like Matthew Walker (UC Berkeley). Be concise and evidence-based." },
+        { role: "user", content: prompt },
+      ],
     });
 
     if (!response.ok) {
