@@ -167,23 +167,53 @@ const AIChatbot = () => {
               </div>
             </div>
           )}
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                {msg.role === "assistant" ? (
-                  <MarkdownRenderer content={msg.content || "..."} />
-                ) : (
-                  msg.content
-                )}
+          {messages.map((msg, i) => {
+            const hasAction = msg.role === "assistant" && /\[\[ACTION:recommendation\]\]/.test(msg.content);
+            const cleaned = hasAction ? msg.content.replace(/\[\[ACTION:recommendation\]\]/g, "").trim() : msg.content;
+            const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
+            const showActions = hasAction && isLastAssistant && !loading;
+            return (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  }`}
+                >
+                  {msg.role === "assistant" ? (
+                    <MarkdownRenderer content={cleaned || "..."} />
+                  ) : (
+                    cleaned
+                  )}
+                  {showActions && (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-xs"
+                        onClick={() => {
+                          setInput("Make the change — apply that to my plan.");
+                          setTimeout(() => sendMessage(), 0);
+                        }}
+                      >
+                        Make the change
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-8 text-xs"
+                        onClick={() => {
+                          setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                        }}
+                      >
+                        Keep as it is
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {loading && messages[messages.length - 1]?.role === "user" && (
             <div className="flex justify-start">
               <div className="bg-muted rounded-lg px-3 py-2">
