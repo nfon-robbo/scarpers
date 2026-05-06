@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ActivityMap from "@/components/ActivityMap";
 import ActivityCharts from "@/components/ActivityCharts";
+import { decodePolyline } from "@/lib/polyline";
 
 interface Props {
   activityId: string | null;
