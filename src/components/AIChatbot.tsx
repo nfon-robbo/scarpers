@@ -311,7 +311,7 @@ const AIChatbot = () => {
             </div>
           )}
           {messages.map((msg, i) => {
-            const hasAction = msg.role === "assistant" && /\[\[ACTION:recommendation\]\]/.test(msg.content);
+            
             const dayMatch = msg.role === "assistant"
               ? msg.content.match(/\[\[ACTION:day:(\d{1,2}\/\d{1,2}\/\d{4})\]\]/)
               : null;
