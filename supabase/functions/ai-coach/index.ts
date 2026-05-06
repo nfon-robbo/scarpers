@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout } = reqBody;
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
