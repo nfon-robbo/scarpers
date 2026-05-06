@@ -1,12 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
 import { expandWorkoutSteps } from "@/lib/plan-step-expand";
+import {
+  loadCustomSteps, saveCustomSteps, defaultsFor, customToExpanded,
+  type CustomStep, type CustomStepKind, type CustomStepsMap,
+} from "@/lib/plan-custom-steps";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
