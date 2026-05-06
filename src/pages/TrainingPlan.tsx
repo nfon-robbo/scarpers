@@ -236,6 +236,7 @@ const TrainingPlanPage = () => {
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
