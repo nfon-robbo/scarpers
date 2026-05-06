@@ -416,35 +416,6 @@ const AIChatbot = () => {
                       </Button>
                     </div>
                   )}
-                    <div className="mt-3 space-y-2">
-                      {scope.kind === "day" && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Affects only your <strong>{scope.dateUk}</strong> session.
-                        </p>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 h-8 text-xs"
-                          disabled={loading}
-                          onClick={() => applyChange(cleaned, scope)}
-                        >
-                          Make the change
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 h-8 text-xs"
-                          disabled={loading}
-                          onClick={() => {
-                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
-                          }}
-                        >
-                          Keep as it is
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             );
