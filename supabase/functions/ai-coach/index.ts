@@ -613,9 +613,18 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         baseWeeks = String(w - Number(taperWeeks) - Number(sharpenWeeks) - Number(buildWeeks));
       }
 
+      // Day name of the start date so we can force the first workout to land on it
+      const startDayName = new Date(planStart + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" });
+      const startDayShort = startDayName.slice(0, 3);
+      const trainingDaysList = (training_days as string[] | undefined) || [];
+      const includesStartDay = trainingDaysList.some((d) => d.toLowerCase().startsWith(startDayShort.toLowerCase()));
+      const firstWorkoutRule = includesStartDay
+        ? `The first workout MUST be on ${planStart} (${startDayName}).`
+        : `IMPORTANT: The first workout MUST be on ${planStart} (${startDayName}) — even though ${startDayName} is NOT in the regular training days list. Treat the start date as a one-off extra session. From the day AFTER ${planStart} onwards, only schedule workouts on: ${daysStr}.`;
+
       const planLengthInstruction = isAIDecide
-        ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed.`
-        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart}. Only schedule workouts on: ${daysStr}. All other days are rest/recovery. Every single week from week 1 to week ${weeks} must be detailed.`;
+        ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed. ${firstWorkoutRule}`
+        : `Generate the COMPLETE ${weeks}-week plan starting from ${planStart}. ${firstWorkoutRule} After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery. Every single week from week 1 to week ${weeks} must be detailed.`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
