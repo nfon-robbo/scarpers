@@ -117,7 +117,7 @@ export async function generatePlanDocx(workouts: ParsedWorkout[], raceDistance?:
   return await Packer.toBlob(doc);
 }
 
-export async function downloadBlob(blob: Blob, filename: string) {
+export async function downloadBlob(blob: Blob, filename: string): Promise<"shared" | "downloaded"> {
   // Ensure correct MIME type so Android (Samsung Internet/Chrome) recognizes it as a downloadable file
   const docxBlob = blob.type
     ? blob
