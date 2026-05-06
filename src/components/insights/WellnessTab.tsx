@@ -14,6 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
+import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
 
@@ -307,6 +308,7 @@ const WellnessTab = () => {
 
       <SleepStagesChart />
       <GoogleFitConnect />
+      <HealthConnectCard />
     </div>
   );
 };

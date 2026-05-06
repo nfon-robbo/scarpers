@@ -45,10 +45,10 @@ const HealthConnectCard = () => {
     if (!user) return;
     setSyncing(true);
     try {
-      const { sleepCount, metricsCount } = await syncHealthConnect(user.id, 7);
+      const { metricsCount } = await syncHealthConnect(user.id, 7);
       toast({
         title: "Health Connect synced",
-        description: `${sleepCount} sleep stages, ${metricsCount} day metrics`,
+        description: `${metricsCount} days updated (steps, calories, resting HR)`,
       });
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
     } catch (e: any) {
@@ -68,7 +68,7 @@ const HealthConnectCard = () => {
         </CardTitle>
         <CardDescription>
           {availability === "Available"
-            ? "Sync sleep, resting HR, steps and calories from your phone"
+            ? "Sync resting HR, steps and active calories from your phone (sleep stages coming soon)"
             : availability === "NotInstalled"
             ? "Install Health Connect from the Play Store first"
             : availability === "NotSupported"
