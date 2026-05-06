@@ -66,6 +66,11 @@ export function hrZoneToBpm(hrZone: string): { low: number; high: number } {
 
 function paceForSegment(seg: ParsedSegment, intensity: string): string {
   const txt = `${seg.segment} ${seg.duration} ${seg.target} ${seg.notes || ""}`.toLowerCase();
+  // Range like "7:00/km-7:30/km" or "7:00-7:30/km" — use the slower (second)
+  // bound as the displayed/target pace, matching how Garmin/intervals.icu
+  // expose the prescribed pace.
+  const range = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi))?\s*[-–]\s*(\d{1,2}:\d{2})/);
+  if (range) return `${range[2]}/km`;
   const explicit = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
   if (explicit) return `${explicit[1]}/km`;
   if (/recovery|rest/i.test(intensity) || /recovery|rest/.test(txt)) return WALK_PACE;
