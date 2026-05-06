@@ -758,6 +758,7 @@ CRITICAL FORMAT RULES (required for watch sync — do not deviate):
    - Tempo/threshold: 🎵 170 BPM
    - Race pace/VO2max: 🎵 175 BPM
 7. Include HR target ranges from the zones above in the Target column.
+8. Warm-up and cool-down segments MUST be exactly 5 minutes — never 10 minutes or longer.
 
 Example workout format:
 ### Week 1: Base Building
@@ -774,7 +775,7 @@ After all weekly sessions, append:
 **RACE DAY STRATEGY**
 - Mile-by-mile splits (conservative start, build, finish strong)
 - HR targets per mile
-- Warm-up protocol (10min jog Z2 + 4×20sec strides)
+- Warm-up protocol (5min jog Z2 + 4×20sec strides)
 - Fueling (if race >60min)
 
 **STRENGTH CIRCUIT** (2x/week)
