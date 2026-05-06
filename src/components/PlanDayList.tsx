@@ -49,8 +49,8 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
       total += n * (unit.startsWith("s") ? v : v * 60);
       continue;
     }
-    // "MM:SS" or "M:SS"
-    const colon = d.match(/^(\d{1,3}):(\d{2})$/);
+    // "MM:SS" or "M:SS" — anywhere in the field (e.g. "5K (~30:00)")
+    const colon = d.match(/(\d{1,3}):(\d{2})/);
     if (colon) { total += parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10); continue; }
     // "5 min" / "5.5 min"
     const min = d.match(/(\d+(?:\.\d+)?)\s*min/i);
@@ -63,10 +63,10 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
 }
 
 function extractDuration(w: ParsedWorkout): string | null {
-  // If any segment is distance-based (km/mi), the segment-sum will undercount
-  // (e.g. a 5km race leg has no time value). Prefer the workout's stated total in that case.
+  // If any segment is distance-based (km/mi/"5K") with no embedded time, the segment-sum
+  // will undercount. Prefer the workout's stated total in that case.
   const hasDistanceSeg = (w.segments || []).some((s) =>
-    /\d+(?:\.\d+)?\s*(km|mi|m)\b/i.test(s.duration || "")
+    /\d+(?:\.\d+)?\s*(km|mi|k)\b/i.test(s.duration || "") && !/\d{1,3}:\d{2}/.test(s.duration || "")
   );
   const txt = `${w.title} ${w.rawText}`;
   const totalMatch =
