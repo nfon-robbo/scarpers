@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,11 +14,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2, Heart, Timer, Zap, TrendingUp, Mountain, Gauge,
-  Trash2, ChevronDown, ChevronUp, MapPin,
+  Loader2, Heart, Timer, Zap, TrendingUp, Mountain,
+  Trash2, ChevronRight,
 } from "lucide-react";
-import ActivityMap from "@/components/ActivityMap";
-import ActivityCharts from "@/components/ActivityCharts";
+import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 
 const Activities = () => {
   const { user } = useAuth();
