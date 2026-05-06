@@ -543,16 +543,15 @@ export default function PlanDayList({
                                   {(() => {
                                     const ov = overrides[workoutKey(selectedWorkout)]?.[i];
                                     const isModified = !!(ov?.duration || ov?.pace);
-                                    if (!isModified || !onSyncWorkout) return null;
+                                    if (!isModified) return null;
                                     return (
                                       <button
                                         type="button"
-                                        onClick={(e) => { e.stopPropagation(); onSyncWorkout(); }}
-                                        disabled={syncing}
-                                        title="Sync this change to intervals.icu"
-                                        className="flex items-center justify-center px-3 bg-primary/10 hover:bg-primary/20 transition-colors border-l text-primary disabled:opacity-50"
+                                        onClick={(e) => { e.stopPropagation(); resetStepOverride(selectedWorkout, i); }}
+                                        title="Reset this step to the original value"
+                                        className="flex items-center justify-center px-3 bg-primary/10 hover:bg-primary/20 transition-colors border-l text-primary"
                                       >
-                                        {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                        <RefreshCw className="w-4 h-4" />
                                       </button>
                                     );
                                   })()}
