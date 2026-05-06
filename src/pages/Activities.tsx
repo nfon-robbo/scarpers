@@ -22,17 +22,14 @@ import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 const Activities = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { fmt, label } = useUnits();
+  const { fmt } = useUnits();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
-  const [rawDataById, setRawDataById] = useState<Record<string, any>>({});
-  const [loadingRawId, setLoadingRawId] = useState<string | null>(null);
 
-  // Columns needed for list view (exclude heavy raw_data JSONB)
   const LIST_COLUMNS =
     "id,user_id,start_time,activity_type,source_file,training_effect,training_load,training_plan_id," +
     "distance_meters,duration_seconds,avg_heart_rate,max_heart_rate,avg_speed,max_speed," +
@@ -61,21 +58,6 @@ const Activities = () => {
       setLoading(false);
     });
   }, [user]);
-
-  const handleToggleExpand = async (id: string) => {
-    const next = expandedId === id ? null : id;
-    setExpandedId(next);
-    if (next && rawDataById[next] === undefined) {
-      setLoadingRawId(next);
-      const { data } = await supabase
-        .from("activities")
-        .select("raw_data")
-        .eq("id", next)
-        .maybeSingle();
-      setRawDataById((prev) => ({ ...prev, [next]: (data as any)?.raw_data ?? null }));
-      setLoadingRawId(null);
-    }
-  };
 
   const togglePlanAllocation = async (activityId: string, currentlyAllocated: boolean) => {
     setTogglingPlan(activityId);
