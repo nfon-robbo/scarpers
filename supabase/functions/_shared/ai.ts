@@ -122,6 +122,7 @@ export async function callAI(opts: AICallOpts): Promise<Response> {
       model: opts.lovableModel || "google/gemini-3-flash-preview",
       messages: opts.messages,
       stream,
+      max_tokens: maxTokens,
     }),
   });
 }
