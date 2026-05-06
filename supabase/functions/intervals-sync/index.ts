@@ -65,11 +65,15 @@ function paceRange(pace: string): string {
 }
 
 function paceTarget(step: WorkoutStep): string {
-  if (step.pace) return paceRange(step.pace);
-
   const normalized = step.intensity.toLowerCase();
+  // Warm-up and cool-down should not carry a pace target — let the runner ease
+  // in / cool down at whatever feels right. Only honour an explicit override.
+  if (normalized === "warmup" || normalized === "cooldown") {
+    if (step.pace) return paceRange(step.pace);
+    return "";
+  }
+  if (step.pace) return paceRange(step.pace);
   if (normalized === "recovery" || normalized === "rest") return paceRange("9:57/km");
-  if (normalized === "warmup" || normalized === "cooldown") return paceRange("6:27/km");
   if (normalized === "interval") return paceRange("5:00/km");
   return paceRange("6:27/km");
 }
@@ -97,11 +101,12 @@ function structuredStep(step: WorkoutStep, forcedType?: "INTERVAL_ACTIVE" | "INT
             ? "INTERVAL_ACTIVE"
             : "ACTIVE");
 
+  const target = paceTarget(step);
   return {
     type,
     duration: Math.max(1, Math.round(step.duration)),
     durationType: "TIME",
-    target: paceTarget(step),
+    ...(target ? { target } : {}),
   };
 }
 
@@ -189,9 +194,9 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
 
   function fmtStep(step: WorkoutStep): string {
     // intervals.icu native syntax: "- <duration> <pace-range>/km"
-    // No cue words, no section headers — those break the Garmin export
-    // and cause "no target" on the watch.
-    return `- ${fmtDur(step.duration)} ${paceTarget(step)}`;
+    // Warm-up / cool-down may have no pace target — emit just the duration.
+    const pace = paceTarget(step);
+    return pace ? `- ${fmtDur(step.duration)} ${pace}` : `- ${fmtDur(step.duration)}`;
   }
 
   const lines: string[] = [];
