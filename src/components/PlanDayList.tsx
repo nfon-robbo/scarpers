@@ -593,36 +593,53 @@ export default function PlanDayList({
                 (() => {
                   const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
                   const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
-                  const expanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
+                  const aiExpanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
+                  const myCustom = customSteps[workoutKey(selectedWorkout)] || [];
+                  const customExpanded = customToExpanded(myCustom);
+                  const combined = [...aiExpanded, ...customExpanded];
                   return (
                     <div className="relative mt-2 pl-2">
                       {/* Vertical dotted spine */}
                       <div className="absolute left-[18px] top-3 bottom-3 border-l-2 border-dotted border-muted-foreground/30" />
                       <div className="space-y-3">
-                        {expanded.map((step, i) => {
+                        {combined.map((step, i) => {
                           const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
                           const isWarmCool = step.intensity === "Warmup" || step.intensity === "Cooldown";
                           const Icon = isWalk ? PersonStanding : Footprints;
                           const durStr = fmtTime(step.duration);
                           const paceStr = fmtPace(step.pace);
+                          const customIdx = i - aiExpanded.length;
+                          const isCustom = customIdx >= 0;
+                          const customRef = isCustom ? myCustom[customIdx] : null;
                           return (
                             <div key={i} className="relative flex items-start gap-3">
                               <div className="relative z-10 shrink-0 w-9 h-9 rounded-full bg-background border-2 border-muted-foreground/30 flex items-center justify-center text-xs font-semibold text-muted-foreground">
                                 {i + 1}
                               </div>
                               <div className="flex-1 min-w-0 space-y-1.5 pt-1">
-                                <p className="text-sm font-semibold leading-none">{step.label}</p>
+                                <p className="text-sm font-semibold leading-none flex items-center gap-2">
+                                  {step.label}
+                                  {isCustom && (
+                                    <span className="text-[10px] uppercase tracking-wide bg-primary/15 text-primary px-1.5 py-0.5 rounded">Custom</span>
+                                  )}
+                                </p>
                                 <div className="flex items-stretch rounded-xl border bg-card overflow-hidden">
                                   <div className="flex items-center justify-center w-12 bg-primary/10 shrink-0">
                                     <Icon className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
                                     <EditableStat
-                                      value={overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr}
+                                      value={isCustom ? durStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr)}
                                       label="Time (mm:ss)"
                                       placeholder="mm:ss"
-                                      onSave={(v) => setStepOverride(selectedWorkout, i, "duration", v)}
-                                      isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
+                                      onSave={(v) => isCustom && customRef
+                                        ? setCustomSteps((prev) => {
+                                            const key = workoutKey(selectedWorkout);
+                                            const list = (prev[key] || []).map((s) => s.id === customRef.id ? { ...s, duration: v } : s);
+                                            return { ...prev, [key]: list };
+                                          })
+                                        : setStepOverride(selectedWorkout, i, "duration", v)}
+                                      isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
                                     />
                                     {isWarmCool ? (
                                       <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
@@ -631,15 +648,30 @@ export default function PlanDayList({
                                       </div>
                                     ) : (
                                       <EditableStat
-                                        value={overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr}
+                                        value={isCustom ? paceStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr)}
                                         label="Pace (min/km)"
                                         placeholder="m:ss"
-                                        onSave={(v) => setStepOverride(selectedWorkout, i, "pace", v)}
-                                        isOverridden={!!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                        onSave={(v) => isCustom && customRef
+                                          ? setCustomSteps((prev) => {
+                                              const key = workoutKey(selectedWorkout);
+                                              const list = (prev[key] || []).map((s) => s.id === customRef.id ? { ...s, pace: v } : s);
+                                              return { ...prev, [key]: list };
+                                            })
+                                          : setStepOverride(selectedWorkout, i, "pace", v)}
+                                        isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
                                       />
                                     )}
                                   </div>
-                                  {(() => {
+                                  {isCustom && customRef ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); removeCustomStep(selectedWorkout, customRef.id); }}
+                                      title="Remove this custom step"
+                                      className="flex items-center justify-center px-3 bg-destructive/10 hover:bg-destructive/20 transition-colors border-l text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  ) : (() => {
                                     const ov = overrides[workoutKey(selectedWorkout)]?.[i];
                                     const isModified = !!(ov?.duration || ov?.pace);
                                     if (!isModified) return null;
@@ -659,6 +691,10 @@ export default function PlanDayList({
                             </div>
                           );
                         })}
+                      </div>
+
+                      <div className="mt-4 pl-12">
+                        <AddStepForm onAdd={(s) => addCustomStep(selectedWorkout, s)} />
                       </div>
                     </div>
                   );
