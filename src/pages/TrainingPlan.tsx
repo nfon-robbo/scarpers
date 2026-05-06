@@ -502,9 +502,6 @@ const TrainingPlanPage = () => {
         setLoading(false);
         savePlan(accumulated);
         toast({ title: "Plan saved", description: "Your training plan has been saved." });
-        // Offer post-generation analysis
-        setPostAnalysisPlanContent(accumulated);
-        setShowPostAnalysis(true);
       },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
