@@ -45,14 +45,29 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
   return (durationSeconds / paceSeconds) * metresPerUnit;
 }
 
+// Build a pace range from a single pace string. Intervals.icu / Garmin
+// require a target *range* for the workout step to display a pace target;
+// a single value falls back to "No Target". We use the supplied pace as
+// the fast bound and add 60s/km for the slow bound.
+function paceRange(pace: string): string {
+  const cleaned = pace.replace(/\s+/g, "");
+  const m = cleaned.match(/^(\d{1,2}):(\d{2})(?:\/(km|mi))?$/i);
+  if (!m) return `${cleaned.replace(/\/$/, "")} Pace`;
+  const fastSec = Number(m[1]) * 60 + Number(m[2]);
+  const slowSec = fastSec + 60;
+  const unit = (m[3] || "km").toLowerCase();
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  return `${fmt(fastSec)}-${fmt(slowSec)}/${unit} Pace`;
+}
+
 function paceTarget(step: WorkoutStep): string {
-  if (step.pace) return `${step.pace.replace(/\s+/g, "").replace(/\/$/, "")} Pace`;
+  if (step.pace) return paceRange(step.pace);
 
   const normalized = step.intensity.toLowerCase();
-  if (normalized === "recovery" || normalized === "rest") return "9:57/km Pace";
-  if (normalized === "warmup" || normalized === "cooldown") return "6:27/km Pace";
-  if (normalized === "interval") return "5:00/km Pace";
-  return "6:27/km Pace";
+  if (normalized === "recovery" || normalized === "rest") return paceRange("9:57/km");
+  if (normalized === "warmup" || normalized === "cooldown") return paceRange("6:27/km");
+  if (normalized === "interval") return paceRange("5:00/km");
+  return paceRange("6:27/km");
 }
 
 function zoneTarget(step: WorkoutStep): string {
