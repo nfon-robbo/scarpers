@@ -82,6 +82,25 @@ function paceForSegment(seg: ParsedSegment, intensity: string): string {
   return "6:27/km";
 }
 
+/** Parse "M:SS/km" → seconds-per-km. Returns null if unparseable. */
+function paceToSeconds(pace: string): number | null {
+  const m = pace.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/**
+ * Walk/run ramp sessions must use conversational easy paces. The AI
+ * occasionally injects race-derived targets (e.g. 2:45/km, 3:05/km) which are
+ * dangerous and unrealistic. Clamp anything faster than 5:30/km to 6:00/km.
+ */
+function clampWalkRunPace(pace: string): string {
+  const secs = paceToSeconds(pace);
+  if (secs == null) return pace;
+  if (secs < 330) return "6:00/km"; // < 5:30/km
+  return pace;
+}
+
 export function normalizePaceInput(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return trimmed;
