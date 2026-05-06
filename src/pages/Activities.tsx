@@ -250,31 +250,6 @@ const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string;
   );
 };
 
-const DetailField = ({ label, value, tooltip }: { label: string; value: string | null; tooltip?: string }) => {
-  if (!value) return null;
-  if (tooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="cursor-help">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-sm font-semibold">{value}</p>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-xs text-xs">
-          <p>{tooltip}</p>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-semibold">{value}</p>
-    </div>
-  );
-};
-
 function getTrainingEffectDescription(te: number): string {
   if (te < 2.0) return "Minor impact — helps recovery without significantly improving fitness.";
   if (te < 3.0) return "Maintaining your current aerobic fitness level.";
@@ -282,49 +257,5 @@ function getTrainingEffectDescription(te: number): string {
   if (te < 5.0) return "Highly improving your fitness — a hard workout pushing your limits.";
   return "Overreaching — extreme effort, ensure adequate recovery.";
 }
-
-const RawDataDisplay = ({ data }: { data: any }) => {
-  if (typeof data !== "object" || data === null) {
-    return <span className="text-xs text-muted-foreground">{String(data)}</span>;
-  }
-
-  const entries = Object.entries(data).filter(
-    ([_, v]) => v !== null && v !== undefined && v !== ""
-  );
-
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
-      {entries.map(([key, val]) => {
-        const displayKey = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-        let displayVal: string;
-
-        if (typeof val === "object" && val !== null) {
-          displayVal = JSON.stringify(val);
-        } else if (typeof val === "number") {
-          displayVal = Number.isInteger(val) ? String(val) : Number(val).toFixed(2);
-        } else if (typeof val === "boolean") {
-          displayVal = val ? "Yes" : "No";
-        } else {
-          displayVal = String(val);
-          // Try to format dates
-          if (/^\d{4}-\d{2}-\d{2}/.test(displayVal)) {
-            try {
-              displayVal = new Date(displayVal).toLocaleString();
-            } catch {}
-          }
-        }
-
-        return (
-          <div key={key} className="flex justify-between gap-2 py-0.5">
-            <span className="text-xs text-muted-foreground truncate">{displayKey}</span>
-            <span className="text-xs font-mono text-foreground text-right truncate max-w-[60%]">{displayVal}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
 
 export default Activities;
