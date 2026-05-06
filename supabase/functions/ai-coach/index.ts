@@ -357,17 +357,12 @@ BREVITY RULES (strict):
 - Be practical and actionable — no filler or preamble
 
 RECOMMENDATION ACTIONS:
-- WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with this exact marker on its own line:
-  [[ACTION:recommendation]]
-- Do NOT include the marker for general advice, education, or questions that don't change the plan.
+- WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with one of these markers on its own line:
+  • [[ACTION:day:DD/MM/YYYY]]   ← use this when the change affects ONE specific day only (e.g. "today's session", "Wednesday 17 June", a single workout the user just asked about). Replace DD/MM/YYYY with that exact date in UK format.
+  • [[ACTION:plan]]              ← use this ONLY when the change requires rewriting multiple weeks/sessions of the plan (e.g. "reduce overall volume across the next 4 weeks").
+- Default to [[ACTION:day:...]] whenever possible. Only use [[ACTION:plan]] when a single-day edit cannot capture the change.
+- Do NOT include any marker for general advice, education, or questions that don't change the plan.
 - Never wrap the marker in code fences. Always plain text on the last line.
-
-WHEN THE USER CONFIRMS A CHANGE (e.g. they reply "Make the change", "yes apply it", "do it"):
-- Respond with a SHORT confirmation in this exact shape and nothing else:
-  ✅ Done — here's what I changed:
-  - **<date or session name>**: <old> → <new>
-  - (one bullet per change, max 4)
-- Do NOT re-explain the rationale, do NOT add caveats, do NOT add follow-up questions, do NOT waffle. Just confirm what changed.
 
 ${athleteContext}
 

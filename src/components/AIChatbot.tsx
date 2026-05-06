@@ -8,6 +8,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { MessageCircle, Send, Loader2, X, Minimize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
+import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 
 interface Message {
   role: "user" | "assistant";
@@ -35,7 +36,10 @@ const AIChatbot = () => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
-  const applyChange = useCallback(async (recommendationText: string) => {
+  const applyChange = useCallback(async (
+    recommendationText: string,
+    scope: { kind: "day"; dateUk: string } | { kind: "plan" },
+  ) => {
     if (loading) return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
@@ -57,8 +61,92 @@ const AIChatbot = () => {
     }
 
     setLoading(true);
-    setMessages(prev => [...prev, { role: "assistant", content: "✏️ Applying the change to your plan…" }]);
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: scope.kind === "day"
+        ? `✏️ Updating your ${scope.dateUk} session…`
+        : "✏️ Applying the change to your plan…",
+    }]);
 
+    const finishWith = (msg: string) => {
+      setMessages(prev => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: "assistant", content: msg };
+        return copy;
+      });
+      setLoading(false);
+    };
+
+    // ─── SINGLE-DAY CHANGE ────────────────────────────────────────────────
+    if (scope.kind === "day") {
+      // Parse DD/MM/YYYY → yyyy-mm-dd, then locate that workout in the plan.
+      const m = scope.dateUk.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (!m) { finishWith("⚠️ Couldn't parse the date for that change."); return; }
+      const [, dd, mm, yyyy] = m;
+      const isoDate = `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+
+      const workouts = parseWorkoutsFromPlan(plan.content);
+      const target = workouts.find(w => {
+        if (!w.dateObj) return false;
+        const y = w.dateObj.getFullYear();
+        const mo = String(w.dateObj.getMonth() + 1).padStart(2, "0");
+        const d = String(w.dateObj.getDate()).padStart(2, "0");
+        return `${y}-${mo}-${d}` === isoDate;
+      });
+      if (!target?.rawText) {
+        finishWith(`⚠️ Couldn't find a workout on ${scope.dateUk} in your plan.`);
+        return;
+      }
+
+      // Build today_workout block (same shape the day-adjust prompt expects).
+      let todayWorkoutBlock = `**${target.title}**\n`;
+      if (target.segments.length > 0) {
+        todayWorkoutBlock += "| Segment | Duration | Target | HR Zone | Notes |\n";
+        todayWorkoutBlock += "|---------|----------|--------|---------|-------|\n";
+        for (const s of target.segments) {
+          todayWorkoutBlock += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
+        }
+      }
+      // Append the chat recommendation so the AI knows WHAT to change.
+      todayWorkoutBlock += `\n\nCOACH RECOMMENDATION TO APPLY (from chat):\n${recommendationText}`;
+
+      let dayResp = "";
+      streamAICoach({
+        type: "day-adjust",
+        token: session.access_token,
+        targetDate: isoDate,
+        todayWorkout: todayWorkoutBlock,
+        onDelta: (t) => { dayResp += t; },
+        onDone: async () => {
+          // Extract the new "## 📝 Workout for Today" block.
+          const sec = dayResp.match(/##\s*📝\s*Workout for Today\s*\n([\s\S]*?)(?=\n##\s|$)/i);
+          if (!sec) { finishWith("⚠️ Couldn't extract the adjusted workout."); return; }
+          const adjusted = sec[1].trim();
+
+          // Splice it into the existing plan in place of the original raw block.
+          const rawLines = target.rawText!.split("\n");
+          const dateLine = rawLines[0];
+          const newTitleMatch = adjusted.match(/\*\*([^*]+)\*\*/);
+          const newTitle = newTitleMatch ? newTitleMatch[1] : target.title;
+          const datePrefix = dateLine.match(/(\*\*[^*]*\d{1,2}\/\d{1,2}\/\d{4}\*\*\s*[-–:]\s*)/);
+          const newDateLine = datePrefix ? `${datePrefix[1]}${newTitle}` : dateLine;
+          const adjustedBody = adjusted.replace(/^\*\*[^*]+\*\*\s*\n?/, "").trim();
+          const replacement = `${newDateLine}\n\n${adjustedBody}`;
+
+          const idx = plan.content!.indexOf(target.rawText!);
+          if (idx === -1) { finishWith("⚠️ Couldn't locate the workout in your plan."); return; }
+          const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
+
+          await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Reload the Training Plan page to see it.`);
+          toast({ title: "Workout updated", description: scope.dateUk });
+        },
+        onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
+      });
+      return;
+    }
+
+    // ─── FULL-PLAN CHANGE ─────────────────────────────────────────────────
     let revised = "";
     streamAICoach({
       type: "plan-adjust",
@@ -72,43 +160,20 @@ const AIChatbot = () => {
       reviewText: recommendationText,
       onDelta: (t) => { revised += t; },
       onDone: async () => {
-        if (revised.trim()) {
-          // Archive old plan, save new one with same metadata.
-          await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
-          await supabase.from("training_plans").insert({
-            user_id: session.user.id,
-            race_distance: plan.race_distance,
-            goal_time: plan.goal_time,
-            training_days: plan.training_days,
-            start_date: plan.start_date,
-            content: revised,
-          } as any);
-          setMessages(prev => {
-            const copy = [...prev];
-            copy[copy.length - 1] = {
-              role: "assistant",
-              content: "✅ Done — your plan has been updated. Reload the Training Plan page to see the new sessions.",
-            };
-            return copy;
-          });
-          toast({ title: "Plan updated", description: "AI coach applied the change." });
-        } else {
-          setMessages(prev => {
-            const copy = [...prev];
-            copy[copy.length - 1] = { role: "assistant", content: "⚠️ Couldn't apply the change — please try again." };
-            return copy;
-          });
-        }
-        setLoading(false);
+        if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
+        await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
+        await supabase.from("training_plans").insert({
+          user_id: session.user.id,
+          race_distance: plan.race_distance,
+          goal_time: plan.goal_time,
+          training_days: plan.training_days,
+          start_date: plan.start_date,
+          content: revised,
+        } as any);
+        finishWith("✅ Done — your plan has been updated. Reload the Training Plan page to see the new sessions.");
+        toast({ title: "Plan updated", description: "AI coach applied the change." });
       },
-      onError: (err) => {
-        setMessages(prev => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { role: "assistant", content: `⚠️ Couldn't apply the change: ${err}` };
-          return copy;
-        });
-        setLoading(false);
-      },
+      onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
     });
   }, [loading, toast]);
 
@@ -246,10 +311,26 @@ const AIChatbot = () => {
             </div>
           )}
           {messages.map((msg, i) => {
-            const hasAction = msg.role === "assistant" && /\[\[ACTION:recommendation\]\]/.test(msg.content);
-            const cleaned = hasAction ? msg.content.replace(/\[\[ACTION:recommendation\]\]/g, "").trim() : msg.content;
+            
+            const dayMatch = msg.role === "assistant"
+              ? msg.content.match(/\[\[ACTION:day:(\d{1,2}\/\d{1,2}\/\d{4})\]\]/)
+              : null;
+            const planMatch = msg.role === "assistant"
+              ? /\[\[ACTION:plan\]\]/.test(msg.content)
+              : false;
+            // Backwards-compatible legacy marker.
+            const legacyMatch = msg.role === "assistant"
+              ? /\[\[ACTION:recommendation\]\]/.test(msg.content)
+              : false;
+            const hasAction = !!dayMatch || planMatch || legacyMatch;
+            const cleaned = hasAction
+              ? msg.content.replace(/\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g, "").trim()
+              : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const showActions = hasAction && isLastAssistant && !loading;
+            const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
+              ? { kind: "day", dateUk: dayMatch[1] }
+              : { kind: "plan" };
             return (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
@@ -265,26 +346,33 @@ const AIChatbot = () => {
                     cleaned
                   )}
                   {showActions && (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-8 text-xs"
-                        disabled={loading}
-                        onClick={() => applyChange(cleaned)}
-                      >
-                        Make the change
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 h-8 text-xs"
-                        disabled={loading}
-                        onClick={() => {
-                          setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
-                        }}
-                      >
-                        Keep as it is
-                      </Button>
+                    <div className="mt-3 space-y-2">
+                      {scope.kind === "day" && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Affects only your <strong>{scope.dateUk}</strong> session.
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => applyChange(cleaned, scope)}
+                        >
+                          Make the change
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs"
+                          disabled={loading}
+                          onClick={() => {
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                          }}
+                        >
+                          Keep as it is
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
