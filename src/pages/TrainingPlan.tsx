@@ -1281,6 +1281,32 @@ const TrainingPlanPage = () => {
                   Target finish time — the AI will build pace targets and intervals around hitting this.
                 </p>
               </div>
+              <div className="space-y-2 rounded-lg border border-border/50 p-4 bg-muted/20">
+                <Label className="text-sm font-medium">Current Easy Run Pace <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  If you know your current easy/Z2 pace, enter the range here (min:sec per km). The plan will start at this pace and gradually progress toward your goal. Leave blank and we'll estimate from your Strava history.
+                </p>
+                <div className="flex items-center gap-2 max-w-[360px]">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 7:00"
+                    value={currentPaceMin}
+                    onChange={(e) => setCurrentPaceMin(e.target.value)}
+                    className="text-center"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 7:30"
+                    value={currentPaceMax}
+                    onChange={(e) => setCurrentPaceMax(e.target.value)}
+                    className="text-center"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
                 <div className="flex flex-wrap gap-2">
