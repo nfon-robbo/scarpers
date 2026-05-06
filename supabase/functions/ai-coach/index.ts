@@ -1015,11 +1015,20 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
     }
 
     const { callAI } = await import("../_shared/ai.ts");
+    const isChat = type === "chat";
+    const priorTurns = isChat && Array.isArray(chatHistory)
+      ? chatHistory
+          .filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+          .slice(-20)
+          // Drop the trailing user turn — we send it as the final userPrompt below.
+          .slice(0, -1)
+      : [];
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
       messages: [
         { role: "system", content: systemPrompt },
+        ...priorTurns,
         { role: "user", content: userPrompt },
       ],
     });
