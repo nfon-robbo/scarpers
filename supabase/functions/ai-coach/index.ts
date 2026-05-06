@@ -629,7 +629,13 @@ Generate the complete revised ${raceLabel} training plan based on the review and
         z2Pace = fb.easy;
         z2PaceSource = fb.label;
       }
-      const avgRunPace = avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A";
+      // When user supplies their current pace, ignore the historical average so the AI is not tempted to use it.
+      const avgRunPace = userPaceRange
+        ? `IGNORED — user supplied current easy pace (${userPaceRange}/km); use that instead`
+        : (avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A");
+      const userAnchorBlock = userPaceRange
+        ? `\n🚨 USER-SUPPLIED PACE OVERRIDE 🚨\nThe athlete has explicitly told us their current easy run pace is ${userPaceRange}/km.\nWeek 1 EVERY easy/Z2/recovery/long run MUST be prescribed at ${userPaceRange}/km — no faster, no slower.\nDo NOT fall back to historical averages, textbook paces, or goal-derived paces for week 1.\nProgress this anchor by no more than ~5-10 seconds/km per week toward the goal pace as fitness builds.\n`
+        : "";
 
       // ACWR (acute:chronic workload ratio) from training load
       const today = new Date();
