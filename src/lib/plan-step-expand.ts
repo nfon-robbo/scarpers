@@ -205,7 +205,7 @@ export function expandWorkoutSteps(
       const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
       const restZone = `Z${Math.max(1, workZoneNumber - 1)}`;
       const restBpm = hrZoneToBpm(restZone);
-      const workPace = paceForSegment(seg, "Interval");
+      const workPace = maybeClamp(paceForSegment(seg, "Interval"));
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
