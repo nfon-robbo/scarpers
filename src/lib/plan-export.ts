@@ -115,15 +115,32 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
         i++;
       }
 
-      // Fallback: if no table segments found, try to parse compact format from the title line
-      // e.g. "Easy Run (30 min) @ Z2" or "Intervals: 6 x 400m @ 7:15/km (Z4). 90s walk recovery."
+      // Capture raw text
+      const rawText = lines.slice(startLine, i).join("\n");
+
+      // Extract native intervals.icu text from ~~~intervals code blocks
+      let intervalsText: string | undefined;
+      const intervalsMatch = rawText.match(/~~~intervals\n([\s\S]*?)~~~/);
+      if (intervalsMatch) {
+        intervalsText = intervalsMatch[1].trim();
+      }
+
+      // PREFERRED: parse the ~~~intervals block into structured segments.
+      // This must run BEFORE the title-based fallback, otherwise titles like
+      // "S1 10x1min Run/" trigger the fallback's hardcoded "Warm-up 10 min".
+      if (intervalsText && segments.length === 0) {
+        const parsed = parseIntervalsBlock(intervalsText);
+        if (parsed.length) segments.push(...parsed);
+      }
+
+      // Fallback: if no table segments AND no intervals block, parse compact
+      // format from the title line e.g. "Easy Run (30 min) @ Z2".
       if (segments.length === 0 && title) {
         const durationMatch = title.match(/\((\d+\s*min)\)/i) || title.match(/(\d+\s*min)/i);
         const zoneMatch = title.match(/Z(\d)/i);
         if (durationMatch) {
           const dur = durationMatch[1];
           const zone = zoneMatch ? `Z${zoneMatch[1]}` : "Z2";
-          // Check for interval pattern
           const intervalMatch = title.match(/(\d+)\s*x\s*([\d.]+\s*(?:m|km|min|sec)\b)/i);
           if (intervalMatch) {
             segments.push({ segment: "Warm-up", duration: "10 min", target: "easy", hrZone: "Z1", notes: "" });
@@ -135,24 +152,6 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
             segments.push({ segment: "Cool-down", duration: "5 min", target: "easy", hrZone: "Z1", notes: "" });
           }
         }
-      }
-
-      // Capture raw text
-      const rawText = lines.slice(startLine, i).join("\n");
-
-      // Extract native intervals.icu text from ~~~intervals code blocks
-      let intervalsText: string | undefined;
-      const intervalsMatch = rawText.match(/~~~intervals\n([\s\S]*?)~~~/);
-      if (intervalsMatch) {
-        intervalsText = intervalsMatch[1].trim();
-      }
-
-      // If we found a ~~~intervals block but no table segments, parse the
-      // block into structured segments so the UI step list and the sync
-      // payload reflect the actual prescribed durations & paces.
-      if (intervalsText && segments.length === 0) {
-        const parsed = parseIntervalsBlock(intervalsText);
-        if (parsed.length) segments.push(...parsed);
       }
 
       workouts.push({
