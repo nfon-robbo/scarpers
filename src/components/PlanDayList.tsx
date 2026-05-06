@@ -20,6 +20,8 @@ interface PlanDayListProps {
   onMoveWorkout?: (fromDate: string, toDate: string) => void;
   onSyncWorkout?: () => void | Promise<void>;
   syncing?: boolean;
+  goalTime?: string;
+  raceDistance?: string;
 }
 
 function shortLabel(title: string): string {
