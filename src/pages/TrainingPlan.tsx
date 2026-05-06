@@ -20,6 +20,7 @@ import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { importDocxPlan } from "@/lib/docx-plan-import";
+import { importFitPlan } from "@/lib/fit-plan-import";
 
 interface ApiStep {
   duration: number;
@@ -199,6 +200,7 @@ const TrainingPlanPage = () => {
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fitInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -952,6 +954,45 @@ const TrainingPlanPage = () => {
     }
   };
 
+  const handleImportFit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length || !user) return;
+
+    const valid = files.filter(f => /\.(fit|zip)$/i.test(f.name));
+    if (valid.length === 0) {
+      toast({ title: "Invalid files", description: "Please select .fit files or a .zip archive.", variant: "destructive" });
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const result = await importFitPlan(valid);
+      setRaceDistance(result.raceDistance);
+      setTrainingDays(result.trainingDays);
+      setStartDate(new Date(result.startDate));
+      setRaceDate(new Date(result.endDate));
+      setLetAIDecide(false);
+      setContent(result.markdown);
+      await savePlan(result.markdown);
+
+      toast({
+        title: `Imported ${result.workoutCount} workouts!`,
+        description: result.errors.length
+          ? `Some files couldn't be parsed (${result.errors.length}).`
+          : `Plan from ${result.startDate} to ${result.endDate}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Could not parse the FIT files.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const showConfig = !content && !loading;
 
   if (initialLoading) {
@@ -1119,6 +1160,33 @@ const TrainingPlanPage = () => {
               <>
                 <FileUp className="w-4 h-4 mr-2" />
                 Import .docx Plan
+              </>
+            )}
+          </Button>
+          <input
+            ref={fitInputRef}
+            type="file"
+            accept=".fit,.zip"
+            multiple
+            onChange={handleImportFit}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={loading || importing}
+            onClick={() => fitInputRef.current?.click()}
+          >
+            {importing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <FileUp className="w-4 h-4 mr-2" />
+                Import .fit / .zip
               </>
             )}
           </Button>
