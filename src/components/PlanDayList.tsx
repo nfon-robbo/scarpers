@@ -66,7 +66,7 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
   return Math.round(total);
 }
 
-function extractDuration(w: ParsedWorkout): string | null {
+function extractDuration(w: ParsedWorkout, customExtraSecs = 0): string | null {
   const txt = `${w.title} ${w.rawText}`;
 
   // Race day: detail view shows ONLY the race effort (warm-up/cool-down stripped).
