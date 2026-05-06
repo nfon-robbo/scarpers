@@ -284,6 +284,8 @@ export default function PlanDayList({
   planEndDate,
   completedDates = new Set(),
   onMoveWorkout,
+  onSyncWorkout,
+  syncing = false,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
