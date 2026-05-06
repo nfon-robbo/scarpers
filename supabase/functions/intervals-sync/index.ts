@@ -52,12 +52,13 @@ function paceToDistanceMeters(durationSeconds: number, pace?: string): number {
 function paceRange(pace: string): string {
   const cleaned = pace.replace(/\s+/g, "");
   const m = cleaned.match(/^(\d{1,2}):(\d{2})(?:\/(km|mi))?$/i);
-  if (!m) return `${cleaned.replace(/\/$/, "")} Pace`;
+  if (!m) return cleaned.replace(/\/$/, "");
   const fastSec = Number(m[1]) * 60 + Number(m[2]);
   const slowSec = fastSec + 60;
   const unit = (m[3] || "km").toLowerCase();
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  return `${fmt(fastSec)}-${fmt(slowSec)}/${unit} Pace`;
+  // intervals.icu native pace-range syntax: "fast-slow/km" (no trailing "Pace" word)
+  return `${fmt(fastSec)}-${fmt(slowSec)}/${unit}`;
 }
 
 function paceTarget(step: WorkoutStep): string {
