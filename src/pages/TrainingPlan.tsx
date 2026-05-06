@@ -884,7 +884,10 @@ const TrainingPlanPage = () => {
       toast({ title: "No workouts with dates found", variant: "destructive" });
       return;
     }
-    const dates = withDates.map(w => w.dateObj!.toISOString().split("T")[0]).sort();
+    const dates = withDates.map(w => {
+      const d = w.dateObj!;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }).sort();
     setSyncing(true);
     try {
       const resp = await supabase.functions.invoke("intervals-sync", {
