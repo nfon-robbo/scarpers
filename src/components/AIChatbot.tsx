@@ -166,15 +166,18 @@ const AIChatbot = () => {
       onDone: async () => {
         if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
         await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
-        await supabase.from("training_plans").insert({
+        const { data: inserted } = await supabase.from("training_plans").insert({
           user_id: session.user.id,
           race_distance: plan.race_distance,
           goal_time: plan.goal_time,
           training_days: plan.training_days,
           start_date: plan.start_date,
           content: revised,
-        } as any);
-        finishWith("✅ Done — your plan has been updated. Reload the Training Plan page to see the new sessions.");
+        } as any).select("id").maybeSingle();
+        if (inserted?.id) {
+          pushUndoEntry(inserted.id, plan.content!, "full plan rewrite");
+        }
+        finishWith("✅ Done — your plan has been updated. Use the **Undo** button at the top of the Training Plan to revert.");
         toast({ title: "Plan updated", description: "AI coach applied the change." });
       },
       onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
