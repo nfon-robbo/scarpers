@@ -404,6 +404,26 @@ export default function PlanDayList({
     } catch {}
   }, [overrides]);
 
+  // Custom user-added steps (warm-up / rep / cool-down / custom).
+  // Stored locally; appended after AI steps both in UI and on Intervals.icu sync.
+  const [customSteps, setCustomSteps] = useState<CustomStepsMap>({});
+  useEffect(() => { setCustomSteps(loadCustomSteps()); }, []);
+  useEffect(() => { saveCustomSteps(customSteps); }, [customSteps]);
+
+  const addCustomStep = (w: ParsedWorkout, step: CustomStep) => {
+    const key = workoutKey(w);
+    setCustomSteps((prev) => ({ ...prev, [key]: [...(prev[key] || []), step] }));
+  };
+  const removeCustomStep = (w: ParsedWorkout, id: string) => {
+    const key = workoutKey(w);
+    setCustomSteps((prev) => {
+      const list = (prev[key] || []).filter((s) => s.id !== id);
+      const next = { ...prev };
+      if (list.length) next[key] = list; else delete next[key];
+      return next;
+    });
+  };
+
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
     for (const w of workouts) {
