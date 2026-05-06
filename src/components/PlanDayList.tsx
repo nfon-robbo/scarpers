@@ -288,6 +288,8 @@ export default function PlanDayList({
   onMoveWorkout,
   onSyncWorkout,
   syncing = false,
+  goalTime,
+  raceDistance,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
