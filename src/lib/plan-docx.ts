@@ -117,13 +117,36 @@ export async function generatePlanDocx(workouts: ParsedWorkout[], raceDistance?:
   return await Packer.toBlob(doc);
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
+export async function downloadBlob(blob: Blob, filename: string) {
+  // Ensure correct MIME type so Android (Samsung Internet/Chrome) recognizes it as a downloadable file
+  const docxBlob = blob.type
+    ? blob
+    : new Blob([blob], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+
+  // Prefer the native share/save sheet on mobile so user can pick where the file goes
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const file = new File([docxBlob], filename, { type: docxBlob.type });
+
+  if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (err) {
+      // User cancelled or share failed — fall back to download link
+    }
+  }
+
+  const url = URL.createObjectURL(docxBlob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
+  // Some Android browsers require target=_blank for the download attribute to trigger
+  a.target = "_blank";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
