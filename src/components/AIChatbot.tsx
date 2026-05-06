@@ -192,10 +192,8 @@ const AIChatbot = () => {
                       <Button
                         size="sm"
                         className="flex-1 h-8 text-xs"
-                        onClick={() => {
-                          setInput("Make the change — apply that to my plan.");
-                          setTimeout(() => sendMessage(), 0);
-                        }}
+                        disabled={loading}
+                        onClick={() => applyChange(cleaned)}
                       >
                         Make the change
                       </Button>
@@ -203,6 +201,7 @@ const AIChatbot = () => {
                         size="sm"
                         variant="outline"
                         className="flex-1 h-8 text-xs"
+                        disabled={loading}
                         onClick={() => {
                           setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
                         }}
