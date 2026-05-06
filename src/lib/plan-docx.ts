@@ -132,7 +132,7 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<"share
   if (isMobile && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename });
-      return;
+      return "shared";
     } catch (err) {
       // User cancelled or share failed — fall back to download link
     }
