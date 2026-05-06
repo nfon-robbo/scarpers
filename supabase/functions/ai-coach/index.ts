@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout } = reqBody;
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
@@ -363,6 +363,12 @@ RECOMMENDATION ACTIONS:
 - Default to [[ACTION:day:...]] whenever possible. Only use [[ACTION:plan]] when a single-day edit cannot capture the change.
 - Do NOT include any marker for general advice, education, or questions that don't change the plan.
 - Never wrap the marker in code fences. Always plain text on the last line.
+
+CONVERSATION CONTEXT (CRITICAL):
+- The earlier messages in this conversation are real prior turns. Use them.
+- If the user gives a follow-up like "add another rep", "remove a rep", "make it shorter", "swap it for an easy run", or any modification WITHOUT naming a date, it refers to the SAME workout that was last discussed in this conversation (the most recent [[ACTION:day:DD/MM/YYYY]] you produced, or the workout date the user explicitly named most recently).
+- In that case, reuse that exact same DD/MM/YYYY in your [[ACTION:day:...]] marker. Do NOT pick a different date and do NOT say "couldn't find a workout" — just apply the change to the remembered session.
+- Only switch to a different date if the user explicitly names a new date or session.
 
 ${athleteContext}
 
@@ -1015,11 +1021,20 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
     }
 
     const { callAI } = await import("../_shared/ai.ts");
+    const isChat = type === "chat";
+    const priorTurns = isChat && Array.isArray(chatHistory)
+      ? chatHistory
+          .filter((m: any) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+          .slice(-20)
+          // Drop the trailing user turn — we send it as the final userPrompt below.
+          .slice(0, -1)
+      : [];
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
       messages: [
         { role: "system", content: systemPrompt },
+        ...priorTurns,
         { role: "user", content: userPrompt },
       ],
     });
