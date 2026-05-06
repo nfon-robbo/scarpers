@@ -275,16 +275,16 @@ function fmtTarget(s: FitWorkoutStep): string {
     const toPace = (mmps: number) => {
       const mps = mmps / 1000;
       if (mps <= 0) return null;
-      const secPerKm = 1000 / mps;
+      let secPerKm = Math.round(1000 / mps);
       const m = Math.floor(secPerKm / 60);
-      const sec = Math.round(secPerKm % 60);
+      const sec = secPerKm % 60;
       return `${m}:${String(sec).padStart(2, "0")}/km`;
     };
+    // FIT stores faster speed (= lower min/km) in customHigh
     const fast = toPace(s.customHigh);
     const slow = toPace(s.customLow);
     if (fast && slow) return `${fast}-${slow} Pace`;
   }
-  // Power, Cadence — skip (rare for run workouts) and let it be open
   return "";
 }
 
