@@ -184,6 +184,41 @@ const TrainingPlanPage = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
+  const [undoCount, setUndoCount] = useState(0);
+
+  // Track undo stack size for the active plan; refresh when chat pushes/pops entries.
+  useEffect(() => {
+    const refresh = () => setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+    refresh();
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || detail.planId === savedPlanId) refresh();
+    };
+    window.addEventListener("plan-undo-changed", onChange);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("plan-undo-changed", onChange);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [savedPlanId]);
+
+  const handleUndo = useCallback(async () => {
+    if (!savedPlanId || !user) return;
+    const peek = peekUndoEntry(savedPlanId);
+    if (!peek) return;
+    const entry = popUndoEntry(savedPlanId);
+    if (!entry) return;
+    const { error } = await supabase
+      .from("training_plans")
+      .update({ content: entry.prevContent })
+      .eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Undo failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setContent(entry.prevContent);
+    toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
+  }, [savedPlanId, user, toast]);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
