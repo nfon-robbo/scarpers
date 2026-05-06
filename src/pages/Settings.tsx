@@ -694,8 +694,55 @@ const Settings = () => {
             <p className="text-sm text-muted-foreground">No previous plans yet.</p>
           ) : (
             <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={selectMode ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectMode((v) => !v);
+                      setSelectedIds(new Set());
+                    }}
+                  >
+                    {selectMode ? "Cancel" : "Select"}
+                  </Button>
+                  {selectMode && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedIds.size === archivedPlans.length) {
+                          setSelectedIds(new Set());
+                        } else {
+                          setSelectedIds(new Set(archivedPlans.map((p) => p.id)));
+                        }
+                      }}
+                    >
+                      {selectedIds.size === archivedPlans.length ? "Clear all" : "Select all"}
+                    </Button>
+                  )}
+                </div>
+                {selectMode && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={selectedIds.size === 0 || bulkDeleting}
+                    onClick={() => setConfirmBulkDelete(true)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                  </Button>
+                )}
+              </div>
               {archivedPlans.map((plan) => (
                 <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  {selectMode && (
+                    <Checkbox
+                      checked={selectedIds.has(plan.id)}
+                      onCheckedChange={() => toggleSelected(plan.id)}
+                      aria-label="Select plan"
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{plan.race_distance}</p>
                     <p className="text-xs text-muted-foreground">
@@ -706,33 +753,35 @@ const Settings = () => {
                       {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => resumePlan(plan)}
-                      disabled={planActionId === plan.id}
-                    >
-                      <Play className="w-3.5 h-3.5 mr-1" /> Resume
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => restartPlan(plan)}
-                      disabled={planActionId === plan.id}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmDelete(plan)}
-                      disabled={planActionId === plan.id}
-                      aria-label="Delete permanently"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                  {!selectMode && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => resumePlan(plan)}
+                        disabled={planActionId === plan.id}
+                      >
+                        <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => restartPlan(plan)}
+                        disabled={planActionId === plan.id}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmDelete(plan)}
+                        disabled={planActionId === plan.id}
+                        aria-label="Delete permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -752,6 +801,23 @@ const Settings = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => confirmDelete && deletePlanForever(confirmDelete)}>
               Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmBulkDelete} onOpenChange={(o) => !o && setConfirmBulkDelete(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} plan{selectedIds.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the selected plans. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={bulkDeletePlans} disabled={bulkDeleting}>
+              {bulkDeleting ? "Deleting…" : "Delete forever"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
