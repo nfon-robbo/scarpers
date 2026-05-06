@@ -224,6 +224,7 @@ const TrainingPlanPage = () => {
         setContent(data.content);
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
+        setGoalTime((data as any).goal_time || "");
         setTrainingDays(data.training_days);
         setStartDate(parseLocalISODate(data.start_date));
         if (data.race_date && data.race_date !== "ai-recommend") {
