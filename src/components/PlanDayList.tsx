@@ -131,15 +131,13 @@ function expandSegments(
         duration: formatTime(spec.on),
         pace: paceForZone(hrZone, segText + " " + (notes || "")),
       });
-      if (i < spec.reps - 1) {
-        walkIdx++;
-        steps.push({
-          kind: "walk",
-          label: `Walk ${walkIdx}`,
-          duration: formatTime(spec.off),
-          pace: "9:57",
-        });
-      }
+      walkIdx++;
+      steps.push({
+        kind: "walk",
+        label: `Walk ${walkIdx}`,
+        duration: formatTime(spec.off),
+        pace: "9:57",
+      });
     }
     mainEmitted = true;
   };
