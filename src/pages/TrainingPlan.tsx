@@ -827,18 +827,20 @@ const TrainingPlanPage = () => {
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
         const overridesForWorkout = stepOverrides[dateStr] || {};
-        const steps = w.segments.flatMap(seg => expandSegmentToSteps(seg)).map((step, idx) => ({
-          ...step,
-          duration: overridesForWorkout[idx]?.duration ? parseDurationSeconds(overridesForWorkout[idx].duration) : step.duration,
-          pace: overridesForWorkout[idx]?.pace ? normalizePaceInput(overridesForWorkout[idx].pace) : step.pace,
+        const expanded = expandWorkoutSteps(w.segments, w.title, w.rawText ?? "");
+        const steps = expanded.map((step, idx) => ({
+          duration: overridesForWorkout[idx]?.duration ? sharedParseDuration(overridesForWorkout[idx].duration!) : step.duration,
+          hrLow: step.hrLow,
+          hrHigh: step.hrHigh,
+          hrZone: step.hrZone,
+          intensity: step.intensity,
+          pace: overridesForWorkout[idx]?.pace ? sharedNormalizePace(overridesForWorkout[idx].pace!) : step.pace,
         }));
         const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
-        // Collect notes (including music BPM) from segments
         const notes = w.segments
           .map(s => s.notes?.trim())
           .filter(Boolean)
           .join("\n");
-        // Compute actual total duration and fix the title to match
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
