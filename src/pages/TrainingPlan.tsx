@@ -1187,6 +1187,10 @@ const TrainingPlanPage = () => {
                   <FileDown className="w-4 h-4 mr-2" />
                   Export plan (Word .docx)
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowTextDialog(true)}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Show text only
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
                   <RotateCcw className="w-4 h-4 mr-2" />
