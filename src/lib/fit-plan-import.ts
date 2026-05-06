@@ -9,6 +9,7 @@
 
 import JSZip from "jszip";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "./fit-parser";
+import { parseFitWorkout, fitWorkoutToIntervalsText, type FitWorkout } from "./fit-workout-parser";
 
 function stubActivity(fileName: string): ParsedActivity {
   return {
