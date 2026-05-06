@@ -82,10 +82,31 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
 
   const track = useMemo(() => {
     const t = data?.raw_data?.gps_track;
-    return Array.isArray(t) ? t : [];
+    if (Array.isArray(t) && t.length > 0) return t;
+    // Fallback: decode Strava map_polyline if present
+    const poly = data?.raw_data?.map_polyline;
+    if (typeof poly === "string" && poly.length > 0) {
+      try {
+        // Lazy require to avoid circulars
+        const { decodePolyline } = require("@/lib/polyline");
+        const pts = decodePolyline(poly);
+        return pts.map(([lat, lng]: [number, number]) => ({ lat, lng }));
+      } catch {
+        return [];
+      }
+    }
+    // Fallback: start_latlng / end_latlng if present
+    const start = data?.raw_data?.start_latlng;
+    const end = data?.raw_data?.end_latlng;
+    if (Array.isArray(start) && start.length === 2) {
+      const arr: any[] = [{ lat: start[0], lng: start[1] }];
+      if (Array.isArray(end) && end.length === 2) arr.push({ lat: end[0], lng: end[1] });
+      return arr;
+    }
+    return [];
   }, [data]);
 
-  const hasMap = track.length >= 2 ||
+  const hasMap = track.length >= 1 ||
     (data?.latitude != null && data?.longitude != null && Math.abs(data.latitude) > 0.01);
 
   // ---- Derived stats (Garmin-like) ----
