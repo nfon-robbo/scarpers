@@ -236,6 +236,7 @@ const TrainingPlanPage = () => {
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
@@ -1186,6 +1187,10 @@ const TrainingPlanPage = () => {
                   <FileDown className="w-4 h-4 mr-2" />
                   Export plan (Word .docx)
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowTextDialog(true)}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Show text only
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowNewPlanDialog(true)}>
                   <RotateCcw className="w-4 h-4 mr-2" />
@@ -1273,6 +1278,50 @@ const TrainingPlanPage = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <Dialog open={showTextDialog} onOpenChange={setShowTextDialog}>
+            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Plan as plain text</DialogTitle>
+                <DialogDescription>Copy or share — works on every device.</DialogDescription>
+              </DialogHeader>
+              {(() => {
+                const workouts = parseWorkoutsFromPlan(content);
+                const text = workouts.map(w => {
+                  const dayLabel = w.dateObj
+                    ? `${format(w.dateObj, "EEEE")} ${format(w.dateObj, "dd/MM/yyyy")}`
+                    : w.date;
+                  const lines = [`${dayLabel} — ${w.title}`];
+                  if (w.segments.length > 0) {
+                    w.segments.forEach((s, i) => {
+                      const parts = [s.segment, s.duration, s.target, s.hrZone].filter(Boolean);
+                      lines.push(`  ${i + 1}. ${parts.join(" • ")}`);
+                      if (s.notes) lines.push(`     ${s.notes}`);
+                    });
+                  } else {
+                    lines.push(w.rawText.replace(/[#*|]/g, "").trim());
+                  }
+                  return lines.join("\n");
+                }).join("\n\n");
+                return (
+                  <>
+                    <textarea
+                      readOnly
+                      value={text}
+                      className="flex-1 min-h-[300px] w-full rounded-md border bg-muted/30 p-3 font-mono text-xs whitespace-pre overflow-auto"
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={() => {
+                        navigator.clipboard.writeText(text);
+                        toast({ title: "Copied to clipboard" });
+                      }}>Copy all</Button>
+                      <Button onClick={() => setShowTextDialog(false)}>Close</Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
         </>
       )}
       {(showConfig || loading) && (
