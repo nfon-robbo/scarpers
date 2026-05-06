@@ -11,9 +11,9 @@ import JSZip from "jszip";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "./fit-parser";
 import { parseFitWorkout, fitWorkoutToIntervalsText, type FitWorkout } from "./fit-workout-parser";
 
-function stubActivity(fileName: string): ParsedActivity {
+function stubActivity(fileName: string, extras?: { workout?: FitWorkout | null; intervalsText?: string }): ParsedActivity {
   return {
-    activity_type: "workout",
+    activity_type: extras?.workout?.sport || "workout",
     start_time: null,
     duration_seconds: null,
     distance_meters: null,
@@ -32,7 +32,11 @@ function stubActivity(fileName: string): ParsedActivity {
     training_load: null,
     source_file: fileName,
     gps_track: [],
-    raw_data: { stub: true },
+    raw_data: {
+      stub: true,
+      workout_name: extras?.workout?.name || null,
+      intervals_text: extras?.intervalsText || null,
+    },
   };
 }
 
