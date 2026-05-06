@@ -149,6 +149,12 @@ export function expandWorkoutSteps(
     : null;
   let mainInjected = false;
 
+  // Walk/run ramp sessions: clamp absurd race-paces. Detect from title or text.
+  const isWalkRun = /walk\s*[\/-]\s*run|run\s*[\/-]\s*walk|walk\/run|run\/walk/i.test(
+    `${workoutTitle} ${rawText}`,
+  );
+  const maybeClamp = (pace: string) => (isWalkRun ? clampWalkRunPace(pace) : pace);
+
   const pushStep = (s: Omit<ExpandedStep, "label"> & { label?: string }, label: string) => {
     out.push({ ...s, label } as ExpandedStep);
   };
