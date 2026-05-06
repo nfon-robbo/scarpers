@@ -171,8 +171,8 @@ export function expandWorkoutSteps(
 
     const cleanDuration = seg.duration.replace(/[()]/g, "").trim();
 
-    // Inline "Nx Awork / Brest" pattern
-    const repeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
+    // Inline "Nx Awork / Brest" pattern (accept both ASCII x and Unicode ×)
+    const repeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
     if (repeatMatch) {
       const reps = parseInt(repeatMatch[1], 10);
       const workDuration = parseDurationSeconds(repeatMatch[2]);
