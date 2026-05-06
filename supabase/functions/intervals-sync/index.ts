@@ -57,8 +57,10 @@ function paceRange(pace: string): string {
   const slowSec = fastSec + 60;
   const unit = (m[3] || "km").toLowerCase();
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  // intervals.icu native pace-range syntax: "fast-slow/km" (no trailing "Pace" word)
-  return `${fmt(fastSec)}-${fmt(slowSec)}/${unit}`;
+  // intervals.icu absolute pace range syntax: "fast/unit-slow/unit Pace"
+  // Both bounds need the unit and the trailing "Pace" keyword, otherwise the
+  // Garmin export drops the target.
+  return `${fmt(fastSec)}/${unit}-${fmt(slowSec)}/${unit} Pace`;
 }
 
 function paceTarget(step: WorkoutStep): string {
