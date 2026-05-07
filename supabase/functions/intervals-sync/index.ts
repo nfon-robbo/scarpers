@@ -200,13 +200,14 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: "- <duration> <pace-range>/km <label>"
-    // Trailing free text becomes the workout step name on Garmin (instead of "Run").
+    // intervals.icu native syntax: a quoted trailing string sets the step
+    // name, which becomes wktStepName in the Garmin FIT export. Bare trailing
+    // words are ignored by their parser so the watch falls back to "Run".
     const pace = paceTarget(step);
-    const label = stepLabel(step);
+    const name = `"${stepLabel(step)}"`;
     return pace
-      ? `- ${fmtDur(step.duration)} ${pace} ${label}`
-      : `- ${fmtDur(step.duration)} ${label}`;
+      ? `- ${fmtDur(step.duration)} ${pace} ${name}`
+      : `- ${fmtDur(step.duration)} ${name}`;
   }
 
   const lines: string[] = [];
