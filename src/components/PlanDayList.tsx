@@ -632,7 +632,7 @@ export default function PlanDayList({
                           <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">{shortLabel(workout.title)}</p>
+                          <p className="text-sm font-semibold break-words">{shortLabel(workout.title)}</p>
                           {(() => {
                             const customs = customSteps[workoutKey(workout)] || [];
                             const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
