@@ -67,9 +67,9 @@ function paceRange(pace: string): string {
 function paceTarget(step: WorkoutStep): string {
   const normalized = step.intensity.toLowerCase();
   // Warm-up, cool-down, recovery and rest all use a fixed easy walking pace
-  // of 9:55/km so intervals.icu / Garmin display a consistent gentle target.
+  // of 9:25/km so intervals.icu / Garmin display a consistent gentle target.
   if (["warmup", "cooldown", "recovery", "rest"].includes(normalized)) {
-    return paceRange("9:55/km");
+    return paceRange("9:25/km");
   }
   if (step.pace) return paceRange(step.pace);
   if (normalized === "interval") return paceRange("5:00/km");
