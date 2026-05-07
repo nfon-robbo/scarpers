@@ -18,7 +18,7 @@ export interface ExpandedStep {
   label: string;
 }
 
-const WALK_PACE = "9:55/km";
+const WALK_PACE = "9:25/km";
 /** Fixed duration (seconds) for warm-up, cool-down, and walk/recovery steps. */
 const WALK_DURATION_SEC = 5 * 60; // 5:00
 
