@@ -96,7 +96,23 @@ function stepName(intensity: string, target: string): string {
   return `${label} ${target}`.slice(0, 31);
 }
 
+function buildOpenStep(durationMs: number, intensity: string, label: string): WorkoutStep {
+  return {
+    name: stepName(intensity, label),
+    intensity: toFitIntensity(intensity),
+    durationType: WKT_STEP_DURATION.TIME,
+    durationValue: durationMs,
+    targetType: WKT_STEP_TARGET.OPEN,
+    targetValue: 0,
+  };
+}
+
 function buildSpeedFitStep(durationMs: number, pace: string, intensity: string): WorkoutStep | null {
+  // No pace target for warmup/cooldown/recovery/rest — avoids nagging alerts
+  const normalized = (intensity || "").toLowerCase();
+  if (["warmup", "cooldown", "recovery", "rest"].includes(normalized)) {
+    return buildOpenStep(durationMs, intensity, "easy");
+  }
   const speed = paceToSpeedMps(pace);
   if (!speed) return null;
   const targetPace = pace.replace(/\s+/g, "").replace(/\s*Pace$/i, "");
