@@ -164,10 +164,42 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const hasPower = powerPoints.length > 10;
     const avgPower = powerPoints.length ? Math.round(powerPoints.reduce((a, b) => a + b, 0) / powerPoints.length) : null;
 
+    const hasTemperature = track.filter((p) => p.temperature != null).length > 10;
+    const hasVertOsc = track.filter((p) => p.vertical_oscillation != null).length > 10;
+    const hasStance = track.filter((p) => p.stance_time != null).length > 10;
+    const hasStride = track.filter((p) => p.step_length != null).length > 10;
+
+    const scatterData = track
+      .filter((p, i) => i % step === 0 && p.heart_rate && p.speed && p.speed > 1)
+      .map((p) => {
+        const rawSpeedKmh = p.speed!;
+        const displaySpeed = units.speed === "mph" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh;
+        return { speed: Math.round(displaySpeed * 10) / 10, hr: p.heart_rate! };
+      });
+
+    let powerZoneData: { zone: string; pct: number; color: string }[] = [];
+    if (hasPower && powerPoints.length) {
+      const ftp = Math.round(Math.max(...powerPoints) * 0.75);
+      const pz = [0, 0, 0, 0, 0, 0, 0];
+      const thresholds = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50];
+      for (const w of powerPoints) {
+        const r = w / ftp;
+        let z = 6;
+        for (let i = 0; i < thresholds.length; i++) { if (r < thresholds[i]) { z = i; break; } }
+        pz[z]++;
+      }
+      const total = powerPoints.length;
+      const colors = ["chart-2", "primary", "chart-3", "chart-4", "chart-5", "destructive", "destructive"];
+      const labels = ["Z1 Recovery", "Z2 Endurance", "Z3 Tempo", "Z4 Threshold", "Z5 VO2", "Z6 Anaerobic", "Z7 Neuro"];
+      powerZoneData = pz.map((c, i) => ({ zone: labels[i], pct: Math.round(c / total * 100), color: `hsl(var(--${colors[i]}))` }));
+    }
+
     return {
       timeSeriesData,
       zoneData,
       splits,
+      scatterData,
+      powerZoneData,
       elevGain: Math.round(elevGainRaw * elevMult),
       elevLoss: Math.round(elevLossRaw * elevMult),
       minAlt: altitudes.length ? Math.round(Math.min(...altitudes) * elevMult) : null,
@@ -178,6 +210,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       avgCadence,
       hasPower,
       avgPower,
+      hasTemperature,
+      hasVertOsc,
+      hasStance,
+      hasStride,
     };
   }, [track, maxHR, units]);
 
