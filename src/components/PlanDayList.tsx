@@ -439,6 +439,7 @@ export default function PlanDayList({
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [syncingDate, setSyncingDate] = useState<string | null>(null);
   const touchSourceRef = useRef<string | null>(null);
   // Per-workout overrides: { [workoutKey]: { [stepIdx]: { duration?, pace? } } }
   const [overrides, setOverrides] = useState<Record<string, Record<number, { duration?: string; pace?: string }>>>({});
