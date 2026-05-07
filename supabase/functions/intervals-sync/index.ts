@@ -200,13 +200,15 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: "- <duration> <pace-range>/km <label>"
-    // Trailing free text becomes the workout step name on Garmin (instead of "Run").
+    // intervals.icu native syntax (per official docs): any text BEFORE the
+    // duration becomes the step name (wktStepName on Garmin). Without it,
+    // every step on the watch falls back to "Run".
+    //   - Warm up 10m 9:25-10:25/km Pace
     const pace = paceTarget(step);
-    const label = stepLabel(step);
+    const name = stepLabel(step);
     return pace
-      ? `- ${fmtDur(step.duration)} ${pace} ${label}`
-      : `- ${fmtDur(step.duration)} ${label}`;
+      ? `- ${name} ${fmtDur(step.duration)} ${pace}`
+      : `- ${name} ${fmtDur(step.duration)}`;
   }
 
   const lines: string[] = [];
