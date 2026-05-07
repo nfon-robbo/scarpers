@@ -281,7 +281,7 @@ const RunningIQWidget = () => {
           </div>
         </CardContent>
       </Card>
-
+    </div>
   );
 };
 
