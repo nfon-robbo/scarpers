@@ -195,7 +195,7 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     if (n === "warmup") return "Warm up";
     if (n === "cooldown") return "Cool down";
     if (n === "recovery" || n === "rest") return "Recover";
-    if (n === "interval") return "Interval";
+    if (n === "interval") return "Run";
     return "Steady";
   }
 
