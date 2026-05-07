@@ -31,7 +31,7 @@ const AppLayout = () => {
   const { signOut } = useAuth();
   const { profile } = useProfile();
   const { theme, toggleTheme } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
 
   return (
     <div className="flex min-h-screen bg-background">
