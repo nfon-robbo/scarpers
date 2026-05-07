@@ -16,6 +16,7 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 import RunningIQWidget from "@/components/RunningIQWidget";
+import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 
