@@ -124,62 +124,57 @@ const AppLayout = () => {
             </div>
             <span className="font-bold text-sm gradient-text">AI Coach</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-xl">
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
-        </div>
-
-        {/* Mobile dropdown menu */}
-        {mobileMenuOpen && (
-          <div className="glass-strong border-t border-border/50 px-3 pb-4 pt-2 space-y-0.5 animate-fade-in">
-            {navItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === "/"}
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  }`
-                }
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-                  <Icon className="w-[18px] h-[18px]" />
-                </div>
-                {label}
-              </NavLink>
-            ))}
-            <div className="border-t border-border/50 mt-2 pt-2 space-y-0.5">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-foreground h-10"
-                onClick={() => { toggleTheme(); setMobileMenuOpen(false); }}
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-                  {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
-                </div>
-                {theme === "dark" ? "Light Mode" : "Dark Mode"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-destructive h-10"
-                onClick={() => { signOut(); setMobileMenuOpen(false); }}
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-                  <LogOut className="w-[18px] h-[18px]" />
-                </div>
-                Sign out
-              </Button>
-            </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="rounded-xl text-muted-foreground"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="rounded-xl text-muted-foreground hover:text-destructive"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
           </div>
-        )}
+        </div>
       </div>
 
+      {/* Mobile Bottom Tab Bar */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-border/50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="grid grid-cols-6 h-16">
+          {navItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === "/"}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center gap-1 transition-colors ${
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`
+              }
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium leading-none">{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14 flex flex-col min-h-0">
+      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14 pb-20 md:pb-0 flex flex-col min-h-0">
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <Outlet />
         </div>
