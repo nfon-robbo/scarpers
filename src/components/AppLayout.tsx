@@ -13,13 +13,10 @@ import {
   ListChecks,
   Settings,
   LogOut,
-  Menu,
-  X,
   Moon,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
