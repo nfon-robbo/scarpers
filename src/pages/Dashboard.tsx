@@ -611,19 +611,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* ── AI Coach Training Focus ── */}
-          {coachFocus && (
-            <Card className="overflow-hidden border-border/30 relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8" />
-              <CardContent className="p-5 flex items-start gap-4 relative z-10">
-                <div className="text-3xl">🏅</div>
-                <div>
-                  <h3 className="text-sm font-bold mb-1">AI Coach Training Focus</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{coachFocus}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* ── Quick Actions ── */}
           <div className="grid gap-3 sm:grid-cols-3">
