@@ -132,6 +132,7 @@ const Dashboard = () => {
   const [metrics, setMetrics] = useState<MetricsRow[]>([]);
   const [plan, setPlan] = useState<PlanRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openActivityId, setOpenActivityId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const dailyQuote = useMemo(() => {
