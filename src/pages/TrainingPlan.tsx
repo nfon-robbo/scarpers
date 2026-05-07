@@ -866,9 +866,16 @@ const TrainingPlanPage = () => {
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const handleSyncToIntervals = async (refresh = false) => {
+  const handleSyncToIntervals = async (refresh = false, singleDate?: string) => {
     const workouts = parseWorkoutsFromPlan(content);
-    const withSegments = workouts.filter(w => w.segments.length > 0 && w.dateObj);
+    let withSegments = workouts.filter(w => w.segments.length > 0 && w.dateObj);
+    if (singleDate) {
+      withSegments = withSegments.filter(w => {
+        const d = w.dateObj!;
+        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return ds === singleDate;
+      });
+    }
     if (withSegments.length === 0) {
       toast({ title: "No structured workouts found", description: "The plan needs workout tables with Segment/Duration/HR Zone columns.", variant: "destructive" });
       return;
@@ -1627,7 +1634,7 @@ const TrainingPlanPage = () => {
               planEndDate={raceDate}
               completedDates={completedDates}
               onMoveWorkout={moveWorkoutDate}
-              onSyncWorkout={() => handleSyncToIntervals(true)}
+              onSyncWorkout={(singleDate) => handleSyncToIntervals(true, singleDate)}
               syncing={syncing}
               goalTime={goalTime}
               raceDistance={raceDistance}
