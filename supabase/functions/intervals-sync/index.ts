@@ -190,11 +190,23 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
   }
 
+  function stepLabel(step: WorkoutStep): string {
+    const n = step.intensity.toLowerCase();
+    if (n === "warmup") return "Warm up";
+    if (n === "cooldown") return "Cool down";
+    if (n === "recovery" || n === "rest") return "Recover";
+    if (n === "interval") return "Interval";
+    return "Steady";
+  }
+
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: "- <duration> <pace-range>/km"
-    // Warm-up / cool-down may have no pace target — emit just the duration.
+    // intervals.icu native syntax: "- <duration> <pace-range>/km <label>"
+    // Trailing free text becomes the workout step name on Garmin (instead of "Run").
     const pace = paceTarget(step);
-    return pace ? `- ${fmtDur(step.duration)} ${pace}` : `- ${fmtDur(step.duration)}`;
+    const label = stepLabel(step);
+    return pace
+      ? `- ${fmtDur(step.duration)} ${pace} ${label}`
+      : `- ${fmtDur(step.duration)} ${label}`;
   }
 
   const lines: string[] = [];
