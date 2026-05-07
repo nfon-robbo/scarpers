@@ -148,8 +148,11 @@ function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensi
 function parseTextStep(line: string, intensity: string): WorkoutStep | null {
   const durationMatch = line.match(durationPattern);
   if (!durationMatch) return null;
+  // Walks should not carry a pace target — keep them open like warmup/cooldown
+  const isWalk = /\bwalk(ing)?\b/i.test(line);
+  const effectiveIntensity = isWalk ? "Recovery" : intensity;
   const paceMatch = line.match(pacePattern);
-  if (paceMatch) return buildSpeedFitStep(durationTextToMilliseconds(durationMatch[1]), paceMatch[0], intensity);
+  if (paceMatch) return buildSpeedFitStep(durationTextToMilliseconds(durationMatch[1]), paceMatch[0], effectiveIntensity);
 
   const bpmMatch = line.match(bpmPattern);
   const zoneMatch = line.match(/Z\d(?:\s*[-–]\s*Z\d)?/i);
@@ -161,7 +164,7 @@ function parseTextStep(line: string, intensity: string): WorkoutStep | null {
 
   if (!range) return null;
 
-  return buildFitStep(durationTextToMilliseconds(durationMatch[1]), range.low, range.high, intensity);
+  return buildFitStep(durationTextToMilliseconds(durationMatch[1]), range.low, range.high, effectiveIntensity);
 }
 
 function parseRawDescriptionToFitSteps(rawDescription: string): WorkoutStep[] {
