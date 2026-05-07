@@ -320,14 +320,15 @@ export function expandWorkoutSteps(
     }
 
     // Plain segment: emit one step.
-    const duration = parseDurationSeconds(seg.duration);
+    let duration = parseDurationSeconds(seg.duration);
     const pace = intensity === "Interval" || intensity === "Active" ? maybeClamp(paceForSegment(seg, intensity)) : paceForSegment(seg, intensity);
     let label: string;
-    if (isWarmup) label = "Warm Up";
-    else if (isCooldown) label = "Cool Down";
+    if (isWarmup) { label = "Warm Up"; duration = WALK_DURATION_SEC; }
+    else if (isCooldown) { label = "Cool Down"; duration = WALK_DURATION_SEC; }
     else if (intensity === "Recovery" || intensity === "Rest") {
       walkIdx++;
       label = `Walk ${walkIdx}`;
+      duration = WALK_DURATION_SEC;
     } else {
       runIdx++;
       label = isMain ? `Run ${runIdx}` : seg.segment || `Run ${runIdx}`;
