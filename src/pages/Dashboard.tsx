@@ -381,6 +381,7 @@ const Dashboard = () => {
   const recentRuns = useMemo(() => {
     return activities
       .filter((a) => a.distance_meters && a.duration_seconds)
+      .filter((a) => !/walk/i.test(a.activity_type || ""))
       .slice(-3)
       .reverse()
       .map((a, i) => {
