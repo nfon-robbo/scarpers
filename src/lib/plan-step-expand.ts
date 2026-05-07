@@ -68,16 +68,16 @@ export function hrZoneToBpm(hrZone: string): { low: number; high: number } {
 
 function paceForSegment(seg: ParsedSegment, intensity: string): string {
   const txt = `${seg.segment} ${seg.duration} ${seg.target} ${seg.notes || ""}`.toLowerCase();
-  // Range like "7:00/km-7:30/km" or "7:00-7:30/km" — use the slower (second)
-  // bound as the displayed/target pace, matching how Garmin/intervals.icu
-  // expose the prescribed pace.
+  // Warm-up, cool-down, recovery, rest, and walks are ALWAYS WALK_PACE.
+  // This MUST take priority over any explicit pace the AI may have written.
+  if (/warmup|cooldown|recovery|rest/i.test(intensity)) return WALK_PACE;
+  if (/warm|cool|recovery|rest/.test(txt)) return WALK_PACE;
+  if (/walk/.test(txt) && !/run|interval|tempo|stride|fast/.test(txt)) return WALK_PACE;
+  // Range like "7:00/km-7:30/km" or "7:00-7:30/km" — slower bound.
   const range = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi))?\s*[-–]\s*(\d{1,2}:\d{2})/);
   if (range) return `${range[2]}/km`;
   const explicit = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
   if (explicit) return `${explicit[1]}/km`;
-  if (/recovery|rest/i.test(intensity) || /recovery|rest/.test(txt)) return WALK_PACE;
-  if (/warmup|cooldown/i.test(intensity)) return /walk/.test(txt) ? WALK_PACE : "6:27/km";
-  if (/walk/.test(txt) && !/run|interval|tempo|stride|fast/.test(txt)) return WALK_PACE;
   if (/z5|vo2|sprint|fast/.test(txt)) return "4:30/km";
   if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
   if (/z3|tempo|steady/.test(txt)) return "5:30/km";
