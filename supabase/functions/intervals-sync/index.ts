@@ -195,27 +195,24 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
   }
 
-  function stepLabel(step: WorkoutStep): string {
-    // Intervals.icu native syntax recognises these keywords and uses them
-    // as the Garmin step name on the watch. Without an explicit label the
-    // exporter falls back to generic types ("Recovery", "Run") which the
-    // user finds confusing — they want "Walk" instead of "Recovery".
-    const n = step.intensity.toLowerCase();
-    if (n === "warmup") return "Warmup";
-    if (n === "cooldown") return "Cooldown";
-    if (n === "recovery" || n === "rest") return "Walk";
-    if (n === "interval") return "Run";
-    return "Run";
-  }
-
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: "- <duration> <Label> <pace-range>/km Pace"
-    // Warm-up / cool-down / walks have no pace target — emit just label.
+    // intervals.icu native syntax: the FIRST keyword on the line determines
+    // the step type that gets exported to Garmin (Warmup / Cooldown /
+    // Recovery / Run). Putting the duration first or injecting a custom
+    // label like "Walk" breaks type detection — the parser falls back to a
+    // generic Run step and the watch loses its interval graph. Keep the
+    // keyword-first form intervals.icu documents, e.g.
+    //   "Warmup 10:00"
+    //   "- 1km 7:30-8:30/km Pace"     (work step inside Nx)
+    //   "- 1:00 Recovery"               (rest step inside Nx)
+    const n = step.intensity.toLowerCase();
     const pace = paceTarget(step);
-    const label = stepLabel(step);
-    return pace
-      ? `- ${fmtDur(step.duration)} ${label} ${pace}`
-      : `- ${fmtDur(step.duration)} ${label}`;
+    const dur = fmtDur(step.duration);
+    if (n === "warmup") return `Warmup ${dur}`;
+    if (n === "cooldown") return `Cooldown ${dur}`;
+    if (n === "recovery" || n === "rest") return `- ${dur} Recovery`;
+    // Interval / work step
+    return pace ? `- ${dur} ${pace}` : `- ${dur}`;
   }
 
   const lines: string[] = [];
