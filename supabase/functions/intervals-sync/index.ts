@@ -66,14 +66,17 @@ function paceRange(pace: string): string {
 
 function paceTarget(step: WorkoutStep): string {
   const normalized = step.intensity.toLowerCase();
-  // Warm-up and cool-down should not carry a pace target — let the runner ease
-  // in / cool down at whatever feels right. Only honour an explicit override.
-  if (normalized === "warmup" || normalized === "cooldown") {
-    if (step.pace) return paceRange(step.pace);
+  // Warm-up, cool-down, recovery and rest steps must NOT carry a pace target —
+  // they should be open so the runner can ease without nagging alerts.
+  if (
+    normalized === "warmup" ||
+    normalized === "cooldown" ||
+    normalized === "recovery" ||
+    normalized === "rest"
+  ) {
     return "";
   }
   if (step.pace) return paceRange(step.pace);
-  if (normalized === "recovery" || normalized === "rest") return paceRange("13:00/km");
   if (normalized === "interval") return paceRange("5:00/km");
   return paceRange("6:27/km");
 }
