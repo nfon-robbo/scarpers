@@ -195,11 +195,27 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     return lowZone === highZone ? `Z${lowZone}` : `Z${lowZone}-Z${highZone}`;
   }
 
+  function stepLabel(step: WorkoutStep): string {
+    // Intervals.icu native syntax recognises these keywords and uses them
+    // as the Garmin step name on the watch. Without an explicit label the
+    // exporter falls back to generic types ("Recovery", "Run") which the
+    // user finds confusing — they want "Walk" instead of "Recovery".
+    const n = step.intensity.toLowerCase();
+    if (n === "warmup") return "Warmup";
+    if (n === "cooldown") return "Cooldown";
+    if (n === "recovery" || n === "rest") return "Walk";
+    if (n === "interval") return "Run";
+    return "Run";
+  }
+
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: "- <duration> <pace-range>/km"
-    // Warm-up / cool-down may have no pace target — emit just the duration.
+    // intervals.icu native syntax: "- <duration> <Label> <pace-range>/km Pace"
+    // Warm-up / cool-down / walks have no pace target — emit just label.
     const pace = paceTarget(step);
-    return pace ? `- ${fmtDur(step.duration)} ${pace}` : `- ${fmtDur(step.duration)}`;
+    const label = stepLabel(step);
+    return pace
+      ? `- ${fmtDur(step.duration)} ${label} ${pace}`
+      : `- ${fmtDur(step.duration)} ${label}`;
   }
 
   const lines: string[] = [];
