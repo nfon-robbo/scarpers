@@ -16,6 +16,7 @@ import {
   ResponsiveContainer, CartesianGrid, LineChart, Line,
 } from "recharts";
 import RunningIQWidget from "@/components/RunningIQWidget";
+import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 
@@ -131,6 +132,7 @@ const Dashboard = () => {
   const [metrics, setMetrics] = useState<MetricsRow[]>([]);
   const [plan, setPlan] = useState<PlanRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openActivityId, setOpenActivityId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
   const dailyQuote = useMemo(() => {
@@ -391,12 +393,17 @@ const Dashboard = () => {
         const paceMin = Math.floor(pace);
         const paceSec = Math.round((pace - paceMin) * 60);
         const colors = ["bg-emerald-500", "bg-amber-500", "bg-purple-500"];
+        const d = a.start_time ? new Date(a.start_time) : null;
+        const dateStr = d
+          ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`
+          : "";
         return {
           id: a.id,
           dist: distMi.toFixed(2),
           pace: `${paceMin}:${paceSec.toString().padStart(2, "0")}`,
           color: colors[i % colors.length],
           type: a.activity_type || "Run",
+          date: dateStr,
         };
       });
   }, [activities]);
@@ -583,11 +590,17 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-2.5">
                 {recentRuns.length > 0 ? recentRuns.map((run) => (
-                  <div key={run.id} className="flex items-center gap-3">
+                  <button
+                    key={run.id}
+                    type="button"
+                    onClick={() => setOpenActivityId(run.id)}
+                    className="w-full flex items-center gap-3 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
+                  >
                     <span className={`w-2.5 h-2.5 rounded-full ${run.color}`} />
-                    <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
+                    <span className="text-sm font-semibold">{run.dist} mi</span>
+                    <span className="text-[11px] text-muted-foreground flex-1">{run.date}</span>
                     <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
-                  </div>
+                  </button>
                 )) : (
                   <p className="text-xs text-muted-foreground">No recent runs yet</p>
                 )}
@@ -766,6 +779,7 @@ const Dashboard = () => {
           )}
         </>
       )}
+      <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
     </div>
   );
 };
