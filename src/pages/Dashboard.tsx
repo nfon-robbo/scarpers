@@ -345,8 +345,13 @@ const Dashboard = () => {
     // Activity dates (yyyy-mm-dd) this week and last week
     const activityDatesThisWeek = new Set<string>();
     let lastWeekActivityCount = 0;
+    // Only count running activities — walks shouldn't count as completed workouts
+    const isRunning = (a: any) => {
+      const t = (a.activity_type || "").toLowerCase();
+      return t.includes("run");
+    };
     for (const a of activities) {
-      if (!a.start_time) continue;
+      if (!a.start_time || !isRunning(a)) continue;
       const d = new Date(a.start_time);
       if (inRange(d, startOfWeek, endOfWeek)) activityDatesThisWeek.add(ymd(d));
       else if (inRange(d, lastWeekStart, startOfWeek)) lastWeekActivityCount++;
