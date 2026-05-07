@@ -277,7 +277,7 @@ const AIChatbot = () => {
       <Button
         onClick={() => setOpen(true)}
         size="lg"
-        className="fixed bottom-6 right-6 z-50 rounded-full h-14 w-14 shadow-lg p-0"
+        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 rounded-full h-14 w-14 shadow-lg p-0"
       >
         <MessageCircle className="w-6 h-6" />
       </Button>
@@ -285,7 +285,7 @@ const AIChatbot = () => {
   }
 
   return (
-    <Card className="fixed bottom-6 right-6 z-50 w-[360px] sm:w-[400px] h-[500px] shadow-2xl flex flex-col">
+    <Card className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[400px] h-[500px] max-h-[calc(100vh-6rem)] shadow-2xl flex flex-col">
       <CardHeader className="p-3 border-b flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" />
