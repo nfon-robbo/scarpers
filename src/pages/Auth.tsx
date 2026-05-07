@@ -78,7 +78,7 @@ const Auth = () => {
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
           <img
             src={paceSquadLogo}
-            alt="Pace Squad — AI Running Plan Builder"
+            alt="Scarpers — AI Running Plan Builder"
             className="w-full max-w-md rounded-2xl shadow-2xl mb-8"
           />
           <p className="text-primary-foreground/80 text-lg max-w-md leading-relaxed text-center">
@@ -104,7 +104,7 @@ const Auth = () => {
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile brand */}
           <div className="flex flex-col items-center gap-3 mb-8 lg:hidden">
-            <img src={paceSquadLogo} alt="Pace Squad" className="w-full max-w-xs rounded-xl shadow-lg" />
+            <img src={paceSquadLogo} alt="Scarpers" className="w-full max-w-xs rounded-xl shadow-lg" />
           </div>
 
           <Card className="glass border-border/30">
