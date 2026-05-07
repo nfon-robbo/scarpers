@@ -45,7 +45,7 @@ const AppLayout = () => {
             </div>
           </div>
           <div>
-            <span className="text-base font-bold tracking-tight gradient-text">AI Coach</span>
+            <span className="text-base font-bold tracking-tight gradient-text">Pace Squad</span>
             <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Endurance</p>
           </div>
         </div>
@@ -119,7 +119,7 @@ const AppLayout = () => {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
               <Activity className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-sm gradient-text">AI Coach</span>
+            <span className="font-bold text-sm gradient-text">Pace Squad</span>
           </div>
           <div className="flex items-center gap-1">
             <Button

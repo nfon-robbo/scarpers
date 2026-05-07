@@ -80,7 +80,7 @@ const Auth = () => {
               <Activity className="w-7 h-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">AI Coach</h1>
+              <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Pace Squad</h1>
               <p className="text-primary-foreground/60 text-xs tracking-[0.3em] uppercase font-medium">Endurance Training</p>
             </div>
           </div>
@@ -110,7 +110,7 @@ const Auth = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-sm">
               <Activity className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold gradient-text">AI Coach</span>
+            <span className="text-2xl font-bold gradient-text">Pace Squad</span>
           </div>
 
           <Card className="glass border-border/30">
