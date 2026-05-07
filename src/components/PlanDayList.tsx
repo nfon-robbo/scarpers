@@ -696,7 +696,7 @@ export default function PlanDayList({
                       <div className="space-y-3">
                         {combined.map((step, i) => {
                           const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
-                          const isWarmCool = step.intensity === "Warmup" || step.intensity === "Cooldown";
+                          const isWarmCool = step.intensity === "Warmup" || step.intensity === "Cooldown" || step.intensity === "Recovery" || step.intensity === "Rest";
                           const Icon = isWalk ? PersonStanding : Footprints;
                           const durStr = fmtTime(step.duration);
                           const paceStr = fmtPace(step.pace);
