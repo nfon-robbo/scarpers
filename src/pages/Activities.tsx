@@ -53,7 +53,7 @@ const Activities = () => {
         .limit(1)
         .maybeSingle(),
     ]).then(([activitiesRes, planRes]) => {
-      setActivities(activitiesRes.data || []);
+      setActivities(dedupeActivities(activitiesRes.data || []));
       setCurrentPlanId(planRes.data?.id || null);
       setLoading(false);
     });
