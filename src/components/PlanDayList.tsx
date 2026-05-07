@@ -145,7 +145,7 @@ function hrZoneBpm(zone: string): string | null {
 // Defaults assume a recreational runner; tweak per-athlete in a future iteration.
 function paceForZone(zone: string, segmentText: string): string {
   const txt = `${zone} ${segmentText}`.toLowerCase();
-  if (/walk/.test(txt)) return "13:00";
+  if (/walk/.test(txt)) return "9:55";
   if (/z5|vo2|sprint/.test(txt)) return "4:30";
   if (/z4|threshold|race\s*pace/.test(txt)) return "5:00";
   if (/z3|tempo|steady/.test(txt)) return "5:30";
@@ -215,7 +215,7 @@ function expandSegments(
         kind: "walk",
         label: `Walk ${walkIdx}`,
         duration: formatTime(spec.off),
-        pace: "13:00",
+        pace: "9:55",
       });
     }
     mainEmitted = true;
@@ -241,7 +241,7 @@ function expandSegments(
         kind: "walk",
         label: isWalkWarmup ? "Warm Up - Walk" : "Warm Up",
         duration: formatTime(seg.duration),
-        pace: isWalkWarmup ? "13:00" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
+        pace: isWalkWarmup ? "9:55" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
       });
       // If the table has no main interval row, inject the fallback spec straight after warm-up
       if (fallbackSpec && !mainEmitted) {
@@ -258,7 +258,7 @@ function expandSegments(
         kind: "walk",
         label: isWalkCooldown ? "Cool Down - Walk" : "Cool Down",
         duration: formatTime(seg.duration),
-        pace: isWalkCooldown ? "13:00" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
+        pace: isWalkCooldown ? "9:55" : paceForZone(seg.hrZone, seg.segment + " " + seg.duration),
       });
     } else if (isWalk) {
       walkIdx++;
@@ -266,7 +266,7 @@ function expandSegments(
         kind: "walk",
         label: `Walk ${walkIdx}`,
         duration: formatTime(seg.duration),
-        pace: "13:00",
+        pace: "9:55",
       });
     } else {
       runIdx++;
@@ -282,9 +282,9 @@ function expandSegments(
 
   // Final safety net: nothing matched but title says "10 × 1min" — emit warm-up + reps + cool-down
   if (fallbackSpec && !mainEmitted && steps.length === 0) {
-    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "05:00", pace: "13:00" });
+    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "05:00", pace: "9:55" });
     emitIntervalBlock(fallbackSpec, "Z2", "Run", undefined);
-    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "05:00", pace: "13:00" });
+    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "05:00", pace: "9:55" });
   }
 
   return steps;
