@@ -19,6 +19,8 @@ export interface ExpandedStep {
 }
 
 const WALK_PACE = "9:55/km";
+/** Fixed duration (seconds) for warm-up, cool-down, and walk/recovery steps. */
+const WALK_DURATION_SEC = 9 * 60 + 55; // 9:55
 
 export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
