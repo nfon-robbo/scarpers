@@ -66,17 +66,14 @@ function paceRange(pace: string): string {
 
 function paceTarget(step: WorkoutStep): string {
   const normalized = step.intensity.toLowerCase();
-  // Warm-up, cool-down, recovery and rest steps must NOT carry a pace target —
-  // they should be open so the runner can ease without nagging alerts.
-  if (
-    normalized === "warmup" ||
-    normalized === "cooldown" ||
-    normalized === "recovery" ||
-    normalized === "rest"
-  ) {
+  // Warm-up and cool-down should not carry a pace target — let the runner ease
+  // in / cool down at whatever feels right. Only honour an explicit override.
+  if (normalized === "warmup" || normalized === "cooldown") {
+    if (step.pace) return paceRange(step.pace);
     return "";
   }
   if (step.pace) return paceRange(step.pace);
+  if (normalized === "recovery" || normalized === "rest") return paceRange("13:00/km");
   if (normalized === "interval") return paceRange("5:00/km");
   return paceRange("6:27/km");
 }
@@ -196,23 +193,10 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
   }
 
   function fmtStep(step: WorkoutStep): string {
-    // intervals.icu native syntax: the FIRST keyword on the line determines
-    // the step type that gets exported to Garmin (Warmup / Cooldown /
-    // Recovery / Run). Putting the duration first or injecting a custom
-    // label like "Walk" breaks type detection — the parser falls back to a
-    // generic Run step and the watch loses its interval graph. Keep the
-    // keyword-first form intervals.icu documents, e.g.
-    //   "Warmup 10:00"
-    //   "- 1km 7:30-8:30/km Pace"     (work step inside Nx)
-    //   "- 1:00 Recovery"               (rest step inside Nx)
-    const n = step.intensity.toLowerCase();
+    // intervals.icu native syntax: "- <duration> <pace-range>/km"
+    // Warm-up / cool-down may have no pace target — emit just the duration.
     const pace = paceTarget(step);
-    const dur = fmtDur(step.duration);
-    if (n === "warmup") return `Warmup ${dur}`;
-    if (n === "cooldown") return `Cooldown ${dur}`;
-    if (n === "recovery" || n === "rest") return `- ${dur} Recovery`;
-    // Interval / work step
-    return pace ? `- ${dur} ${pace}` : `- ${dur}`;
+    return pace ? `- ${fmtDur(step.duration)} ${pace}` : `- ${fmtDur(step.duration)}`;
   }
 
   const lines: string[] = [];
@@ -309,43 +293,23 @@ serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // Set Run threshold_pace on intervals.icu to match the FASTEST pace in
-    // this sync. Intervals.icu exports planned-workout paces to Garmin as a
-    // percentage of threshold_pace, so if threshold doesn't match the
-    // workout, the watch shows wrong absolute paces. Aligning threshold to
-    // the fastest target keeps the slowest end honest and prevents Garmin
-    // from rescaling targets into nonsense.
+    // Ensure a Run threshold_pace is set on intervals.icu. Without it, the
+    // Garmin export silently strips all pace targets and the watch shows
+    // "No Target" — regardless of workout description syntax.
     try {
-      let fastestSecPerKm: number | null = null;
-      for (const w of workouts || []) {
-        for (const step of w.steps || []) {
-          const m = step.pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
-          if (!m) continue;
-          let sec = Number(m[1]) * 60 + Number(m[2]);
-          if (!Number.isFinite(sec) || sec <= 0) continue;
-          if (/mi/i.test(m[3] || "")) sec = sec / 1.609344; // normalise to /km
-          if (fastestSecPerKm == null || sec < fastestSecPerKm) fastestSecPerKm = sec;
-        }
-      }
-      const targetMps = fastestSecPerKm ? 1000 / fastestSecPerKm : 3.03;
-
       const settingsResp = await fetch(`${baseUrl}/sport-settings`, { headers: authHeaders });
       if (settingsResp.ok) {
         const allSettings = await settingsResp.json();
         const runSettings = Array.isArray(allSettings)
           ? allSettings.find((s: { types?: string[] }) => Array.isArray(s.types) && s.types.includes("Run"))
           : null;
-        if (runSettings) {
-          const current = Number(runSettings.threshold_pace) || 0;
-          // Update if missing or differs by more than 1% — avoids needless writes.
-          if (!current || Math.abs(current - targetMps) / targetMps > 0.01) {
-            await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
-              method: "PUT",
-              headers: authHeaders,
-              body: JSON.stringify({ threshold_pace: targetMps }),
-            });
-            console.log(`Set Run threshold_pace=${targetMps.toFixed(3)} m/s (from fastest workout pace ${fastestSecPerKm}s/km)`);
-          }
+        if (runSettings && (runSettings.threshold_pace == null || runSettings.threshold_pace === 0)) {
+          await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
+            method: "PUT",
+            headers: authHeaders,
+            body: JSON.stringify({ threshold_pace: 3.03 }),
+          });
+          console.log("Set default Run threshold_pace=3.03 m/s on intervals.icu");
         }
       }
     } catch (e) {
