@@ -1234,10 +1234,12 @@ const TrainingPlanPage = () => {
         </p>
         {content && !loading && (
           <div className="flex flex-wrap gap-2">
-            <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing || dayAdjusting}>
-              {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
-              {reviewing ? "Reviewing..." : "Review Progress"}
-            </Button>
+            {Object.keys(linkedActivities).length > 0 && (
+              <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing || dayAdjusting}>
+                {reviewing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ClipboardCheck className="w-4 h-4 mr-2" />}
+                {reviewing ? "Reviewing..." : "Review Progress"}
+              </Button>
+            )}
             <Button className="w-full sm:w-auto" variant="secondary" onClick={assessDayAhead} disabled={syncing || reviewing || dayAdjusting}>
               {dayAdjusting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sun className="w-4 h-4 mr-2" />}
               {dayAdjusting ? "Assessing..." : "Assess Day Ahead"}
