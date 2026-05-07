@@ -652,6 +652,26 @@ export default function PlanDayList({
                         {isCompleted && (
                           <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
                         )}
+                        {onSyncWorkout && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Sync this workout to intervals.icu"
+                            title="Sync this workout to intervals.icu"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (syncingDate) return;
+                              setSyncingDate(key);
+                              try { await onSyncWorkout(key); } finally { setSyncingDate(null); }
+                            }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (e.currentTarget as HTMLElement).click(); } }}
+                            className="shrink-0 w-7 h-7 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center text-primary cursor-pointer transition-colors"
+                          >
+                            {syncingDate === key
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <RefreshCw className="w-3.5 h-3.5" />}
+                          </span>
+                        )}
                         <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                       </button>
                     ) : (
