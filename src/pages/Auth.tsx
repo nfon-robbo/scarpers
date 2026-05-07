@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Activity, Mountain, Bike, Zap } from "lucide-react";
+import paceSquadLogo from "@/assets/pace-squad-logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -75,16 +76,12 @@ const Auth = () => {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/10 backdrop-blur-sm flex items-center justify-center border border-primary-foreground/20">
-              <Activity className="w-7 h-7 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Pace Squad</h1>
-              <p className="text-primary-foreground/60 text-xs tracking-[0.3em] uppercase font-medium">Endurance Training</p>
-            </div>
-          </div>
-          <p className="text-primary-foreground/70 text-lg max-w-md leading-relaxed text-center">
+          <img
+            src={paceSquadLogo}
+            alt="Pace Squad — AI Running Plan Builder"
+            className="w-full max-w-md rounded-2xl shadow-2xl mb-8"
+          />
+          <p className="text-primary-foreground/80 text-lg max-w-md leading-relaxed text-center">
             AI-powered training analysis and coaching for endurance athletes. Upload your data, get insights, and train smarter.
           </p>
 
@@ -93,7 +90,7 @@ const Auth = () => {
             {["FIT File Analysis", "AI Coaching", "Training Plans", "Sleep Tracking", "Readiness Score"].map((f) => (
               <span
                 key={f}
-                className="px-4 py-1.5 rounded-full text-xs font-medium bg-primary-foreground/10 text-primary-foreground/80 border border-primary-foreground/10 backdrop-blur-sm"
+                className="px-4 py-1.5 rounded-full text-xs font-medium bg-primary-foreground/15 text-primary-foreground border border-primary-foreground/20 backdrop-blur-sm"
               >
                 {f}
               </span>
@@ -106,11 +103,8 @@ const Auth = () => {
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8">
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile brand */}
-          <div className="flex items-center justify-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-sm">
-              <Activity className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold gradient-text">Pace Squad</span>
+          <div className="flex flex-col items-center gap-3 mb-8 lg:hidden">
+            <img src={paceSquadLogo} alt="Pace Squad" className="w-full max-w-xs rounded-xl shadow-lg" />
           </div>
 
           <Card className="glass border-border/30">
