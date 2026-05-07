@@ -277,7 +277,7 @@ const AIChatbot = () => {
       <Button
         onClick={() => setOpen(true)}
         size="lg"
-        className="fixed bottom-6 right-6 z-50 rounded-full h-14 w-14 shadow-lg p-0"
+        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 rounded-full h-14 w-14 shadow-lg p-0"
       >
         <MessageCircle className="w-6 h-6" />
       </Button>
