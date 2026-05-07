@@ -779,6 +779,7 @@ const Dashboard = () => {
           )}
         </>
       )}
+      <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
     </div>
   );
 };
