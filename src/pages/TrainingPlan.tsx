@@ -481,7 +481,7 @@ const TrainingPlanPage = () => {
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
-      const newContent = shiftPlanDates(content, deltaDays);
+      const newContent = shiftPlanDates(content, deltaDays, newStart);
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
