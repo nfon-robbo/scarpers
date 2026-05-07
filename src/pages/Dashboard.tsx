@@ -597,8 +597,8 @@ const Dashboard = () => {
                     className="w-full flex items-center gap-3 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
                   >
                     <span className={`w-2.5 h-2.5 rounded-full ${run.color}`} />
-                    <span className="text-sm font-semibold">{run.dist} mi</span>
-                    <span className="text-[11px] text-muted-foreground flex-1">{run.date}</span>
+                    <span className="text-[11px] text-muted-foreground w-14">{run.date}</span>
+                    <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
                     <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
                   </button>
                 )) : (
