@@ -296,23 +296,43 @@ serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // Ensure a Run threshold_pace is set on intervals.icu. Without it, the
-    // Garmin export silently strips all pace targets and the watch shows
-    // "No Target" — regardless of workout description syntax.
+    // Set Run threshold_pace on intervals.icu to match the FASTEST pace in
+    // this sync. Intervals.icu exports planned-workout paces to Garmin as a
+    // percentage of threshold_pace, so if threshold doesn't match the
+    // workout, the watch shows wrong absolute paces. Aligning threshold to
+    // the fastest target keeps the slowest end honest and prevents Garmin
+    // from rescaling targets into nonsense.
     try {
+      let fastestSecPerKm: number | null = null;
+      for (const w of workouts || []) {
+        for (const step of w.steps || []) {
+          const m = step.pace?.match(/(\d{1,2}):(\d{2})(?:\s*\/\s*(km|mi))?/i);
+          if (!m) continue;
+          let sec = Number(m[1]) * 60 + Number(m[2]);
+          if (!Number.isFinite(sec) || sec <= 0) continue;
+          if (/mi/i.test(m[3] || "")) sec = sec / 1.609344; // normalise to /km
+          if (fastestSecPerKm == null || sec < fastestSecPerKm) fastestSecPerKm = sec;
+        }
+      }
+      const targetMps = fastestSecPerKm ? 1000 / fastestSecPerKm : 3.03;
+
       const settingsResp = await fetch(`${baseUrl}/sport-settings`, { headers: authHeaders });
       if (settingsResp.ok) {
         const allSettings = await settingsResp.json();
         const runSettings = Array.isArray(allSettings)
           ? allSettings.find((s: { types?: string[] }) => Array.isArray(s.types) && s.types.includes("Run"))
           : null;
-        if (runSettings && (runSettings.threshold_pace == null || runSettings.threshold_pace === 0)) {
-          await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
-            method: "PUT",
-            headers: authHeaders,
-            body: JSON.stringify({ threshold_pace: 3.03 }),
-          });
-          console.log("Set default Run threshold_pace=3.03 m/s on intervals.icu");
+        if (runSettings) {
+          const current = Number(runSettings.threshold_pace) || 0;
+          // Update if missing or differs by more than 1% — avoids needless writes.
+          if (!current || Math.abs(current - targetMps) / targetMps > 0.01) {
+            await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
+              method: "PUT",
+              headers: authHeaders,
+              body: JSON.stringify({ threshold_pace: targetMps }),
+            });
+            console.log(`Set Run threshold_pace=${targetMps.toFixed(3)} m/s (from fastest workout pace ${fastestSecPerKm}s/km)`);
+          }
         }
       }
     } catch (e) {
