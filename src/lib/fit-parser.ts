@@ -10,6 +10,13 @@ export interface GpsPoint {
   speed?: number;
   cadence?: number;
   power?: number;
+  temperature?: number;
+  vertical_oscillation?: number;
+  stance_time?: number;
+  stance_time_balance?: number;
+  step_length?: number;
+  vertical_ratio?: number;
+  grade?: number;
 }
 
 export interface ParsedActivity {
@@ -85,6 +92,13 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             speed: r.speed ?? r.enhanced_speed ?? undefined,
             cadence: r.cadence ?? r.running_cadence ?? undefined,
             power: r.power ?? undefined,
+            temperature: r.temperature ?? undefined,
+            vertical_oscillation: r.vertical_oscillation ?? undefined,
+            stance_time: r.stance_time ?? undefined,
+            stance_time_balance: r.stance_time_balance ?? undefined,
+            step_length: r.step_length ?? r.stride_length ?? undefined,
+            vertical_ratio: r.vertical_ratio ?? undefined,
+            grade: r.grade ?? undefined,
           });
         }
       }

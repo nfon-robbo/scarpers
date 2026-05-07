@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
+  ScatterChart, Scatter, ZAxis,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Heart, TrendingUp, Mountain, Gauge, Timer, Zap } from "lucide-react";
+import { Heart, TrendingUp, Mountain, Gauge, Timer, Zap, Thermometer, Activity, Footprints } from "lucide-react";
 import { useUnits } from "@/hooks/useUnits";
 
 interface GpsPoint {
@@ -19,6 +20,12 @@ interface GpsPoint {
   speed?: number;
   cadence?: number;
   power?: number;
+  temperature?: number;
+  vertical_oscillation?: number;
+  stance_time?: number;
+  step_length?: number;
+  vertical_ratio?: number;
+  grade?: number;
 }
 
 interface Props {
@@ -56,6 +63,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           (units.speed === "min/km" || units.speed === "min/mi") ? (rawSpeedKmh > 1.5 ? 60 / (units.speed === "min/mi" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh) : null) :
           rawSpeedKmh;
         const displayAlt = p.altitude != null ? (units.elevation === "ft" ? p.altitude * M_TO_FT : p.altitude) : null;
+        const displayTemp = p.temperature != null ? (units.temperature === "F" ? p.temperature * 9 / 5 + 32 : p.temperature) : null;
         return {
           min: elapsedMin,
           label: formatMinSec(elapsedSec),
@@ -64,6 +72,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
           cadence: p.cadence ?? null,
           power: p.power ?? null,
+          temperature: displayTemp != null ? Math.round(displayTemp * 10) / 10 : null,
+          vert_osc: p.vertical_oscillation != null ? Math.round(p.vertical_oscillation * 10) / 10 : null,
+          stance: p.stance_time != null ? Math.round(p.stance_time) : null,
+          stride: p.step_length != null ? Math.round((p.step_length > 10 ? p.step_length / 1000 : p.step_length) * 100) / 100 : null,
         };
       });
 
@@ -152,10 +164,42 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const hasPower = powerPoints.length > 10;
     const avgPower = powerPoints.length ? Math.round(powerPoints.reduce((a, b) => a + b, 0) / powerPoints.length) : null;
 
+    const hasTemperature = track.filter((p) => p.temperature != null).length > 10;
+    const hasVertOsc = track.filter((p) => p.vertical_oscillation != null).length > 10;
+    const hasStance = track.filter((p) => p.stance_time != null).length > 10;
+    const hasStride = track.filter((p) => p.step_length != null).length > 10;
+
+    const scatterData = track
+      .filter((p, i) => i % step === 0 && p.heart_rate && p.speed && p.speed > 1)
+      .map((p) => {
+        const rawSpeedKmh = p.speed!;
+        const displaySpeed = units.speed === "mph" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh;
+        return { speed: Math.round(displaySpeed * 10) / 10, hr: p.heart_rate! };
+      });
+
+    let powerZoneData: { zone: string; pct: number; color: string }[] = [];
+    if (hasPower && powerPoints.length) {
+      const ftp = Math.round(Math.max(...powerPoints) * 0.75);
+      const pz = [0, 0, 0, 0, 0, 0, 0];
+      const thresholds = [0.55, 0.75, 0.90, 1.05, 1.20, 1.50];
+      for (const w of powerPoints) {
+        const r = w / ftp;
+        let z = 6;
+        for (let i = 0; i < thresholds.length; i++) { if (r < thresholds[i]) { z = i; break; } }
+        pz[z]++;
+      }
+      const total = powerPoints.length;
+      const colors = ["chart-2", "primary", "chart-3", "chart-4", "chart-5", "destructive", "destructive"];
+      const labels = ["Z1 Recovery", "Z2 Endurance", "Z3 Tempo", "Z4 Threshold", "Z5 VO2", "Z6 Anaerobic", "Z7 Neuro"];
+      powerZoneData = pz.map((c, i) => ({ zone: labels[i], pct: Math.round(c / total * 100), color: `hsl(var(--${colors[i]}))` }));
+    }
+
     return {
       timeSeriesData,
       zoneData,
       splits,
+      scatterData,
+      powerZoneData,
       elevGain: Math.round(elevGainRaw * elevMult),
       elevLoss: Math.round(elevLossRaw * elevMult),
       minAlt: altitudes.length ? Math.round(Math.min(...altitudes) * elevMult) : null,
@@ -166,6 +210,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
       avgCadence,
       hasPower,
       avgPower,
+      hasTemperature,
+      hasVertOsc,
+      hasStance,
+      hasStride,
     };
   }, [track, maxHR, units]);
 
@@ -300,6 +348,147 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
                   <Area type="monotone" dataKey="power" stroke="hsl(var(--chart-5))" fill="hsl(var(--chart-5))" fillOpacity={0.15} strokeWidth={1.5} name="Power (W)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Temperature */}
+        {analysis.hasTemperature && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Thermometer className="w-4 h-4 text-chart-3" /> Temperature
+              </CardTitle>
+              <CardDescription className="text-xs">°{units.temperature} over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="temperature" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.15} strokeWidth={1.5} name={`Temp (°${units.temperature})`} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Vertical Oscillation */}
+        {analysis.hasVertOsc && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-chart-2" /> Vertical Oscillation
+              </CardTitle>
+              <CardDescription className="text-xs">cm over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="vert_osc" stroke="hsl(var(--chart-2))" strokeWidth={1.5} name="Vert Osc (cm)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Ground Contact Time */}
+        {analysis.hasStance && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Footprints className="w-4 h-4 text-chart-4" /> Ground Contact Time
+              </CardTitle>
+              <CardDescription className="text-xs">ms over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="stance" stroke="hsl(var(--chart-4))" strokeWidth={1.5} name="GCT (ms)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stride Length */}
+        {analysis.hasStride && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Footprints className="w-4 h-4 text-primary" /> Stride Length
+              </CardTitle>
+              <CardDescription className="text-xs">m over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="stride" stroke="hsl(var(--primary))" strokeWidth={1.5} name="Stride (m)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* HR vs Speed scatter */}
+        {analysis.scatterData.length > 20 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-primary" /> HR vs Speed
+              </CardTitle>
+              <CardDescription className="text-xs">Aerobic efficiency · each dot = a sample</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <ScatterChart>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" dataKey="speed" name={label.speed} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <YAxis type="number" dataKey="hr" name="HR" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <ZAxis range={[20, 20]} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: "3 3" }} />
+                  <Scatter data={analysis.scatterData} fill="hsl(var(--primary))" fillOpacity={0.5} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Power Zones */}
+        {analysis.powerZoneData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-chart-5" /> Power Zones
+              </CardTitle>
+              <CardDescription className="text-xs">Time in each power zone (FTP estimated)</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <div className="space-y-2">
+                {analysis.powerZoneData.map((z) => (
+                  <div key={z.zone} className="flex items-center gap-2">
+                    <span className="text-xs w-28 text-muted-foreground truncate">{z.zone}</span>
+                    <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(z.pct, 1)}%`, backgroundColor: z.color }} />
+                    </div>
+                    <span className="text-xs font-mono w-10 text-right">{z.pct}%</span>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}

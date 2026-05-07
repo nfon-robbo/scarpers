@@ -1,51 +1,59 @@
-# Add manual sections to a workout (Intervals-safe)
+## Goal
 
-Let users append their own steps (warm-up, rep, cool-down, or custom) to any workout from the detail dialog, and have those steps flow through to Intervals.icu when they export.
+Make sure that every statistic captured from a FIT file is visible in the Activity detail dialog — both as readable text **and** as charts wherever a time-series exists in `raw_data.gps_track`.
 
-## What the user sees
+The parser already stores the full FIT `session` object in `activities.raw_data` and per-record samples in `raw_data.gps_track` (heart rate, speed, cadence, power, altitude, temperature, plus any other record fields). Today the dialog shows most session-level numbers and 5 charts (HR, Speed, Elevation, Cadence, Power, HR zones, splits). Several fields that Garmin/FIT files commonly include are either hidden inside the "All Data" tab or never plotted.
 
-In the workout detail dialog (the popup with numbered steps), a new **"+ Add step"** button appears below the last step. Tapping it opens a small inline form:
+## Changes
 
-- **Type**: Warm-up / Rep / Cool-down / Custom
-- **Label** (auto-filled from type, editable — e.g. "Easy jog", "1 km @ tempo")
-- **Duration** (mm:ss)
-- **Pace** (m:ss /km, optional — hidden for warm-up/cool-down, matching existing behaviour)
+### 1. `src/components/ActivityDetailDialog.tsx` — new "Running Dynamics" + "Advanced" sections in Overview
 
-Save adds the step to the bottom of the numbered list. Each user-added step shows a small **"Custom"** badge and a trash icon to remove it. The existing tap-to-edit on duration/pace works on them too.
+Add Stat cards (only render when the value exists in `data.raw_data`) for:
 
-The list-view `~Xmin` summary updates to include the added time (race-day still shows only the race effort, per the fix just made).
+- **Running dynamics**: avg ground contact time (`avg_stance_time`), GCT balance (`avg_stance_time_balance`), vertical oscillation (`avg_vertical_oscillation`), vertical ratio (`avg_vertical_ratio`), avg stride length (`avg_stride_length` or `avg_step_length`), total strides (`total_strides`).
+- **Power detail**: normalized power (`normalized_power` / `avg_power`), intensity factor (`intensity_factor`), training stress score (`training_stress_score`), total work (`total_work` in kJ), L/R balance (`left_right_balance`), avg/max torque effectiveness, pedal smoothness (cycling).
+- **Temperature**: avg / max / min temperature (compute min/max from `gps_track[].temperature` if not in session).
+- **HR detail**: min HR (compute from track if not in session), HR drift (first-half vs second-half avg).
+- **Speed detail**: avg moving speed vs avg overall, time moving vs time elapsed (`total_timer_time` vs `total_elapsed_time`).
+- **Lap count** (`num_laps`), **device** (`device_info` make/model if present).
 
-## Where it plugs in
+All of these read from `data.raw_data.*` and use the existing `Stat` component, so they auto-hide when missing.
 
-- **`src/components/PlanDayList.tsx`** — the dialog (lines 553–650) iterates `expandWorkoutSteps(...)`. Render `[...expandedSteps, ...customSteps]` and add the "+ Add step" affordance + inline `AddStepForm` (co-located, like `EditableStat`).
-- **Storage** — reuse the existing `localStorage` pattern. Add `plan-custom-steps`:
-  ```ts
-  // { [workoutKey]: Array<{ id, kind: 'warmup'|'rep'|'cooldown'|'custom', label, duration, pace? }> }
-  ```
-  Same `workoutKey(w)` (date + title) so steps stick to the right day.
-- **Duration summary** — `extractDuration` adds custom-step seconds to the displayed `~Xmin` (skipped on race-day).
+### 2. `src/components/ActivityCharts.tsx` — extra charts
 
-## Intervals.icu integration (the important part)
+Extend the per-point series built in `analysis` to also include `temperature`, `vertical_oscillation`, `stance_time`, `stride_length` (read from each `gps_track` point — `parseFitBuffer` already maps these via the raw record but currently only writes a fixed subset; see step 3).
 
-The current export builds an `~~~intervals` block from `expandWorkoutSteps`. To carry custom steps through:
+Then conditionally render one card per series (same pattern as Cadence/Power):
 
-1. **Single source of truth at export time.** Add a small helper `getEffectiveSteps(workout)` that returns `[...expandedSteps, ...customSteps]`. Both the detail dialog and the Intervals export call this — guaranteeing what the user sees is what they export.
-2. **Same syntax, no new fields.** Custom steps render with the existing Intervals syntax already used elsewhere in the codebase:
-   - Warm-up / cool-down → `Xmin Z2` (or `Z1` for cool-down) — no pace, matches how the AI plans render them today.
-   - Rep / custom with pace → `Xmin Pace m:ss` — exactly the format `expandWorkoutSteps` already emits.
-   - Rep / custom without pace → `Xmin Z2` fallback.
-3. **No schema or markdown changes.** `training_plans.content` is never modified; custom steps live only in `localStorage`. The bulk-upsert payload to Intervals stays structurally identical — just longer.
-4. **Verified before shipping.** Quick check in `src/lib/plan-export.ts` (and the intervals encoder) to confirm appended steps round-trip cleanly: each line is one of `Xmin Z[1-5]` or `Xmin Pace m:ss/km`, which are the formats Intervals already accepts in this app.
+- **Temperature over time** — area chart, °C/°F via `useUnits`.
+- **Stride length over time** — line chart (m).
+- **Vertical oscillation** — line chart (cm).
+- **Ground contact time** — line chart (ms).
+- **HR vs Pace scatter** — recharts `ScatterChart` correlating speed and HR per sample (efficiency view).
+- **Power zone distribution** — bar chart computed from sample powers when power exists, using FTP from `raw_data.functional_threshold_power` if present, else 75% of max power.
+- **Splits chart upgrade** — overlay per-km elevation gain bars alongside the existing time bars.
+
+Each new chart only renders when at least ~10 samples have that field.
+
+### 3. `src/lib/fit-parser.ts` — pass through the extra per-record fields
+
+In the `gpsTrack.push({...})` block, also forward (when present on the FIT record): `temperature`, `vertical_oscillation`, `stance_time`, `stance_time_balance`, `step_length` / `stride_length`, `vertical_ratio`. These are standard fields fit-file-parser exposes; they're currently dropped.
+
+Update the `GpsPoint` interface accordingly. No DB migration needed — `raw_data` is JSONB.
+
+### 4. "All Data" tab polish (existing `raw` tab)
+
+- Group fields (Session / Device / User Profile / Other) by simple key-prefix heuristics.
+- Format known unit-bearing keys (anything ending in `_time` → duration, `*_speed` → speed, `*_distance` → distance, `*_temperature` → temperature, `*_heart_rate` → bpm).
+- Keep the catch-all rendering so nothing is ever hidden.
 
 ## Out of scope
 
-- No backend writes; no edits to `training_plans.content`.
-- No reordering between AI steps and custom steps in v1 — custom steps render last (matches "I added a cool-down" mental model).
-- No editing of the AI step list itself (already handled by the existing override system).
+- No backend / schema changes (everything fits in `raw_data` JSONB which is already populated).
+- Existing FIT files re-render with whatever is already in `raw_data`; new per-record fields (step 3) only appear after re-uploading. That is acceptable — call this out in the final reply.
 
-## Technical notes
+## Files touched
 
-- New small component `AddStepForm` co-located in `PlanDayList.tsx`.
-- Defaults: warm-up → 10:00 no pace, cool-down → 10:00 no pace, rep → 01:00 @ 5:00, custom → blank.
-- Custom rows reuse the same row markup (`Footprints` / `PersonStanding` icon, `EditableStat` for duration/pace) so visuals stay consistent.
-- Export call sites (`plan-export.ts`, intervals sync edge function caller) get switched from `expandWorkoutSteps(...)` to `getEffectiveSteps(...)` in the same one-line change.
+- `src/lib/fit-parser.ts` (extend `GpsPoint` + record mapping)
+- `src/components/ActivityCharts.tsx` (new chart cards + scatter + power zones)
+- `src/components/ActivityDetailDialog.tsx` (new stat sections, grouped raw tab)

@@ -336,6 +336,74 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                       </CardContent>
                     </Card>
 
+                    {/* Running Dynamics */}
+                    {(() => {
+                      const r = data.raw_data || {};
+                      const has = r.avg_stance_time != null || r.avg_vertical_oscillation != null ||
+                        r.avg_vertical_ratio != null || r.avg_stance_time_balance != null ||
+                        r.avg_stride_length != null || r.total_strides != null;
+                      if (!has) return null;
+                      return (
+                        <Card>
+                          <CardContent className="p-4">
+                            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Running Dynamics</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+                              <Stat label="Ground Contact" value={r.avg_stance_time != null ? `${Math.round(r.avg_stance_time)} ms` : null} />
+                              <Stat label="GCT Balance" value={r.avg_stance_time_balance != null ? `${Number(r.avg_stance_time_balance).toFixed(1)}%` : null} />
+                              <Stat label="Vert Oscillation" value={r.avg_vertical_oscillation != null ? `${Number(r.avg_vertical_oscillation).toFixed(1)} cm` : null} />
+                              <Stat label="Vert Ratio" value={r.avg_vertical_ratio != null ? `${Number(r.avg_vertical_ratio).toFixed(1)}%` : null} />
+                              <Stat label="Avg Stride" value={r.avg_stride_length != null ? `${Number(r.avg_stride_length).toFixed(2)} m` : null} />
+                              <Stat label="Total Strides" value={r.total_strides != null ? Number(r.total_strides).toLocaleString() : null} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Power Detail */}
+                    {(() => {
+                      const r = data.raw_data || {};
+                      const has = r.normalized_power != null || r.intensity_factor != null ||
+                        r.training_stress_score != null || r.total_work != null || r.left_right_balance != null;
+                      if (!has) return null;
+                      return (
+                        <Card>
+                          <CardContent className="p-4">
+                            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Power Detail</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+                              <Stat label="Normalized Power" value={r.normalized_power != null ? `${Math.round(r.normalized_power)} W` : null} icon={Zap} />
+                              <Stat label="Intensity Factor" value={r.intensity_factor != null ? Number(r.intensity_factor).toFixed(2) : null} />
+                              <Stat label="TSS" value={r.training_stress_score != null ? Math.round(r.training_stress_score).toString() : null} />
+                              <Stat label="Total Work" value={r.total_work != null ? `${Math.round(Number(r.total_work) / 1000)} kJ` : null} />
+                              <Stat label="L/R Balance" value={r.left_right_balance != null ? `${Number(r.left_right_balance).toFixed(0)}%` : null} />
+                              <Stat label="FTP" value={r.functional_threshold_power != null ? `${Math.round(r.functional_threshold_power)} W` : null} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Activity Detail */}
+                    {(() => {
+                      const r = data.raw_data || {};
+                      const has = r.total_timer_time != null || r.total_elapsed_time != null ||
+                        r.num_laps != null || r.avg_running_cadence != null || r.max_running_cadence != null;
+                      if (!has) return null;
+                      return (
+                        <Card>
+                          <CardContent className="p-4">
+                            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Activity Detail</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+                              <Stat label="Moving Time" value={r.total_timer_time != null ? fmtDuration(r.total_timer_time) : null} />
+                              <Stat label="Elapsed Time" value={r.total_elapsed_time != null ? fmtDuration(r.total_elapsed_time) : null} />
+                              <Stat label="Laps" value={r.num_laps != null ? String(r.num_laps) : null} />
+                              <Stat label="Max Cadence" value={r.max_running_cadence != null ? `${Math.round(r.max_running_cadence * 2)} spm` : (r.max_cadence != null ? `${Math.round(r.max_cadence)} rpm` : null)} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
                     {(data.training_effect || data.training_load || data.raw_data?.total_anaerobic_training_effect) && (
                       <Card>
                         <CardContent className="p-4">
