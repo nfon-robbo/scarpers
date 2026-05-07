@@ -590,11 +590,17 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-2.5">
                 {recentRuns.length > 0 ? recentRuns.map((run) => (
-                  <div key={run.id} className="flex items-center gap-3">
+                  <button
+                    key={run.id}
+                    type="button"
+                    onClick={() => setOpenActivityId(run.id)}
+                    className="w-full flex items-center gap-3 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
+                  >
                     <span className={`w-2.5 h-2.5 rounded-full ${run.color}`} />
-                    <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
+                    <span className="text-sm font-semibold">{run.dist} mi</span>
+                    <span className="text-[11px] text-muted-foreground flex-1">{run.date}</span>
                     <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
-                  </div>
+                  </button>
                 )) : (
                   <p className="text-xs text-muted-foreground">No recent runs yet</p>
                 )}
