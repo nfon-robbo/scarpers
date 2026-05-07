@@ -18,7 +18,7 @@ export interface ExpandedStep {
   label: string;
 }
 
-const WALK_PACE = "13:00/km";
+const WALK_PACE = "9:55/km";
 
 export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
