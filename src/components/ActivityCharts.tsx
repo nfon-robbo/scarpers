@@ -352,6 +352,147 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           </Card>
         )}
 
+        {/* Temperature */}
+        {analysis.hasTemperature && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Thermometer className="w-4 h-4 text-chart-3" /> Temperature
+              </CardTitle>
+              <CardDescription className="text-xs">°{units.temperature} over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="temperature" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.15} strokeWidth={1.5} name={`Temp (°${units.temperature})`} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Vertical Oscillation */}
+        {analysis.hasVertOsc && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-chart-2" /> Vertical Oscillation
+              </CardTitle>
+              <CardDescription className="text-xs">cm over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="vert_osc" stroke="hsl(var(--chart-2))" strokeWidth={1.5} name="Vert Osc (cm)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Ground Contact Time */}
+        {analysis.hasStance && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Footprints className="w-4 h-4 text-chart-4" /> Ground Contact Time
+              </CardTitle>
+              <CardDescription className="text-xs">ms over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="stance" stroke="hsl(var(--chart-4))" strokeWidth={1.5} name="GCT (ms)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stride Length */}
+        {analysis.hasStride && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Footprints className="w-4 h-4 text-primary" /> Stride Length
+              </CardTitle>
+              <CardDescription className="text-xs">m over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={analysis.timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="fill-muted-foreground" />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Line type="monotone" dataKey="stride" stroke="hsl(var(--primary))" strokeWidth={1.5} name="Stride (m)" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* HR vs Speed scatter */}
+        {analysis.scatterData.length > 20 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-primary" /> HR vs Speed
+              </CardTitle>
+              <CardDescription className="text-xs">Aerobic efficiency · each dot = a sample</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ResponsiveContainer width="100%" height={180}>
+                <ScatterChart>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" dataKey="speed" name={label.speed} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <YAxis type="number" dataKey="hr" name="HR" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                  <ZAxis range={[20, 20]} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: "3 3" }} />
+                  <Scatter data={analysis.scatterData} fill="hsl(var(--primary))" fillOpacity={0.5} />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Power Zones */}
+        {analysis.powerZoneData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-chart-5" /> Power Zones
+              </CardTitle>
+              <CardDescription className="text-xs">Time in each power zone (FTP estimated)</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <div className="space-y-2">
+                {analysis.powerZoneData.map((z) => (
+                  <div key={z.zone} className="flex items-center gap-2">
+                    <span className="text-xs w-28 text-muted-foreground truncate">{z.zone}</span>
+                    <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(z.pct, 1)}%`, backgroundColor: z.color }} />
+                    </div>
+                    <span className="text-xs font-mono w-10 text-right">{z.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
