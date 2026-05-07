@@ -282,9 +282,9 @@ function expandSegments(
 
   // Final safety net: nothing matched but title says "10 × 1min" — emit warm-up + reps + cool-down
   if (fallbackSpec && !mainEmitted && steps.length === 0) {
-    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "05:00", pace: "9:55" });
+    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "09:55", pace: "9:55" });
     emitIntervalBlock(fallbackSpec, "Z2", "Run", undefined);
-    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "05:00", pace: "9:55" });
+    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "09:55", pace: "9:55" });
   }
 
   return steps;
