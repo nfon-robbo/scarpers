@@ -258,4 +258,29 @@ function getTrainingEffectDescription(te: number): string {
   return "Overreaching — extreme effort, ensure adequate recovery.";
 }
 
+const isStrava = (a: any) => typeof a?.source_file === "string" && a.source_file.startsWith("strava:");
+
+function dedupeActivities(list: any[]): any[] {
+  // Group by start_time rounded to nearest 2 minutes; prefer FIT (non-strava) over Strava.
+  const buckets = new Map<string, any[]>();
+  const noTime: any[] = [];
+  for (const a of list) {
+    if (!a.start_time) { noTime.push(a); continue; }
+    const t = new Date(a.start_time).getTime();
+    const key = `${Math.round(t / 120000)}`;
+    const arr = buckets.get(key) || [];
+    arr.push(a);
+    buckets.set(key, arr);
+  }
+  const kept: any[] = [...noTime];
+  for (const arr of buckets.values()) {
+    if (arr.length === 1) { kept.push(arr[0]); continue; }
+    const hasFit = arr.some((a) => !isStrava(a));
+    const filtered = hasFit ? arr.filter((a) => !isStrava(a)) : arr;
+    kept.push(...filtered);
+  }
+  kept.sort((a, b) => new Date(b.start_time || 0).getTime() - new Date(a.start_time || 0).getTime());
+  return kept;
+}
+
 export default Activities;
