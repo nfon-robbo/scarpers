@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
+  ScatterChart, Scatter, ZAxis,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Heart, TrendingUp, Mountain, Gauge, Timer, Zap } from "lucide-react";
+import { Heart, TrendingUp, Mountain, Gauge, Timer, Zap, Thermometer, Activity, Footprints } from "lucide-react";
 import { useUnits } from "@/hooks/useUnits";
 
 interface GpsPoint {
@@ -19,6 +20,12 @@ interface GpsPoint {
   speed?: number;
   cadence?: number;
   power?: number;
+  temperature?: number;
+  vertical_oscillation?: number;
+  stance_time?: number;
+  step_length?: number;
+  vertical_ratio?: number;
+  grade?: number;
 }
 
 interface Props {
@@ -56,6 +63,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           (units.speed === "min/km" || units.speed === "min/mi") ? (rawSpeedKmh > 1.5 ? 60 / (units.speed === "min/mi" ? rawSpeedKmh * KM_TO_MI : rawSpeedKmh) : null) :
           rawSpeedKmh;
         const displayAlt = p.altitude != null ? (units.elevation === "ft" ? p.altitude * M_TO_FT : p.altitude) : null;
+        const displayTemp = p.temperature != null ? (units.temperature === "F" ? p.temperature * 9 / 5 + 32 : p.temperature) : null;
         return {
           min: elapsedMin,
           label: formatMinSec(elapsedSec),
@@ -64,6 +72,10 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
           cadence: p.cadence ?? null,
           power: p.power ?? null,
+          temperature: displayTemp != null ? Math.round(displayTemp * 10) / 10 : null,
+          vert_osc: p.vertical_oscillation != null ? Math.round(p.vertical_oscillation * 10) / 10 : null,
+          stance: p.stance_time != null ? Math.round(p.stance_time) : null,
+          stride: p.step_length != null ? Math.round((p.step_length > 10 ? p.step_length / 1000 : p.step_length) * 100) / 100 : null,
         };
       });
 
