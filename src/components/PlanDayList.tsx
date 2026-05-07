@@ -240,7 +240,7 @@ function expandSegments(
       steps.push({
         kind: "walk",
         label: isWalkWarmup ? "Warm Up - Walk" : "Warm Up",
-        duration: "09:55",
+        duration: "05:00",
         pace: "9:55",
       });
       // If the table has no main interval row, inject the fallback spec straight after warm-up
@@ -257,7 +257,7 @@ function expandSegments(
       steps.push({
         kind: "walk",
         label: isWalkCooldown ? "Cool Down - Walk" : "Cool Down",
-        duration: "09:55",
+        duration: "05:00",
         pace: "9:55",
       });
     } else if (isWalk) {
@@ -265,7 +265,7 @@ function expandSegments(
       steps.push({
         kind: "walk",
         label: `Walk ${walkIdx}`,
-        duration: "09:55",
+        duration: "05:00",
         pace: "9:55",
       });
     } else {
@@ -282,9 +282,9 @@ function expandSegments(
 
   // Final safety net: nothing matched but title says "10 × 1min" — emit warm-up + reps + cool-down
   if (fallbackSpec && !mainEmitted && steps.length === 0) {
-    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "09:55", pace: "9:55" });
+    steps.push({ kind: "walk", label: "Warm Up - Walk", duration: "05:00", pace: "9:55" });
     emitIntervalBlock(fallbackSpec, "Z2", "Run", undefined);
-    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "09:55", pace: "9:55" });
+    steps.push({ kind: "walk", label: "Cool Down - Walk", duration: "05:00", pace: "9:55" });
   }
 
   return steps;
