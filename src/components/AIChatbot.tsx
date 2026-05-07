@@ -289,7 +289,7 @@ const AIChatbot = () => {
       <CardHeader className="p-3 border-b flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" />
-          Pace Squad Chat
+          Scarpers Chat
         </CardTitle>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
           <X className="w-4 h-4" />

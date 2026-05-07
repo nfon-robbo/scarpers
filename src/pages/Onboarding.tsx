@@ -60,7 +60,7 @@ const Onboarding = () => {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Activity className="w-8 h-8 text-primary" />
-            <span className="text-xl font-bold">Pace Squad</span>
+            <span className="text-xl font-bold">Scarpers</span>
           </div>
           <CardTitle>Let's set up your profile</CardTitle>
           <CardDescription>Step {step + 1} of {STEPS.length} — {STEPS[step]}</CardDescription>
