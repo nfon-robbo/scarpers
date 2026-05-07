@@ -594,8 +594,17 @@ export default function PlanDayList({
                       "flex items-stretch gap-3 px-3 py-2.5 transition-colors",
                       today && "bg-primary/5",
                       isDragOver && "bg-primary/10 ring-2 ring-primary/40 ring-inset",
-                      isDragSource && "opacity-40"
+                      isDragSource && "opacity-40",
+                      dragSourceDate && dragSourceDate !== key && "cursor-pointer hover:bg-primary/10"
                     )}
+                    onClick={() => {
+                      if (dragSourceDate && dragSourceDate !== key && onMoveWorkout) {
+                        const src = dragSourceDate;
+                        setDragSourceDate(null);
+                        setDragOverDate(null);
+                        onMoveWorkout(src, key);
+                      }
+                    }}
                   >
                     {/* Date column */}
                     <div className="flex flex-col items-center justify-center w-14 shrink-0 text-center">
@@ -619,17 +628,48 @@ export default function PlanDayList({
                         type="button"
                         draggable={draggable}
                         onDragStart={(e) => handleDragStart(e, key)}
-                        onDragEnd={() => { setDragSourceDate(null); setDragOverDate(null); }}
-                        onClick={() => setSelectedWorkout(workout)}
+                        onDragEnd={() => { setDragOverDate(null); }}
+                        onClick={(e) => {
+                          if (dragSourceDate && dragSourceDate !== key && onMoveWorkout) {
+                            e.stopPropagation();
+                            const src = dragSourceDate;
+                            setDragSourceDate(null);
+                            setDragOverDate(null);
+                            onMoveWorkout(src, key);
+                            return;
+                          }
+                          setSelectedWorkout(workout);
+                        }}
                         className={cn(
                           "flex-1 flex items-center gap-2 text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors px-3 py-2 group",
-                          isCompleted && "border-primary/40"
+                          isCompleted && "border-primary/40",
+                          isDragSource && "ring-2 ring-primary"
                         )}
                       >
                         {/* Coloured accent bar */}
                         <span className={cn("w-1 self-stretch rounded-full", workoutAccent(workout.title))} />
                         {draggable && (
-                          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0 cursor-grab active:cursor-grabbing" />
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={isDragSource ? "Cancel move" : "Move workout — then tap a target day"}
+                            title={isDragSource ? "Tap target day to move, or tap again to cancel" : "Move workout — then tap a target day"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (dragSourceDate === key) {
+                                setDragSourceDate(null);
+                              } else {
+                                setDragSourceDate(key);
+                              }
+                              setDragOverDate(null);
+                            }}
+                            className={cn(
+                              "shrink-0 p-1 -m-1 rounded touch-manipulation",
+                              isDragSource ? "text-primary" : "text-muted-foreground/50 hover:text-muted-foreground"
+                            )}
+                          >
+                            <GripVertical className="w-3.5 h-3.5 cursor-grab active:cursor-grabbing" />
+                          </span>
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold break-words">{shortLabel(workout.title)}</p>
@@ -679,8 +719,13 @@ export default function PlanDayList({
                         <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                       </button>
                     ) : (
-                      <div className="flex-1 flex items-center rounded-lg border border-dashed bg-muted/20 px-3 py-2">
-                        <span className="text-sm text-muted-foreground/70">Rest</span>
+                      <div className={cn(
+                        "flex-1 flex items-center rounded-lg border border-dashed bg-muted/20 px-3 py-2",
+                        dragSourceDate && "border-primary/50 bg-primary/5"
+                      )}>
+                        <span className="text-sm text-muted-foreground/70">
+                          {dragSourceDate && dragSourceDate !== key ? "Tap to move here" : "Rest"}
+                        </span>
                       </div>
                     )}
                   </div>
