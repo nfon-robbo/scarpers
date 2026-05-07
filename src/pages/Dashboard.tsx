@@ -391,12 +391,17 @@ const Dashboard = () => {
         const paceMin = Math.floor(pace);
         const paceSec = Math.round((pace - paceMin) * 60);
         const colors = ["bg-emerald-500", "bg-amber-500", "bg-purple-500"];
+        const d = a.start_time ? new Date(a.start_time) : null;
+        const dateStr = d
+          ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`
+          : "";
         return {
           id: a.id,
           dist: distMi.toFixed(2),
           pace: `${paceMin}:${paceSec.toString().padStart(2, "0")}`,
           color: colors[i % colors.length],
           type: a.activity_type || "Run",
+          date: dateStr,
         };
       });
   }, [activities]);
