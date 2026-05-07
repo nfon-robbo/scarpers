@@ -386,17 +386,61 @@ const TrainingPlanPage = () => {
     }
   }, [datePopoverOpen, startDate, raceDate]);
 
-  const shiftPlanDates = (markdown: string, deltaDays: number): string => {
+  const shiftPlanDates = (markdown: string, deltaDays: number, newStart?: Date): string => {
     if (!deltaDays) return markdown;
-    return markdown.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g, (_m, d, mo, y) => {
+
+    const fmt = (date: Date) =>
+      `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const shortToIdx: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const allowed = new Set(
+      (trainingDays || []).map((d) => shortToIdx[d]).filter((n) => n !== undefined),
+    );
+
+    // Collect ordered workout-header dates so we can re-map each to the next
+    // allowed training day from the new start. This keeps the planned cadence
+    // (Mon/Wed/Fri etc.) intact when the user moves the plan onto a different
+    // weekday.
+    const headerRe = /###\s+\*\*[^*\n]*?\b(\d{1,2}\/\d{1,2}\/\d{4})\b[^*\n]*\*\*/g;
+    const workoutDates: string[] = [];
+    let hm: RegExpExecArray | null;
+    while ((hm = headerRe.exec(markdown)) !== null) workoutDates.push(hm[1]);
+
+    let dateMap: Map<string, string> | null = null;
+    if (newStart && workoutDates.length > 0 && allowed.size > 0) {
+      const newDates: string[] = [];
+      const cursor = new Date(newStart);
+      let guard = 0;
+      while (newDates.length < workoutDates.length && guard++ < 5000) {
+        if (allowed.has(cursor.getDay())) newDates.push(fmt(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      dateMap = new Map();
+      workoutDates.forEach((old, i) => dateMap!.set(old, newDates[i] ?? old));
+    }
+
+    // Pass 1: replace dates. Workout-header dates use the remap; other dates
+    // (week-of ranges, race date) shift by deltaDays for consistency.
+    let result = markdown.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g, (orig, d, mo, y) => {
+      if (dateMap?.has(orig)) return dateMap.get(orig)!;
       const date = new Date(Number(y), Number(mo) - 1, Number(d));
-      if (isNaN(date.getTime())) return _m;
+      if (isNaN(date.getTime())) return orig;
       date.setDate(date.getDate() + deltaDays);
-      const dd = String(date.getDate()).padStart(2, "0");
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const yy = date.getFullYear();
-      return `${dd}/${mm}/${yy}`;
+      return fmt(date);
     });
+
+    // Pass 2: fix the weekday word in each workout header so it matches the
+    // new date (e.g. "Thursday 07/05/2026" → "Friday 08/05/2026").
+    result = result.replace(
+      /(###\s+\*\*)([A-Za-z]+)(\s+)(\d{1,2})\/(\d{1,2})\/(\d{4})/g,
+      (_m, pre, _wd, sp, d, mo, y) => {
+        const date = new Date(Number(y), Number(mo) - 1, Number(d));
+        if (isNaN(date.getTime())) return _m;
+        return `${pre}${dayNames[date.getDay()]}${sp}${d}/${mo}/${y}`;
+      },
+    );
+
+    return result;
   };
 
   // Move a single workout from one date to another by rewriting the bold date marker in the markdown
@@ -437,7 +481,7 @@ const TrainingPlanPage = () => {
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
-      const newContent = shiftPlanDates(content, deltaDays);
+      const newContent = shiftPlanDates(content, deltaDays, newStart);
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
