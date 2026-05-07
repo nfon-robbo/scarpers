@@ -403,6 +403,8 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                         </Card>
                       );
                     })()}
+
+                    {(data.training_effect || data.training_load || data.raw_data?.total_anaerobic_training_effect) && (
                       <Card>
                         <CardContent className="p-4">
                           <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Training</p>
