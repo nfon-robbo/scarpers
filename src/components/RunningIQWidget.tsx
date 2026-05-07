@@ -281,22 +281,6 @@ const RunningIQWidget = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Coaching Tip Card */}
-      <Card className="overflow-hidden border-border/30 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8" />
-        <CardContent className="p-4 flex items-start gap-3 relative z-10">
-          <div className="text-2xl mt-0.5">🏅</div>
-          <div className="flex-1">
-            <h4 className="text-xs font-bold text-foreground mb-1">
-              Focus Area: {result.lowestPillar}
-            </h4>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              {result.coachingTip}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
