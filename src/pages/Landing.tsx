@@ -115,7 +115,7 @@ const Landing = () => {
   useEffect(() => {
     const id = setInterval(() => {
       setHeroIdx((i) => (i + 1) % HERO_IMAGES.length);
-    }, 5000);
+    }, 7000);
     return () => clearInterval(id);
   }, []);
 
@@ -164,8 +164,8 @@ const Landing = () => {
               src={src}
               alt={i === 0 ? "Runner at sunrise on an open road" : ""}
               aria-hidden={i === 0 ? undefined : true}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ease-in-out ${
-                i === heroIdx ? "opacity-100" : "opacity-0"
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-[2500ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                i === heroIdx ? "opacity-100 scale-105" : "opacity-0 scale-100"
               }`}
               width={1920}
               height={1280}
