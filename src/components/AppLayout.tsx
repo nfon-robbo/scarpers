@@ -39,8 +39,11 @@ const AppLayout = () => {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-[260px] flex-col glass-strong fixed inset-y-0 left-0 z-40">
         {/* Brand */}
-        <div className="flex items-center px-5 py-6 border-b border-border/50">
-          <img src={scarpersLogo} alt="Scarpers" className="h-8 w-auto" />
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-border/50">
+          <img src={scarpersLogo} alt="" className="h-12 w-12 object-contain shrink-0" />
+          <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            scarpers
+          </span>
         </div>
 
         {/* Nav */}
@@ -108,8 +111,11 @@ const AppLayout = () => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
         <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center">
-            <img src={scarpersLogo} alt="Scarpers" className="h-6 w-auto" />
+          <div className="flex items-center gap-2">
+            <img src={scarpersLogo} alt="" className="h-9 w-9 object-contain" />
+            <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              scarpers
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Button
