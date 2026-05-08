@@ -121,14 +121,16 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     // HR zones from track (using max HR ~ user's max if present, else 190)
     const userMax = data.max_heart_rate ?? 190;
     const zones = [0, 0, 0, 0, 0];
+    const firstTrackTime = track[0]?.time ? new Date(track[0].time).getTime() : null;
+    const elapsedForPoint = (p: any) => p.elapsed_time ?? (p.time && firstTrackTime != null ? (new Date(p.time).getTime() - firstTrackTime) / 1000 : null);
     let lastT = 0;
     for (let i = 0; i < track.length; i++) {
       const p: any = track[i];
       const hr = p.heart_rate;
-      if (!hr) { lastT = p.elapsed_time ?? lastT; continue; }
+      if (!hr) { lastT = elapsedForPoint(p) ?? lastT; continue; }
       const pct = hr / userMax;
       const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
-      const t = p.elapsed_time ?? lastT + 1;
+      const t = elapsedForPoint(p) ?? lastT + 1;
       zones[z] += Math.max(0, t - lastT);
       lastT = t;
     }
@@ -188,9 +190,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     } else if (track.length > 10 && dist > 1000) {
       let cumDist = 0;
       let lastSplitDist = 0;
-      const firstTime = track[0]?.time ? new Date(track[0].time).getTime() : null;
-      const elapsedAt = (p: any) => p.elapsed_time ?? (p.time && firstTime != null ? (new Date(p.time).getTime() - firstTime) / 1000 : null);
-      let lastSplitTime = elapsedAt(track[0]) ?? 0;
+      let lastSplitTime = elapsedForPoint(track[0]) ?? 0;
       let splitHrSum = 0;
       let splitHrN = 0;
       let splitAscent = 0;
@@ -218,7 +218,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
         }
         if (p.heart_rate) { splitHrSum += p.heart_rate; splitHrN++; }
         while (cumDist - lastSplitDist >= 1000) {
-          const currentTime = elapsedAt(p) ?? lastSplitTime;
+          const currentTime = elapsedForPoint(p) ?? lastSplitTime;
           const splitTime = currentTime - lastSplitTime;
           const km = splits.length + 1;
           const paceMin = Math.floor(splitTime / 60);
