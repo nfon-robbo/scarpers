@@ -13,7 +13,7 @@ import { Activity, ChevronRight, ChevronLeft } from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
 
-const STEPS = ["About You", "Experience & Goals", "Units", "Integrations"];
+const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Integrations"];
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
@@ -106,67 +106,14 @@ const Onboarding = () => {
                 <Label htmlFor="name">Your name</Label>
                 <Input id="name" placeholder="e.g. Alex Johnson" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Sex</Label>
-                  <Select value={sex} onValueChange={setSex}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dob">Date of birth</Label>
-                  <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="height">Height (cm)</Label>
-                  <Input id="height" type="number" inputMode="numeric" placeholder="175" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input id="weight" type="number" inputMode="decimal" placeholder="70" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="dob">Date of birth</Label>
+                <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
               </div>
             </div>
           )}
 
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Running experience</Label>
-                <Select value={experienceLevel} onValueChange={setExperienceLevel}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Beginner — new to running</SelectItem>
-                    <SelectItem value="intermediate">Intermediate — run regularly</SelectItem>
-                    <SelectItem value="advanced">Advanced — race competitively</SelectItem>
-                    <SelectItem value="elite">Elite — high-performance athlete</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="goals">Training goals</Label>
-                <Input id="goals" placeholder="e.g. Sub-3hr marathon, run a 10K" value={trainingGoals} onChange={(e) => setTrainingGoals(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="injuries">Injuries or niggles</Label>
-                <Textarea id="injuries" placeholder="Any current or recurring injuries the AI coach should know about — knee pain, plantar fasciitis, etc." value={injuries} onChange={(e) => setInjuries(e.target.value)} rows={3} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="context">Anything else?</Label>
-                <Textarea id="context" placeholder="Schedule constraints, recent training history, preferences..." value={athleteContext} onChange={(e) => setAthleteContext(e.target.value)} rows={3} />
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">Choose how you want measurements displayed throughout the app.</p>
               <div className="grid grid-cols-2 gap-3">
@@ -237,7 +184,63 @@ const Onboarding = () => {
             </div>
           )}
 
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Sex</Label>
+                <Select value={sex} onValueChange={setSex}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="height">Height ({units.height === "ft" ? "cm" : "cm"})</Label>
+                  <Input id="height" type="number" inputMode="numeric" placeholder="175" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Weight (kg)</Label>
+                  <Input id="weight" type="number" inputMode="decimal" placeholder="70" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
           {step === 3 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Running experience</Label>
+                <Select value={experienceLevel} onValueChange={setExperienceLevel}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="beginner">Beginner — new to running</SelectItem>
+                    <SelectItem value="intermediate">Intermediate — run regularly</SelectItem>
+                    <SelectItem value="advanced">Advanced — race competitively</SelectItem>
+                    <SelectItem value="elite">Elite — high-performance athlete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="goals">Training goals</Label>
+                <Input id="goals" placeholder="e.g. Sub-3hr marathon, run a 10K" value={trainingGoals} onChange={(e) => setTrainingGoals(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="injuries">Injuries or niggles</Label>
+                <Textarea id="injuries" placeholder="Any current or recurring injuries the AI coach should know about — knee pain, plantar fasciitis, etc." value={injuries} onChange={(e) => setInjuries(e.target.value)} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="context">Anything else?</Label>
+                <Textarea id="context" placeholder="Schedule constraints, recent training history, preferences..." value={athleteContext} onChange={(e) => setAthleteContext(e.target.value)} rows={3} />
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Connect your accounts to pull in runs and sleep data automatically. You can skip and add these later in Settings.
