@@ -110,6 +110,14 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [heroIdx, setHeroIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % HERO_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     document.title = "Scarpers — Free AI Running Coach & Personalised Training Plans UK";
