@@ -108,11 +108,8 @@ const AppLayout = () => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
         <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Activity className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-sm gradient-text">Scarpers</span>
+          <div className="flex items-center">
+            <img src={scarpersWordmark} alt="Scarpers" className="h-6 w-auto" />
           </div>
           <div className="flex items-center gap-1">
             <Button
