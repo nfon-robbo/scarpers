@@ -250,6 +250,8 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
   };
 
   const open = !!activityId;
+  const hasDetailedTrack = track.length >= 10 || data?.raw_data?.gps_track_source === "fit";
+  const displayedMapTrack = hasDetailedTrack ? track : track.slice(0, 1);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -317,10 +319,10 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                       <Card>
                         <CardContent className="p-3">
                           <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {track.length >= 2 ? "Route" : "Location"}
+                            <MapPin className="w-3 h-3" /> {hasDetailedTrack ? "Route" : "Location"}
                           </p>
-                          {track.length >= 2 ? (
-                            <ActivityMap track={track} interactive />
+                          {displayedMapTrack.length >= 1 ? (
+                            <ActivityMap track={displayedMapTrack} interactive height={hasDetailedTrack ? undefined : 300} />
                           ) : (
                             <ActivityMap track={[{ lat: data.latitude!, lng: data.longitude! }]} interactive height={300} />
                           )}
