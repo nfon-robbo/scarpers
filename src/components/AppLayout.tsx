@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import scarpersWordmark from "@/assets/scarpers-wordmark.png";
+import scarpersLogo from "@/assets/scarpers-logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import AIChatbot from "@/components/AIChatbot";
