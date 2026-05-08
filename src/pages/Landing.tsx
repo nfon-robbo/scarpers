@@ -151,11 +151,19 @@ const Landing = () => {
             poster={heroRunner}
             autoPlay
             muted
-            loop
             playsInline
             preload="auto"
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover"
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              if (v.duration > 3) v.currentTime = 3;
+            }}
+            onEnded={(e) => {
+              const v = e.currentTarget;
+              v.currentTime = 3;
+              v.play().catch(() => {});
+            }}
           />
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
