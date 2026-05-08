@@ -155,7 +155,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
       })
       .filter(Boolean) as { meters: number; time: number; movingTime: number; hr: number | null; ascent: number }[];
 
-    if (measuredGarminSplits.length) {
+    if (!track.some((p: any) => p.elapsed_time != null || p.time) && measuredGarminSplits.length) {
       let carryDistance = 0;
       let carryTime = 0;
       let carryMovingTime = 0;
