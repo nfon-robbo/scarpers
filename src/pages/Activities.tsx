@@ -27,7 +27,8 @@ const Activities = () => {
   const { fmt } = useUnits();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(searchParams.get("activity"));
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
