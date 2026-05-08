@@ -235,7 +235,13 @@ const Activities = () => {
         </div>
       )}
 
-      <ActivityDetailDialog activityId={openId} onClose={() => setOpenId(null)} />
+      <ActivityDetailDialog activityId={openId} onClose={() => {
+        setOpenId(null);
+        if (searchParams.get("activity")) {
+          searchParams.delete("activity");
+          setSearchParams(searchParams, { replace: true });
+        }
+      }} />
     </div>
   );
 };
