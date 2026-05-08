@@ -163,8 +163,36 @@ export async function importGarminExport(
       };
     }).filter((r) => r.start_time);
 
-    // Replace existing by source_file (Garmin activity id) — atomic per-batch.
+    // Snapshot existing activities (overlapping start_times or source_files) BEFORE delete
+    // so the user can undo this import.
     const sourceFiles = rows.map((r) => r.source_file);
+    const startTimes = rows.map((r) => r.start_time!).filter(Boolean);
+    try {
+      const snap: any[] = [];
+      const fetchChunk = async (col: "source_file" | "start_time", values: string[]) => {
+        for (let i = 0; i < values.length; i += 500) {
+          const { data } = await supabase
+            .from("activities")
+            .select("*")
+            .eq("user_id", userId)
+            .in(col, values.slice(i, i + 500));
+          if (data) snap.push(...data);
+        }
+      };
+      if (sourceFiles.length) await fetchChunk("source_file", sourceFiles);
+      if (startTimes.length) await fetchChunk("start_time", startTimes);
+      // Dedupe by id, strip raw_data to keep localStorage small
+      const byId = new Map<string, any>();
+      for (const r of snap) {
+        if (r.raw_data) r.raw_data = null;
+        byId.set(r.id, r);
+      }
+      activitiesBackup = Array.from(byId.values());
+    } catch (e: any) {
+      errors.push(`Activities snapshot: ${e?.message || e}`);
+    }
+
+    // Replace existing by source_file (Garmin activity id) — atomic per-batch.
     if (sourceFiles.length) {
       const chunkSize = 500;
       for (let i = 0; i < sourceFiles.length; i += chunkSize) {
@@ -176,8 +204,6 @@ export async function importGarminExport(
     }
 
     // Also delete any pre-existing activity at same start_time (overlap from Strava/FIT).
-    // Done in a single query per batch using OR of timestamps.
-    const startTimes = rows.map((r) => r.start_time!).filter(Boolean);
     if (startTimes.length) {
       const chunkSize = 500;
       for (let i = 0; i < startTimes.length; i += chunkSize) {
