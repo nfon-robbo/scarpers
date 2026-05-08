@@ -81,6 +81,13 @@ export async function importGarminExport(
     errors,
   };
 
+  // Per-import backup so the user can undo
+  let activitiesBackup: any[] = [];
+  let dailyMetricsBackup: any[] = [];
+  let sleepStagesBackup: any[] = [];
+  let profileBackup: { height_cm: number | null; weight_kg: number | null } | null = null;
+
+
   onProgress?.({ phase: "Opening ZIP" });
   const zip = await JSZip.loadAsync(file);
 
