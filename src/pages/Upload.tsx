@@ -223,7 +223,7 @@ const UploadPage = () => {
             >
               <FileArchive className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-1">Drop your files here</p>
-              <p className="text-sm text-muted-foreground mb-4">.fit files or .zip archives</p>
+              <p className="text-sm text-muted-foreground mb-4">.fit files, .zip archives, or a Garmin Connect data export</p>
               <Button variant="outline" asChild>
                 <span>Select Files</span>
               </Button>
