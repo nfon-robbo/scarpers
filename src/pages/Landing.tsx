@@ -156,14 +156,23 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* ====== HERO — full-bleed runner photo ====== */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">
-        {/* Background image + overlays */}
-        <img
-          src={heroRunner}
-          alt="Runner at sunrise on an open road"
-          className="absolute inset-0 w-full h-full object-cover -z-20"
-          width={1920}
-          height={1280}
-        />
+        {/* Background carousel + overlays */}
+        <div className="absolute inset-0 -z-20">
+          {HERO_IMAGES.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={i === 0 ? "Runner at sunrise on an open road" : ""}
+              aria-hidden={i === 0 ? undefined : true}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ease-in-out ${
+                i === heroIdx ? "opacity-100" : "opacity-0"
+              }`}
+              width={1920}
+              height={1280}
+              loading={i === 0 ? "eager" : "lazy"}
+            />
+          ))}
+        </div>
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/95 via-background/60 to-background/30" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/40 to-transparent" />
 
