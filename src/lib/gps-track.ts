@@ -5,7 +5,6 @@ export interface GpsTrackPoint {
   time?: string;
   elapsed_time?: number;
   distance_meters?: number;
-  [key: string]: unknown;
 }
 
 const lonOf = (p: GpsTrackPoint) => p.lng ?? p.lon;
