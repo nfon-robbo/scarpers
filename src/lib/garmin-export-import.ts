@@ -9,6 +9,7 @@
 
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
+import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
 
 export interface GarminImportProgress {
   phase: string;
@@ -38,6 +39,52 @@ async function findFiles(zip: JSZip, predicate: (p: string) => boolean): Promise
   const out: string[] = [];
   zip.forEach((path, entry) => { if (!entry.dir && predicate(path)) out.push(path); });
   return out;
+}
+
+function routeFromGarminSummary(a: any): Array<{ lat: number; lng: number; time?: string }> {
+  const points: Array<{ lat: number; lng: number; time?: string }> = [];
+  const push = (lat: any, lng: any, time?: any) => {
+    const nLat = Number(lat);
+    const nLng = Number(lng);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLng) || Math.abs(nLat) < 0.01) return;
+    const prev = points[points.length - 1];
+    if (prev && Math.abs(prev.lat - nLat) < 0.000001 && Math.abs(prev.lng - nLng) < 0.000001) return;
+    points.push({ lat: nLat, lng: nLng, time: time ? new Date(Number(time)).toISOString() : undefined });
+  };
+
+  push(a.startLatitude, a.startLongitude, a.beginTimestamp);
+  const splits = Array.isArray(a.splits) ? [...a.splits] : [];
+  splits.sort((x, y) => Number(x.startIndex ?? 0) - Number(y.startIndex ?? 0));
+  for (const s of splits) {
+    push(s.startLatitude, s.startLongitude);
+    push(s.endLatitude, s.endLongitude, s.endTimeGMT);
+  }
+  push(a.endLatitude, a.endLongitude);
+  return points;
+}
+
+async function parseGarminFitDetails(zip: JSZip): Promise<{ byActivityId: Map<string, ParsedActivity>; byStartMinute: Map<string, ParsedActivity> }> {
+  const byActivityId = new Map<string, ParsedActivity>();
+  const byStartMinute = new Map<string, ParsedActivity>();
+  const fitFiles = await findFiles(zip, (p) => /\.fit$/i.test(p));
+  for (const path of fitFiles) {
+    try {
+      const file = zip.file(path);
+      if (!file) continue;
+      const parsed = await parseFitBuffer(await file.async("arraybuffer"), path);
+      for (const activity of parsed) {
+        const idMatch = path.match(/(\d{6,})/);
+        if (idMatch) byActivityId.set(idMatch[1], activity);
+        if (activity.start_time) {
+          const minute = new Date(activity.start_time).toISOString().slice(0, 16);
+          byStartMinute.set(minute, activity);
+        }
+      }
+    } catch {
+      // The summary export is still usable if an embedded FIT file is corrupt or absent.
+    }
+  }
+  return { byActivityId, byStartMinute };
 }
 
 function isoDate(d: Date): string {
@@ -120,18 +167,19 @@ export async function importGarminExport(
         if (Array.isArray(arr)) allActs.push(...arr);
       }
     }
+    const fitDetails = await parseGarminFitDetails(zip);
     onProgress?.({ phase: "Importing activities", total: allActs.length, current: 0 });
 
     // Build rows.
     // Garmin Connect data export uses these units (different from FIT/SDK):
     //   distance:        centimetres   → /100 = metres
     //   elevation gain/loss, min/max:   centimetres   → /100 = metres
-    //   avgSpeed/maxSpeed:               cm/ms (= 10× m/s)  → /10 = m/s
+    //   avgSpeed/maxSpeed:               cm/ms → ×36 = km/h
     //   duration/elapsedDuration:        milliseconds  → /1000 = seconds (already handled)
     //   avgRunCadence:                   single-leg    → ×2 = total spm; prefer avgDoubleCadence
     //   temperature:                     Celsius       (no conversion)
     const cm = (v: any) => (v == null ? null : Number(v) / 100);
-    const speed = (v: any) => (v == null ? null : Number(v) / 10);
+    const speed = (v: any) => (v == null ? null : Number(v) * 36);
     const cadence = (a: any) => {
       if (a.avgDoubleCadence != null) return Number(a.avgDoubleCadence);
       if (a.avgRunCadence != null) return Number(a.avgRunCadence) * 2;
@@ -141,6 +189,8 @@ export async function importGarminExport(
 
     const rows = allActs.map((a) => {
       const start = toIso(a.startTimeGmt ?? a.beginTimestamp);
+      const fit = fitDetails.byActivityId.get(String(a.activityId ?? "")) || (start ? fitDetails.byStartMinute.get(start.slice(0, 16)) : undefined);
+      const gpsTrack = fit?.gps_track?.length ? fit.gps_track : routeFromGarminSummary(a);
       return {
         user_id: userId,
         upload_id: uploadId,
@@ -150,8 +200,8 @@ export async function importGarminExport(
         distance_meters: cm(a.distance),
         avg_heart_rate: a.avgHr ?? null,
         max_heart_rate: a.maxHr ?? null,
-        avg_speed: speed(a.avgSpeed),
-        max_speed: speed(a.maxSpeed),
+        avg_speed: speed(a.avgSpeed) ?? (a.distance != null && a.duration ? (cm(a.distance)! / 1000) / (Number(a.duration) / 3600000) : fit?.avg_speed ?? null),
+        max_speed: speed(a.maxSpeed) ?? fit?.max_speed ?? null,
         avg_power: a.avgPower ?? null,
         max_power: a.maxPower ?? null,
         avg_cadence: cadence(a),
@@ -162,10 +212,10 @@ export async function importGarminExport(
         training_effect: a.aerobicTrainingEffect ?? null,
         training_load: a.activityTrainingLoad ?? null,
         total_steps: a.steps ? Math.round(a.steps) : null,
-        latitude: a.startLatitude ?? null,
-        longitude: a.startLongitude ?? null,
+        latitude: a.startLatitude ?? gpsTrack[0]?.lat ?? null,
+        longitude: a.startLongitude ?? gpsTrack[0]?.lng ?? null,
         source_file: `garmin-export:${a.activityId}`,
-        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a },
+        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a, gps_track: gpsTrack },
 
       };
     }).filter((r) => r.start_time);

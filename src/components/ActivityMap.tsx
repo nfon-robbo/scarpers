@@ -97,9 +97,12 @@ const ActivityMap = ({ track, className = "", interactive = false, height }: Pro
     }
 
     // Ensure map computes correct size after mount (important inside dialogs)
-    setTimeout(() => map.invalidateSize(), 0);
+    const resizeTimer = window.setTimeout(() => {
+      if (mapInstance.current === map) map.invalidateSize();
+    }, 0);
 
     return () => {
+      window.clearTimeout(resizeTimer);
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
