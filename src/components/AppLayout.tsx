@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import AIChatbot from "@/components/AIChatbot";
@@ -38,16 +39,8 @@ const AppLayout = () => {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-[260px] flex-col glass-strong fixed inset-y-0 left-0 z-40">
         {/* Brand */}
-        <div className="flex items-center gap-3 px-5 py-6 border-b border-border/50">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-sm">
-              <Activity className="w-5 h-5 text-primary-foreground" />
-            </div>
-          </div>
-          <div>
-            <span className="text-base font-bold tracking-tight gradient-text">Scarpers</span>
-            <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Endurance</p>
-          </div>
+        <div className="flex items-center px-5 py-6 border-b border-border/50">
+          <img src={scarpersWordmark} alt="Scarpers" className="h-8 w-auto" />
         </div>
 
         {/* Nav */}
@@ -115,11 +108,8 @@ const AppLayout = () => {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
         <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Activity className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-sm gradient-text">Scarpers</span>
+          <div className="flex items-center">
+            <img src={scarpersWordmark} alt="Scarpers" className="h-6 w-auto" />
           </div>
           <div className="flex items-center gap-1">
             <Button
