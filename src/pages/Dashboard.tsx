@@ -460,6 +460,16 @@ const Dashboard = () => {
     return upcoming ? { workout: upcoming, isNext: true } : null;
   }, [plan]);
 
+  // Has the user completed a run today?
+  const completedToday = useMemo(() => {
+    return activities.some((a) => {
+      if (!a.start_time) return false;
+      if (/walk/i.test(a.activity_type || "")) return false;
+      if (!a.distance_meters || !a.duration_seconds) return false;
+      return isToday(new Date(a.start_time));
+    });
+  }, [activities]);
+
   // Latest resting HR
   const latestRHR = useMemo(() => {
     const withRHR = metrics.filter((m) => m.resting_heart_rate);
@@ -575,7 +585,21 @@ const Dashboard = () => {
             </Card>
 
             {/* Today's Workout */}
-            <Card className="glass border-border/30">
+            <Card className="glass border-border/30 relative overflow-hidden">
+              {completedToday && !todaysWorkout?.isNext && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                  <div
+                    className="select-none -rotate-12 px-5 py-2 rounded-md border-[3px] border-emerald-500/80 text-emerald-500 font-extrabold tracking-wider uppercase text-2xl bg-background/40 backdrop-blur-[2px]"
+                    style={{
+                      boxShadow: "inset 0 0 0 2px hsl(var(--background) / 0.6)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      textShadow: "1px 1px 0 hsl(var(--background) / 0.3)",
+                    }}
+                  >
+                    Completed&nbsp;It!
+                  </div>
+                </div>
+              )}
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-sm font-semibold">
                   {todaysWorkout?.isNext ? "Next Run" : "Today's Run"}
