@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { segmentGpsTrack } from "@/lib/gps-track";
 
 interface GpsPoint {
   lat: number;
@@ -50,9 +51,12 @@ const ActivityMap = ({ track, className = "", interactive = false, height }: Pro
       maxZoom: 19,
     }).addTo(map);
 
-    const latlngs: L.LatLngExpression[] = track
-      .filter((p) => p.lat != null && (p.lng != null || p.lon != null) && isFinite(p.lat) && isFinite((p.lng ?? p.lon)!))
-      .map((p) => [p.lat, (p.lng ?? p.lon)!] as [number, number]);
+    const segments = segmentGpsTrack(track)
+      .map((segment) => segment
+        .filter((p) => p.lat != null && (p.lng != null || p.lon != null) && isFinite(p.lat) && isFinite((p.lng ?? p.lon)!))
+        .map((p) => [p.lat, (p.lng ?? p.lon)!] as [number, number]))
+      .filter((segment) => segment.length > 0);
+    const latlngs: L.LatLngExpression[] = segments.flat();
 
     if (latlngs.length === 0) {
       map.remove();
@@ -79,11 +83,13 @@ const ActivityMap = ({ track, className = "", interactive = false, height }: Pro
         .bindTooltip("Location", { direction: "top", offset: [0, -10] });
       map.setView(latlngs[0] as L.LatLngExpression, 15);
     } else {
-      const polyline = L.polyline(latlngs, {
-        color: "hsl(152, 60%, 36%)",
-        weight: 4,
-        opacity: 0.9,
-      }).addTo(map);
+      for (const segment of segments) {
+        L.polyline(segment, {
+          color: "hsl(152, 60%, 36%)",
+          weight: 4,
+          opacity: 0.9,
+        }).addTo(map);
+      }
 
       L.marker(latlngs[0], { icon: makePin("hsl(152,60%,36%)", "S") })
         .addTo(map)
@@ -93,7 +99,7 @@ const ActivityMap = ({ track, className = "", interactive = false, height }: Pro
         .addTo(map)
         .bindTooltip("Finish", { direction: "top", offset: [0, -12] });
 
-      map.fitBounds(polyline.getBounds(), { padding: [24, 24] });
+      map.fitBounds(L.latLngBounds(latlngs), { padding: [24, 24] });
     }
 
     // Ensure map computes correct size after mount (important inside dialogs)
