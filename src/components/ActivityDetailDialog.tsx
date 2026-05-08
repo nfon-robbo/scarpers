@@ -272,25 +272,36 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
       const points = track.filter((_, i) => i % stride === 0 || i === track.length - 1);
       const CHUNK = 90;
       const out: { lat: number; lng: number }[] = [];
+      let matchedAny = false;
+      let lastErr = "";
+      // Public OSRM demo server only serves the `driving` profile; it still snaps
+      // to the underlying road/path network well for walking/running tracks.
       for (let i = 0; i < points.length; i += CHUNK - 1) {
         const slice = points.slice(i, i + CHUNK);
         if (slice.length < 2) break;
         const coords = slice.map(p => `${(p as any).lng ?? (p as any).lon},${p.lat}`).join(";");
-        const radii = slice.map(() => "25").join(";");
-        const url = `https://router.project-osrm.org/match/v1/foot/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`OSRM ${res.status}`);
-        const json = await res.json();
-        if (json.code !== "Ok" || !json.matchings?.length) {
-          // Fallback: keep raw points for this chunk
-          for (const p of slice) out.push({ lat: p.lat, lng: (p as any).lng ?? (p as any).lon });
-          continue;
+        const radii = slice.map(() => "30").join(";");
+        const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
+        let json: any = null;
+        try {
+          const res = await fetch(url);
+          json = await res.json().catch(() => null);
+          if (!res.ok) lastErr = `OSRM ${res.status}${json?.message ? `: ${json.message}` : ""}`;
+        } catch (e: any) {
+          lastErr = e?.message || "Network error";
         }
-        for (const m of json.matchings) {
-          for (const [lng, lat] of m.geometry.coordinates) out.push({ lat, lng });
+        if (json?.code === "Ok" && json.matchings?.length) {
+          matchedAny = true;
+          for (const m of json.matchings) {
+            for (const [lng, lat] of m.geometry.coordinates) out.push({ lat, lng });
+          }
+        } else {
+          if (json?.code && json.code !== "Ok") lastErr = `OSRM: ${json.code}`;
+          // Keep raw points for this chunk so we still draw something
+          for (const p of slice) out.push({ lat: p.lat, lng: (p as any).lng ?? (p as any).lon });
         }
       }
-      if (out.length < 2) throw new Error("No matched route returned");
+      if (!matchedAny) throw new Error(lastErr || "No matched route returned");
       setSnappedTrack(out);
     } catch (e: any) {
       setSnapError(e.message || "Snap failed");
