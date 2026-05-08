@@ -918,6 +918,16 @@ export default function PlanDayList({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Workout Review (for completed workouts) */}
+      <WorkoutReviewDialog
+        open={!!reviewWorkout}
+        onOpenChange={(o) => { if (!o) setReviewWorkout(null); }}
+        workout={reviewWorkout}
+        activity={reviewWorkout ? linkedActivities[workoutKey(reviewWorkout)] || null : null}
+        workoutDate={reviewWorkout?.dateObj || null}
+        workoutTitle={reviewWorkout ? shortLabel(reviewWorkout.title) : "Workout"}
+      />
     </Card>
   );
 }
