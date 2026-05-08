@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/training-plan", icon: Calendar, label: "Plan" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/insights", icon: Brain, label: "Insights" },
@@ -51,7 +51,7 @@ const AppLayout = () => {
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/dashboard"}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
                   isActive
@@ -147,7 +147,7 @@ const AppLayout = () => {
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/dashboard"}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center gap-1 transition-colors ${
                   isActive
