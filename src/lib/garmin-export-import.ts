@@ -63,25 +63,62 @@ function routeFromGarminSummary(a: any): Array<{ lat: number; lng: number; time?
   return points;
 }
 
-async function parseGarminFitDetails(zip: JSZip): Promise<{ byActivityId: Map<string, ParsedActivity>; byStartMinute: Map<string, ParsedActivity> }> {
+async function gunzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
+  // @ts-ignore - DecompressionStream is available in modern browsers
+  const ds = new DecompressionStream("gzip");
+  const stream = new Blob([buf]).stream().pipeThrough(ds);
+  return await new Response(stream).arrayBuffer();
+}
+
+async function collectFitBuffers(zip: JSZip, onProgress?: Cb): Promise<Array<{ path: string; buf: ArrayBuffer }>> {
+  const out: Array<{ path: string; buf: ArrayBuffer }> = [];
+  const entries: Array<{ path: string; entry: JSZip.JSZipObject }> = [];
+  zip.forEach((path, entry) => { if (!entry.dir) entries.push({ path, entry }); });
+
+  for (const { path, entry } of entries) {
+    try {
+      if (/\.fit$/i.test(path)) {
+        out.push({ path, buf: await entry.async("arraybuffer") });
+      } else if (/\.fit\.gz$/i.test(path)) {
+        out.push({ path, buf: await gunzip(await entry.async("arraybuffer")) });
+      } else if (/\.zip$/i.test(path)) {
+        // Nested ZIPs (Garmin packages each upload as a single-file zip).
+        try {
+          const inner = await JSZip.loadAsync(await entry.async("arraybuffer"));
+          const innerEntries: Array<{ p: string; e: JSZip.JSZipObject }> = [];
+          inner.forEach((p, e) => { if (!e.dir) innerEntries.push({ p, e }); });
+          for (const { p, e } of innerEntries) {
+            if (/\.fit$/i.test(p)) out.push({ path: `${path}!${p}`, buf: await e.async("arraybuffer") });
+            else if (/\.fit\.gz$/i.test(p)) out.push({ path: `${path}!${p}`, buf: await gunzip(await e.async("arraybuffer")) });
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+  return out;
+}
+
+async function parseGarminFitDetails(zip: JSZip, onProgress?: Cb): Promise<{ byActivityId: Map<string, ParsedActivity>; byStartMinute: Map<string, ParsedActivity> }> {
   const byActivityId = new Map<string, ParsedActivity>();
   const byStartMinute = new Map<string, ParsedActivity>();
-  const fitFiles = await findFiles(zip, (p) => /\.fit$/i.test(p));
-  for (const path of fitFiles) {
+  const fitBuffers = await collectFitBuffers(zip);
+  let i = 0;
+  for (const { path, buf } of fitBuffers) {
+    i++;
+    onProgress?.({ phase: "Parsing FIT GPS tracks", current: i, total: fitBuffers.length });
     try {
-      const file = zip.file(path);
-      if (!file) continue;
-      const parsed = await parseFitBuffer(await file.async("arraybuffer"), path);
+      const parsed = await parseFitBuffer(buf, path);
       for (const activity of parsed) {
-        const idMatch = path.match(/(\d{6,})/);
-        if (idMatch) byActivityId.set(idMatch[1], activity);
+        // Last 6+ digit group in the path is the activity id (Garmin uses `<userId>_<activityId>.fit`).
+        const idMatches = path.match(/(\d{6,})/g);
+        if (idMatches?.length) byActivityId.set(idMatches[idMatches.length - 1], activity);
         if (activity.start_time) {
           const minute = new Date(activity.start_time).toISOString().slice(0, 16);
           byStartMinute.set(minute, activity);
         }
       }
     } catch {
-      // The summary export is still usable if an embedded FIT file is corrupt or absent.
+      // Skip corrupt FIT files; summary fallback still works.
     }
   }
   return { byActivityId, byStartMinute };
@@ -167,7 +204,8 @@ export async function importGarminExport(
         if (Array.isArray(arr)) allActs.push(...arr);
       }
     }
-    const fitDetails = await parseGarminFitDetails(zip);
+    const fitDetails = await parseGarminFitDetails(zip, onProgress);
+    console.log(`[garmin-import] FIT tracks parsed: ${fitDetails.byActivityId.size} by id, ${fitDetails.byStartMinute.size} by start minute`);
     onProgress?.({ phase: "Importing activities", total: allActs.length, current: 0 });
 
     // Build rows.
