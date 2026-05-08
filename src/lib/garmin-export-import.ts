@@ -412,10 +412,49 @@ export async function importGarminExport(
       result.bioMetrics.weightKg = updates.weight_kg;
     }
     if (Object.keys(updates).length) {
+      // Snapshot current profile values first
+      try {
+        const { data } = await supabase.from("profiles")
+          .select("height_cm, weight_kg").eq("user_id", userId).maybeSingle();
+        profileBackup = {
+          height_cm: data?.height_cm ?? null,
+          weight_kg: data?.weight_kg ?? null,
+        };
+      } catch { /* ignore */ }
       await supabase.from("profiles").update(updates).eq("user_id", userId);
     }
   } catch (e: any) {
     errors.push(`Biometrics: ${e?.message || e}`);
+  }
+
+  // Persist undo snapshot to localStorage
+  try {
+    const undoBlob = {
+      uploadId,
+      userId,
+      createdAt: new Date().toISOString(),
+      fileName: file.name,
+      counts: {
+        activities: result.activities.inserted,
+        dailyMetrics: result.dailyMetrics.inserted,
+        sleepDays: result.sleepDays,
+      },
+      activitiesBackup,
+      dailyMetricsBackup,
+      sleepStagesBackup,
+      profileBackup,
+    };
+    localStorage.setItem(undoKey(userId), JSON.stringify(undoBlob));
+  } catch (e: any) {
+    // localStorage may be full — still let the user delete imported rows via undo
+    try {
+      localStorage.setItem(undoKey(userId), JSON.stringify({
+        uploadId, userId, createdAt: new Date().toISOString(), fileName: file.name,
+        counts: { activities: result.activities.inserted, dailyMetrics: result.dailyMetrics.inserted, sleepDays: result.sleepDays },
+        activitiesBackup: [], dailyMetricsBackup: [], sleepStagesBackup: [], profileBackup,
+        truncated: true,
+      }));
+    } catch { /* give up */ }
   }
 
   // Finalize upload row
