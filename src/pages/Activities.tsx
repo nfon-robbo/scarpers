@@ -18,6 +18,7 @@ import {
   Trash2, ChevronRight,
 } from "lucide-react";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
+import UndoGarminImportButton from "@/components/UndoGarminImportButton";
 
 const Activities = () => {
   const { user } = useAuth();
@@ -110,9 +111,12 @@ const Activities = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Activities</h1>
-        <p className="text-muted-foreground mt-1">{activities.length} activities imported</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Activities</h1>
+          <p className="text-muted-foreground mt-1">{activities.length} activities imported</p>
+        </div>
+        <UndoGarminImportButton />
       </div>
 
       {activities.length === 0 ? (

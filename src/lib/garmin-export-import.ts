@@ -81,6 +81,13 @@ export async function importGarminExport(
     errors,
   };
 
+  // Per-import backup so the user can undo
+  let activitiesBackup: any[] = [];
+  let dailyMetricsBackup: any[] = [];
+  let sleepStagesBackup: any[] = [];
+  let profileBackup: { height_cm: number | null; weight_kg: number | null } | null = null;
+
+
   onProgress?.({ phase: "Opening ZIP" });
   const zip = await JSZip.loadAsync(file);
 
@@ -115,7 +122,23 @@ export async function importGarminExport(
     }
     onProgress?.({ phase: "Importing activities", total: allActs.length, current: 0 });
 
-    // Build rows
+    // Build rows.
+    // Garmin Connect data export uses these units (different from FIT/SDK):
+    //   distance:        centimetres   → /100 = metres
+    //   elevation gain/loss, min/max:   centimetres   → /100 = metres
+    //   avgSpeed/maxSpeed:               cm/ms (= 10× m/s)  → /10 = m/s
+    //   duration/elapsedDuration:        milliseconds  → /1000 = seconds (already handled)
+    //   avgRunCadence:                   single-leg    → ×2 = total spm; prefer avgDoubleCadence
+    //   temperature:                     Celsius       (no conversion)
+    const cm = (v: any) => (v == null ? null : Number(v) / 100);
+    const speed = (v: any) => (v == null ? null : Number(v) / 10);
+    const cadence = (a: any) => {
+      if (a.avgDoubleCadence != null) return Number(a.avgDoubleCadence);
+      if (a.avgRunCadence != null) return Number(a.avgRunCadence) * 2;
+      if (a.avgBikeCadence != null) return Number(a.avgBikeCadence);
+      return null;
+    };
+
     const rows = allActs.map((a) => {
       const start = toIso(a.startTimeGmt ?? a.beginTimestamp);
       return {
@@ -124,16 +147,16 @@ export async function importGarminExport(
         activity_type: (a.activityType || a.sportType || "other").toString().toLowerCase(),
         start_time: start,
         duration_seconds: a.duration != null ? Math.round(Number(a.duration) / 1000) : null,
-        distance_meters: a.distance ?? null,
+        distance_meters: cm(a.distance),
         avg_heart_rate: a.avgHr ?? null,
         max_heart_rate: a.maxHr ?? null,
-        avg_speed: a.avgSpeed ?? null,
-        max_speed: a.maxSpeed ?? null,
+        avg_speed: speed(a.avgSpeed),
+        max_speed: speed(a.maxSpeed),
         avg_power: a.avgPower ?? null,
         max_power: a.maxPower ?? null,
-        avg_cadence: a.avgRunCadence ?? a.avgBikeCadence ?? a.avgDoubleCadence ?? null,
-        total_ascent: a.elevationGain ?? null,
-        total_descent: a.elevationLoss ?? null,
+        avg_cadence: cadence(a),
+        total_ascent: cm(a.elevationGain),
+        total_descent: cm(a.elevationLoss),
         calories: a.calories ?? null,
         avg_temperature: a.minTemperature != null && a.maxTemperature != null ? (a.minTemperature + a.maxTemperature) / 2 : null,
         training_effect: a.aerobicTrainingEffect ?? null,
@@ -143,11 +166,40 @@ export async function importGarminExport(
         longitude: a.startLongitude ?? null,
         source_file: `garmin-export:${a.activityId}`,
         raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a },
+
       };
     }).filter((r) => r.start_time);
 
-    // Replace existing by source_file (Garmin activity id) — atomic per-batch.
+    // Snapshot existing activities (overlapping start_times or source_files) BEFORE delete
+    // so the user can undo this import.
     const sourceFiles = rows.map((r) => r.source_file);
+    const startTimes = rows.map((r) => r.start_time!).filter(Boolean);
+    try {
+      const snap: any[] = [];
+      const fetchChunk = async (col: "source_file" | "start_time", values: string[]) => {
+        for (let i = 0; i < values.length; i += 500) {
+          const { data } = await supabase
+            .from("activities")
+            .select("*")
+            .eq("user_id", userId)
+            .in(col, values.slice(i, i + 500));
+          if (data) snap.push(...data);
+        }
+      };
+      if (sourceFiles.length) await fetchChunk("source_file", sourceFiles);
+      if (startTimes.length) await fetchChunk("start_time", startTimes);
+      // Dedupe by id, strip raw_data to keep localStorage small
+      const byId = new Map<string, any>();
+      for (const r of snap) {
+        if (r.raw_data) r.raw_data = null;
+        byId.set(r.id, r);
+      }
+      activitiesBackup = Array.from(byId.values());
+    } catch (e: any) {
+      errors.push(`Activities snapshot: ${e?.message || e}`);
+    }
+
+    // Replace existing by source_file (Garmin activity id) — atomic per-batch.
     if (sourceFiles.length) {
       const chunkSize = 500;
       for (let i = 0; i < sourceFiles.length; i += chunkSize) {
@@ -159,8 +211,6 @@ export async function importGarminExport(
     }
 
     // Also delete any pre-existing activity at same start_time (overlap from Strava/FIT).
-    // Done in a single query per batch using OR of timestamps.
-    const startTimes = rows.map((r) => r.start_time!).filter(Boolean);
     if (startTimes.length) {
       const chunkSize = 500;
       for (let i = 0; i < startTimes.length; i += chunkSize) {
@@ -239,9 +289,19 @@ export async function importGarminExport(
       });
     }
 
-    // Replace existing rows for these dates
+    // Snapshot existing daily_metrics for these dates
     const dates = rows.map((r) => r.date);
     if (dates.length) {
+      try {
+        for (let i = 0; i < dates.length; i += 500) {
+          const { data } = await supabase.from("daily_metrics")
+            .select("*").eq("user_id", userId).in("date", dates.slice(i, i + 500));
+          if (data) {
+            for (const r of data) { if (r.raw_data) r.raw_data = null; dailyMetricsBackup.push(r); }
+          }
+        }
+      } catch (e: any) { errors.push(`Daily snapshot: ${e?.message || e}`); }
+
       const chunkSize = 500;
       for (let i = 0; i < dates.length; i += chunkSize) {
         await supabase.from("daily_metrics")
@@ -293,6 +353,15 @@ export async function importGarminExport(
     }
     if (datesTouched.size) {
       const dates = Array.from(datesTouched);
+      // Snapshot first
+      try {
+        for (let i = 0; i < dates.length; i += 500) {
+          const { data } = await supabase.from("sleep_stages")
+            .select("*").eq("user_id", userId).in("date", dates.slice(i, i + 500));
+          if (data) sleepStagesBackup.push(...data);
+        }
+      } catch (e: any) { errors.push(`Sleep snapshot: ${e?.message || e}`); }
+
       const chunkSize = 500;
       for (let i = 0; i < dates.length; i += chunkSize) {
         await supabase.from("sleep_stages")
@@ -343,10 +412,49 @@ export async function importGarminExport(
       result.bioMetrics.weightKg = updates.weight_kg;
     }
     if (Object.keys(updates).length) {
+      // Snapshot current profile values first
+      try {
+        const { data } = await supabase.from("profiles")
+          .select("height_cm, weight_kg").eq("user_id", userId).maybeSingle();
+        profileBackup = {
+          height_cm: data?.height_cm ?? null,
+          weight_kg: data?.weight_kg ?? null,
+        };
+      } catch { /* ignore */ }
       await supabase.from("profiles").update(updates).eq("user_id", userId);
     }
   } catch (e: any) {
     errors.push(`Biometrics: ${e?.message || e}`);
+  }
+
+  // Persist undo snapshot to localStorage
+  try {
+    const undoBlob = {
+      uploadId,
+      userId,
+      createdAt: new Date().toISOString(),
+      fileName: file.name,
+      counts: {
+        activities: result.activities.inserted,
+        dailyMetrics: result.dailyMetrics.inserted,
+        sleepDays: result.sleepDays,
+      },
+      activitiesBackup,
+      dailyMetricsBackup,
+      sleepStagesBackup,
+      profileBackup,
+    };
+    localStorage.setItem(undoKey(userId), JSON.stringify(undoBlob));
+  } catch (e: any) {
+    // localStorage may be full — still let the user delete imported rows via undo
+    try {
+      localStorage.setItem(undoKey(userId), JSON.stringify({
+        uploadId, userId, createdAt: new Date().toISOString(), fileName: file.name,
+        counts: { activities: result.activities.inserted, dailyMetrics: result.dailyMetrics.inserted, sleepDays: result.sleepDays },
+        activitiesBackup: [], dailyMetricsBackup: [], sleepStagesBackup: [], profileBackup,
+        truncated: true,
+      }));
+    } catch { /* give up */ }
   }
 
   // Finalize upload row
@@ -359,4 +467,91 @@ export async function importGarminExport(
 
   onProgress?.({ phase: "Done" });
   return result;
+}
+
+// ----------------- Undo support -----------------
+
+function undoKey(userId: string): string {
+  return `garmin-import-undo:${userId}`;
+}
+
+export interface GarminUndoSnapshot {
+  uploadId: string | null;
+  userId: string;
+  createdAt: string;
+  fileName: string;
+  counts: { activities: number; dailyMetrics: number; sleepDays: number };
+  truncated?: boolean;
+}
+
+export function getGarminUndoInfo(userId: string): GarminUndoSnapshot | null {
+  try {
+    const raw = localStorage.getItem(undoKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      uploadId: parsed.uploadId ?? null,
+      userId: parsed.userId,
+      createdAt: parsed.createdAt,
+      fileName: parsed.fileName,
+      counts: parsed.counts || { activities: 0, dailyMetrics: 0, sleepDays: 0 },
+      truncated: parsed.truncated,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearGarminUndo(userId: string) {
+  try { localStorage.removeItem(undoKey(userId)); } catch { /* ignore */ }
+}
+
+export async function undoLastGarminImport(userId: string): Promise<{ restored: number; errors: string[] }> {
+  const errors: string[] = [];
+  let restored = 0;
+  const raw = localStorage.getItem(undoKey(userId));
+  if (!raw) return { restored: 0, errors: ["No import to undo"] };
+  const blob = JSON.parse(raw);
+
+  // 1. Delete rows imported by this Garmin import (matched via upload_id)
+  if (blob.uploadId) {
+    await supabase.from("activities").delete().eq("user_id", userId).eq("upload_id", blob.uploadId);
+    await supabase.from("daily_metrics").delete().eq("user_id", userId).eq("upload_id", blob.uploadId);
+  }
+  // Sleep stages are tagged by source instead of upload_id
+  await supabase.from("sleep_stages").delete().eq("user_id", userId).eq("source", "garmin-export");
+
+  // 2. Restore snapshots
+  const reinsert = async (table: "activities" | "daily_metrics" | "sleep_stages", rows: any[]) => {
+    for (let i = 0; i < rows.length; i += 200) {
+      const batch = rows.slice(i, i + 200).map((r: any) => {
+        const { id, created_at, ...rest } = r;
+        return rest;
+      });
+      const { error } = await supabase.from(table).insert(batch as any);
+      if (error) errors.push(`${table}: ${error.message}`);
+      else restored += batch.length;
+    }
+  };
+
+  if (Array.isArray(blob.activitiesBackup) && blob.activitiesBackup.length) {
+    await reinsert("activities", blob.activitiesBackup);
+  }
+  if (Array.isArray(blob.dailyMetricsBackup) && blob.dailyMetricsBackup.length) {
+    await reinsert("daily_metrics", blob.dailyMetricsBackup);
+  }
+  if (Array.isArray(blob.sleepStagesBackup) && blob.sleepStagesBackup.length) {
+    await reinsert("sleep_stages", blob.sleepStagesBackup);
+  }
+
+  // 3. Restore profile bio
+  if (blob.profileBackup) {
+    await supabase.from("profiles").update({
+      height_cm: blob.profileBackup.height_cm,
+      weight_kg: blob.profileBackup.weight_kg,
+    }).eq("user_id", userId);
+  }
+
+  clearGarminUndo(userId);
+  return { restored, errors };
 }
