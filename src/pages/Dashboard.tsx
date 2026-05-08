@@ -19,6 +19,7 @@ import RunningIQWidget from "@/components/RunningIQWidget";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
+import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 
 
 // ── Types ──
@@ -35,6 +36,7 @@ interface ActivityRow {
   avg_power: number | null;
   calories: number | null;
   training_effect: number | null;
+  source_file: string | null;
 }
 
 interface MetricsRow {
@@ -239,7 +241,7 @@ const Dashboard = () => {
       const since = new Date();
       since.setDate(since.getDate() - 56);
       supabase.from("activities")
-        .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
+        .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
         .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
         .then(({ data }) => setActivities((data as ActivityRow[]) || []));
       supabase.from("daily_metrics")
@@ -258,7 +260,7 @@ const Dashboard = () => {
 
     supabase
       .from("activities")
-      .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect")
+      .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
       .eq("user_id", user.id)
       .gte("start_time", since.toISOString())
       .order("start_time", { ascending: true })
@@ -286,6 +288,20 @@ const Dashboard = () => {
       .then(({ data }) => {
         if (data && data.length > 0) setPlan(data[0] as PlanRow);
       });
+
+    // One-time cleanup: delete any Strava activities that overlap a FIT
+    // activity (FIT always wins). Refreshes the visible list when rows change.
+    purgeAllStravaOverlaps(user.id).then((removed) => {
+      if (removed > 0) {
+        supabase
+          .from("activities")
+          .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
+          .eq("user_id", user.id)
+          .gte("start_time", since.toISOString())
+          .order("start_time", { ascending: true })
+          .then(({ data }) => setActivities((data as ActivityRow[]) || []));
+      }
+    }).catch((e) => console.error("Strava sweep failed:", e));
   }, [user]);
 
   const stats = useMemo(() => {
@@ -396,11 +412,10 @@ const Dashboard = () => {
 
   // Recent runs (last 3)
   const recentRuns = useMemo(() => {
-    return activities
+    return dedupeActivities(activities)
       .filter((a) => a.distance_meters && a.duration_seconds)
       .filter((a) => !/walk/i.test(a.activity_type || ""))
-      .slice(-3)
-      .reverse()
+      .slice(0, 3)
       .map((a, i) => {
         const distMi = (a.distance_meters || 0) / 1609.34;
         const durMin = (a.duration_seconds || 0) / 60;
