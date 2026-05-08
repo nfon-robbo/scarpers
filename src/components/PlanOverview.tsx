@@ -80,6 +80,17 @@ const DISTANCE_LABELS: Record<string, string> = {
   "marathon": "Marathon",
 };
 
+function workoutDisplayTitle(title: string): string {
+  const cleaned = title
+    .replace(/\s*\(Total:.*?\)/i, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*[—–\-]+\s*/, "")
+    .trim();
+  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
+  if (/^scarpers\s*[-–]/i.test(cleaned)) return cleaned;
+  return `Scarpers - ${cleaned}`;
+}
+
 export default function PlanOverview({
   workouts,
   planStartDate,
@@ -353,7 +364,7 @@ export default function PlanOverview({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold truncate">
-                  {todayWorkout.title.replace(/\s*\(Total:.*?\)/, "")}
+                  {workoutDisplayTitle(todayWorkout.title)}
                 </p>
                 {todayIsCompleted && (
                   <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
@@ -414,7 +425,7 @@ export default function PlanOverview({
               Workout Review
             </DialogTitle>
             <DialogDescription>
-              {todayWorkout?.title.replace(/\s*\(Total:.*?\)/, "")} — {format(today, "d MMMM yyyy")}
+              {todayWorkout ? workoutDisplayTitle(todayWorkout.title) : "Workout"} — {format(today, "d MMMM yyyy")}
             </DialogDescription>
           </DialogHeader>
 
