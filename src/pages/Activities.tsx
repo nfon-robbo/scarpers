@@ -116,12 +116,15 @@ const Activities = () => {
     );
   }
 
-  const availableTypes = Array.from(
-    new Set(activities.map((a) => (a.activity_type || "").toLowerCase()).filter(Boolean))
-  ).sort();
+  const categorise = (t: string | null | undefined) => {
+    const s = (t || "").toLowerCase();
+    if (s.includes("walk") || s.includes("hike")) return "walking";
+    if (s.includes("run")) return "running";
+    return "other";
+  };
 
   const visibleActivities = activities
-    .filter((a) => typeFilter === "all" || (a.activity_type || "").toLowerCase() === typeFilter)
+    .filter((a) => typeFilter === "all" || categorise(a.activity_type) === typeFilter)
     .slice()
     .sort((a, b) => {
       if (sortBy === "distance") {
@@ -150,9 +153,8 @@ const Activities = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All types</SelectItem>
-              {availableTypes.map((t) => (
-                <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-              ))}
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="walking">Walking</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "distance")}>
