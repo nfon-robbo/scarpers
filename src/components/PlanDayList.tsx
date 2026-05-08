@@ -438,6 +438,7 @@ export default function PlanDayList({
   planStartDate,
   planEndDate,
   completedDates = new Set(),
+  linkedActivities = {},
   onMoveWorkout,
   onSyncWorkout,
   syncing = false,
@@ -445,6 +446,7 @@ export default function PlanDayList({
   raceDistance,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
+  const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [syncingDate, setSyncingDate] = useState<string | null>(null);
