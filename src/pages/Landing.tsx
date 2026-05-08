@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
+import heroRunner from "@/assets/hero-runner.jpg";
 
 const FAQS = [
   {
