@@ -398,11 +398,10 @@ const Dashboard = () => {
 
   // Recent runs (last 3)
   const recentRuns = useMemo(() => {
-    return activities
+    return dedupeActivities(activities)
       .filter((a) => a.distance_meters && a.duration_seconds)
       .filter((a) => !/walk/i.test(a.activity_type || ""))
-      .slice(-3)
-      .reverse()
+      .slice(0, 3)
       .map((a, i) => {
         const distMi = (a.distance_meters || 0) / 1609.34;
         const durMin = (a.duration_seconds || 0) / 60;
