@@ -35,6 +35,7 @@ interface ActivityRow {
   avg_power: number | null;
   calories: number | null;
   training_effect: number | null;
+  source_file: string | null;
 }
 
 interface MetricsRow {
