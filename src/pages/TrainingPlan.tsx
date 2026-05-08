@@ -1636,6 +1636,7 @@ const TrainingPlanPage = () => {
               planStartDate={startDate}
               planEndDate={raceDate}
               completedDates={completedDates}
+              linkedActivities={linkedActivities}
               onMoveWorkout={moveWorkoutDate}
               onSyncWorkout={(singleDate) => handleSyncToIntervals(true, singleDate)}
               syncing={syncing}
