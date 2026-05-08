@@ -86,7 +86,7 @@ const Onboarding = () => {
         .eq("user_id", user.id);
 
       if (error) throw error;
-      navigate("/");
+      navigate("/dashboard");
     } catch (error: any) {
       toast({
         title: "Error saving profile",

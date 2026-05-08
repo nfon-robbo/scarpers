@@ -7,6 +7,7 @@ import { UnitsProvider } from "./hooks/useUnits";
 import { ThemeProvider } from "./hooks/useTheme";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import Activities from "./pages/Activities";
@@ -31,6 +32,7 @@ const App = () => (
         <SupabaseErrorBanner />
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route
@@ -40,7 +42,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/activities" element={<Activities />} />
               <Route path="/insights" element={<InsightsPage />} />
