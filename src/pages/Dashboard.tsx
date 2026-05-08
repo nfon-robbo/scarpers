@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Upload, Brain, Calendar, Activity, TrendingUp, Heart,
   Timer, Zap, Flame, Moon, Footprints, RefreshCw, Medal,
-  ChevronRight,
+  ChevronRight, Trash2, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
