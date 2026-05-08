@@ -153,9 +153,8 @@ const Activities = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All types</SelectItem>
-              {availableTypes.map((t) => (
-                <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-              ))}
+              <SelectItem value="running">Running</SelectItem>
+              <SelectItem value="walking">Walking</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "distance")}>
