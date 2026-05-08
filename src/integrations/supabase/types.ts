@@ -280,6 +280,33 @@ export type Database = {
         }
         Relationships: []
       }
+      intervals_credentials: {
+        Row: {
+          api_key: string
+          athlete_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          athlete_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           athlete_context: string | null
