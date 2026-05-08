@@ -195,7 +195,7 @@ const Landing = () => {
               <Zap className="w-3 h-3 text-primary" />
               Free AI running coach · Beta
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-foreground drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               Free AI<br />Running Plan
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
