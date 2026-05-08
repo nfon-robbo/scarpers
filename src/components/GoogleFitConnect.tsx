@@ -127,7 +127,7 @@ const GoogleFitConnect = () => {
         <CardDescription>
           {connected
             ? "Connected — sync to get Deep, Light, REM & Awake breakdown"
-            : "Connect Google Fit for granular sleep stage data from your Amazfit watch"}
+            : "Connect Google Fit for granular sleep stage data from your watch"}
         </CardDescription>
       </CardHeader>
       <CardContent>
