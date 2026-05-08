@@ -928,7 +928,8 @@ const TrainingPlanPage = () => {
           .join("\n");
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
-        const correctedName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
+        const baseName = w.title.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`);
+        const correctedName = /^scarpers\s*[-–]/i.test(baseName) ? baseName : `Scarpers - ${baseName}`;
         return {
           date: dateStr,
           name: correctedName,
