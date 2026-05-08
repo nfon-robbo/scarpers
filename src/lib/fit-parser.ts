@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import FitParser from "fit-file-parser";
+import { cleanGpsTrack, haversineDistance } from "@/lib/gps-track";
 
 export interface GpsPoint {
   lat: number;
@@ -126,6 +127,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
       const sessions = data?.sessions || data?.activity?.sessions || [];
       if (sessions.length > 0) {
         for (const session of sessions) {
+          const cleanedTrack = cleanGpsTrack(gpsTrack);
           activities.push({
             activity_type: session.sport || session.sub_sport || null,
             start_time: session.start_time ? new Date(session.start_time).toISOString() : null,
@@ -145,7 +147,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             training_effect: session.total_training_effect ?? null,
             training_load: null,
             source_file: fileName,
-            gps_track: gpsTrack,
+            gps_track: cleanedTrack,
             raw_data: session,
           });
         }
@@ -180,6 +182,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             distanceMeters = Math.round(d);
           }
 
+          const cleanedTrack = cleanGpsTrack(gpsTrack);
           activities.push({
             activity_type: data?.sport?.sport || null,
             start_time: first.timestamp ? new Date(first.timestamp).toISOString() : null,
@@ -201,7 +204,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             training_effect: null,
             training_load: null,
             source_file: fileName,
-            gps_track: gpsTrack,
+            gps_track: cleanedTrack,
             raw_data: { records_count: records.length },
           });
         }
@@ -210,16 +213,6 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
       resolve(activities);
     });
   });
-}
-
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export async function parseZipFile(file: File): Promise<ParseResult> {
