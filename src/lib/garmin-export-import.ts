@@ -215,9 +215,11 @@ export async function importGarminExport(
     //   avgSpeed/maxSpeed:               cm/ms → ×36 = km/h
     //   duration/elapsedDuration:        milliseconds  → /1000 = seconds (already handled)
     //   avgRunCadence:                   single-leg    → ×2 = total spm; prefer avgDoubleCadence
+    //   calories/energy:                 kilojoules    → /4.184 = kcal
     //   temperature:                     Celsius       (no conversion)
     const cm = (v: any) => (v == null ? null : Number(v) / 100);
     const speed = (v: any) => (v == null ? null : Number(v) * 36);
+    const energyKcal = (v: any) => (v == null ? null : Number(v) / 4.184);
     const cadence = (a: any) => {
       if (a.avgDoubleCadence != null) return Number(a.avgDoubleCadence);
       if (a.avgRunCadence != null) return Number(a.avgRunCadence) * 2;
@@ -229,6 +231,7 @@ export async function importGarminExport(
       const start = toIso(a.startTimeGmt ?? a.beginTimestamp);
       const fit = fitDetails.byActivityId.get(String(a.activityId ?? "")) || (start ? fitDetails.byStartMinute.get(start.slice(0, 16)) : undefined);
       const gpsTrack = fit?.gps_track?.length ? fit.gps_track : routeFromGarminSummary(a);
+      const gpsTrackSource = fit?.gps_track?.length ? "fit" : "garmin-summary";
       return {
         user_id: userId,
         upload_id: uploadId,
@@ -245,7 +248,7 @@ export async function importGarminExport(
         avg_cadence: cadence(a),
         total_ascent: cm(a.elevationGain),
         total_descent: cm(a.elevationLoss),
-        calories: a.calories ?? null,
+        calories: energyKcal(a.calories),
         avg_temperature: a.minTemperature != null && a.maxTemperature != null ? (a.minTemperature + a.maxTemperature) / 2 : null,
         training_effect: a.aerobicTrainingEffect ?? null,
         training_load: a.activityTrainingLoad ?? null,
@@ -253,7 +256,7 @@ export async function importGarminExport(
         latitude: a.startLatitude ?? gpsTrack[0]?.lat ?? null,
         longitude: a.startLongitude ?? gpsTrack[0]?.lng ?? null,
         source_file: `garmin-export:${a.activityId}`,
-        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a, gps_track: gpsTrack },
+        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a, gps_track: gpsTrack, gps_track_source: gpsTrackSource },
 
       };
     }).filter((r) => r.start_time);
