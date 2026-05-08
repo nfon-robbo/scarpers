@@ -93,47 +93,8 @@ const PLANS = [
   { distance: "Ultra", weeks: "20–24 weeks", who: "50K, 50mi, 100K trail" },
 ];
 
-/** CSS-only phone mockup with a sample dashboard inside */
-const PhoneMockup = () => (
-  <div className="relative mx-auto w-[260px] sm:w-[300px] aspect-[9/19] rounded-[2.5rem] border-[10px] border-foreground/90 bg-background shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] overflow-hidden">
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-foreground/90 rounded-b-2xl z-10" />
-    <div className="h-full w-full bg-gradient-to-b from-background via-background to-card p-4 pt-10 flex flex-col gap-3 text-left">
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Good morning</p>
-        <p className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Alex</p>
-      </div>
-      <div className="rounded-2xl border border-border/60 bg-card/80 p-3">
-        <p className="text-[10px] text-muted-foreground">Today's run</p>
-        <p className="text-sm font-semibold mt-0.5">6 × 1km @ threshold</p>
-        <p className="text-[10px] text-muted-foreground mt-1">175 spm · 90s easy between</p>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-border/60 bg-card/80 p-2.5">
-          <p className="text-[9px] text-muted-foreground">Readiness</p>
-          <p className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>87</p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-card/80 p-2.5">
-          <p className="text-[9px] text-muted-foreground">Running IQ</p>
-          <p className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>142</p>
-        </div>
-      </div>
-      <div className="rounded-2xl border border-border/60 bg-card/80 p-3">
-        <p className="text-[10px] text-muted-foreground mb-2">This week</p>
-        <div className="flex items-end gap-1.5 h-12">
-          {[40, 70, 30, 90, 55, 0, 80].map((h, i) => (
-            <div key={i} className="flex-1 rounded-sm bg-gradient-to-t from-primary to-accent" style={{ height: `${h}%`, opacity: h ? 1 : 0.2 }} />
-          ))}
-        </div>
-        <div className="flex justify-between mt-1.5 text-[8px] text-muted-foreground">
-          {["M","T","W","T","F","S","S"].map((d,i)=><span key={i}>{d}</span>)}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase text-primary">{children}</p>
+const SectionLabel = ({ children, light }: { children: React.ReactNode; light?: boolean }) => (
+  <p className={`text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase ${light ? "text-primary-foreground/80" : "text-primary"}`}>{children}</p>
 );
 
 const H2 = ({ children }: { children: React.ReactNode }) => (
@@ -180,19 +141,18 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* ====== HERO with full-bleed atmosphere ====== */}
+      {/* ====== HERO — full-bleed runner photo ====== */}
       <section className="relative min-h-screen flex flex-col overflow-hidden">
-        {/* Atmospheric background */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-card" />
-          <div className="absolute -top-40 -left-40 w-[700px] h-[700px] rounded-full bg-primary/30 blur-3xl" />
-          <div className="absolute top-1/4 -right-40 w-[700px] h-[700px] rounded-full bg-accent/30 blur-3xl" />
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-primary/15 blur-3xl" />
-          <div className="absolute inset-0 opacity-[0.03]" style={{
-            backgroundImage: "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
-            backgroundSize: "60px 60px",
-          }} />
-        </div>
+        {/* Background image + overlays */}
+        <img
+          src={heroRunner}
+          alt="Runner at sunrise on an open road"
+          className="absolute inset-0 w-full h-full object-cover -z-20"
+          width={1920}
+          height={1280}
+        />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/95 via-background/60 to-background/30" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/40 to-transparent" />
 
         {/* Top nav */}
         <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
@@ -200,39 +160,36 @@ const Landing = () => {
             <img src={scarpersIcon} alt="" className="h-9 w-9 object-contain" />
             <img src={scarpersWordmark} alt="Scarpers" className="h-5 w-auto object-contain" />
           </Link>
-          <Button asChild variant="ghost" size="sm" className="text-foreground/80 hover:text-foreground">
+          <Button asChild variant="ghost" size="sm" className="text-foreground hover:text-foreground bg-background/30 backdrop-blur rounded-full">
             <Link to="/auth">Sign In</Link>
           </Button>
         </header>
 
-        {/* Hero body — phone center, headline bottom-left */}
-        <div className="relative z-10 flex-1 flex items-center justify-center pt-10 sm:pt-16">
-          <PhoneMockup />
-        </div>
-
-        <div className="relative z-10 px-5 sm:px-10 pb-16 sm:pb-24 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-card/40 backdrop-blur text-[11px] font-medium text-muted-foreground mb-5">
-            <Zap className="w-3 h-3 text-primary" />
-            Free AI running coach · Beta
-          </div>
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Free AI<br />Running Plan
-          </h1>
-          <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
-            Get a personalised training plan tailored to your goal — week by week, AI plans for 5K, 10K, half marathon, marathon and ultra. Completely free.
-          </p>
-          <div className="mt-7 flex items-center gap-3">
-            <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
-              <Link to="/auth">Get Your Free Plan</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur">
-              <a href="#how">See How It Works</a>
-            </Button>
+        {/* Hero copy bottom-left */}
+        <div className="relative z-10 flex-1 flex items-end">
+          <div className="px-5 sm:px-10 pb-20 sm:pb-28 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-background/40 backdrop-blur text-[11px] font-medium text-foreground/80 mb-6">
+              <Zap className="w-3 h-3 text-primary" />
+              Free AI running coach · Beta
+            </div>
+            <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold tracking-tight leading-[0.92] text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Free AI<br />Running Plan
+            </h1>
+            <p className="mt-6 text-base sm:text-lg text-foreground/80 max-w-md leading-relaxed">
+              Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra. Completely free.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
+                <Link to="/auth">Get Your Free Plan</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur border-foreground/20">
+                <a href="#how">See How It Works</a>
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Scroll cue */}
-        <a href="#how" aria-label="Scroll" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-muted-foreground animate-bounce">
+        <a href="#how" aria-label="Scroll" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-foreground/70 animate-bounce z-10">
           <ChevronDown className="w-5 h-5" />
         </a>
       </section>
