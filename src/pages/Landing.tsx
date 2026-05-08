@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,6 +106,27 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const heroVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [heroLoopFading, setHeroLoopFading] = useState(false);
+
+  const handleHeroVideoTimeUpdate = () => {
+    const video = heroVideoRef.current;
+    if (!video?.duration) return;
+
+    const shouldFade = video.currentTime >= video.duration - 0.85;
+    setHeroLoopFading((current) => (current === shouldFade ? current : shouldFade));
+  };
+
+  const handleHeroVideoEnded = () => {
+    const video = heroVideoRef.current;
+    if (!video) return;
+
+    setHeroLoopFading(true);
+    video.currentTime = 0;
+    void video.play();
+
+    window.setTimeout(() => setHeroLoopFading(false), 280);
+  };
 
   useEffect(() => {
     document.title = "Scarpers — Free AI Running Coach & Personalised Training Plans UK";
@@ -147,15 +168,17 @@ const Landing = () => {
         {/* Background video + overlays */}
         <div className="absolute inset-0 z-0 bg-background">
           <video
+            ref={heroVideoRef}
             src={heroRunnerVideo.url}
             poster={heroRunner}
             autoPlay
             muted
-            loop
             playsInline
             preload="auto"
+            onTimeUpdate={handleHeroVideoTimeUpdate}
+            onEnded={handleHeroVideoEnded}
             aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${heroLoopFading ? "opacity-0" : "opacity-100"}`}
           />
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
