@@ -112,16 +112,19 @@ async function syncStravaForUser(supabase: any, userId: string, tokens: any) {
 
 // --- Intervals.icu wellness sync for a single user ---
 async function syncIntervalsForUser(supabase: any, userId: string) {
-  const INTERVALS_API_KEY = Deno.env.get("INTERVALS_API_KEY");
-  const INTERVALS_ATHLETE_ID = Deno.env.get("INTERVALS_ATHLETE_ID");
-  if (!INTERVALS_API_KEY || !INTERVALS_ATHLETE_ID) return 0;
+  const { data: creds } = await supabase
+    .from("intervals_credentials")
+    .select("athlete_id, api_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!creds?.athlete_id || !creds?.api_key) return 0;
 
   const newest = new Date().toISOString().split("T")[0];
   const oldest = new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0];
-  const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
+  const basicAuth = btoa(`API_KEY:${creds.api_key}`);
 
   const resp = await fetch(
-    `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}/wellness?oldest=${oldest}&newest=${newest}`,
+    `https://intervals.icu/api/v1/athlete/${creds.athlete_id}/wellness?oldest=${oldest}&newest=${newest}`,
     { headers: { Authorization: `Basic ${basicAuth}`, "Content-Type": "application/json" } }
   );
   if (!resp.ok) throw new Error(`Intervals.icu API error: ${resp.status}`);
