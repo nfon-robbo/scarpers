@@ -121,25 +121,76 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     // HR zones from track (using max HR ~ user's max if present, else 190)
     const userMax = data.max_heart_rate ?? 190;
     const zones = [0, 0, 0, 0, 0];
+    const firstTrackTime = track[0]?.time ? new Date(track[0].time).getTime() : null;
+    const elapsedForPoint = (p: any) => p.elapsed_time ?? (p.time && firstTrackTime != null ? (new Date(p.time).getTime() - firstTrackTime) / 1000 : null);
     let lastT = 0;
     for (let i = 0; i < track.length; i++) {
       const p: any = track[i];
       const hr = p.heart_rate;
-      if (!hr) { lastT = p.elapsed_time ?? lastT; continue; }
+      if (!hr) { lastT = elapsedForPoint(p) ?? lastT; continue; }
       const pct = hr / userMax;
       const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
-      const t = p.elapsed_time ?? lastT + 1;
+      const t = elapsedForPoint(p) ?? lastT + 1;
       zones[z] += Math.max(0, t - lastT);
       lastT = t;
     }
     const zonesTotal = zones.reduce((a, b) => a + b, 0);
 
-    // Splits per km from gps_track
+    const readMeasurement = (split: any, field: string) => {
+      const m = Array.isArray(split?.measurements)
+        ? split.measurements.find((x: any) => x?.fieldEnum === field && x?.valid !== false)
+        : null;
+      const n = Number(m?.value);
+      return Number.isFinite(n) ? n : null;
+    };
+
     const splits: { km: number; time: number; pace: string; hr: number | null; ascent: number }[] = [];
-    if (track.length > 10 && dist > 1000) {
+    const garminSplits = Array.isArray(data.raw_data?.garmin?.splits) ? data.raw_data.garmin.splits : [];
+    const measuredGarminSplits = garminSplits
+      .map((s: any) => {
+        const meters = readMeasurement(s, "SUM_DISTANCE");
+        const movingMs = readMeasurement(s, "SUM_DURATION") ?? readMeasurement(s, "SUM_MOVINGDURATION") ?? readMeasurement(s, "SUM_ELAPSEDDURATION");
+        const elapsedMs = readMeasurement(s, "SUM_ELAPSEDDURATION") ?? movingMs;
+        const hr = readMeasurement(s, "WEIGHTED_MEAN_HEARTRATE");
+        const ascent = readMeasurement(s, "GAIN_ELEVATION");
+        return meters != null && elapsedMs != null ? { meters: meters / 100, time: elapsedMs / 1000, movingTime: movingMs != null ? movingMs / 1000 : elapsedMs / 1000, hr, ascent: ascent != null ? ascent / 100 : 0 } : null;
+      })
+      .filter(Boolean) as { meters: number; time: number; movingTime: number; hr: number | null; ascent: number }[];
+
+    if (!track.some((p: any) => p.elapsed_time != null || p.time) && measuredGarminSplits.length) {
+      let carryDistance = 0;
+      let carryMovingTime = 0;
+      let carryHrWeighted = 0;
+      let carryHrMeters = 0;
+      let carryAscent = 0;
+      for (const s of measuredGarminSplits) {
+        carryDistance += s.meters;
+        carryMovingTime += s.movingTime;
+        if (s.hr) { carryHrWeighted += s.hr * s.meters; carryHrMeters += s.meters; }
+        carryAscent += s.ascent;
+        while (carryDistance >= 1000) {
+          const ratio = 1000 / carryDistance;
+          const splitTime = carryMovingTime * ratio;
+          const paceMin = Math.floor(splitTime / 60);
+          const paceSec = Math.round(splitTime - paceMin * 60);
+          splits.push({
+            km: splits.length + 1,
+            time: splitTime,
+            pace: `${paceMin}:${paceSec.toString().padStart(2, "0")}`,
+            hr: carryHrMeters ? Math.round(carryHrWeighted / carryHrMeters) : null,
+            ascent: Math.round(carryAscent * ratio),
+          });
+          carryDistance -= 1000;
+          carryMovingTime *= 1 - ratio;
+          carryHrWeighted *= 1 - ratio;
+          carryHrMeters *= 1 - ratio;
+          carryAscent *= 1 - ratio;
+        }
+      }
+    } else if (track.length > 10 && dist > 1000) {
       let cumDist = 0;
       let lastSplitDist = 0;
-      let lastSplitTime = track[0]?.elapsed_time ?? 0;
+      let lastSplitTime = elapsedForPoint(track[0]) ?? 0;
       let splitHrSum = 0;
       let splitHrN = 0;
       let splitAscent = 0;
@@ -167,7 +218,8 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
         }
         if (p.heart_rate) { splitHrSum += p.heart_rate; splitHrN++; }
         while (cumDist - lastSplitDist >= 1000) {
-          const splitTime = (p.elapsed_time ?? 0) - lastSplitTime;
+          const currentTime = elapsedForPoint(p) ?? lastSplitTime;
+          const splitTime = currentTime - lastSplitTime;
           const km = splits.length + 1;
           const paceMin = Math.floor(splitTime / 60);
           const paceSec = Math.round(splitTime - paceMin * 60);
@@ -179,7 +231,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
             ascent: Math.round(splitAscent),
           });
           lastSplitDist += 1000;
-          lastSplitTime = p.elapsed_time ?? lastSplitTime;
+          lastSplitTime = currentTime;
           splitHrSum = 0; splitHrN = 0; splitAscent = 0;
         }
       }
