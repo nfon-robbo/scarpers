@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import UndoGarminImportButton from "@/components/UndoGarminImportButton";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 const Activities = () => {
   const { user } = useAuth();
@@ -32,6 +35,8 @@ const Activities = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"date" | "distance">("date");
 
   const LIST_COLUMNS =
     "id,user_id,start_time,activity_type,source_file,training_effect,training_load,training_plan_id," +
@@ -111,25 +116,68 @@ const Activities = () => {
     );
   }
 
+  const availableTypes = Array.from(
+    new Set(activities.map((a) => (a.activity_type || "").toLowerCase()).filter(Boolean))
+  ).sort();
+
+  const visibleActivities = activities
+    .filter((a) => typeFilter === "all" || (a.activity_type || "").toLowerCase() === typeFilter)
+    .slice()
+    .sort((a, b) => {
+      if (sortBy === "distance") {
+        return (Number(b.distance_meters) || 0) - (Number(a.distance_meters) || 0);
+      }
+      return new Date(b.start_time || 0).getTime() - new Date(a.start_time || 0).getTime();
+    });
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Activities</h1>
-          <p className="text-muted-foreground mt-1">{activities.length} activities imported</p>
+          <p className="text-muted-foreground mt-1">
+            {visibleActivities.length} of {activities.length} activities
+          </p>
         </div>
         <UndoGarminImportButton />
       </div>
 
-      {activities.length === 0 ? (
+      {activities.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {availableTypes.map((t) => (
+                <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "distance")}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Newest first</SelectItem>
+              <SelectItem value="distance">Longest distance</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {visibleActivities.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            No activities yet. Upload FIT files to get started.
+            {activities.length === 0
+              ? "No activities yet. Upload FIT files to get started."
+              : "No activities match the current filter."}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {activities.map((a) => (
+          {visibleActivities.map((a) => (
             <Card key={a.id} className="hover:shadow-sm transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
