@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check for duplicates
+    // Check for duplicates by Strava id
     const stravaIds = stravaActivities.map((a: any) => `strava:${a.id}`);
     const { data: existing } = await supabase
       .from("activities")
@@ -260,9 +260,35 @@ Deno.serve(async (req) => {
       .in("source_file", stravaIds);
 
     const existingSet = new Set((existing || []).map((e: any) => e.source_file));
-    const newActivities = stravaActivities.filter(
-      (a: any) => !existingSet.has(`strava:${a.id}`)
-    );
+
+    // FIT always wins: skip any Strava activity that overlaps an existing
+    // non-Strava (FIT) activity within ±15 minutes.
+    const WINDOW_MS = 15 * 60 * 1000;
+    const stravaTimes = stravaActivities
+      .map((a: any) => new Date(a.start_date).getTime())
+      .filter((n: number) => isFinite(n));
+    let fitTimes: number[] = [];
+    if (stravaTimes.length) {
+      const minT = Math.min(...stravaTimes) - WINDOW_MS;
+      const maxT = Math.max(...stravaTimes) + WINDOW_MS;
+      const { data: fitRows } = await supabase
+        .from("activities")
+        .select("start_time, source_file")
+        .eq("user_id", user.id)
+        .gte("start_time", new Date(minT).toISOString())
+        .lte("start_time", new Date(maxT).toISOString())
+        .not("source_file", "like", "strava:%");
+      fitTimes = (fitRows || [])
+        .map((r: any) => r.start_time ? new Date(r.start_time).getTime() : NaN)
+        .filter((n: number) => isFinite(n));
+    }
+
+    const newActivities = stravaActivities.filter((a: any) => {
+      if (existingSet.has(`strava:${a.id}`)) return false;
+      const t = new Date(a.start_date).getTime();
+      if (!isFinite(t)) return true;
+      return !fitTimes.some((ft) => Math.abs(ft - t) <= WINDOW_MS);
+    });
 
     // Create upload record and fetch streams + insert one by one
     let uploadId: string | null = null;
