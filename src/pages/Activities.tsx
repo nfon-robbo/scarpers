@@ -35,6 +35,8 @@ const Activities = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"date" | "distance">("date");
 
   const LIST_COLUMNS =
     "id,user_id,start_time,activity_type,source_file,training_effect,training_load,training_plan_id," +
