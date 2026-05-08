@@ -9,6 +9,7 @@
 
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
+import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
 
 export interface GarminImportProgress {
   phase: string;
@@ -38,6 +39,52 @@ async function findFiles(zip: JSZip, predicate: (p: string) => boolean): Promise
   const out: string[] = [];
   zip.forEach((path, entry) => { if (!entry.dir && predicate(path)) out.push(path); });
   return out;
+}
+
+function routeFromGarminSummary(a: any): Array<{ lat: number; lng: number; time?: string }> {
+  const points: Array<{ lat: number; lng: number; time?: string }> = [];
+  const push = (lat: any, lng: any, time?: any) => {
+    const nLat = Number(lat);
+    const nLng = Number(lng);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLng) || Math.abs(nLat) < 0.01) return;
+    const prev = points[points.length - 1];
+    if (prev && Math.abs(prev.lat - nLat) < 0.000001 && Math.abs(prev.lng - nLng) < 0.000001) return;
+    points.push({ lat: nLat, lng: nLng, time: time ? new Date(Number(time)).toISOString() : undefined });
+  };
+
+  push(a.startLatitude, a.startLongitude, a.beginTimestamp);
+  const splits = Array.isArray(a.splits) ? [...a.splits] : [];
+  splits.sort((x, y) => Number(x.startIndex ?? 0) - Number(y.startIndex ?? 0));
+  for (const s of splits) {
+    push(s.startLatitude, s.startLongitude);
+    push(s.endLatitude, s.endLongitude, s.endTimeGMT);
+  }
+  push(a.endLatitude, a.endLongitude);
+  return points;
+}
+
+async function parseGarminFitDetails(zip: JSZip): Promise<{ byActivityId: Map<string, ParsedActivity>; byStartMinute: Map<string, ParsedActivity> }> {
+  const byActivityId = new Map<string, ParsedActivity>();
+  const byStartMinute = new Map<string, ParsedActivity>();
+  const fitFiles = await findFiles(zip, (p) => /\.fit$/i.test(p));
+  for (const path of fitFiles) {
+    try {
+      const file = zip.file(path);
+      if (!file) continue;
+      const parsed = await parseFitBuffer(await file.async("arraybuffer"), path);
+      for (const activity of parsed) {
+        const idMatch = path.match(/(\d{6,})/);
+        if (idMatch) byActivityId.set(idMatch[1], activity);
+        if (activity.start_time) {
+          const minute = new Date(activity.start_time).toISOString().slice(0, 16);
+          byStartMinute.set(minute, activity);
+        }
+      }
+    } catch {
+      // The summary export is still usable if an embedded FIT file is corrupt or absent.
+    }
+  }
+  return { byActivityId, byStartMinute };
 }
 
 function isoDate(d: Date): string {
