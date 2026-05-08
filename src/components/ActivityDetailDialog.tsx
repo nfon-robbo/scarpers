@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnits } from "@/hooks/useUnits";
 import {
@@ -251,7 +252,52 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
 
   const open = !!activityId;
   const hasDetailedTrack = track.length >= 10 || data?.raw_data?.gps_track_source === "fit";
-  const displayedMapTrack = hasDetailedTrack ? track : track.slice(0, 1);
+
+  const [snappedTrack, setSnappedTrack] = useState<{ lat: number; lng: number }[] | null>(null);
+  const [snapping, setSnapping] = useState(false);
+  const [snapError, setSnapError] = useState<string | null>(null);
+
+  // Reset snap when switching activities
+  useEffect(() => { setSnappedTrack(null); setSnapError(null); }, [activityId]);
+
+  const displayedMapTrack = snappedTrack ?? (hasDetailedTrack ? track : track.slice(0, 1));
+
+  const snapToRoads = async () => {
+    if (!track.length) return;
+    setSnapping(true);
+    setSnapError(null);
+    try {
+      // Downsample so chunks cover more ground; OSRM match limit is 100 coords/req
+      const stride = Math.max(1, Math.ceil(track.length / 600));
+      const points = track.filter((_, i) => i % stride === 0 || i === track.length - 1);
+      const CHUNK = 90;
+      const out: { lat: number; lng: number }[] = [];
+      for (let i = 0; i < points.length; i += CHUNK - 1) {
+        const slice = points.slice(i, i + CHUNK);
+        if (slice.length < 2) break;
+        const coords = slice.map(p => `${(p as any).lng ?? (p as any).lon},${p.lat}`).join(";");
+        const radii = slice.map(() => "25").join(";");
+        const url = `https://router.project-osrm.org/match/v1/foot/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`OSRM ${res.status}`);
+        const json = await res.json();
+        if (json.code !== "Ok" || !json.matchings?.length) {
+          // Fallback: keep raw points for this chunk
+          for (const p of slice) out.push({ lat: p.lat, lng: (p as any).lng ?? (p as any).lon });
+          continue;
+        }
+        for (const m of json.matchings) {
+          for (const [lng, lat] of m.geometry.coordinates) out.push({ lat, lng });
+        }
+      }
+      if (out.length < 2) throw new Error("No matched route returned");
+      setSnappedTrack(out);
+    } catch (e: any) {
+      setSnapError(e.message || "Snap failed");
+    } finally {
+      setSnapping(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
