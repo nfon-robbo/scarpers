@@ -194,195 +194,192 @@ const Landing = () => {
         </a>
       </section>
 
-      {/* ====== HOW IT WORKS ====== */}
-      <section id="how" className="max-w-6xl mx-auto px-5 py-24 sm:py-32">
-        <div className="text-center max-w-2xl mx-auto">
-          <SectionLabel>How It Works</SectionLabel>
-          <H2>Three Steps to Your Best Race</H2>
-        </div>
-        <div className="mt-16 grid md:grid-cols-3 gap-6">
-          {STEPS.map((s) => (
-            <article key={s.n} className="text-center">
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/50 flex items-center justify-center mb-5">
-                <s.icon className="w-7 h-7 text-primary" />
-              </div>
-              <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">{s.n}</p>
-              <h3 className="mt-2 text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{s.title}</h3>
-              <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* ====== ALTERNATING SPLIT 1: Plan distances ====== */}
-      <section id="plans" className="max-w-6xl mx-auto px-5 py-24">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <SectionLabel>Training Plans</SectionLabel>
-            <H2>From your first 5K to your first 100K</H2>
-            <p className="mt-5 text-muted-foreground leading-relaxed">
-              Pick your distance, set your race date, and Scarpers writes a plan that peaks you on the right day — with a real taper, recovery weeks and intensity that scales to your fitness.
-            </p>
-            <Button asChild size="lg" className="mt-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0">
-              <Link to="/auth">Build my plan <ChevronRight className="w-4 h-4 ml-1" /></Link>
-            </Button>
+      {/* ====== HOW IT WORKS — default dark band ====== */}
+      <section id="how" className="bg-background">
+        <div className="max-w-6xl mx-auto px-5 py-24 sm:py-32">
+          <div className="text-center max-w-2xl mx-auto">
+            <SectionLabel>How It Works</SectionLabel>
+            <H2>Three Steps to Your Best Race</H2>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {PLANS.map((p) => (
-              <div key={p.distance} className={`rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-5 ${p.distance === "Ultra" ? "col-span-2" : ""}`}>
-                <p className="text-[11px] text-muted-foreground">{p.weeks}</p>
-                <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{p.distance}</h3>
-                <p className="mt-2 text-xs text-muted-foreground">{p.who}</p>
-              </div>
+          <div className="mt-16 grid md:grid-cols-3 gap-6">
+            {STEPS.map((s) => (
+              <article key={s.n} className="text-center">
+                <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/50 flex items-center justify-center mb-5">
+                  <s.icon className="w-7 h-7 text-primary" />
+                </div>
+                <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">{s.n}</p>
+                <h3 className="mt-2 text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{s.title}</h3>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ====== ALTERNATING SPLIT 2: Imports ====== */}
-      <section className="max-w-6xl mx-auto px-5 py-24">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div className="order-2 lg:order-1 rounded-3xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur p-8">
+      {/* ====== PLANS — tinted card band ====== */}
+      <section id="plans" className="relative bg-card/40 border-y border-border/40">
+        <div className="absolute inset-0 -z-0 opacity-40 pointer-events-none" style={{
+          backgroundImage: "radial-gradient(circle at 10% 20%, hsl(var(--primary) / 0.15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, hsl(var(--accent) / 0.15) 0%, transparent 40%)",
+        }} />
+        <div className="relative max-w-6xl mx-auto px-5 py-24">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <SectionLabel>Training Plans</SectionLabel>
+              <H2>From your first 5K to your first 100K</H2>
+              <p className="mt-5 text-muted-foreground leading-relaxed">
+                Pick your distance, set your race date, and Scarpers writes a plan that peaks you on the right day — with a real taper, recovery weeks and intensity that scales to your fitness.
+              </p>
+              <Button asChild size="lg" className="mt-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0">
+                <Link to="/auth">Build my plan <ChevronRight className="w-4 h-4 ml-1" /></Link>
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              {["Garmin","Strava","Apple Watch","Coros","Polar","Suunto","Wahoo","Intervals.icu"].map((b) => (
-                <div key={b} className="rounded-xl border border-border/40 bg-background/60 p-4 flex items-center gap-2 text-sm font-medium">
-                  <Watch className="w-4 h-4 text-primary shrink-0" />
-                  {b}
+              {PLANS.map((p) => (
+                <div key={p.distance} className={`rounded-2xl border border-border/50 bg-background/70 backdrop-blur p-5 ${p.distance === "Ultra" ? "col-span-2" : ""}`}>
+                  <p className="text-[11px] text-muted-foreground">{p.weeks}</p>
+                  <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{p.distance}</h3>
+                  <p className="mt-2 text-xs text-muted-foreground">{p.who}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="order-1 lg:order-2">
-            <SectionLabel>One Tap Import</SectionLabel>
-            <H2>Bring your runs from anywhere</H2>
-            <p className="mt-5 text-muted-foreground leading-relaxed">
-              Drop a .FIT file or connect Strava once — Scarpers de-duplicates, parses GPS, heart rate and pace, and starts learning how you actually run. Apple Health and Google Fit sleep sync automatically.
-            </p>
-            <ul className="mt-6 space-y-3 text-sm">
-              {[
-                "FIT files always take priority over duplicates",
-                "Strava OAuth — no manual exports",
-                "Apple Health & Google Fit sleep sync",
-                "Auto-merges sensor and watch data",
-              ].map((b) => (
-                <li key={b} className="flex items-start gap-3">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary to-accent shrink-0" />
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
+        </div>
+      </section>
+
+      {/* ====== IMPORTS — back to dark ====== */}
+      <section className="bg-background">
+        <div className="max-w-6xl mx-auto px-5 py-24">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="order-2 lg:order-1 rounded-3xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur p-8">
+              <div className="grid grid-cols-2 gap-3">
+                {["Garmin","Strava","Apple Watch","Coros","Polar","Suunto","Wahoo","Intervals.icu"].map((b) => (
+                  <div key={b} className="rounded-xl border border-border/40 bg-background/60 p-4 flex items-center gap-2 text-sm font-medium">
+                    <Watch className="w-4 h-4 text-primary shrink-0" />
+                    {b}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="order-1 lg:order-2">
+              <SectionLabel>One Tap Import</SectionLabel>
+              <H2>Bring your runs from anywhere</H2>
+              <p className="mt-5 text-muted-foreground leading-relaxed">
+                Drop a .FIT file or connect Strava once — Scarpers de-duplicates, parses GPS, heart rate and pace, and starts learning how you actually run. Apple Health and Google Fit sleep sync automatically.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm">
+                {[
+                  "FIT files always take priority over duplicates",
+                  "Strava OAuth — no manual exports",
+                  "Apple Health & Google Fit sleep sync",
+                  "Auto-merges sensor and watch data",
+                ].map((b) => (
+                  <li key={b} className="flex items-start gap-3">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary to-accent shrink-0" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ====== FEATURES GRID ====== */}
-      <section id="features" className="max-w-6xl mx-auto px-5 py-24">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <SectionLabel>Features</SectionLabel>
-          <H2>Everything Your Running Needs</H2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <article key={f.title} className="group rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-6 hover:border-primary/40 hover:bg-card/80 transition-all">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
-                <f.icon className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{f.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* ====== WHAT IS IT? Deep cards ====== */}
-      <section className="max-w-6xl mx-auto px-5 py-24">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <SectionLabel>What Is It?</SectionLabel>
-          <H2>What Is a Smart AI Running Coach?</H2>
-          <p className="mt-5 text-muted-foreground leading-relaxed">
-            A smart AI running coach is a digital training partner that reads your real running data and writes a plan only you should be running — no generic templates, no guesswork.
-          </p>
-        </div>
-        <div className="grid md:grid-cols-2 gap-6">
-          {[
-            {
-              icon: Brain,
-              title: "What It Does",
-              body: "Scarpers takes information about your running — recent runs, sleep, resting HR, goal race and experience — and uses AI to build a bespoke week-by-week plan. It tells you exactly what to run and when, with intensity targets, music BPM cues and a real race-day taper.",
-            },
-            {
-              icon: Heart,
-              title: "Why You Need One",
-              body: "Generic plans give every runner the same Tuesday tempo. They don't know if you slept four hours, ran a half-marathon at the weekend, or are coming back from a calf strain. A smart coach reads your data and adapts — preventing injury and overtraining while keeping you progressing.",
-            },
-            {
-              icon: Sparkles,
-              title: "How It Works",
-              body: "Onboarding takes under two minutes. Tell us your race, experience and any niggles, then drop in a FIT file or connect Strava. Within seconds you have a complete plan with daily readiness, post-run reviews and a 24/7 AI coach you can chat to.",
-            },
-            {
-              icon: Target,
-              title: "Why Scarpers",
-              body: "Scarpers is the UK's most comprehensive free AI running coach. Personalised plans, daily readiness, Running IQ, sleep tracking, post-run reviews, and one-click Intervals.icu export — all completely free, on web, iOS and Android.",
-            },
-          ].map((c) => (
-            <article key={c.title} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-7">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center">
-                  <c.icon className="w-5 h-5 text-primary" />
+      {/* ====== FEATURES — gradient band ====== */}
+      <section id="features" className="relative border-y border-border/40 bg-gradient-to-b from-primary/10 via-card/40 to-accent/10">
+        <div className="max-w-6xl mx-auto px-5 py-24">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <SectionLabel>Features</SectionLabel>
+            <H2>Everything Your Running Needs</H2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURES.map((f) => (
+              <article key={f.title} className="group rounded-2xl border border-border/50 bg-background/70 backdrop-blur p-6 hover:border-primary/40 hover:bg-background/90 transition-all">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                  <f.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.title}</h3>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
-            </article>
-          ))}
+                <h3 className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{f.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ====== FAQ ====== */}
-      <section id="faq" className="max-w-3xl mx-auto px-5 py-24">
-        <div className="text-center mb-14">
-          <SectionLabel>FAQ</SectionLabel>
-          <H2>Frequently Asked Questions</H2>
-        </div>
-        <div className="space-y-3">
-          {FAQS.map((f, i) => {
-            const open = openFaq === i;
-            return (
-              <div key={f.q} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setOpenFaq(open ? null : i)}
-                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-card/80 transition"
-                  aria-expanded={open}
-                >
-                  <span className="text-sm sm:text-base font-semibold">{f.q}</span>
-                  <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-                </button>
-                {open && <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{f.a}</div>}
-              </div>
-            );
-          })}
+      {/* ====== WHAT IS IT? — dark band ====== */}
+      <section className="bg-background">
+        <div className="max-w-6xl mx-auto px-5 py-24">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <SectionLabel>What Is It?</SectionLabel>
+            <H2>What Is a Smart AI Running Coach?</H2>
+            <p className="mt-5 text-muted-foreground leading-relaxed">
+              A smart AI running coach is a digital training partner that reads your real running data and writes a plan only you should be running — no generic templates, no guesswork.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              { icon: Brain, title: "What It Does", body: "Scarpers takes information about your running — recent runs, sleep, resting HR, goal race and experience — and uses AI to build a bespoke week-by-week plan. It tells you exactly what to run and when, with intensity targets, music BPM cues and a real race-day taper." },
+              { icon: Heart, title: "Why You Need One", body: "Generic plans give every runner the same Tuesday tempo. They don't know if you slept four hours, ran a half-marathon at the weekend, or are coming back from a calf strain. A smart coach reads your data and adapts — preventing injury and overtraining while keeping you progressing." },
+              { icon: Sparkles, title: "How It Works", body: "Onboarding takes under two minutes. Tell us your race, experience and any niggles, then drop in a FIT file or connect Strava. Within seconds you have a complete plan with daily readiness, post-run reviews and a 24/7 AI coach you can chat to." },
+              { icon: Target, title: "Why Scarpers", body: "Scarpers is the UK's most comprehensive free AI running coach. Personalised plans, daily readiness, Running IQ, sleep tracking, post-run reviews, and one-click Intervals.icu export — all completely free, on web, iOS and Android." },
+            ].map((c) => (
+              <article key={c.title} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-7">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center">
+                    <c.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ====== FINAL CTA ====== */}
-      <section className="max-w-5xl mx-auto px-5 py-24">
-        <div className="relative rounded-3xl overflow-hidden border border-border/50 bg-gradient-to-br from-primary/20 via-card/80 to-accent/20 backdrop-blur p-10 sm:p-16 text-center">
-          <div className="absolute inset-0 -z-10 opacity-30" style={{
-            backgroundImage: "radial-gradient(circle at 30% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsl(var(--accent)) 0%, transparent 50%)",
-          }} />
+      {/* ====== FAQ — tinted card band ====== */}
+      <section id="faq" className="bg-card/40 border-y border-border/40">
+        <div className="max-w-3xl mx-auto px-5 py-24">
+          <div className="text-center mb-14">
+            <SectionLabel>FAQ</SectionLabel>
+            <H2>Frequently Asked Questions</H2>
+          </div>
+          <div className="space-y-3">
+            {FAQS.map((f, i) => {
+              const open = openFaq === i;
+              return (
+                <div key={f.q} className="rounded-2xl border border-border/50 bg-background/70 backdrop-blur overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(open ? null : i)}
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-background/90 transition"
+                    aria-expanded={open}
+                  >
+                    <span className="text-sm sm:text-base font-semibold">{f.q}</span>
+                    <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+                  </button>
+                  {open && <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{f.a}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FINAL CTA — full gradient band ====== */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary/30 via-background to-accent/30">
+        <div className="absolute inset-0 -z-0 opacity-40" style={{
+          backgroundImage: "radial-gradient(circle at 30% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsl(var(--accent)) 0%, transparent 50%)",
+        }} />
+        <div className="relative max-w-3xl mx-auto px-5 py-24 sm:py-32 text-center">
           <H2>Ready to Transform Your Running?</H2>
-          <p className="mt-5 text-lg text-muted-foreground max-w-xl mx-auto">
+          <p className="mt-5 text-lg text-foreground/80 max-w-xl mx-auto">
             Join thousands of runners who've taken the guesswork out of training. Free, forever.
           </p>
-          <Button asChild size="lg" className="mt-8 h-12 px-8 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
+          <Button asChild size="lg" className="mt-8 h-12 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 text-base">
             <Link to="/auth">Get Your Free Plan</Link>
           </Button>
         </div>
       </section>
-
-      {/* ====== FOOTER ====== */}
       <footer className="border-t border-border/40 bg-card/30 backdrop-blur">
         <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-3 gap-6 text-sm">
           <div>
