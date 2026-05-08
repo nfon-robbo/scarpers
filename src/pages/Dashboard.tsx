@@ -134,6 +134,21 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [openActivityId, setOpenActivityId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+
+  const deleteRun = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this activity? This cannot be undone.")) return;
+    setDeletingRunId(id);
+    const { error } = await supabase.from("activities").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    } else {
+      setActivities((prev) => prev.filter((a) => a.id !== id));
+      toast({ title: "Activity deleted" });
+    }
+    setDeletingRunId(null);
+  };
 
   const dailyQuote = useMemo(() => {
     const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
