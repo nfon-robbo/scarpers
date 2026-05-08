@@ -14,7 +14,7 @@ const StravaConnect = () => {
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(isStravaImportRunning());
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [importTypes, setImportTypes] = useState<Record<string, boolean>>({
