@@ -6,6 +6,7 @@ import {
   Brain,
   Calendar,
   ChevronDown,
+  ChevronRight,
   Heart,
   LineChart,
   Moon,
@@ -20,29 +21,67 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 
 const FAQS = [
   {
-    q: "How does the AI running coach build my training plan?",
-    a: "Scarpers analyses your recent runs, resting heart rate, sleep and stated goal (5K, 10K, half marathon, marathon or ultra) and writes a week-by-week plan using OpenAI. It includes intensity targets, music BPM (170–180 spm), recovery weeks and a clear taper.",
+    q: "What is the best AI running coach app?",
+    a: "Scarpers is a free AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra. It analyses your real running data, sleep and resting HR, then writes a week-by-week plan only you would get.",
   },
   {
-    q: "Is Scarpers free?",
-    a: "Yes — Scarpers is free to use. Sign up, import your runs and generate your first AI training plan in under two minutes.",
+    q: "How does Scarpers create a personalised training plan?",
+    a: "Answer a few questions about your goal, experience and any injuries. Scarpers reads your last 8 weeks of runs and 30 nights of sleep, then generates a personalised training plan in under two minutes.",
+  },
+  {
+    q: "Is Scarpers a free running plan app?",
+    a: "Yes — Scarpers is completely free. AI training plans, FIT and Strava import, sleep tracking, daily readiness and post-run reviews, all at no cost.",
   },
   {
     q: "Which devices and apps does it work with?",
-    a: "Anything that exports a .FIT file (Garmin, Coros, Polar, Suunto, Wahoo, Apple Watch via export apps, Android Health Connect) plus direct Strava OAuth import. Apple Health sleep and readiness data sync automatically.",
+    a: "Anything that exports a .FIT file — Garmin, Coros, Polar, Suunto, Wahoo, Apple Watch — plus direct Strava import and Apple Health / Google Fit sleep sync.",
   },
   {
-    q: "Can I follow a marathon plan if I'm a beginner?",
-    a: "Yes. During onboarding you tell Scarpers your experience level, weekly mileage and any injuries. The AI scales the plan to your current fitness and progresses load safely (ACWR-aware).",
-  },
-  {
-    q: "Does it replace a human coach?",
-    a: "It replaces the day-to-day plan-writing and analysis a coach does, at a fraction of the cost. You get personalised workouts, post-run reviews and a daily readiness score 24/7.",
+    q: "Can a beginner follow a marathon training plan?",
+    a: "Yes. Onboarding captures your experience, weekly mileage and injuries. The AI scales the plan to your current fitness and progresses load safely.",
   },
   {
     q: "Can I export my plan to Garmin or Intervals.icu?",
-    a: "Yes — one-click export to Intervals.icu using native interval syntax with target heart rate zones. Your watch then picks up the structured workouts.",
+    a: "One-click export to Intervals.icu using native interval syntax with target heart rate zones. Your watch then picks up the structured workouts.",
   },
+  {
+    q: "How long does it take to set up?",
+    a: "Under two minutes. Sign up, answer a few questions, drop in a FIT file or connect Strava, and your first AI training plan is ready.",
+  },
+  {
+    q: "Do I need a coach as well?",
+    a: "Scarpers replaces the day-to-day plan-writing and analysis a coach does, at a fraction of the cost. You get personalised workouts, daily readiness and post-run reviews 24/7.",
+  },
+];
+
+const STEPS = [
+  {
+    icon: Target,
+    n: "STEP 1",
+    title: "Tell Us About Your Running",
+    body: "Pick your race distance, share your experience, weekly mileage and any injuries — our system does the rest.",
+  },
+  {
+    icon: Upload,
+    n: "STEP 2",
+    title: "Get Your Personalised Plan",
+    body: "Our AI running coach builds a week-by-week plan tailored to your goal, fitness and recovery — in under two minutes.",
+  },
+  {
+    icon: Calendar,
+    n: "STEP 3",
+    title: "Train, Adapt, Race",
+    body: "Daily readiness, smart pacing, music BPM cues and post-run reviews keep you progressing without overtraining.",
+  },
+];
+
+const FEATURES = [
+  { icon: Brain, title: "Personalised AI Training Plan", body: "Every plan is unique — built from your real running data, not generic templates." },
+  { icon: Heart, title: "Daily Readiness Score", body: "Sleep, resting HR, HRV and load combined into one honest push-or-back-off score." },
+  { icon: LineChart, title: "Running IQ", body: "A 0–200 score across durability, consistency, progression, recovery and pace." },
+  { icon: Moon, title: "Sleep Tracking", body: "365-day sleep calendar with stages from Apple Health, Google Fit and your watch." },
+  { icon: Sparkles, title: "Day-Ahead Coach", body: "Wake up to a smart preview of today's run, adapted to last night's sleep." },
+  { icon: Activity, title: "Post-Run Reviews", body: "Every run gets an AI debrief: what went well, what to build on, what's next." },
 ];
 
 const PLANS = [
@@ -53,74 +92,61 @@ const PLANS = [
   { distance: "Ultra", weeks: "20–24 weeks", who: "50K, 50mi, 100K trail" },
 ];
 
-const FEATURES = [
-  {
-    icon: Brain,
-    title: "AI training plans",
-    body: "Personalised week-by-week plans for any distance, written by AI from your real running data and goals.",
-  },
-  {
-    icon: Upload,
-    title: "FIT file & Strava import",
-    body: "Drop a .FIT file or connect Strava. Garmin, Coros, Polar, Suunto, Wahoo, Apple Watch — all welcome.",
-  },
-  {
-    icon: Heart,
-    title: "Daily readiness score",
-    body: "Sleep, resting HR, HRV and training load combined into one honest score that tells you to push or back off.",
-  },
-  {
-    icon: LineChart,
-    title: "Running IQ",
-    body: "A 0–200 score across 5 pillars — durability, consistency, progression, recovery and pace — that tracks how you're really developing.",
-  },
-  {
-    icon: Moon,
-    title: "Sleep tracking",
-    body: "365-day sleep calendar with stages, merged from Apple Health, Google Fit and your watch.",
-  },
-  {
-    icon: Sparkles,
-    title: "Day-ahead AI coach",
-    body: "Wake up to a smart preview of today's run with pacing, music BPM and a focus cue — adapted to last night's sleep.",
-  },
-  {
-    icon: Activity,
-    title: "Post-run reviews",
-    body: "Every run gets an AI debrief: what went well, what to build on, and how it fits the bigger picture.",
-  },
-  {
-    icon: Target,
-    title: "Race-ready taper",
-    body: "Plans peak you on the right day with a properly engineered taper — no guesswork, no overtraining.",
-  },
-];
+/** CSS-only phone mockup with a sample dashboard inside */
+const PhoneMockup = () => (
+  <div className="relative mx-auto w-[260px] sm:w-[300px] aspect-[9/19] rounded-[2.5rem] border-[10px] border-foreground/90 bg-background shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] overflow-hidden">
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-foreground/90 rounded-b-2xl z-10" />
+    <div className="h-full w-full bg-gradient-to-b from-background via-background to-card p-4 pt-10 flex flex-col gap-3 text-left">
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Good morning</p>
+        <p className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Alex</p>
+      </div>
+      <div className="rounded-2xl border border-border/60 bg-card/80 p-3">
+        <p className="text-[10px] text-muted-foreground">Today's run</p>
+        <p className="text-sm font-semibold mt-0.5">6 × 1km @ threshold</p>
+        <p className="text-[10px] text-muted-foreground mt-1">175 spm · 90s easy between</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-border/60 bg-card/80 p-2.5">
+          <p className="text-[9px] text-muted-foreground">Readiness</p>
+          <p className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>87</p>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-card/80 p-2.5">
+          <p className="text-[9px] text-muted-foreground">Running IQ</p>
+          <p className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>142</p>
+        </div>
+      </div>
+      <div className="rounded-2xl border border-border/60 bg-card/80 p-3">
+        <p className="text-[10px] text-muted-foreground mb-2">This week</p>
+        <div className="flex items-end gap-1.5 h-12">
+          {[40, 70, 30, 90, 55, 0, 80].map((h, i) => (
+            <div key={i} className="flex-1 rounded-sm bg-gradient-to-t from-primary to-accent" style={{ height: `${h}%`, opacity: h ? 1 : 0.2 }} />
+          ))}
+        </div>
+        <div className="flex justify-between mt-1.5 text-[8px] text-muted-foreground">
+          {["M","T","W","T","F","S","S"].map((d,i)=><span key={i}>{d}</span>)}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Tell us your goal",
-    body: "Pick your race distance and date, share your experience and any injuries.",
-  },
-  {
-    n: "02",
-    title: "Import your runs",
-    body: "Upload a .FIT file or connect Strava. We handle the rest — including duplicate detection.",
-  },
-  {
-    n: "03",
-    title: "Train smarter, daily",
-    body: "Get an AI plan, daily readiness, post-run reviews and a clear path to race day.",
-  },
-];
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <p className="text-xs sm:text-sm font-semibold tracking-[0.2em] uppercase text-primary">{children}</p>
+);
+
+const H2 = ({ children }: { children: React.ReactNode }) => (
+  <h2 className="mt-3 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.05]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+    {children}
+  </h2>
+);
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
-    document.title = "Scarpers — AI Running Coach & Personalised Training Plans";
+    document.title = "Scarpers — Free AI Running Coach & Personalised Training Plans UK";
 
-    // FAQ JSON-LD for rich results
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
     ld.text = JSON.stringify({
@@ -142,245 +168,224 @@ const Landing = () => {
       name: "Scarpers",
       applicationCategory: "HealthApplication",
       operatingSystem: "Web, iOS, Android",
-      description:
-        "AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra distances.",
+      description: "Free AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra distances.",
       offers: { "@type": "Offer", price: "0", priceCurrency: "GBP" },
       url: "https://www.scarpers.co.uk/",
     });
     document.head.appendChild(org);
 
-    return () => {
-      ld.remove();
-      org.remove();
-    };
+    return () => { ld.remove(); org.remove(); };
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Background decoration */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute top-1/3 -right-40 w-[600px] h-[600px] rounded-full bg-accent/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 w-[500px] h-[500px] rounded-full bg-primary/10 blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ====== HERO with full-bleed atmosphere ====== */}
+      <section className="relative min-h-screen flex flex-col overflow-hidden">
+        {/* Atmospheric background */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-card" />
+          <div className="absolute -top-40 -left-40 w-[700px] h-[700px] rounded-full bg-primary/30 blur-3xl" />
+          <div className="absolute top-1/4 -right-40 w-[700px] h-[700px] rounded-full bg-accent/30 blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-primary/15 blur-3xl" />
+          <div className="absolute inset-0 opacity-[0.03]" style={{
+            backgroundImage: "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }} />
+        </div>
 
-      {/* Nav */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/40">
-        <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+        {/* Top nav */}
+        <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img src={scarpersIcon} alt="" className="h-9 w-9 object-contain" />
             <img src={scarpersWordmark} alt="Scarpers" className="h-5 w-auto object-contain" />
           </Link>
-          <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition">Features</a>
-            <a href="#plans" className="hover:text-foreground transition">Plans</a>
-            <a href="#how" className="hover:text-foreground transition">How it works</a>
-            <a href="#faq" className="hover:text-foreground transition">FAQ</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link to="/auth">Sign in</Link>
-            </Button>
-            <Button asChild size="sm" className="bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90">
-              <Link to="/auth">Get started free</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="relative max-w-6xl mx-auto px-5 pt-16 sm:pt-24 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/60 bg-card/50 backdrop-blur text-xs font-medium text-muted-foreground mb-6">
-          <Zap className="w-3.5 h-3.5 text-primary" />
-          AI running coach · Free during beta
-        </div>
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.05] max-w-4xl mx-auto" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-          Your{" "}
-          <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-            AI running coach
-          </span>{" "}
-          for every distance
-        </h1>
-        <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Personalised training plans for 5K, 10K, half marathon, marathon and ultra — written from your real running data, sleep and readiness. Built for runners who want to train smarter, not just harder.
-        </p>
-        <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Button asChild size="lg" className="h-12 px-7 bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
-            <Link to="/auth">Build my free plan</Link>
+          <Button asChild variant="ghost" size="sm" className="text-foreground/80 hover:text-foreground">
+            <Link to="/auth">Sign In</Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="h-12 px-7 text-base">
-            <a href="#how">See how it works</a>
-          </Button>
-        </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          No credit card · Imports Garmin, Strava, Apple Watch, Coros, Polar
-        </p>
+        </header>
 
-        {/* Hero card mockup */}
-        <div className="mt-16 relative max-w-4xl mx-auto">
-          <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 to-accent/30 blur-3xl rounded-[2rem]" />
-          <div className="relative rounded-2xl border border-border/60 bg-card/80 backdrop-blur-xl shadow-2xl p-6 sm:p-8 text-left">
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-border/40 bg-background/60 p-4">
-                <p className="text-xs text-muted-foreground">Readiness</p>
-                <p className="text-3xl font-bold mt-1 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">87</p>
-                <p className="text-xs text-muted-foreground mt-2">Push for tempo today</p>
-              </div>
-              <div className="rounded-xl border border-border/40 bg-background/60 p-4">
-                <p className="text-xs text-muted-foreground">Today's run</p>
-                <p className="text-base font-semibold mt-1">6 × 1km @ threshold</p>
-                <p className="text-xs text-muted-foreground mt-2">175 spm · easy ks between</p>
-              </div>
-              <div className="rounded-xl border border-border/40 bg-background/60 p-4">
-                <p className="text-xs text-muted-foreground">Running IQ</p>
-                <p className="text-3xl font-bold mt-1">142<span className="text-sm text-muted-foreground">/200</span></p>
-                <p className="text-xs text-muted-foreground mt-2">↑ 8 this month</p>
-              </div>
-            </div>
+        {/* Hero body — phone center, headline bottom-left */}
+        <div className="relative z-10 flex-1 flex items-center justify-center pt-10 sm:pt-16">
+          <PhoneMockup />
+        </div>
+
+        <div className="relative z-10 px-5 sm:px-10 pb-16 sm:pb-24 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-card/40 backdrop-blur text-[11px] font-medium text-muted-foreground mb-5">
+            <Zap className="w-3 h-3 text-primary" />
+            Free AI running coach · Beta
           </div>
-        </div>
-      </section>
-
-      {/* Trust bar */}
-      <section className="border-y border-border/40 bg-card/30 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-5 py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-xs sm:text-sm text-muted-foreground">
-          <span className="flex items-center gap-2"><Watch className="w-4 h-4" /> Garmin</span>
-          <span>Strava</span>
-          <span>Apple Watch</span>
-          <span>Coros</span>
-          <span>Polar</span>
-          <span>Suunto</span>
-          <span>Wahoo</span>
-          <span>Intervals.icu</span>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-5 py-24">
-        <div className="max-w-2xl mb-14">
-          <p className="text-sm font-semibold text-primary uppercase tracking-wider">Features</p>
-          <h2 className="mt-2 text-3xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Everything you need to train smarter
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            One app. Your plan, your runs, your sleep, your readiness — all talking to each other.
+          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Free AI<br />Running Plan
+          </h1>
+          <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
+            Get a personalised training plan tailored to your goal — week by week, AI plans for 5K, 10K, half marathon, marathon and ultra. Completely free.
           </p>
+          <div className="mt-7 flex items-center gap-3">
+            <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
+              <Link to="/auth">Get Your Free Plan</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur">
+              <a href="#how">See How It Works</a>
+            </Button>
+          </div>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {FEATURES.map((f) => (
-            <article key={f.title} className="group rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-5 hover:border-primary/40 hover:bg-card/80 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <f.icon className="w-5 h-5 text-primary" />
+
+        {/* Scroll cue */}
+        <a href="#how" aria-label="Scroll" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-muted-foreground animate-bounce">
+          <ChevronDown className="w-5 h-5" />
+        </a>
+      </section>
+
+      {/* ====== HOW IT WORKS ====== */}
+      <section id="how" className="max-w-6xl mx-auto px-5 py-24 sm:py-32">
+        <div className="text-center max-w-2xl mx-auto">
+          <SectionLabel>How It Works</SectionLabel>
+          <H2>Three Steps to Your Best Race</H2>
+        </div>
+        <div className="mt-16 grid md:grid-cols-3 gap-6">
+          {STEPS.map((s) => (
+            <article key={s.n} className="text-center">
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/50 flex items-center justify-center mb-5">
+                <s.icon className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="text-base font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+              <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">{s.n}</p>
+              <h3 className="mt-2 text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{s.title}</h3>
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
             </article>
           ))}
         </div>
       </section>
 
-      {/* Plans */}
+      {/* ====== ALTERNATING SPLIT 1: Plan distances ====== */}
       <section id="plans" className="max-w-6xl mx-auto px-5 py-24">
-        <div className="max-w-2xl mb-14">
-          <p className="text-sm font-semibold text-primary uppercase tracking-wider">Training plans</p>
-          <h2 className="mt-2 text-3xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            From your first 5K to your first 100K
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Pick a distance, set a date, get a personalised AI training plan with a real taper.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {PLANS.map((p) => (
-            <Link
-              to="/auth"
-              key={p.distance}
-              className="group rounded-2xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur p-5 hover:border-primary/50 transition-all"
-            >
-              <p className="text-xs text-muted-foreground">{p.weeks}</p>
-              <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                {p.distance}
-              </h3>
-              <p className="mt-3 text-sm text-muted-foreground">{p.who}</p>
-              <p className="mt-4 text-xs text-primary opacity-0 group-hover:opacity-100 transition">Build plan →</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="max-w-6xl mx-auto px-5 py-24">
-        <div className="max-w-2xl mb-14">
-          <p className="text-sm font-semibold text-primary uppercase tracking-wider">How it works</p>
-          <h2 className="mt-2 text-3xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            From sign-up to race day in three steps
-          </h2>
-        </div>
-        <ol className="grid md:grid-cols-3 gap-5">
-          {STEPS.map((s) => (
-            <li key={s.n} className="relative rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-6">
-              <div className="text-5xl font-bold bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                {s.n}
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <SectionLabel>Training Plans</SectionLabel>
+            <H2>From your first 5K to your first 100K</H2>
+            <p className="mt-5 text-muted-foreground leading-relaxed">
+              Pick your distance, set your race date, and Scarpers writes a plan that peaks you on the right day — with a real taper, recovery weeks and intensity that scales to your fitness.
+            </p>
+            <Button asChild size="lg" className="mt-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0">
+              <Link to="/auth">Build my plan <ChevronRight className="w-4 h-4 ml-1" /></Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {PLANS.map((p) => (
+              <div key={p.distance} className={`rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-5 ${p.distance === "Ultra" ? "col-span-2" : ""}`}>
+                <p className="text-[11px] text-muted-foreground">{p.weeks}</p>
+                <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{p.distance}</h3>
+                <p className="mt-2 text-xs text-muted-foreground">{p.who}</p>
               </div>
-              <h3 className="mt-3 text-lg font-semibold">{s.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* Why Scarpers */}
-      <section className="max-w-6xl mx-auto px-5 py-24">
-        <div className="rounded-3xl border border-border/50 bg-gradient-to-br from-primary/10 via-card/60 to-accent/10 backdrop-blur p-8 sm:p-14">
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            <div>
-              <p className="text-sm font-semibold text-primary uppercase tracking-wider">Why Scarpers</p>
-              <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                A coach that actually looks at your data
-              </h2>
-              <p className="mt-4 text-muted-foreground leading-relaxed">
-                Generic plans give every runner the same Tuesday tempo. Scarpers reads your last 8 weeks of running, the last 30 nights of sleep, your resting HR trend and your goal — then writes a plan only you would get.
-              </p>
-              <ul className="mt-6 space-y-3">
-                {[
-                  "Adaptive load — never red-zones into injury",
-                  "Honest readiness — pulls back when you need it",
-                  "Music BPM cues — 170–180 spm to lock in cadence",
-                  "Real taper — peaks you on race day, not before",
-                ].map((b) => (
-                  <li key={b} className="flex items-start gap-3 text-sm">
-                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary to-accent shrink-0" />
-                    <span className="text-foreground/90">{b}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { v: "5+", l: "Race distances" },
-                { v: "365", l: "Day sleep history" },
-                { v: "200", l: "Running IQ scale" },
-                { v: "<2 min", l: "Setup to first plan" },
-              ].map((s) => (
-                <div key={s.l} className="rounded-2xl border border-border/40 bg-background/60 p-5 text-center">
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {s.v}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{s.l}</p>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* ====== ALTERNATING SPLIT 2: Imports ====== */}
+      <section className="max-w-6xl mx-auto px-5 py-24">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="order-2 lg:order-1 rounded-3xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur p-8">
+            <div className="grid grid-cols-2 gap-3">
+              {["Garmin","Strava","Apple Watch","Coros","Polar","Suunto","Wahoo","Intervals.icu"].map((b) => (
+                <div key={b} className="rounded-xl border border-border/40 bg-background/60 p-4 flex items-center gap-2 text-sm font-medium">
+                  <Watch className="w-4 h-4 text-primary shrink-0" />
+                  {b}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <SectionLabel>One Tap Import</SectionLabel>
+            <H2>Bring your runs from anywhere</H2>
+            <p className="mt-5 text-muted-foreground leading-relaxed">
+              Drop a .FIT file or connect Strava once — Scarpers de-duplicates, parses GPS, heart rate and pace, and starts learning how you actually run. Apple Health and Google Fit sleep sync automatically.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm">
+              {[
+                "FIT files always take priority over duplicates",
+                "Strava OAuth — no manual exports",
+                "Apple Health & Google Fit sleep sync",
+                "Auto-merges sensor and watch data",
+              ].map((b) => (
+                <li key={b} className="flex items-start gap-3">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary to-accent shrink-0" />
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FEATURES GRID ====== */}
+      <section id="features" className="max-w-6xl mx-auto px-5 py-24">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <SectionLabel>Features</SectionLabel>
+          <H2>Everything Your Running Needs</H2>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {FEATURES.map((f) => (
+            <article key={f.title} className="group rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-6 hover:border-primary/40 hover:bg-card/80 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                <f.icon className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="text-lg font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{f.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ====== WHAT IS IT? Deep cards ====== */}
+      <section className="max-w-6xl mx-auto px-5 py-24">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <SectionLabel>What Is It?</SectionLabel>
+          <H2>What Is a Smart AI Running Coach?</H2>
+          <p className="mt-5 text-muted-foreground leading-relaxed">
+            A smart AI running coach is a digital training partner that reads your real running data and writes a plan only you should be running — no generic templates, no guesswork.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {[
+            {
+              icon: Brain,
+              title: "What It Does",
+              body: "Scarpers takes information about your running — recent runs, sleep, resting HR, goal race and experience — and uses AI to build a bespoke week-by-week plan. It tells you exactly what to run and when, with intensity targets, music BPM cues and a real race-day taper.",
+            },
+            {
+              icon: Heart,
+              title: "Why You Need One",
+              body: "Generic plans give every runner the same Tuesday tempo. They don't know if you slept four hours, ran a half-marathon at the weekend, or are coming back from a calf strain. A smart coach reads your data and adapts — preventing injury and overtraining while keeping you progressing.",
+            },
+            {
+              icon: Sparkles,
+              title: "How It Works",
+              body: "Onboarding takes under two minutes. Tell us your race, experience and any niggles, then drop in a FIT file or connect Strava. Within seconds you have a complete plan with daily readiness, post-run reviews and a 24/7 AI coach you can chat to.",
+            },
+            {
+              icon: Target,
+              title: "Why Scarpers",
+              body: "Scarpers is the UK's most comprehensive free AI running coach. Personalised plans, daily readiness, Running IQ, sleep tracking, post-run reviews, and one-click Intervals.icu export — all completely free, on web, iOS and Android.",
+            },
+          ].map((c) => (
+            <article key={c.title} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-7">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center">
+                  <c.icon className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.title}</h3>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ====== FAQ ====== */}
       <section id="faq" className="max-w-3xl mx-auto px-5 py-24">
-        <div className="text-center mb-12">
-          <p className="text-sm font-semibold text-primary uppercase tracking-wider">FAQ</p>
-          <h2 className="mt-2 text-3xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Questions, answered
-          </h2>
+        <div className="text-center mb-14">
+          <SectionLabel>FAQ</SectionLabel>
+          <H2>Frequently Asked Questions</H2>
         </div>
         <div className="space-y-3">
           {FAQS.map((f, i) => {
@@ -396,40 +401,30 @@ const Landing = () => {
                   <span className="text-sm sm:text-base font-semibold">{f.q}</span>
                   <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
                 </button>
-                {open && (
-                  <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{f.a}</div>
-                )}
+                {open && <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{f.a}</div>}
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* ====== FINAL CTA ====== */}
       <section className="max-w-5xl mx-auto px-5 py-24">
         <div className="relative rounded-3xl overflow-hidden border border-border/50 bg-gradient-to-br from-primary/20 via-card/80 to-accent/20 backdrop-blur p-10 sm:p-16 text-center">
           <div className="absolute inset-0 -z-10 opacity-30" style={{
             backgroundImage: "radial-gradient(circle at 30% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsl(var(--accent)) 0%, transparent 50%)",
           }} />
-          <Calendar className="w-10 h-10 mx-auto text-primary" />
-          <h2 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Your next race starts now
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">
-            Build a personalised AI running plan in under two minutes. Free, forever.
+          <H2>Ready to Transform Your Running?</H2>
+          <p className="mt-5 text-lg text-muted-foreground max-w-xl mx-auto">
+            Join thousands of runners who've taken the guesswork out of training. Free, forever.
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button asChild size="lg" className="h-12 px-8 bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
-              <Link to="/auth">Build my free plan</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 px-8 text-base">
-              <Link to="/auth">Sign in</Link>
-            </Button>
-          </div>
+          <Button asChild size="lg" className="mt-8 h-12 px-8 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
+            <Link to="/auth">Get Your Free Plan</Link>
+          </Button>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ====== FOOTER ====== */}
       <footer className="border-t border-border/40 bg-card/30 backdrop-blur">
         <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-3 gap-6 text-sm">
           <div>
@@ -438,15 +433,15 @@ const Landing = () => {
               <img src={scarpersWordmark} alt="Scarpers" className="h-4 w-auto object-contain" />
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              The AI running coach that reads your data and writes the plan only you should be running.
+              The free AI running coach that reads your data and writes the plan only you should be running.
             </p>
           </div>
           <div>
             <p className="font-semibold mb-3">Product</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li><a href="#features" className="hover:text-foreground">Features</a></li>
-              <li><a href="#plans" className="hover:text-foreground">Training plans</a></li>
               <li><a href="#how" className="hover:text-foreground">How it works</a></li>
+              <li><a href="#plans" className="hover:text-foreground">Training plans</a></li>
+              <li><a href="#features" className="hover:text-foreground">Features</a></li>
               <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
             </ul>
           </div>
