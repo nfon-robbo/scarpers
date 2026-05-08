@@ -3,11 +3,8 @@ import { format, differenceInDays, startOfWeek, isToday, isBefore, differenceInW
 import { Card } from "@/components/ui/card";
 import { ParsedWorkout } from "@/lib/plan-export";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Calendar, Trophy, CheckCircle2, Loader2, Activity, Clock, Heart, Zap } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { streamAICoach } from "@/lib/ai-stream";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { ChevronRight, Calendar, Trophy, CheckCircle2 } from "lucide-react";
+import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 
 interface PlanOverviewProps {
   workouts: ParsedWorkout[];
