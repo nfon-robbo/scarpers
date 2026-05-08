@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +19,7 @@ import {
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunner from "@/assets/hero-runner.jpg";
-import heroRunner2 from "@/assets/hero-runner-2.jpg";
-import heroRunner3 from "@/assets/hero-runner-3.jpg";
-import heroRunner4 from "@/assets/hero-runner-4.jpg";
-
-const HERO_IMAGES = [heroRunner, heroRunner2, heroRunner3, heroRunner4];
+import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 
 const FAQS = [
   {
