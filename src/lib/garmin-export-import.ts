@@ -289,9 +289,19 @@ export async function importGarminExport(
       });
     }
 
-    // Replace existing rows for these dates
+    // Snapshot existing daily_metrics for these dates
     const dates = rows.map((r) => r.date);
     if (dates.length) {
+      try {
+        for (let i = 0; i < dates.length; i += 500) {
+          const { data } = await supabase.from("daily_metrics")
+            .select("*").eq("user_id", userId).in("date", dates.slice(i, i + 500));
+          if (data) {
+            for (const r of data) { if (r.raw_data) r.raw_data = null; dailyMetricsBackup.push(r); }
+          }
+        }
+      } catch (e: any) { errors.push(`Daily snapshot: ${e?.message || e}`); }
+
       const chunkSize = 500;
       for (let i = 0; i < dates.length; i += chunkSize) {
         await supabase.from("daily_metrics")
