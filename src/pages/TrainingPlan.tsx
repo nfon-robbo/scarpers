@@ -287,7 +287,7 @@ const TrainingPlanPage = () => {
     if (!savedPlanId || !user) { setCompletedDates(new Set()); setLinkedActivities({}); return; }
     const { data } = await supabase
       .from("activities")
-      .select("start_time, distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_speed, avg_cadence, calories, activity_type")
+      .select("id, start_time, distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_speed, avg_cadence, calories, activity_type")
       .eq("user_id", user.id)
       .eq("training_plan_id", savedPlanId);
     if (data) {
@@ -1636,6 +1636,7 @@ const TrainingPlanPage = () => {
               planStartDate={startDate}
               planEndDate={raceDate}
               completedDates={completedDates}
+              linkedActivities={linkedActivities}
               onMoveWorkout={moveWorkoutDate}
               onSyncWorkout={(singleDate) => handleSyncToIntervals(true, singleDate)}
               syncing={syncing}

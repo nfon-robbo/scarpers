@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +27,8 @@ const Activities = () => {
   const { fmt } = useUnits();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(searchParams.get("activity"));
   const [deleting, setDeleting] = useState<string | null>(null);
   const [currentPlanId, setCurrentPlanId] = useState<string | null>(null);
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
@@ -233,7 +235,13 @@ const Activities = () => {
         </div>
       )}
 
-      <ActivityDetailDialog activityId={openId} onClose={() => setOpenId(null)} />
+      <ActivityDetailDialog activityId={openId} onClose={() => {
+        setOpenId(null);
+        if (searchParams.get("activity")) {
+          searchParams.delete("activity");
+          setSearchParams(searchParams, { replace: true });
+        }
+      }} />
     </div>
   );
 };

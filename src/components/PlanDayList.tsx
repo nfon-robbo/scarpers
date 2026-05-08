@@ -15,12 +15,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
   planStartDate?: Date;
   planEndDate?: Date;
   completedDates?: Set<string>;
+  linkedActivities?: Record<string, any>;
   onMoveWorkout?: (fromDate: string, toDate: string) => void;
   onSyncWorkout?: (singleDate?: string) => void | Promise<void>;
   syncing?: boolean;
@@ -437,6 +439,7 @@ export default function PlanDayList({
   planStartDate,
   planEndDate,
   completedDates = new Set(),
+  linkedActivities = {},
   onMoveWorkout,
   onSyncWorkout,
   syncing = false,
@@ -444,6 +447,7 @@ export default function PlanDayList({
   raceDistance,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
+  const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
   const [dragSourceDate, setDragSourceDate] = useState<string | null>(null);
   const [dragOverDate, setDragOverDate] = useState<string | null>(null);
   const [syncingDate, setSyncingDate] = useState<string | null>(null);
@@ -627,6 +631,50 @@ export default function PlanDayList({
 
                     {/* Workout card / rest */}
                     {workout ? (
+                      isCompleted ? (
+                        // PlanOverview-style "completed" card
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            if (dragSourceDate && dragSourceDate !== key && onMoveWorkout) {
+                              e.stopPropagation();
+                              const src = dragSourceDate;
+                              setDragSourceDate(null);
+                              setDragOverDate(null);
+                              onMoveWorkout(src, key);
+                              return;
+                            }
+                            setReviewWorkout(workout);
+                          }}
+                          className={cn(
+                            "flex-1 flex items-center gap-3 text-left rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors px-3 py-2.5 group",
+                            isDragSource && "ring-2 ring-primary"
+                          )}
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                            <CheckCircle2 className="w-5 h-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold truncate">{shortLabel(workout.title)}</p>
+                              <span className="text-[10px] font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full shrink-0">
+                                Completed ✓
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {(() => {
+                                const a = linkedActivities[key];
+                                const parts: string[] = [];
+                                if (a?.distance_meters) parts.push(`${(a.distance_meters / 1000).toFixed(1)} km`);
+                                if (a?.duration_seconds) parts.push(`${Math.round(a.duration_seconds / 60)} min`);
+                                parts.push("Tap for review");
+                                return parts.join(" · ");
+                              })()}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                        </button>
+                      ) : (
                       <button
                         type="button"
                         draggable={draggable}
@@ -645,7 +693,6 @@ export default function PlanDayList({
                         }}
                         className={cn(
                           "flex-1 flex items-center gap-2 text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors px-3 py-2 group",
-                          isCompleted && "border-primary/40",
                           isDragSource && "ring-2 ring-primary"
                         )}
                       >
@@ -696,9 +743,6 @@ export default function PlanDayList({
                             );
                           })()}
                         </div>
-                        {isCompleted && (
-                          <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        )}
                         {onSyncWorkout && (
                           <span
                             role="button"
@@ -721,6 +765,7 @@ export default function PlanDayList({
                         )}
                         <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                       </button>
+                      )
                     ) : (
                       <div className={cn(
                         "flex-1 flex items-center rounded-lg border border-dashed bg-muted/20 px-3 py-2",
@@ -873,6 +918,16 @@ export default function PlanDayList({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Workout Review (for completed workouts) */}
+      <WorkoutReviewDialog
+        open={!!reviewWorkout}
+        onOpenChange={(o) => { if (!o) setReviewWorkout(null); }}
+        workout={reviewWorkout}
+        activity={reviewWorkout ? linkedActivities[workoutKey(reviewWorkout)] || null : null}
+        workoutDate={reviewWorkout?.dateObj || null}
+        workoutTitle={reviewWorkout ? shortLabel(reviewWorkout.title) : "Workout"}
+      />
     </Card>
   );
 }
