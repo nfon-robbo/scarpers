@@ -99,8 +99,6 @@ export default function PlanOverview({
 }: PlanOverviewProps) {
   const today = new Date();
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [reviewContent, setReviewContent] = useState<string>("");
-  const [reviewLoading, setReviewLoading] = useState(false);
 
   // Plan date boundaries
   const planDates = useMemo(() => {
