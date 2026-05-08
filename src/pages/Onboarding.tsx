@@ -59,8 +59,28 @@ const Onboarding = () => {
           athlete_context: contextParts.join("\n\n"),
           sex: sex || null,
           date_of_birth: dob || null,
-          height_cm: heightCm ? Number(heightCm) : null,
-          weight_kg: weightKg ? Number(weightKg) : null,
+          height_cm: (() => {
+            if (units.height === "ft") {
+              const ft = Number(heightFt) || 0;
+              const inches = Number(heightIn) || 0;
+              const total = ft * 30.48 + inches * 2.54;
+              return total > 0 ? Math.round(total) : null;
+            }
+            return heightCm ? Number(heightCm) : null;
+          })(),
+          weight_kg: (() => {
+            if (units.weight === "lbs") {
+              const lbs = Number(weightLbs) || 0;
+              return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
+            }
+            if (units.weight === "st") {
+              const st = Number(weightSt) || 0;
+              const lbs = Number(weightStLbs) || 0;
+              const totalLbs = st * 14 + lbs;
+              return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
+            }
+            return weightKg ? Number(weightKg) : null;
+          })(),
           onboarding_completed: true,
         })
         .eq("user_id", user.id);
