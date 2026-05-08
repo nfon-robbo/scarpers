@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2, Unlink, Trash2 } from "lucide-react";
+import { startStravaBackgroundImport, isStravaImportRunning } from "@/lib/strava-background-import";
 
 const StravaConnect = () => {
   const { user, session } = useAuth();
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(isStravaImportRunning());
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [importTypes, setImportTypes] = useState<Record<string, boolean>>({
@@ -99,49 +100,14 @@ const StravaConnect = () => {
     if (!session?.access_token) return;
     setImporting(true);
     setImportResult(null);
-
-    try {
-      let totalImported = 0;
-      let totalSkipped = 0;
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/strava-import`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ page, per_page: 50, after: 1735689600 }),
-          }
-        );
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Import failed");
-        }
-
-        const result = await res.json();
-        totalImported += result.imported;
-        totalSkipped += result.skipped || 0;
-        hasMore = result.has_more;
-        page++;
-      }
-
-      setImportResult({ imported: totalImported, skipped: totalSkipped });
-      toast({
-        title: "Strava import complete",
-        description: `${totalImported} new activities imported${totalSkipped > 0 ? `, ${totalSkipped} already existed` : ""}.`,
-      });
-    } catch (e: any) {
-      toast({ title: "Import failed", description: e.message, variant: "destructive" });
-    } finally {
+    // Fire-and-forget: keeps running across navigation/unmount
+    startStravaBackgroundImport(session.access_token).finally(() => {
       setImporting(false);
-    }
+    });
+    toast({
+      title: "Strava import started",
+      description: "It'll keep running in the background — feel free to continue.",
+    });
   };
 
   if (loading) {
