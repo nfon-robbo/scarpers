@@ -288,6 +288,20 @@ const Dashboard = () => {
       .then(({ data }) => {
         if (data && data.length > 0) setPlan(data[0] as PlanRow);
       });
+
+    // One-time cleanup: delete any Strava activities that overlap a FIT
+    // activity (FIT always wins). Refreshes the visible list when rows change.
+    purgeAllStravaOverlaps(user.id).then((removed) => {
+      if (removed > 0) {
+        supabase
+          .from("activities")
+          .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
+          .eq("user_id", user.id)
+          .gte("start_time", since.toISOString())
+          .order("start_time", { ascending: true })
+          .then(({ data }) => setActivities((data as ActivityRow[]) || []));
+      }
+    }).catch((e) => console.error("Strava sweep failed:", e));
   }, [user]);
 
   const stats = useMemo(() => {
