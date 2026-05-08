@@ -15,6 +15,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format as fmtDate } from "date-fns";
+import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
