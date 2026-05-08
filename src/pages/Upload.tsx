@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
+import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -136,6 +137,14 @@ const UploadPage = () => {
         .single();
 
       if (uploadError) throw uploadError;
+
+      // FIT always wins: remove any overlapping Strava activities (±15min) before insert
+      try {
+        const allFitTimes = parseResult.activities.map((a) => a.start_time);
+        await purgeStravaOverlaps(user.id, allFitTimes, 15);
+      } catch (e) {
+        console.error("Strava overlap purge failed:", e);
+      }
 
       // Insert activities in batches
       const batchSize = 50;

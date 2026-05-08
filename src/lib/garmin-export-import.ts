@@ -10,6 +10,7 @@
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
+import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
 
 export interface GarminImportProgress {
   phase: string;
@@ -309,7 +310,14 @@ export async function importGarminExport(
           .delete()
           .eq("user_id", userId)
           .in("start_time", startTimes.slice(i, i + chunkSize));
-      }
+    }
+
+    // FIT always wins: remove Strava overlaps within ±15min of any FIT start_time
+    try {
+      await purgeStravaOverlaps(userId, startTimes, 15);
+    } catch (e: any) {
+      errors.push(`Strava overlap purge: ${e?.message || e}`);
+    }
     }
 
     // Insert in batches
