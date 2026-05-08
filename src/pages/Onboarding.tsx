@@ -22,7 +22,12 @@ const Onboarding = () => {
   const [sex, setSex] = useState<string>("");
   const [dob, setDob] = useState("");
   const [heightCm, setHeightCm] = useState("");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
   const [weightKg, setWeightKg] = useState("");
+  const [weightLbs, setWeightLbs] = useState("");
+  const [weightSt, setWeightSt] = useState("");
+  const [weightStLbs, setWeightStLbs] = useState("");
   // Experience & goals
   const [experienceLevel, setExperienceLevel] = useState("intermediate");
   const [trainingGoals, setTrainingGoals] = useState("");
@@ -54,8 +59,28 @@ const Onboarding = () => {
           athlete_context: contextParts.join("\n\n"),
           sex: sex || null,
           date_of_birth: dob || null,
-          height_cm: heightCm ? Number(heightCm) : null,
-          weight_kg: weightKg ? Number(weightKg) : null,
+          height_cm: (() => {
+            if (units.height === "ft") {
+              const ft = Number(heightFt) || 0;
+              const inches = Number(heightIn) || 0;
+              const total = ft * 30.48 + inches * 2.54;
+              return total > 0 ? Math.round(total) : null;
+            }
+            return heightCm ? Number(heightCm) : null;
+          })(),
+          weight_kg: (() => {
+            if (units.weight === "lbs") {
+              const lbs = Number(weightLbs) || 0;
+              return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
+            }
+            if (units.weight === "st") {
+              const st = Number(weightSt) || 0;
+              const lbs = Number(weightStLbs) || 0;
+              const totalLbs = st * 14 + lbs;
+              return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
+            }
+            return weightKg ? Number(weightKg) : null;
+          })(),
           onboarding_completed: true,
         })
         .eq("user_id", user.id);
@@ -198,15 +223,29 @@ const Onboarding = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="height">Height ({units.height === "ft" ? "cm" : "cm"})</Label>
-                  <Input id="height" type="number" inputMode="numeric" placeholder="175" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input id="weight" type="number" inputMode="decimal" placeholder="70" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                <Label>Height</Label>
+                {units.height === "ft" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="number" inputMode="numeric" placeholder="ft" value={heightFt} onChange={(e) => setHeightFt(e.target.value)} />
+                    <Input type="number" inputMode="numeric" placeholder="in" value={heightIn} onChange={(e) => setHeightIn(e.target.value)} />
+                  </div>
+                ) : (
+                  <Input type="number" inputMode="numeric" placeholder="175 cm" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Weight</Label>
+                {units.weight === "lbs" ? (
+                  <Input type="number" inputMode="decimal" placeholder="lbs" value={weightLbs} onChange={(e) => setWeightLbs(e.target.value)} />
+                ) : units.weight === "st" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="number" inputMode="numeric" placeholder="st" value={weightSt} onChange={(e) => setWeightSt(e.target.value)} />
+                    <Input type="number" inputMode="numeric" placeholder="lbs" value={weightStLbs} onChange={(e) => setWeightStLbs(e.target.value)} />
+                  </div>
+                ) : (
+                  <Input type="number" inputMode="decimal" placeholder="70 kg" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                )}
               </div>
             </div>
           )}
