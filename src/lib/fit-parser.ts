@@ -5,6 +5,8 @@ export interface GpsPoint {
   lat: number;
   lng: number;
   time?: string;
+  elapsed_time?: number;
+  distance_meters?: number;
   altitude?: number;
   heart_rate?: number;
   speed?: number;
@@ -79,14 +81,19 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
         }
       }
       const gpsTrack: GpsPoint[] = [];
+      const firstRecordTime = records.find((r: any) => r.timestamp)?.timestamp;
+      const firstRecordMs = firstRecordTime ? new Date(firstRecordTime).getTime() : null;
       for (const r of records) {
         const lat = r.position_lat;
         const lng = r.position_long;
         if (lat != null && lng != null && typeof lat === "number" && typeof lng === "number") {
+          const pointMs = r.timestamp ? new Date(r.timestamp).getTime() : null;
           gpsTrack.push({
             lat,
             lng,
             time: r.timestamp ? new Date(r.timestamp).toISOString() : undefined,
+            elapsed_time: pointMs != null && firstRecordMs != null ? Math.max(0, (pointMs - firstRecordMs) / 1000) : undefined,
+            distance_meters: r.distance != null ? r.distance * 1000 : undefined,
             altitude: r.altitude ?? r.enhanced_altitude ?? undefined,
             heart_rate: r.heart_rate ?? undefined,
             speed: r.speed ?? r.enhanced_speed ?? undefined,
