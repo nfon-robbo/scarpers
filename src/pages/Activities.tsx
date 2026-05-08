@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import UndoGarminImportButton from "@/components/UndoGarminImportButton";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 const Activities = () => {
   const { user } = useAuth();
