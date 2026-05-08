@@ -21,6 +21,7 @@ interface PlanDayListProps {
   planStartDate?: Date;
   planEndDate?: Date;
   completedDates?: Set<string>;
+  linkedActivities?: Record<string, any>;
   onMoveWorkout?: (fromDate: string, toDate: string) => void;
   onSyncWorkout?: (singleDate?: string) => void | Promise<void>;
   syncing?: boolean;
