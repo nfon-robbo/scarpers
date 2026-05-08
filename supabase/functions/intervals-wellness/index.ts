@@ -13,16 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const INTERVALS_API_KEY = Deno.env.get("INTERVALS_API_KEY");
-    const INTERVALS_ATHLETE_ID = Deno.env.get("INTERVALS_ATHLETE_ID");
-
-    if (!INTERVALS_API_KEY || !INTERVALS_ATHLETE_ID) {
-      return new Response(
-        JSON.stringify({ error: "Intervals.icu credentials not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization");
@@ -36,12 +26,26 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
+    // Per-user intervals.icu credentials
+    const { data: creds } = await supabase
+      .from("intervals_credentials")
+      .select("athlete_id, api_key")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!creds?.athlete_id || !creds?.api_key) {
+      return new Response(
+        JSON.stringify({ error: "Intervals.icu not connected. Add your athlete ID and API key in Settings." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch last 90 days of wellness data from Intervals.icu
     const newest = new Date().toISOString().split("T")[0];
     const oldest = new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0];
 
-    const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
-    const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
+    const basicAuth = btoa(`API_KEY:${creds.api_key}`);
+    const baseUrl = `https://intervals.icu/api/v1/athlete/${creds.athlete_id}`;
 
     const resp = await fetch(
       `${baseUrl}/wellness?oldest=${oldest}&newest=${newest}`,

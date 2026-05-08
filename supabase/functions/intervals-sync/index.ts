@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 type WorkoutStep = {
   duration: number;
@@ -281,15 +282,43 @@ serve(async (req) => {
   }
 
   try {
-    const INTERVALS_API_KEY = Deno.env.get("INTERVALS_API_KEY");
-    const INTERVALS_ATHLETE_ID = Deno.env.get("INTERVALS_ATHLETE_ID");
-
-    if (!INTERVALS_API_KEY || !INTERVALS_ATHLETE_ID) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "intervals.icu credentials not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing authorization" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: creds } = await supabase
+      .from("intervals_credentials")
+      .select("athlete_id, api_key")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!creds?.athlete_id || !creds?.api_key) {
+      return new Response(
+        JSON.stringify({ error: "Intervals.icu not connected. Add your athlete ID and API key in Settings." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const INTERVALS_API_KEY = creds.api_key;
+    const INTERVALS_ATHLETE_ID = creds.athlete_id;
 
     const body = await req.json();
     const { workouts, clearRange, deleteRange } = body as {

@@ -15,6 +15,7 @@ import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, 
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import IntervalsCredentials from "@/components/IntervalsCredentials";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
@@ -822,6 +823,8 @@ const Settings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <IntervalsCredentials />
 
       {/* Auto-Sync Schedule Card */}
       <Card>
