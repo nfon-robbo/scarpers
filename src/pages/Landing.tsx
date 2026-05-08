@@ -155,9 +155,9 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ====== HERO — full-bleed runner photo ====== */}
-      <section className="relative min-h-screen flex flex-col overflow-hidden">
+      <section className="relative isolate min-h-screen flex flex-col overflow-hidden">
         {/* Background carousel + overlays */}
-        <div className="absolute inset-0 -z-20 bg-background">
+        <div className="absolute inset-0 z-0 bg-background">
           {HERO_IMAGES.map((src, i) => (
             <img
               key={i}
@@ -173,8 +173,8 @@ const Landing = () => {
             />
           ))}
         </div>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/70 via-background/30 to-transparent" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background/45 via-background/5 to-transparent pointer-events-none" />
 
         {/* Top nav */}
         <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
