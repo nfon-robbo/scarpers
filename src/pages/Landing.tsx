@@ -175,7 +175,7 @@ const Landing = () => {
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background/45 via-background/5 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 z-[1] bg-white/15 pointer-events-none" />
+        <div className="absolute inset-0 z-[1] bg-black/35 pointer-events-none" />
 
         {/* Top nav */}
         <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
@@ -195,7 +195,7 @@ const Landing = () => {
               <Zap className="w-3 h-3 text-primary" />
               Free AI running coach · Beta
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-foreground drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               Free AI<br />Running Plan
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
