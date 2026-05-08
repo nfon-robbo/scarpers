@@ -22,7 +22,12 @@ const Onboarding = () => {
   const [sex, setSex] = useState<string>("");
   const [dob, setDob] = useState("");
   const [heightCm, setHeightCm] = useState("");
+  const [heightFt, setHeightFt] = useState("");
+  const [heightIn, setHeightIn] = useState("");
   const [weightKg, setWeightKg] = useState("");
+  const [weightLbs, setWeightLbs] = useState("");
+  const [weightSt, setWeightSt] = useState("");
+  const [weightStLbs, setWeightStLbs] = useState("");
   // Experience & goals
   const [experienceLevel, setExperienceLevel] = useState("intermediate");
   const [trainingGoals, setTrainingGoals] = useState("");
