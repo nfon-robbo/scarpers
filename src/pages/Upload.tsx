@@ -138,6 +138,14 @@ const UploadPage = () => {
 
       if (uploadError) throw uploadError;
 
+      // FIT always wins: remove any overlapping Strava activities (±15min) before insert
+      try {
+        const allFitTimes = parseResult.activities.map((a) => a.start_time);
+        await purgeStravaOverlaps(user.id, allFitTimes, 15);
+      } catch (e) {
+        console.error("Strava overlap purge failed:", e);
+      }
+
       // Insert activities in batches
       const batchSize = 50;
       let saved = 0;
