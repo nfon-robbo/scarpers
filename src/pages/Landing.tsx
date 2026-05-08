@@ -19,11 +19,7 @@ import {
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunner from "@/assets/hero-runner.jpg";
-import heroRunner2 from "@/assets/hero-runner-2.jpg";
-import heroRunner3 from "@/assets/hero-runner-3.jpg";
-import heroRunner4 from "@/assets/hero-runner-4.jpg";
-
-const HERO_IMAGES = [heroRunner, heroRunner2, heroRunner3, heroRunner4];
+import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 
 const FAQS = [
   {
@@ -110,14 +106,6 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [heroIdx, setHeroIdx] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setHeroIdx((i) => (i + 1) % HERO_IMAGES.length);
-    }, 7000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     document.title = "Scarpers — Free AI Running Coach & Personalised Training Plans UK";
@@ -156,22 +144,19 @@ const Landing = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* ====== HERO — full-bleed runner photo ====== */}
       <section className="relative isolate min-h-screen flex flex-col overflow-hidden">
-        {/* Background carousel + overlays */}
+        {/* Background video + overlays */}
         <div className="absolute inset-0 z-0 bg-background">
-          {HERO_IMAGES.map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt={i === 0 ? "Runner at sunrise on an open road" : ""}
-              aria-hidden={i === 0 ? undefined : true}
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-[4500ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
-                i === heroIdx ? "opacity-100 scale-105" : "opacity-0 scale-100"
-              }`}
-              width={1920}
-              height={1280}
-              loading={i === 0 ? "eager" : "lazy"}
-            />
-          ))}
+          <video
+            src={heroRunnerVideo.url}
+            poster={heroRunner}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background/45 via-background/5 to-transparent pointer-events-none" />
