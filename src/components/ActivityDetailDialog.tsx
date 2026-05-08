@@ -157,14 +157,12 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
 
     if (!track.some((p: any) => p.elapsed_time != null || p.time) && measuredGarminSplits.length) {
       let carryDistance = 0;
-      let carryTime = 0;
       let carryMovingTime = 0;
       let carryHrWeighted = 0;
       let carryHrMeters = 0;
       let carryAscent = 0;
       for (const s of measuredGarminSplits) {
         carryDistance += s.meters;
-        carryTime += s.time;
         carryMovingTime += s.movingTime;
         if (s.hr) { carryHrWeighted += s.hr * s.meters; carryHrMeters += s.meters; }
         carryAscent += s.ascent;
@@ -181,7 +179,6 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
             ascent: Math.round(carryAscent * ratio),
           });
           carryDistance -= 1000;
-          carryTime *= 1 - ratio;
           carryMovingTime *= 1 - ratio;
           carryHrWeighted *= 1 - ratio;
           carryHrMeters *= 1 - ratio;
