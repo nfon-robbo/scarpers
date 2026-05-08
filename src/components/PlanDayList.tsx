@@ -29,11 +29,14 @@ interface PlanDayListProps {
 }
 
 function shortLabel(title: string): string {
-  return title
+  const cleaned = title
     .replace(/\s*\(Total:.*?\)/i, "")
     .replace(/\*\*/g, "")
     .replace(/^\s*[—–\-]+\s*/, "")
     .trim();
+  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
+  if (/^scarpers\s*[-–]/i.test(cleaned)) return cleaned;
+  return `Scarpers - ${cleaned}`;
 }
 
 function extractDistance(w: ParsedWorkout): string | null {
