@@ -378,83 +378,14 @@ export default function PlanOverview({
         </div>
       </Card>
 
-      {/* Workout Review Dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-primary" />
-              Workout Review
-            </DialogTitle>
-            <DialogDescription>
-              {todayWorkout ? workoutDisplayTitle(todayWorkout.title) : "Workout"} — {format(today, "d MMMM yyyy")}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Activity Stats Grid */}
-          {todayActivity && (
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {todayActivity.distance_meters && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-                  <Activity className="w-4 h-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">{(todayActivity.distance_meters / 1000).toFixed(2)} km</p>
-                    <p className="text-[10px] text-muted-foreground">Distance</p>
-                  </div>
-                </div>
-              )}
-              {todayActivity.duration_seconds && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-                  <Clock className="w-4 h-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">{Math.round(todayActivity.duration_seconds / 60)} min</p>
-                    <p className="text-[10px] text-muted-foreground">Duration</p>
-                  </div>
-                </div>
-              )}
-              {todayActivity.avg_heart_rate && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-                  <Heart className="w-4 h-4 text-red-500 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">{todayActivity.avg_heart_rate} bpm</p>
-                    <p className="text-[10px] text-muted-foreground">Avg HR</p>
-                  </div>
-                </div>
-              )}
-              {todayActivity.avg_cadence && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-                  <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold">{Math.round(todayActivity.avg_cadence * 2)} spm</p>
-                    <p className="text-[10px] text-muted-foreground">Cadence</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* AI Review */}
-          <div className="mt-3">
-            {reviewLoading && !reviewContent && (
-              <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Analyzing your workout...</span>
-              </div>
-            )}
-            {reviewContent && (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <MarkdownRenderer content={reviewContent} />
-              </div>
-            )}
-            {reviewLoading && reviewContent && (
-              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Still writing...</span>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <WorkoutReviewDialog
+        open={reviewDialogOpen}
+        onOpenChange={setReviewDialogOpen}
+        workout={todayWorkout || null}
+        activity={todayActivity || null}
+        workoutDate={today}
+        workoutTitle={todayWorkout ? workoutDisplayTitle(todayWorkout.title) : "Workout"}
+      />
     </div>
   );
 }
