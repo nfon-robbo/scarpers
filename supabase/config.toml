@@ -1,34 +1,29 @@
 project_id = "datdwxsugeobqigtopnz"
 
-[functions.strava-auth]
-verify_jwt = false
-
-[functions.strava-import]
-verify_jwt = false
-
-[functions.intervals-sync]
-verify_jwt = false
-
-[functions.google-fit-auth]
-verify_jwt = false
-
-[functions.google-fit-callback]
-verify_jwt = false
-
-[functions.google-fit-sleep]
-verify_jwt = false
-
-[functions.sleep-insight]
-verify_jwt = false
-
-[functions.auto-sync]
-verify_jwt = false
-
-[functions.readiness-advice]
-verify_jwt = false
-
-[functions.android-coach]
-verify_jwt = false
-
-[functions.apple-health-sleep]
-verify_jwt = false
+[functions]
+  [functions.android-coach]
+    verify_jwt = false
+  [functions.apple-health-sleep]
+    verify_jwt = false
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.auto-sync]
+    verify_jwt = false
+  [functions.google-fit-auth]
+    verify_jwt = false
+  [functions.google-fit-callback]
+    verify_jwt = false
+  [functions.google-fit-sleep]
+    verify_jwt = false
+  [functions.intervals-sync]
+    verify_jwt = false
+  [functions.process-email-queue]
+    verify_jwt = true
+  [functions.readiness-advice]
+    verify_jwt = false
+  [functions.sleep-insight]
+    verify_jwt = false
+  [functions.strava-auth]
+    verify_jwt = false
+  [functions.strava-import]
+    verify_jwt = false
