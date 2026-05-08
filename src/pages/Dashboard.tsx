@@ -482,6 +482,27 @@ const Dashboard = () => {
         "{dailyQuote.text}" — {dailyQuote.author}
       </p>
 
+      {/* ── Build a plan CTA (when user has no plan) ── */}
+      {!plan && (
+        <Card
+          className="glass border-primary/30 bg-gradient-to-r from-primary/15 via-accent/10 to-primary/15 cursor-pointer hover:from-primary/25 hover:to-primary/25 transition-colors"
+          onClick={() => navigate("/training-plan")}
+        >
+          <CardContent className="flex items-center gap-4 py-4 px-5">
+            <div className="rounded-full bg-primary/20 p-3">
+              <Calendar className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold">Build a plan!</p>
+              <p className="text-xs text-muted-foreground">
+                Get a personalised AI training plan tailored to your goals.
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-primary" />
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Running IQ ── */}
       <RunningIQWidget />
       
