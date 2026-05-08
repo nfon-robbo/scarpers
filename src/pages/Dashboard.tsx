@@ -626,17 +626,32 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-2.5">
                 {recentRuns.length > 0 ? recentRuns.map((run) => (
-                  <button
+                  <div
                     key={run.id}
-                    type="button"
-                    onClick={() => setOpenActivityId(run.id)}
-                    className="w-full flex items-center gap-3 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
+                    className="w-full flex items-center gap-3 rounded-lg px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${run.color}`} />
-                    <span className="text-[11px] text-muted-foreground w-14">{run.date}</span>
-                    <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
-                    <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpenActivityId(run.id)}
+                      className="flex items-center gap-3 flex-1 text-left min-w-0"
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${run.color} shrink-0`} />
+                      <span className="text-[11px] text-muted-foreground w-14 shrink-0">{run.date}</span>
+                      <span className="text-sm font-semibold flex-1">{run.dist} mi</span>
+                      <span className="text-xs text-muted-foreground">{run.pace} /mi</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => deleteRun(run.id, e)}
+                      disabled={deletingRunId === run.id}
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                      aria-label="Delete activity"
+                    >
+                      {deletingRunId === run.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 )) : (
                   <p className="text-xs text-muted-foreground">No recent runs yet</p>
                 )}
