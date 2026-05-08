@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Activity, Mountain, Bike, Zap } from "lucide-react";
 import paceSquadLogo from "@/assets/pace-squad-logo.png";
+import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
