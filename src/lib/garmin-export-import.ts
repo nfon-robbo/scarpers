@@ -468,3 +468,90 @@ export async function importGarminExport(
   onProgress?.({ phase: "Done" });
   return result;
 }
+
+// ----------------- Undo support -----------------
+
+function undoKey(userId: string): string {
+  return `garmin-import-undo:${userId}`;
+}
+
+export interface GarminUndoSnapshot {
+  uploadId: string | null;
+  userId: string;
+  createdAt: string;
+  fileName: string;
+  counts: { activities: number; dailyMetrics: number; sleepDays: number };
+  truncated?: boolean;
+}
+
+export function getGarminUndoInfo(userId: string): GarminUndoSnapshot | null {
+  try {
+    const raw = localStorage.getItem(undoKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      uploadId: parsed.uploadId ?? null,
+      userId: parsed.userId,
+      createdAt: parsed.createdAt,
+      fileName: parsed.fileName,
+      counts: parsed.counts || { activities: 0, dailyMetrics: 0, sleepDays: 0 },
+      truncated: parsed.truncated,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearGarminUndo(userId: string) {
+  try { localStorage.removeItem(undoKey(userId)); } catch { /* ignore */ }
+}
+
+export async function undoLastGarminImport(userId: string): Promise<{ restored: number; errors: string[] }> {
+  const errors: string[] = [];
+  let restored = 0;
+  const raw = localStorage.getItem(undoKey(userId));
+  if (!raw) return { restored: 0, errors: ["No import to undo"] };
+  const blob = JSON.parse(raw);
+
+  // 1. Delete rows imported by this Garmin import (matched via upload_id)
+  if (blob.uploadId) {
+    await supabase.from("activities").delete().eq("user_id", userId).eq("upload_id", blob.uploadId);
+    await supabase.from("daily_metrics").delete().eq("user_id", userId).eq("upload_id", blob.uploadId);
+  }
+  // Sleep stages are tagged by source instead of upload_id
+  await supabase.from("sleep_stages").delete().eq("user_id", userId).eq("source", "garmin-export");
+
+  // 2. Restore snapshots
+  const reinsert = async (table: "activities" | "daily_metrics" | "sleep_stages", rows: any[]) => {
+    for (let i = 0; i < rows.length; i += 200) {
+      const batch = rows.slice(i, i + 200).map((r: any) => {
+        const { id, created_at, ...rest } = r;
+        return rest;
+      });
+      const { error } = await supabase.from(table).insert(batch as any);
+      if (error) errors.push(`${table}: ${error.message}`);
+      else restored += batch.length;
+    }
+  };
+
+  if (Array.isArray(blob.activitiesBackup) && blob.activitiesBackup.length) {
+    await reinsert("activities", blob.activitiesBackup);
+  }
+  if (Array.isArray(blob.dailyMetricsBackup) && blob.dailyMetricsBackup.length) {
+    await reinsert("daily_metrics", blob.dailyMetricsBackup);
+  }
+  if (Array.isArray(blob.sleepStagesBackup) && blob.sleepStagesBackup.length) {
+    await reinsert("sleep_stages", blob.sleepStagesBackup);
+  }
+
+  // 3. Restore profile bio
+  if (blob.profileBackup) {
+    await supabase.from("profiles").update({
+      height_cm: blob.profileBackup.height_cm,
+      weight_kg: blob.profileBackup.weight_kg,
+    }).eq("user_id", userId);
+  }
+
+  clearGarminUndo(userId);
+  return { restored, errors };
+}
