@@ -7,8 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Activity, Mountain, Bike, Zap } from "lucide-react";
-import paceSquadLogo from "@/assets/pace-squad-logo.png";
-import scarpersWordmark from "@/assets/scarpers-wordmark.png";
+import scarpersLogo from "@/assets/scarpers-logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -78,7 +77,7 @@ const Auth = () => {
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
           <img
-            src={paceSquadLogo}
+            src={scarpersLogo}
             alt="Scarpers — AI Running Plan Builder"
             className="w-full max-w-md rounded-2xl shadow-2xl mb-8"
           />
@@ -105,7 +104,7 @@ const Auth = () => {
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile brand */}
           <div className="flex flex-col items-center gap-3 mb-8 lg:hidden">
-            <img src={scarpersWordmark} alt="Scarpers" className="w-full max-w-[260px]" />
+            <img src={scarpersLogo} alt="Scarpers" className="w-full max-w-[260px]" />
           </div>
 
           <Card className="glass border-border/30">

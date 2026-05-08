@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import scarpersWordmark from "@/assets/scarpers-wordmark.png";
+import scarpersLogo from "@/assets/scarpers-logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import AIChatbot from "@/components/AIChatbot";
@@ -40,7 +40,7 @@ const AppLayout = () => {
       <aside className="hidden md:flex w-[260px] flex-col glass-strong fixed inset-y-0 left-0 z-40">
         {/* Brand */}
         <div className="flex items-center px-5 py-6 border-b border-border/50">
-          <img src={scarpersWordmark} alt="Scarpers" className="h-8 w-auto" />
+          <img src={scarpersLogo} alt="Scarpers" className="h-8 w-auto" />
         </div>
 
         {/* Nav */}
@@ -109,7 +109,7 @@ const AppLayout = () => {
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center">
-            <img src={scarpersWordmark} alt="Scarpers" className="h-6 w-auto" />
+            <img src={scarpersLogo} alt="Scarpers" className="h-6 w-auto" />
           </div>
           <div className="flex items-center gap-1">
             <Button

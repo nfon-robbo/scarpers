@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 20% 8%;
 
-    --primary: 222 78% 46%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 10% 93%;
@@ -24,7 +24,7 @@
     --muted: 240 8% 93%;
     --muted-foreground: 240 8% 46%;
 
-    --accent: 150 62% 44%;
+    --accent: 330 81% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -32,28 +32,28 @@
 
     --border: 240 10% 90%;
     --input: 240 10% 90%;
-    --ring: 222 78% 46%;
+    --ring: 262 83% 58%;
 
     --radius: 0.75rem;
 
-    --chart-1: 222 78% 46%;
-    --chart-2: 150 62% 44%;
+    --chart-1: 262 83% 58%;
+    --chart-2: 330 81% 60%;
     --chart-3: 38 92% 50%;
     --chart-4: 199 89% 48%;
     --chart-5: 0 72% 51%;
 
-    --glow-primary: 222 78% 46%;
-    --gradient-start: 222 78% 46%;
-    --gradient-end: 150 62% 44%;
+    --glow-primary: 262 83% 58%;
+    --gradient-start: 262 83% 58%;
+    --gradient-end: 330 81% 60%;
 
     --sidebar-background: 240 12% 97%;
     --sidebar-foreground: 240 20% 8%;
-    --sidebar-primary: 222 78% 46%;
+    --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 10% 93%;
     --sidebar-accent-foreground: 240 20% 8%;
     --sidebar-border: 240 10% 90%;
-    --sidebar-ring: 222 78% 46%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
@@ -66,7 +66,7 @@
     --popover: 240 12% 9%;
     --popover-foreground: 240 5% 96%;
 
-    --primary: 222 80% 58%;
+    --primary: 262 83% 65%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 12% 14%;
@@ -75,7 +75,7 @@
     --muted: 240 12% 14%;
     --muted-foreground: 240 6% 55%;
 
-    --accent: 150 65% 50%;
+    --accent: 330 81% 65%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 45%;
@@ -83,26 +83,26 @@
 
     --border: 240 12% 15%;
     --input: 240 12% 15%;
-    --ring: 222 80% 58%;
+    --ring: 262 83% 65%;
 
-    --chart-1: 222 80% 58%;
-    --chart-2: 150 65% 50%;
+    --chart-1: 262 83% 65%;
+    --chart-2: 330 81% 65%;
     --chart-3: 38 85% 55%;
     --chart-4: 199 80% 55%;
     --chart-5: 0 62% 50%;
 
-    --glow-primary: 222 80% 58%;
-    --gradient-start: 222 80% 55%;
-    --gradient-end: 150 65% 50%;
+    --glow-primary: 262 83% 65%;
+    --gradient-start: 262 83% 60%;
+    --gradient-end: 330 81% 62%;
 
     --sidebar-background: 240 15% 7%;
     --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 222 80% 58%;
+    --sidebar-primary: 262 83% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 12% 12%;
     --sidebar-accent-foreground: 240 5% 96%;
     --sidebar-border: 240 12% 15%;
-    --sidebar-ring: 222 80% 58%;
+    --sidebar-ring: 262 83% 65%;
   }
 }
 
