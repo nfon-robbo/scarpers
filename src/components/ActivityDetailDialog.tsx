@@ -272,6 +272,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
       const stride = Math.max(1, Math.ceil(track.length / 600));
       const points = track.filter((_, i) => i % stride === 0 || i === track.length - 1);
       const CHUNK = 45;
+      const radiusOptions = [40, 30, 20, 10];
       const out: { lat: number; lng: number }[] = [];
       let matchedAny = false;
       let lastErr = "";
@@ -281,15 +282,20 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
         const slice = points.slice(i, i + CHUNK);
         if (slice.length < 2) break;
         const coords = slice.map(p => `${(p as any).lng ?? (p as any).lon},${p.lat}`).join(";");
-        const radii = slice.map(() => "60").join(";");
-        const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
         let json: any = null;
-        try {
-          const res = await fetch(url);
-          json = await res.json().catch(() => null);
-          if (!res.ok) lastErr = `OSRM ${res.status}${json?.message ? `: ${json.message}` : ""}`;
-        } catch (e: any) {
-          lastErr = e?.message || "Network error";
+        for (const radius of radiusOptions) {
+          const radii = slice.map(() => String(radius)).join(";");
+          const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
+          try {
+            const res = await fetch(url);
+            json = await res.json().catch(() => null);
+            if (res.ok && json?.code === "Ok") break;
+            lastErr = json?.message ? `OSRM: ${json.message}` : `OSRM ${res.status}`;
+            if (json?.code !== "TooBig") break;
+          } catch (e: any) {
+            lastErr = e?.message || "Network error";
+            break;
+          }
         }
         if (json?.code === "Ok" && json.matchings?.length) {
           matchedAny = true;
