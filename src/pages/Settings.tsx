@@ -246,6 +246,8 @@ const Settings = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
@@ -986,6 +988,73 @@ const Settings = () => {
           </p>
         </CardContent>
       </Card>
+
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+            <Trash2 className="w-5 h-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Permanently delete your account and all associated data. This cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={() => setConfirmDeleteAccount(true)}>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete My Profile
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmDeleteAccount} onOpenChange={(o) => !o && setConfirmDeleteAccount(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes your profile, training plans, activities, sleep data, integrations, and login. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingAccount}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletingAccount}
+              onClick={async (e) => {
+                e.preventDefault();
+                setDeletingAccount(true);
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) throw new Error("Not signed in");
+                  const resp = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${session.access_token}`,
+                        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                      },
+                    }
+                  );
+                  const data = await resp.json();
+                  if (!resp.ok) throw new Error(data.error || "Failed");
+                  await supabase.auth.signOut();
+                  toast({ title: "Account deleted" });
+                  navigate("/auth");
+                } catch (err: any) {
+                  toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+                  setDeletingAccount(false);
+                  setConfirmDeleteAccount(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingAccount ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              {deletingAccount ? "Deleting..." : "Delete forever"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
