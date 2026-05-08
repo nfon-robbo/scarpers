@@ -116,12 +116,15 @@ const Activities = () => {
     );
   }
 
-  const availableTypes = Array.from(
-    new Set(activities.map((a) => (a.activity_type || "").toLowerCase()).filter(Boolean))
-  ).sort();
+  const categorise = (t: string | null | undefined) => {
+    const s = (t || "").toLowerCase();
+    if (s.includes("walk") || s.includes("hike")) return "walking";
+    if (s.includes("run")) return "running";
+    return "other";
+  };
 
   const visibleActivities = activities
-    .filter((a) => typeFilter === "all" || (a.activity_type || "").toLowerCase() === typeFilter)
+    .filter((a) => typeFilter === "all" || categorise(a.activity_type) === typeFilter)
     .slice()
     .sort((a, b) => {
       if (sortBy === "distance") {
