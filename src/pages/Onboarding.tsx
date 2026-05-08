@@ -223,15 +223,29 @@ const Onboarding = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="height">Height ({units.height === "ft" ? "cm" : "cm"})</Label>
-                  <Input id="height" type="number" inputMode="numeric" placeholder="175" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input id="weight" type="number" inputMode="decimal" placeholder="70" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                <Label>Height</Label>
+                {units.height === "ft" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="number" inputMode="numeric" placeholder="ft" value={heightFt} onChange={(e) => setHeightFt(e.target.value)} />
+                    <Input type="number" inputMode="numeric" placeholder="in" value={heightIn} onChange={(e) => setHeightIn(e.target.value)} />
+                  </div>
+                ) : (
+                  <Input type="number" inputMode="numeric" placeholder="175 cm" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Weight</Label>
+                {units.weight === "lbs" ? (
+                  <Input type="number" inputMode="decimal" placeholder="lbs" value={weightLbs} onChange={(e) => setWeightLbs(e.target.value)} />
+                ) : units.weight === "st" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="number" inputMode="numeric" placeholder="st" value={weightSt} onChange={(e) => setWeightSt(e.target.value)} />
+                    <Input type="number" inputMode="numeric" placeholder="lbs" value={weightStLbs} onChange={(e) => setWeightStLbs(e.target.value)} />
+                  </div>
+                ) : (
+                  <Input type="number" inputMode="decimal" placeholder="70 kg" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                )}
               </div>
             </div>
           )}
