@@ -364,9 +364,26 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                     {hasMap && (
                       <Card>
                         <CardContent className="p-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {hasDetailedTrack ? "Route" : "Location"}
-                          </p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> {hasDetailedTrack ? "Route" : "Location"}
+                              {snappedTrack && <Badge variant="secondary" className="ml-2 text-[10px]">Snapped</Badge>}
+                            </p>
+                            {hasDetailedTrack && (
+                              <div className="flex items-center gap-2">
+                                {snapError && <span className="text-[11px] text-destructive">{snapError}</span>}
+                                {snappedTrack ? (
+                                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSnappedTrack(null)}>
+                                    Show raw GPS
+                                  </Button>
+                                ) : (
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={snapToRoads} disabled={snapping}>
+                                    {snapping ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Snapping…</> : "Snap to roads/paths"}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           {displayedMapTrack.length >= 1 ? (
                             <ActivityMap track={displayedMapTrack} interactive height={hasDetailedTrack ? undefined : 300} />
                           ) : (
