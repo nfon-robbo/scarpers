@@ -8,20 +8,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useUnits } from "@/hooks/useUnits";
 import { Activity, ChevronRight, ChevronLeft } from "lucide-react";
+import GoogleFitConnect from "@/components/GoogleFitConnect";
+import StravaConnect from "@/components/StravaConnect";
 
-const STEPS = ["About You", "Your Sport", "Goals & Context"];
+const STEPS = ["About You", "Experience & Goals", "Units", "Integrations"];
 
 const Onboarding = () => {
   const [step, setStep] = useState(0);
+  // About you
   const [name, setName] = useState("");
-  const [primarySport, setPrimarySport] = useState("running");
+  const [sex, setSex] = useState<string>("");
+  const [dob, setDob] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  // Experience & goals
   const [experienceLevel, setExperienceLevel] = useState("intermediate");
   const [trainingGoals, setTrainingGoals] = useState("");
+  const [injuries, setInjuries] = useState("");
   const [athleteContext, setAthleteContext] = useState("");
+
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { units, setUnit } = useUnits();
 
   const handleComplete = async () => {
     setLoading(true);
@@ -29,14 +40,22 @@ const Onboarding = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      const contextParts: string[] = [];
+      if (injuries.trim()) contextParts.push(`Injuries / niggles: ${injuries.trim()}`);
+      if (athleteContext.trim()) contextParts.push(athleteContext.trim());
+
       const { error } = await supabase
         .from("profiles")
         .update({
           name,
-          primary_sport: primarySport,
+          primary_sport: "running",
           experience_level: experienceLevel,
           training_goals: trainingGoals,
-          athlete_context: athleteContext,
+          athlete_context: contextParts.join("\n\n"),
+          sex: sex || null,
+          date_of_birth: dob || null,
+          height_cm: heightCm ? Number(heightCm) : null,
+          weight_kg: weightKg ? Number(weightKg) : null,
           onboarding_completed: true,
         })
         .eq("user_id", user.id);
@@ -54,6 +73,11 @@ const Onboarding = () => {
     }
   };
 
+  const canNext = () => {
+    if (step === 0) return name.trim().length > 0;
+    return true;
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
@@ -64,7 +88,6 @@ const Onboarding = () => {
           </div>
           <CardTitle>Let's set up your profile</CardTitle>
           <CardDescription>Step {step + 1} of {STEPS.length} — {STEPS[step]}</CardDescription>
-          {/* Progress bar */}
           <div className="flex gap-2 mt-4">
             {STEPS.map((_, i) => (
               <div
@@ -81,12 +104,35 @@ const Onboarding = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Your name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. Alex Johnson"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <Input id="name" placeholder="e.g. Alex Johnson" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Sex</Label>
+                  <Select value={sex} onValueChange={setSex}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dob">Date of birth</Label>
+                  <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="height">Height (cm)</Label>
+                  <Input id="height" type="number" inputMode="numeric" placeholder="175" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Weight (kg)</Label>
+                  <Input id="weight" type="number" inputMode="decimal" placeholder="70" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                </div>
               </div>
             </div>
           )}
@@ -94,58 +140,110 @@ const Onboarding = () => {
           {step === 1 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Primary sport</Label>
-                <Select value={primarySport} onValueChange={setPrimarySport}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label>Running experience</Label>
+                <Select value={experienceLevel} onValueChange={setExperienceLevel}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="running">Running</SelectItem>
-                    <SelectItem value="cycling">Cycling</SelectItem>
-                    <SelectItem value="triathlon">Triathlon</SelectItem>
-                    <SelectItem value="swimming">Swimming</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="beginner">Beginner — new to running</SelectItem>
+                    <SelectItem value="intermediate">Intermediate — run regularly</SelectItem>
+                    <SelectItem value="advanced">Advanced — race competitively</SelectItem>
+                    <SelectItem value="elite">Elite — high-performance athlete</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Experience level</Label>
-                <Select value={experienceLevel} onValueChange={setExperienceLevel}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="beginner">Beginner</SelectItem>
-                    <SelectItem value="intermediate">Intermediate</SelectItem>
-                    <SelectItem value="advanced">Advanced</SelectItem>
-                    <SelectItem value="elite">Elite</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="goals">Training goals</Label>
+                <Input id="goals" placeholder="e.g. Sub-3hr marathon, run a 10K" value={trainingGoals} onChange={(e) => setTrainingGoals(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="injuries">Injuries or niggles</Label>
+                <Textarea id="injuries" placeholder="Any current or recurring injuries the AI coach should know about — knee pain, plantar fasciitis, etc." value={injuries} onChange={(e) => setInjuries(e.target.value)} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="context">Anything else?</Label>
+                <Textarea id="context" placeholder="Schedule constraints, recent training history, preferences..." value={athleteContext} onChange={(e) => setAthleteContext(e.target.value)} rows={3} />
               </div>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="goals">Training goals</Label>
-                <Input
-                  id="goals"
-                  placeholder="e.g. Sub-3hr marathon, complete first Ironman"
-                  value={trainingGoals}
-                  onChange={(e) => setTrainingGoals(e.target.value)}
-                />
+              <p className="text-sm text-muted-foreground">Choose how you want measurements displayed throughout the app.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Distance</Label>
+                  <Select value={units.distance} onValueChange={(v) => setUnit("distance", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="km">Kilometres</SelectItem>
+                      <SelectItem value="mi">Miles</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Pace / Speed</Label>
+                  <Select value={units.speed} onValueChange={(v) => setUnit("speed", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="min/km">min/km</SelectItem>
+                      <SelectItem value="min/mi">min/mi</SelectItem>
+                      <SelectItem value="km/h">km/h</SelectItem>
+                      <SelectItem value="mph">mph</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Elevation</Label>
+                  <Select value={units.elevation} onValueChange={(v) => setUnit("elevation", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="m">Metres</SelectItem>
+                      <SelectItem value="ft">Feet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Temperature</Label>
+                  <Select value={units.temperature} onValueChange={(v) => setUnit("temperature", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="C">Celsius</SelectItem>
+                      <SelectItem value="F">Fahrenheit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Weight</Label>
+                  <Select value={units.weight} onValueChange={(v) => setUnit("weight", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kg">Kilograms</SelectItem>
+                      <SelectItem value="lbs">Pounds</SelectItem>
+                      <SelectItem value="st">Stone</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Height</Label>
+                  <Select value={units.height} onValueChange={(v) => setUnit("height", v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cm">Centimetres</SelectItem>
+                      <SelectItem value="ft">Feet / inches</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="context">Athlete context</Label>
-                <Textarea
-                  id="context"
-                  placeholder="Anything the AI coach should know — injuries, schedule constraints, recent training history..."
-                  value={athleteContext}
-                  onChange={(e) => setAthleteContext(e.target.value)}
-                  rows={4}
-                />
-              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Connect your accounts to pull in runs and sleep data automatically. You can skip and add these later in Settings.
+              </p>
+              <GoogleFitConnect />
+              <StravaConnect />
             </div>
           )}
 
@@ -156,12 +254,12 @@ const Onboarding = () => {
               </Button>
             )}
             {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep(step + 1)} className="flex-1">
+              <Button onClick={() => setStep(step + 1)} className="flex-1" disabled={!canNext()}>
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
               <Button onClick={handleComplete} disabled={loading} className="flex-1">
-                {loading ? "Saving..." : "Complete Setup"}
+                {loading ? "Saving..." : "Go to Dashboard"}
               </Button>
             )}
           </div>
