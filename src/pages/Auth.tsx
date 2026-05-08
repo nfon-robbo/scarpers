@@ -105,7 +105,7 @@ const Auth = () => {
         <div className="w-full max-w-md animate-fade-in">
           {/* Mobile brand */}
           <div className="flex flex-col items-center gap-3 mb-8 lg:hidden">
-            <img src={paceSquadLogo} alt="Scarpers" className="w-full max-w-xs rounded-xl shadow-lg" />
+            <img src={scarpersWordmark} alt="Scarpers" className="w-full max-w-[260px]" />
           </div>
 
           <Card className="glass border-border/30">
