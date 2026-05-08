@@ -353,6 +353,15 @@ export async function importGarminExport(
     }
     if (datesTouched.size) {
       const dates = Array.from(datesTouched);
+      // Snapshot first
+      try {
+        for (let i = 0; i < dates.length; i += 500) {
+          const { data } = await supabase.from("sleep_stages")
+            .select("*").eq("user_id", userId).in("date", dates.slice(i, i + 500));
+          if (data) sleepStagesBackup.push(...data);
+        }
+      } catch (e: any) { errors.push(`Sleep snapshot: ${e?.message || e}`); }
+
       const chunkSize = 500;
       for (let i = 0; i < dates.length; i += chunkSize) {
         await supabase.from("sleep_stages")
