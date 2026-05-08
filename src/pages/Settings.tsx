@@ -824,6 +824,8 @@ const Settings = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <IntervalsCredentials />
+
       {/* Auto-Sync Schedule Card */}
       <Card>
         <CardHeader>
