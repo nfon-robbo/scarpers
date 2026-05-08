@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2, Unlink, Trash2 } from "lucide-react";
+import { startStravaBackgroundImport, isStravaImportRunning } from "@/lib/strava-background-import";
 
 const StravaConnect = () => {
   const { user, session } = useAuth();
