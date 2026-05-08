@@ -267,10 +267,11 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     setSnapping(true);
     setSnapError(null);
     try {
-      // Downsample so chunks cover more ground; OSRM match limit is 100 coords/req
+      // Downsample so chunks cover more ground; the public OSRM match endpoint
+      // rejects larger traces, so keep each request comfortably below its limit.
       const stride = Math.max(1, Math.ceil(track.length / 600));
       const points = track.filter((_, i) => i % stride === 0 || i === track.length - 1);
-      const CHUNK = 90;
+      const CHUNK = 45;
       const out: { lat: number; lng: number }[] = [];
       let matchedAny = false;
       let lastErr = "";
@@ -296,7 +297,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
             for (const [lng, lat] of m.geometry.coordinates) out.push({ lat, lng });
           }
         } else {
-          if (json?.code && json.code !== "Ok") lastErr = `OSRM: ${json.code}`;
+          if (json?.code && json.code !== "Ok") lastErr = json?.message ? `OSRM: ${json.message}` : `OSRM: ${json.code}`;
           // Keep raw points for this chunk so we still draw something
           for (const p of slice) out.push({ lat: p.lat, lng: (p as any).lng ?? (p as any).lon });
         }
