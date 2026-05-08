@@ -24,15 +24,15 @@ import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 const FAQS = [
   {
     q: "What is the best AI running coach app?",
-    a: "Scarpers is a free AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra. It analyses your real running data, sleep and resting HR, then writes a week-by-week plan only you would get.",
+    a: "Scarpers is an AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra. It analyses your real running data, sleep and resting HR, then writes a week-by-week plan only you would get.",
   },
   {
     q: "How does Scarpers create a personalised training plan?",
     a: "Answer a few questions about your goal, experience and any injuries. Scarpers reads your last 8 weeks of runs and 30 nights of sleep, then generates a personalised training plan in under two minutes.",
   },
   {
-    q: "Is Scarpers a free running plan app?",
-    a: "Yes — Scarpers is completely free. AI training plans, FIT and Strava import, sleep tracking, daily readiness and post-run reviews, all at no cost.",
+    q: "What does Scarpers include?",
+    a: "AI training plans, FIT and Strava import, sleep tracking, daily readiness and post-run reviews — all in one app.",
   },
   {
     q: "Which devices and apps does it work with?",
@@ -129,7 +129,7 @@ const Landing = () => {
   };
 
   useEffect(() => {
-    document.title = "Scarpers — Free AI Running Coach & Personalised Training Plans UK";
+    document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
 
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
@@ -152,8 +152,7 @@ const Landing = () => {
       name: "Scarpers",
       applicationCategory: "HealthApplication",
       operatingSystem: "Web, iOS, Android",
-      description: "Free AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra distances.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "GBP" },
+      description: "AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra distances.",
       url: "https://www.scarpers.co.uk/",
     });
     document.head.appendChild(org);
@@ -201,17 +200,17 @@ const Landing = () => {
           <div className="px-5 sm:px-10 pb-20 sm:pb-28 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-background/40 backdrop-blur text-[11px] font-medium text-foreground/80 mb-6">
               <Zap className="w-3 h-3 text-primary" />
-              Free AI running coach · Beta
+              AI running coach · Beta
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              Free AI<br />Running Plan
+              AI<br />Running Plan
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra. Completely free.
+              Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
-                <Link to="/auth">Get Your Free Plan</Link>
+                <Link to="/auth">Get Your Plan</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur border-foreground/20">
                 <a href="#how">See How It Works</a>
@@ -351,7 +350,7 @@ const Landing = () => {
               { icon: Brain, title: "What It Does", body: "Scarpers takes information about your running — recent runs, sleep, resting HR, goal race and experience — and uses AI to build a bespoke week-by-week plan. It tells you exactly what to run and when, with intensity targets, music BPM cues and a real race-day taper." },
               { icon: Heart, title: "Why You Need One", body: "Generic plans give every runner the same Tuesday tempo. They don't know if you slept four hours, ran a half-marathon at the weekend, or are coming back from a calf strain. A smart coach reads your data and adapts — preventing injury and overtraining while keeping you progressing." },
               { icon: Sparkles, title: "How It Works", body: "Onboarding takes under two minutes. Tell us your race, experience and any niggles, then drop in a FIT file or connect Strava. Within seconds you have a complete plan with daily readiness, post-run reviews and a 24/7 AI coach you can chat to." },
-              { icon: Target, title: "Why Scarpers", body: "Scarpers is the UK's most comprehensive free AI running coach. Personalised plans, daily readiness, Running IQ, sleep tracking, post-run reviews, and one-click Intervals.icu export — all completely free, on web, iOS and Android." },
+              { icon: Target, title: "Why Scarpers", body: "Scarpers is the UK's most comprehensive AI running coach. Personalised plans, daily readiness, Running IQ, sleep tracking, post-run reviews, and one-click Intervals.icu export — on web, iOS and Android." },
             ].map((c) => (
               <article key={c.title} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-7">
                 <div className="flex items-center gap-3 mb-4">
@@ -404,10 +403,10 @@ const Landing = () => {
         <div className="relative max-w-3xl mx-auto px-5 py-24 sm:py-32 text-center">
           <H2>Ready to Transform Your Running?</H2>
           <p className="mt-5 text-lg text-foreground/80 max-w-xl mx-auto">
-            Join thousands of runners who've taken the guesswork out of training. Free, forever.
+            Join thousands of runners who've taken the guesswork out of training.
           </p>
           <Button asChild size="lg" className="mt-8 h-12 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 text-base">
-            <Link to="/auth">Get Your Free Plan</Link>
+            <Link to="/auth">Get Your Plan</Link>
           </Button>
         </div>
       </section>
@@ -419,7 +418,7 @@ const Landing = () => {
               <img src={scarpersWordmark} alt="Scarpers" className="h-4 w-auto object-contain" />
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              The free AI running coach that reads your data and writes the plan only you should be running.
+              The AI running coach that reads your data and writes the plan only you should be running.
             </p>
           </div>
           <div>
