@@ -173,8 +173,8 @@ const Landing = () => {
             />
           ))}
         </div>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/95 via-background/60 to-background/30" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/40 to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background/70 via-background/30 to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
 
         {/* Top nav */}
         <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
