@@ -281,7 +281,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
         const slice = points.slice(i, i + CHUNK);
         if (slice.length < 2) break;
         const coords = slice.map(p => `${(p as any).lng ?? (p as any).lon},${p.lat}`).join(";");
-        const radii = slice.map(() => "30").join(";");
+        const radii = slice.map(() => "60").join(";");
         const url = `https://router.project-osrm.org/match/v1/driving/${coords}?geometries=geojson&overview=full&radiuses=${radii}&gaps=split&tidy=true`;
         let json: any = null;
         try {
