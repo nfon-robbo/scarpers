@@ -18,6 +18,7 @@ import {
   Trash2, ChevronRight,
 } from "lucide-react";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
+import UndoGarminImportButton from "@/components/UndoGarminImportButton";
 
 const Activities = () => {
   const { user } = useAuth();
