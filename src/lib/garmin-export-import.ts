@@ -174,12 +174,12 @@ export async function importGarminExport(
     // Garmin Connect data export uses these units (different from FIT/SDK):
     //   distance:        centimetres   → /100 = metres
     //   elevation gain/loss, min/max:   centimetres   → /100 = metres
-    //   avgSpeed/maxSpeed:               cm/ms (= 10× km/h) → ×10 = km/h
+    //   avgSpeed/maxSpeed:               cm/ms → ×36 = km/h
     //   duration/elapsedDuration:        milliseconds  → /1000 = seconds (already handled)
     //   avgRunCadence:                   single-leg    → ×2 = total spm; prefer avgDoubleCadence
     //   temperature:                     Celsius       (no conversion)
     const cm = (v: any) => (v == null ? null : Number(v) / 100);
-    const speed = (v: any) => (v == null ? null : Number(v) * 10);
+    const speed = (v: any) => (v == null ? null : Number(v) * 36);
     const cadence = (a: any) => {
       if (a.avgDoubleCadence != null) return Number(a.avgDoubleCadence);
       if (a.avgRunCadence != null) return Number(a.avgRunCadence) * 2;
