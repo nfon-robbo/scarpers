@@ -167,18 +167,19 @@ export async function importGarminExport(
         if (Array.isArray(arr)) allActs.push(...arr);
       }
     }
+    const fitDetails = await parseGarminFitDetails(zip);
     onProgress?.({ phase: "Importing activities", total: allActs.length, current: 0 });
 
     // Build rows.
     // Garmin Connect data export uses these units (different from FIT/SDK):
     //   distance:        centimetres   → /100 = metres
     //   elevation gain/loss, min/max:   centimetres   → /100 = metres
-    //   avgSpeed/maxSpeed:               cm/ms (= 10× m/s)  → /10 = m/s
+    //   avgSpeed/maxSpeed:               cm/ms (= 10× km/h) → ×10 = km/h
     //   duration/elapsedDuration:        milliseconds  → /1000 = seconds (already handled)
     //   avgRunCadence:                   single-leg    → ×2 = total spm; prefer avgDoubleCadence
     //   temperature:                     Celsius       (no conversion)
     const cm = (v: any) => (v == null ? null : Number(v) / 100);
-    const speed = (v: any) => (v == null ? null : Number(v) / 10);
+    const speed = (v: any) => (v == null ? null : Number(v) * 10);
     const cadence = (a: any) => {
       if (a.avgDoubleCadence != null) return Number(a.avgDoubleCadence);
       if (a.avgRunCadence != null) return Number(a.avgRunCadence) * 2;
@@ -188,6 +189,8 @@ export async function importGarminExport(
 
     const rows = allActs.map((a) => {
       const start = toIso(a.startTimeGmt ?? a.beginTimestamp);
+      const fit = fitDetails.byActivityId.get(String(a.activityId ?? "")) || (start ? fitDetails.byStartMinute.get(start.slice(0, 16)) : undefined);
+      const gpsTrack = fit?.gps_track?.length ? fit.gps_track : routeFromGarminSummary(a);
       return {
         user_id: userId,
         upload_id: uploadId,
@@ -197,8 +200,8 @@ export async function importGarminExport(
         distance_meters: cm(a.distance),
         avg_heart_rate: a.avgHr ?? null,
         max_heart_rate: a.maxHr ?? null,
-        avg_speed: speed(a.avgSpeed),
-        max_speed: speed(a.maxSpeed),
+        avg_speed: speed(a.avgSpeed) ?? (a.distance != null && a.duration ? (cm(a.distance)! / 1000) / (Number(a.duration) / 3600000) : fit?.avg_speed ?? null),
+        max_speed: speed(a.maxSpeed) ?? fit?.max_speed ?? null,
         avg_power: a.avgPower ?? null,
         max_power: a.maxPower ?? null,
         avg_cadence: cadence(a),
@@ -209,10 +212,10 @@ export async function importGarminExport(
         training_effect: a.aerobicTrainingEffect ?? null,
         training_load: a.activityTrainingLoad ?? null,
         total_steps: a.steps ? Math.round(a.steps) : null,
-        latitude: a.startLatitude ?? null,
-        longitude: a.startLongitude ?? null,
+        latitude: a.startLatitude ?? gpsTrack[0]?.lat ?? null,
+        longitude: a.startLongitude ?? gpsTrack[0]?.lng ?? null,
         source_file: `garmin-export:${a.activityId}`,
-        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a },
+        raw_data: { source: "garmin-export", activityId: a.activityId, name: a.name, garmin: a, gps_track: gpsTrack },
 
       };
     }).filter((r) => r.start_time);
