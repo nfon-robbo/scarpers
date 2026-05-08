@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
+import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -24,8 +25,8 @@ const UploadPage = () => {
     if (!user || files.length === 0) return;
 
     const totalSize = files.reduce((s, f) => s + f.size, 0);
-    if (totalSize > 100 * 1024 * 1024) {
-      toast({ title: "Files too large", description: "Maximum total size is 100MB.", variant: "destructive" });
+    if (totalSize > 500 * 1024 * 1024) {
+      toast({ title: "Files too large", description: "Maximum total size is 500MB.", variant: "destructive" });
       return;
     }
 
@@ -43,6 +44,43 @@ const UploadPage = () => {
     setResult(null);
     setSavedCount(0);
 
+    // Detect Garmin Connect data export ZIPs and route to dedicated importer
+    const garminZips: File[] = [];
+    const fitZips: File[] = [];
+    for (const z of zipFiles) {
+      if (await isGarminExportZip(z)) garminZips.push(z); else fitZips.push(z);
+    }
+
+    if (garminZips.length) {
+      setState("parsing");
+      try {
+        let totalActs = 0, totalDaily = 0, totalSleep = 0;
+        const errs: string[] = [];
+        for (const gz of garminZips) {
+          const res = await importGarminExport(gz, user.id, (p) => {
+            if (p.total) setProgress(Math.min(95, 30 + Math.round((p.current || 0) / p.total * 60)));
+          });
+          totalActs += res.activities.inserted;
+          totalDaily += res.dailyMetrics.inserted;
+          totalSleep += res.sleepDays;
+          errs.push(...res.errors);
+        }
+        setProgress(100);
+        setSavedCount(totalActs);
+        setResult({ activities: [], errors: errs, fileCount: garminZips.length } as any);
+        setState(errs.length ? "error" : "done");
+        toast({
+          title: "Garmin import complete",
+          description: `${totalActs} activities, ${totalDaily} wellness days, ${totalSleep} sleep nights imported.`,
+        });
+      } catch (e: any) {
+        setState("error");
+        toast({ title: "Garmin import failed", description: e.message, variant: "destructive" });
+        return;
+      }
+      if (!fitZips.length && !fitFiles.length) return;
+    }
+
     try {
       setState("parsing");
       setProgress(30);
@@ -52,8 +90,8 @@ const UploadPage = () => {
       const allErrors: string[] = [];
       let totalFileCount = 0;
 
-      // Parse ZIP files
-      for (const zipFile of zipFiles) {
+      // Parse ZIP files (FIT-only zips)
+      for (const zipFile of fitZips) {
         const r = await parseZipFile(zipFile);
         allActivities.push(...r.activities);
         allErrors.push(...r.errors);
@@ -185,7 +223,7 @@ const UploadPage = () => {
             >
               <FileArchive className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium mb-1">Drop your files here</p>
-              <p className="text-sm text-muted-foreground mb-4">.fit files or .zip archives</p>
+              <p className="text-sm text-muted-foreground mb-4">.fit files, .zip archives, or a Garmin Connect data export</p>
               <Button variant="outline" asChild>
                 <span>Select Files</span>
               </Button>
