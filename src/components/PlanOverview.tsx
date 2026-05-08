@@ -182,42 +182,9 @@ export default function PlanOverview({
   const todayIsCompleted = completedDates.has(todayKey);
   const todayActivity = linkedActivities[todayKey];
 
-  const openWorkoutReview = async () => {
+  const openWorkoutReview = () => {
     if (!todayWorkout || !todayActivity) return;
     setReviewDialogOpen(true);
-    setReviewContent("");
-    setReviewLoading(true);
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setReviewLoading(false); return; }
-
-    // Build activity summary
-    const distKm = todayActivity.distance_meters ? (todayActivity.distance_meters / 1000).toFixed(2) : "N/A";
-    const durMin = todayActivity.duration_seconds ? Math.round(todayActivity.duration_seconds / 60) : "N/A";
-    const avgHr = todayActivity.avg_heart_rate || "N/A";
-    const maxHr = todayActivity.max_heart_rate || "N/A";
-    const avgCad = todayActivity.avg_cadence || "N/A";
-    const cals = todayActivity.calories || "N/A";
-    const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
-
-    // Build planned workout summary
-    let plannedWorkout = todayWorkout.title + "\n";
-    if (todayWorkout.segments.length > 0) {
-      for (const s of todayWorkout.segments) {
-        plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
-      }
-    }
-
-    let accumulated = "";
-    streamAICoach({
-      type: "workout-review",
-      token: session.access_token,
-      activitySummary,
-      plannedWorkout,
-      onDelta: (text) => { accumulated += text; setReviewContent(accumulated); },
-      onDone: () => { setReviewLoading(false); },
-      onError: () => { setReviewLoading(false); setReviewContent("Unable to generate review. Please try again."); },
-    });
   };
 
   if (!planDates) return null;
