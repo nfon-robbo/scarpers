@@ -405,30 +405,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ====== ON YOUR WATCH ====== */}
-      <section className="relative bg-card/40 border-y border-border/40">
-        <div className="absolute inset-0 -z-0 opacity-40 pointer-events-none" style={{
-          backgroundImage: "radial-gradient(circle at 20% 30%, hsl(var(--primary) / 0.18) 0%, transparent 45%), radial-gradient(circle at 80% 70%, hsl(var(--accent) / 0.18) 0%, transparent 45%)",
-        }} />
-        <div className="relative max-w-6xl mx-auto px-5 py-24">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <SectionLabel>On Your Watch</SectionLabel>
-            <H2>Your AI plan, right on your wrist</H2>
-            <p className="mt-5 text-muted-foreground leading-relaxed">
-              Every Scarpers workout exports as a structured workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your wrist.
-            </p>
-          </div>
-          <div className="flex justify-center max-w-4xl mx-auto">
-            <WatchMockup
-              frame={watchFenix8}
-              frameAlt="Smartwatch showing a Scarpers workout"
-              screenIndex={watchScreenIdx}
-              screenStyle={FENIX8_SCREEN}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* ====== FEATURES — gradient band ====== */}
       <section id="features" className="relative border-y border-border/40 bg-gradient-to-b from-primary/10 via-card/40 to-accent/10">
         <div className="max-w-6xl mx-auto px-5 py-24">
