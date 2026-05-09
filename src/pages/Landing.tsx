@@ -195,6 +195,9 @@ const Landing = () => {
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra.
             </p>
+            <p className="mt-3 text-sm sm:text-base text-white/90 max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
+              Available on desktop, mobile and tablet.
+            </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
                 <Link to="/auth">Get Your Plan</Link>
