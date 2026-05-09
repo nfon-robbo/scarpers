@@ -170,10 +170,22 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 );
 
 const Landing = () => {
+  const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
   const [watchScreenIdx, setWatchScreenIdx] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  // If already logged in (e.g. PWA relaunch), jump straight to the app
+  useEffect(() => {
+    const isStandalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      // iOS Safari
+      (window.navigator as any).standalone === true;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && isStandalone) navigate("/dashboard", { replace: true });
+    });
+  }, [navigate]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
