@@ -379,6 +379,52 @@ When the user asks about a future or past session (e.g. "next Friday", "this Wed
         console.error("chat plan fetch error:", e);
       }
 
+      // Fetch latest readiness, Running IQ, recent analyses, and uploads so every model sees the full app picture
+      let chatExtraContext = "";
+      try {
+        const [readinessRes, runningIqRes, analysesRes, uploadsRes] = await Promise.all([
+          supabase.from("readiness_snapshots")
+            .select("score, factors, recorded_at, hour")
+            .eq("user_id", user.id)
+            .order("recorded_at", { ascending: false })
+            .limit(14),
+          supabase.from("running_iq_snapshots")
+            .select("score, adjusted_score, label, lowest_pillar, coaching_tip, pillars, recorded_at")
+            .eq("user_id", user.id)
+            .order("recorded_at", { ascending: false })
+            .limit(7),
+          supabase.from("analyses")
+            .select("content, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(3),
+          supabase.from("uploads")
+            .select("file_name, file_type, status, record_count, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
+
+        const unitsBlock = `\nUSER UNIT PREFERENCES: distance=${profile?.unit_distance || "km"}, speed=${profile?.unit_speed || "km/h"}, elevation=${profile?.unit_elevation || "m"}, temperature=${profile?.unit_temperature || "C"}, height=${profile?.unit_height || "cm"}, weight=${profile?.unit_weight || "kg"}. Always present numbers in these units.`;
+        const profileBlock = `\nPROFILE EXTRA: sex=${profile?.sex || "n/a"}, dob=${profile?.date_of_birth || "n/a"}, height_cm=${profile?.height_cm || "n/a"}, weight_kg=${profile?.weight_kg || "n/a"}.`;
+        const readinessBlock = readinessRes.data?.length
+          ? `\nREADINESS SNAPSHOTS (last ${readinessRes.data.length}):\n${JSON.stringify(readinessRes.data, null, 2)}`
+          : "";
+        const runningIqBlock = runningIqRes.data?.length
+          ? `\nRUNNING IQ SNAPSHOTS (last ${runningIqRes.data.length}, 0-200 scale, 5 pillars):\n${JSON.stringify(runningIqRes.data, null, 2)}`
+          : "";
+        const analysesBlock = analysesRes.data?.length
+          ? `\nRECENT AI ANALYSES (most recent first):\n${analysesRes.data.map((a: any) => `- ${a.created_at}: ${String(a.content).slice(0, 600)}`).join("\n")}`
+          : "";
+        const uploadsBlock = uploadsRes.data?.length
+          ? `\nRECENT UPLOADS / IMPORTS:\n${JSON.stringify(uploadsRes.data, null, 2)}`
+          : "";
+
+        chatExtraContext = unitsBlock + profileBlock + readinessBlock + runningIqBlock + analysesBlock + uploadsBlock;
+      } catch (e) {
+        console.error("chat extra context fetch error:", e);
+      }
+
       systemPrompt = `You are an elite RUNNING coach AI assistant. This is a running-only application.
 
 You have access to the athlete's complete training data. Use it to give personalized, data-driven answers.
