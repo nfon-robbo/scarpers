@@ -415,6 +415,14 @@ const AIChatbot = () => {
                       </div>
                     </div>
                   )}
+                  {showNoChange && (
+                    <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-1.5">
+                      <Check className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        No changes needed
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
