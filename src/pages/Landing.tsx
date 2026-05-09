@@ -46,19 +46,17 @@ const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%"
 function WatchMockup({
   frame,
   frameAlt,
-  modelLabel,
   screenIndex,
   screenStyle,
 }: {
   frame: string;
   frameAlt: string;
-  modelLabel: string;
   screenIndex: number;
   screenStyle: React.CSSProperties;
 }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[340px] aspect-square">
+      <div className="relative w-full max-w-[380px] aspect-square">
         <img
           src={frame}
           alt={frameAlt}
@@ -84,9 +82,6 @@ function WatchMockup({
           ))}
         </div>
       </div>
-      <p className="mt-4 text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">
-        {modelLabel}
-      </p>
     </div>
   );
 }
