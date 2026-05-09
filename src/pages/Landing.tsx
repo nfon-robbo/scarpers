@@ -22,7 +22,7 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
-import watchFr970 from "@/assets/watch-fr970.png";
+
 import watchFenix8 from "@/assets/watch-fenix8.png";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
 import watchScreen2 from "@/assets/watch-screens/screen2.png";
@@ -40,7 +40,7 @@ const WATCH_SCREENS = [
 ];
 
 // Circular screen position as % of frame image (1024x1024)
-const FR970_SCREEN = { top: "23.4%", left: "28.5%", width: "43%", height: "43%" };
+
 const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%" };
 
 function WatchMockup({
