@@ -25,13 +25,13 @@ const WALK_DURATION_SEC = 5 * 60; // 5:00
 export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
-  const hourMatch = duration.match(/([\d.]+)\s*h(?:r|our)?s?\b/i);
-  const minMatch = duration.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/i);
-  const secMatch = duration.match(/(\d+)\s*s(?:ec(?:ond)?s?)?\b/i);
+  const hourMatch = duration.match(/(\d+(?:\.\d+)?)\s*h(?:r|our)?s?\b/i);
+  const minMatch = duration.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?\b/i);
+  const secMatch = duration.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?\b/i);
   let total = 0;
   if (hourMatch) total += parseFloat(hourMatch[1]) * 3600;
-  if (minMatch) total += parseInt(minMatch[1], 10) * 60;
-  if (secMatch) total += parseInt(secMatch[1], 10);
+  if (minMatch) total += parseFloat(minMatch[1]) * 60;
+  if (secMatch) total += parseFloat(secMatch[1]);
   if (total === 0) {
     const kmMatch = duration.match(/([\d.]+)\s*km/i);
     if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
