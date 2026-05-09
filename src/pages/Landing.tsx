@@ -39,8 +39,8 @@ const WATCH_SCREENS = [
   watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
 ];
 
-// Circular screen position as % of frame image (600x600)
-const FENIX8_SCREEN = { top: "22.2%", left: "26.7%", width: "46.0%", height: "44.0%" };
+// Circular screen position as % of frame image (1024x1536)
+const FENIX8_SCREEN = { top: "22.2%", left: "18.1%", width: "63.9%", height: "42.6%" };
 
 function WatchMockup({
   frame,
@@ -55,12 +55,12 @@ function WatchMockup({
 }) {
   return (
     <div className="flex w-full flex-col items-center">
-      <div className="relative w-[min(50vw,320px)]" style={{ aspectRatio: "1 / 1" }}>
+      <div className="relative w-[min(40vw,260px)]" style={{ aspectRatio: "1024 / 1536" }}>
         <img
           src={frame}
           alt={frameAlt}
-          width={600}
-          height={600}
+          width={1024}
+          height={1536}
           loading="lazy"
           className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
         />
