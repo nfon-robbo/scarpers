@@ -20,11 +20,10 @@ import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunner from "@/assets/hero-runner.jpg";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
-import heroFeetVideo from "@/assets/hero-feet.mp4.asset.json";
-import heroMarathonVideo from "@/assets/hero-marathon.mp4.asset.json";
+import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
+import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
 
 const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
-const HERO_INTERVAL_MS = 3333;
 
 const FAQS = [
   {
