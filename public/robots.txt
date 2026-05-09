@@ -1,14 +1,13 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Scarpers robots.txt
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /upload
+Disallow: /activities
+Disallow: /insights
+Disallow: /training-plan
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /auth
+
+Sitemap: https://www.scarpers.co.uk/sitemap.xml
