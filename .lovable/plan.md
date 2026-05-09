@@ -1,27 +1,31 @@
-## Goal
-Replace the hero image carousel with a generated video clip of a plus-size woman running on a residential street, glancing at her watch.
+## Problem
 
-## Step 1 — Generate the video
-Use `videogen` to create a 10s, 1080p, 16:9 MP4.
+When we export workouts to Garmin (.fit), the rest/recovery steps are being sent with a pace target of "9:25/km" (walk pace). The user compared with another app that sends:
 
-**Prompt:**
-> Cinematic side-tracking shot of a plus-size woman in her 30s jogging down a quiet tree-lined residential street, wearing modern running clothes (leggings, fitted top) and trainers. Determined expression, breathing steady. Around the 4-second mark she briefly glances down at her sports watch on her left wrist, then looks back up and keeps running. Soft morning sunlight, warm cinematic colour grade, gentle handheld camera, shallow depth of field, realistic body proportions, motivational tone.
+- **Warm up** — no target
+- **Run** — with target (correct, leave alone)
+- **Rest** — no target (ours wrongly sets walk pace)
+- **Cool down** — no target
 
-Saved to `src/assets/hero-runner.mp4`.
+Our current behaviour lives in `src/lib/intervals-workout-fit.ts`. In `buildSpeedFitStep` we detect warmup/cooldown/recovery/rest and force their pace to `9:25/km`, then still build a SPEED-target step. That's why the watch shows a pace target on what should be open steps.
 
-## Step 2 — Swap carousel for video in `src/pages/Landing.tsx`
-- Remove the `HERO_IMAGES` array, `heroIdx` state, and the rotating `setInterval` effect.
-- Remove the four imported runner images (`heroRunner`, `heroRunner2/3/4`).
-- Import the new MP4 and render a single `<video>` with `autoPlay muted loop playsInline preload="auto"` and a poster (still frame from the first hero image kept as fallback) covering the same `absolute inset-0` slot.
-- Keep the existing black overlay and gradient overlays so the white headline stays readable.
-- Keep the white `<h1>` and subtitle styling untouched.
+Also `parseTextStep` rewrites walk lines to "Recovery" but still routes them through the speed step builder if a pace is present in the text.
 
-## Step 3 — Verify
-- Confirm the video renders full-bleed behind the hero.
-- Confirm the overlay still gives enough contrast for "Free AI Running Plan" + subtitle.
-- Confirm there are no leftover references to the removed image imports.
+## Fix
 
-## Notes
-- Video will be ~5–10 MB at 1080p/10s; acceptable for a hero. If too heavy we can drop to 480p in a follow-up.
-- The video loops silently — no audio track is used.
-- Old runner images stay in `src/assets/` only if reused elsewhere; otherwise they can be deleted in a follow-up.
+In `src/lib/intervals-workout-fit.ts`:
+
+1. **`buildSpeedFitStep`**: if intensity is `warmup`, `cooldown`, `recovery`, or `rest`, return an **open** step (no target) instead of a speed-target step. Use the existing `buildOpenStep` with a sensible label (e.g. "Warm up", "Cool down", "Recover").
+2. **`buildFitStep`** (HR-target branch used when API steps lack pace): same treatment — for warmup/cooldown/recovery/rest, return an open step instead of an HR-target step, so the watch shows no target on rests regardless of source.
+3. **`parseTextStep`**: when the line is a walk or the resolved intensity is non-active, skip target parsing entirely and return an open step using just the duration.
+4. Remove the now-unused "9:25/km fallback pace" branch in `buildSpeedFitStep`.
+
+Active/interval steps keep their pace or HR target exactly as today — only the non-working steps become open.
+
+## Files touched
+
+- `src/lib/intervals-workout-fit.ts` — only file affected. No DB / edge function / UI changes.
+
+## Verification
+
+- Re-export a known interval workout to .fit; inspect with the existing FIT decoding (or push to the watch) and confirm warm up / rest / cool down show **No Target**, while the work intervals keep their pace target.
