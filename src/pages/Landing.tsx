@@ -112,18 +112,12 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
-  const [heroFading, setHeroFading] = useState(false);
 
   useEffect(() => {
-    const fadeTimer = window.setInterval(() => setHeroFading(true), HERO_INTERVAL_MS - 280);
     const swapTimer = window.setInterval(() => {
       setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
-      setHeroFading(false);
     }, HERO_INTERVAL_MS);
-    return () => {
-      window.clearInterval(fadeTimer);
-      window.clearInterval(swapTimer);
-    };
+    return () => window.clearInterval(swapTimer);
   }, []);
 
   useEffect(() => {
@@ -174,7 +168,7 @@ const Landing = () => {
             playsInline
             preload="auto"
             aria-hidden="true"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${heroFading ? "opacity-0" : "opacity-100"}`}
+            className="absolute inset-0 w-full h-full object-cover"
           />
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
