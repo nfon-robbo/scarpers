@@ -23,7 +23,7 @@ import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
 
-import watchFenix8 from "@/assets/watch-mockup.png";
+import watchFenix8 from "@/assets/watch-frame.png";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
 import watchScreen2 from "@/assets/watch-screens/screen2.png";
 import watchScreen3 from "@/assets/watch-screens/screen3.png";
@@ -39,8 +39,8 @@ const WATCH_SCREENS = [
   watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
 ];
 
-// Circular screen position as % of frame image (726x1000)
-const FENIX8_SCREEN = { top: "20.6%", left: "17%", width: "65.7%", height: "47.7%" };
+// Circular screen position as % of frame image (1024x1536)
+const FENIX8_SCREEN = { top: "26.7%", left: "25.6%", width: "48.8%", height: "32.6%" };
 
 function WatchMockup({
   frame,
@@ -55,12 +55,12 @@ function WatchMockup({
 }) {
   return (
     <div className="flex w-full flex-col items-center">
-      <div className="relative w-[min(76vw,360px)]" style={{ aspectRatio: "726 / 1000" }}>
+      <div className="relative w-[min(40vw,260px)]" style={{ aspectRatio: "1024 / 1536" }}>
         <img
           src={frame}
           alt={frameAlt}
-          width={726}
-          height={1000}
+          width={1024}
+          height={1536}
           loading="lazy"
           className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
         />
@@ -338,13 +338,11 @@ const Landing = () => {
               </div>
             </div>
             <div className="order-1 md:order-2 flex justify-center">
-              <img
-                src={watchFenix8}
-                alt="Smartwatch showing a Scarpers workout"
-                width={510}
-                height={486}
-                loading="lazy"
-                className="w-[min(38vw,255px)] h-auto object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
+              <WatchMockup
+                frame={watchFenix8}
+                frameAlt="Smartwatch showing a Scarpers workout"
+                screenIndex={watchScreenIdx}
+                screenStyle={FENIX8_SCREEN}
               />
             </div>
           </div>
