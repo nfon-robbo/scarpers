@@ -347,7 +347,38 @@ ${today_workout || "No workout found for today."}
 Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
 
     } else if (type === "chat") {
-      // chatMessages already parsed above from the original req.json(), so re-read from body params
+      // Fetch the user's active training plan so chat answers reference real scheduled sessions
+      let chatPlanContext = "";
+      try {
+        const { data: activePlan } = await supabase
+          .from("training_plans")
+          .select("content, start_date, race_date, race_distance, goal_time, training_days")
+          .eq("user_id", user.id)
+          .eq("archived", false)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activePlan?.content) {
+          const today = new Date();
+          const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+          chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
+- Start date: ${activePlan.start_date || "n/a"}
+- Race date: ${activePlan.race_date || "n/a"}
+- Race distance: ${activePlan.race_distance || "n/a"}
+- Goal time: ${activePlan.goal_time || "n/a"}
+- Training days: ${(activePlan.training_days || []).join(", ") || "n/a"}
+
+PLAN CONTENT (markdown):
+${activePlan.content}
+
+When the user asks about a future or past session (e.g. "next Friday", "this Wednesday", "16/05/2026"), look it up in the plan content above and answer with the actual scheduled workout. Never claim you don't have access to the plan — it is provided here.`;
+        } else {
+          chatPlanContext = `\nACTIVE TRAINING PLAN: none (the user has no active training plan). If they ask about a scheduled session, tell them they don't have an active plan yet.`;
+        }
+      } catch (e) {
+        console.error("chat plan fetch error:", e);
+      }
+
       systemPrompt = `You are an elite RUNNING coach AI assistant. This is a running-only application.
 
 You have access to the athlete's complete training data. Use it to give personalized, data-driven answers.
