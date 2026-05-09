@@ -875,6 +875,14 @@ const TrainingPlanPage = () => {
         const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         return ds === singleDate;
       });
+    } else {
+      // Skip workouts that already have a linked completed activity — no point
+      // pushing them to Intervals/Garmin again.
+      withSegments = withSegments.filter(w => {
+        const d = w.dateObj!;
+        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return !completedDates.has(ds);
+      });
     }
     if (withSegments.length === 0) {
       toast({ title: "No structured workouts found", description: "The plan needs workout tables with Segment/Duration/HR Zone columns.", variant: "destructive" });
