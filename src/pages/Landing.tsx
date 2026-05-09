@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,10 +111,41 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
+  const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  const handleHeroEnded = () => {
-    setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
+  const handleHeroEnded = (endedIndex: number) => {
+    if (endedIndex !== heroIdx) return;
+
+    const nextIndex = (endedIndex + 1) % HERO_VIDEOS.length;
+    const nextVideo = heroVideoRefs.current[nextIndex];
+
+    const showNextVideo = () => {
+      if (nextVideo) {
+        nextVideo.currentTime = 0;
+        void nextVideo.play().catch(() => undefined);
+      }
+      setHeroIdx(nextIndex);
+    };
+
+    if (!nextVideo || nextVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      showNextVideo();
+      return;
+    }
+
+    nextVideo.addEventListener("canplay", showNextVideo, { once: true });
+    nextVideo.load();
   };
+
+  useEffect(() => {
+    heroVideoRefs.current.forEach((video, index) => {
+      if (!video) return;
+      if (index === heroIdx) {
+        void video.play().catch(() => undefined);
+      } else {
+        video.pause();
+      }
+    });
+  }, [heroIdx]);
 
   useEffect(() => {
     document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
@@ -154,18 +185,20 @@ const Landing = () => {
       <section className="relative isolate min-h-screen flex flex-col overflow-hidden">
         {/* Background video + overlays */}
         <div className="absolute inset-0 z-0 bg-background">
-          <video
-            key={heroIdx}
-            src={HERO_VIDEOS[heroIdx]}
-            
-            autoPlay
-            muted
-            playsInline
-            preload="auto"
-            onEnded={handleHeroEnded}
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          {HERO_VIDEOS.map((src, index) => (
+            <video
+              key={src}
+              ref={(node) => { heroVideoRefs.current[index] = node; }}
+              src={src}
+              autoPlay={index === 0}
+              muted
+              playsInline
+              preload="auto"
+              onEnded={() => handleHeroEnded(index)}
+              aria-hidden="true"
+              className={`absolute inset-0 w-full h-full object-cover ${index === heroIdx ? "opacity-100" : "opacity-0"}`}
+            />
+          ))}
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background/45 via-background/5 to-transparent pointer-events-none" />
