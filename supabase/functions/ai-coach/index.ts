@@ -375,7 +375,10 @@ RECOMMENDATION ACTIONS:
   • [[ACTION:plan]]              ← use this ONLY when the change requires rewriting multiple weeks/sessions of the plan (e.g. "reduce overall volume across the next 4 weeks").
 - Default to [[ACTION:day:...]] whenever possible. Only use [[ACTION:plan]] when a single-day edit cannot capture the change.
 - Do NOT include any marker for general advice, education, or questions that don't change the plan.
-- CRITICAL: Only emit a marker if you are PROPOSING A CONCRETE EDIT to a workout (e.g. "swap to easy run", "cut to 20 minutes", "reduce reps to 4"). If your reply only ANALYSES, REASSURES, or CONCLUDES the workout was fine/appropriate/well-managed/no change needed, DO NOT emit any marker. Examples that must NOT have a marker: "The intensity was appropriate", "This looks well-managed", "You're on track", "No change needed", any post-hoc analysis of a completed workout the user is asking about.
+- CRITICAL: Only emit a marker if you are PROPOSING A CONCRETE EDIT to a workout using explicit edit wording such as "swap", "replace", "cut", "reduce", "shorten", "postpone", "move", "skip", "add", or "change".
+- If your reply only ANALYSES, REASSURES, or CONCLUDES the workout was fine/appropriate/well-managed/no change needed, DO NOT emit any marker — even if you give advice such as softer surfaces, cadence cues, recovery, fuelling, hydration, or monitoring symptoms.
+- For questions like "Is it too intense?", "Was that okay?", "How did my workout go?", or any post-hoc review of a completed workout, NEVER emit an action marker unless you explicitly tell the user a future planned workout should be changed.
+- Examples that must NOT have a marker: "The intensity was appropriate", "This looks well-managed", "You're on track", "No change needed", "continue prioritising soft surfaces", "monitor your knee", "keep cadence light".
 - Never wrap the marker in code fences. Always plain text on the last line.
 
 CONVERSATION CONTEXT (CRITICAL):
