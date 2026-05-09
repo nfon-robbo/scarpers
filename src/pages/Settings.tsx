@@ -294,6 +294,7 @@ const Settings = () => {
   const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
   const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
   const [savingAi, setSavingAi] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
