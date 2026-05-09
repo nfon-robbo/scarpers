@@ -322,7 +322,7 @@ const Landing = () => {
         }} />
         <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28">
           <div className="grid md:grid-cols-2 gap-12 md:gap-8 items-center">
-            <div className="order-2 md:order-1">
+            <div className="order-1 md:order-1">
               <SectionLabel>On Your Watch</SectionLabel>
               <h2 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 Your AI plan,<br />
@@ -337,7 +337,7 @@ const Landing = () => {
                 </Button>
               </div>
             </div>
-            <div className="order-1 md:order-2 flex justify-center">
+            <div className="order-2 md:order-2 flex justify-center">
               <WatchMockup
                 frame={watchFenix8}
                 frameAlt="Smartwatch showing a Scarpers workout"
