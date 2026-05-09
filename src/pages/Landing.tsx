@@ -22,8 +22,74 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
+import watchFr970 from "@/assets/watch-fr970.png";
+import watchFenix8 from "@/assets/watch-fenix8.png";
+import watchScreen1 from "@/assets/watch-screens/screen1.png";
+import watchScreen2 from "@/assets/watch-screens/screen2.png";
+import watchScreen3 from "@/assets/watch-screens/screen3.png";
+import watchScreen4 from "@/assets/watch-screens/screen4.png";
+import watchScreen5 from "@/assets/watch-screens/screen5.png";
+import watchScreen6 from "@/assets/watch-screens/screen6.png";
+import watchScreen7 from "@/assets/watch-screens/screen7.png";
+import watchScreen8 from "@/assets/watch-screens/screen8.png";
 
 const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
+
+const WATCH_SCREENS = [
+  watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
+];
+
+// Circular screen position as % of frame image (1024x1024)
+const FR970_SCREEN = { top: "23.4%", left: "28.5%", width: "43%", height: "43%" };
+const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%" };
+
+function WatchMockup({
+  frame,
+  frameAlt,
+  modelLabel,
+  screenIndex,
+  screenStyle,
+}: {
+  frame: string;
+  frameAlt: string;
+  modelLabel: string;
+  screenIndex: number;
+  screenStyle: React.CSSProperties;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-full max-w-[340px] aspect-square">
+        <img
+          src={frame}
+          alt={frameAlt}
+          width={1024}
+          height={1024}
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
+        />
+        <div
+          className="absolute overflow-hidden rounded-full bg-black"
+          style={screenStyle}
+        >
+          {WATCH_SCREENS.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              aria-hidden={i !== screenIndex}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                i === screenIndex ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+      <p className="mt-4 text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">
+        {modelLabel}
+      </p>
+    </div>
+  );
+}
 
 const FAQS = [
   {
