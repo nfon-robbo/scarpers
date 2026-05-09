@@ -130,6 +130,10 @@ function buildSpeedFitStep(durationMs: number, pace: string, intensity: string):
 }
 
 function buildFitStep(durationMs: number, hrLow: number, hrHigh: number, intensity: string): WorkoutStep {
+  const normalized = (intensity || "").toLowerCase();
+  if (["warmup", "cooldown", "recovery", "rest"].includes(normalized)) {
+    return buildOpenStep(durationMs, intensity, "");
+  }
   return {
     name: stepName(intensity, `${hrLow}-${hrHigh} bpm`),
     intensity: toFitIntensity(intensity),
