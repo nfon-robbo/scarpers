@@ -338,13 +338,11 @@ const Landing = () => {
               </div>
             </div>
             <div className="order-1 md:order-2 flex justify-center">
-              <img
-                src={watchFenix8}
-                alt="Smartwatch showing a Scarpers workout"
-                width={510}
-                height={486}
-                loading="lazy"
-                className="w-[min(38vw,255px)] h-auto object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
+              <WatchMockup
+                frame={watchFenix8}
+                frameAlt="Smartwatch showing a Scarpers workout"
+                screenIndex={watchScreenIdx}
+                screenStyle={FENIX8_SCREEN}
               />
             </div>
           </div>
