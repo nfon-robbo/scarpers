@@ -492,7 +492,7 @@ const Landing = () => {
       </section>
 
       {/* ====== FAQ — tinted card band ====== */}
-      <section id="faq" className="bg-card/40 border-y border-border/40">
+      <section id="faq" className="bg-gradient-to-b from-background via-card/70 to-background border-y border-border/60">
         <div className="max-w-3xl mx-auto px-5 py-24">
           <div className="text-center mb-14">
             <SectionLabel>FAQ</SectionLabel>
