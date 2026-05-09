@@ -23,7 +23,7 @@ import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
 
-import watchFenix8 from "@/assets/watch-fenix8.webp";
+import watchFenix8 from "@/assets/watch-mockup.png";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
 import watchScreen2 from "@/assets/watch-screens/screen2.png";
 import watchScreen3 from "@/assets/watch-screens/screen3.png";
@@ -338,11 +338,13 @@ const Landing = () => {
               </div>
             </div>
             <div className="order-1 md:order-2 flex justify-center">
-              <WatchMockup
-                frame={watchFenix8}
-                frameAlt="Smartwatch showing a Scarpers workout"
-                screenIndex={watchScreenIdx}
-                screenStyle={FENIX8_SCREEN}
+              <img
+                src={watchFenix8}
+                alt="Smartwatch showing a Scarpers workout"
+                width={510}
+                height={486}
+                loading="lazy"
+                className="w-[min(38vw,255px)] h-auto object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
               />
             </div>
           </div>
