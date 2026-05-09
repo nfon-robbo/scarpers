@@ -55,12 +55,12 @@ function WatchMockup({
 }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[380px] aspect-square">
+      <div className="relative w-full max-w-[360px]" style={{ aspectRatio: "726 / 1000" }}>
         <img
           src={frame}
           alt={frameAlt}
-          width={1024}
-          height={1024}
+          width={726}
+          height={1000}
           loading="lazy"
           className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
         />
