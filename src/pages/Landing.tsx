@@ -22,7 +22,7 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
-import watchFr970 from "@/assets/watch-fr970.png";
+
 import watchFenix8 from "@/assets/watch-fenix8.png";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
 import watchScreen2 from "@/assets/watch-screens/screen2.png";
@@ -40,25 +40,23 @@ const WATCH_SCREENS = [
 ];
 
 // Circular screen position as % of frame image (1024x1024)
-const FR970_SCREEN = { top: "23.4%", left: "28.5%", width: "43%", height: "43%" };
+
 const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%" };
 
 function WatchMockup({
   frame,
   frameAlt,
-  modelLabel,
   screenIndex,
   screenStyle,
 }: {
   frame: string;
   frameAlt: string;
-  modelLabel: string;
   screenIndex: number;
   screenStyle: React.CSSProperties;
 }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[340px] aspect-square">
+      <div className="relative w-full max-w-[380px] aspect-square">
         <img
           src={frame}
           alt={frameAlt}
@@ -84,9 +82,6 @@ function WatchMockup({
           ))}
         </div>
       </div>
-      <p className="mt-4 text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">
-        {modelLabel}
-      </p>
     </div>
   );
 }
@@ -421,22 +416,14 @@ const Landing = () => {
             <SectionLabel>On Your Watch</SectionLabel>
             <H2>Your AI plan, right on your wrist</H2>
             <p className="mt-5 text-muted-foreground leading-relaxed">
-              Every Scarpers workout exports as a structured Garmin workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your Forerunner or Fenix.
+              Every Scarpers workout exports as a structured workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your wrist.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-6 items-end max-w-4xl mx-auto">
-            <WatchMockup
-              frame={watchFr970}
-              frameAlt="Garmin Forerunner 970 showing a Scarpers workout"
-              modelLabel="Forerunner 970"
-              screenIndex={watchScreenIdx}
-              screenStyle={FR970_SCREEN}
-            />
+          <div className="flex justify-center max-w-4xl mx-auto">
             <WatchMockup
               frame={watchFenix8}
-              frameAlt="Garmin Fenix 8 showing a Scarpers workout"
-              modelLabel="Fenix 8"
-              screenIndex={(watchScreenIdx + 4) % WATCH_SCREENS.length}
+              frameAlt="Smartwatch showing a Scarpers workout"
+              screenIndex={watchScreenIdx}
               screenStyle={FENIX8_SCREEN}
             />
           </div>
