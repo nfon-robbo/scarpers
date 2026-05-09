@@ -489,7 +489,23 @@ ${dataContext}
 ${chatPlanContext}
 ${chatExtraContext}`;
 
-      userPrompt = chatMessages || "Hello, I'd like some coaching advice.";
+      // Resolve bare weekday names in the user's message to explicit dates so
+      // the model can't hallucinate (e.g. "Friday" said on Saturday 09/05/2026
+      // must mean 15/05/2026, not 10/05/2026 which is Sunday).
+      const resolveWeekdays = (text: string): string => {
+        if (!text) return text;
+        const today = new Date();
+        const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+        const fmt = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        return text.replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, (match) => {
+          const idx = dayNames.indexOf(match.toLowerCase());
+          if (idx < 0) return match;
+          const diff = (idx - today.getDay() + 7) % 7 || 7;
+          const next = new Date(today); next.setDate(today.getDate() + diff);
+          return `${match} (${fmt(next)})`;
+        });
+      };
+      userPrompt = resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
