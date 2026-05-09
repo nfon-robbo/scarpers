@@ -294,6 +294,7 @@ const Settings = () => {
   const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
   const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
   const [savingAi, setSavingAi] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -313,6 +314,10 @@ const Settings = () => {
       if (settings) {
         setAiProvider(((settings as any).ai_provider as "lovable" | "claude") ?? "lovable");
         setClaudeModel((settings as any).claude_model ?? "claude-haiku-4-5");
+      }
+      if (roleRow) {
+        const { data: count } = await supabase.rpc("get_user_count" as any);
+        if (typeof count === "number") setUserCount(count);
       }
     })();
   }, [user]);
@@ -502,6 +507,10 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+              <span className="text-sm text-muted-foreground">Registered users</span>
+              <span className="text-sm font-semibold">{userCount ?? "—"}</span>
+            </div>
             <div className="space-y-2">
               <Label>Provider</Label>
               <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as "lovable" | "claude")}>
