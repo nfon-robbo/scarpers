@@ -195,21 +195,32 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     const n = step.intensity.toLowerCase();
     if (n === "warmup") return "Warm up";
     if (n === "cooldown") return "Cool down";
-    if (n === "recovery" || n === "rest") return "Recover";
+    if (n === "recovery" || n === "rest") return "Rest";
     if (n === "interval") return "Run";
     return "Steady";
+  }
+
+  function garminIntensity(step: WorkoutStep): string {
+    const n = step.intensity.toLowerCase();
+    if (n === "warmup") return "warmup";
+    if (n === "cooldown") return "cooldown";
+    if (n === "recovery" || n === "rest") return "rest";
+    return "active";
   }
 
   function fmtStep(step: WorkoutStep): string {
     // intervals.icu native syntax (per official docs): any text BEFORE the
     // duration becomes the step name (wktStepName on Garmin). Without it,
     // every step on the watch falls back to "Run".
+    // The explicit intensity= flag controls Garmin's actual step type:
+    // warmup / active (shown as Run) / rest / cooldown.
     //   - Warm up 10m 9:25-10:25/km Pace
     const pace = paceTarget(step);
     const name = stepLabel(step);
+    const intensity = `intensity=${garminIntensity(step)}`;
     return pace
-      ? `- ${name} ${fmtDur(step.duration)} ${pace}`
-      : `- ${name} ${fmtDur(step.duration)}`;
+      ? `- ${name} ${fmtDur(step.duration)} ${pace} ${intensity}`
+      : `- ${name} ${fmtDur(step.duration)} ${intensity}`;
   }
 
   const lines: string[] = [];
