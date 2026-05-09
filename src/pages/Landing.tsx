@@ -23,7 +23,7 @@ import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
 
-import watchFenix8 from "@/assets/watch-fenix8.png";
+import watchFenix8 from "@/assets/watch-fenix8.webp";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
 import watchScreen2 from "@/assets/watch-screens/screen2.png";
 import watchScreen3 from "@/assets/watch-screens/screen3.png";
@@ -39,9 +39,8 @@ const WATCH_SCREENS = [
   watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
 ];
 
-// Circular screen position as % of frame image (1024x1024)
-
-const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%" };
+// Circular screen position as % of frame image (726x1000)
+const FENIX8_SCREEN = { top: "23.7%", left: "17.9%", width: "64%", height: "46.5%" };
 
 function WatchMockup({
   frame,
@@ -56,12 +55,12 @@ function WatchMockup({
 }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[380px] aspect-square">
+      <div className="relative w-full max-w-[360px]" style={{ aspectRatio: "726 / 1000" }}>
         <img
           src={frame}
           alt={frameAlt}
-          width={1024}
-          height={1024}
+          width={726}
+          height={1000}
           loading="lazy"
           className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
         />
