@@ -40,7 +40,7 @@ const WATCH_SCREENS = [
 ];
 
 // Circular screen position as % of frame image (1024x1536)
-const FENIX8_SCREEN = { top: "26.7%", left: "25.6%", width: "48.8%", height: "32.6%" };
+const FENIX8_SCREEN = { top: "23.2%", left: "16.4%", width: "67.4%", height: "44.9%" };
 
 function WatchMockup({
   frame,
