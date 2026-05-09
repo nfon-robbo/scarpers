@@ -112,12 +112,9 @@ const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
 
-  useEffect(() => {
-    const swapTimer = window.setInterval(() => {
-      setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
-    }, HERO_INTERVAL_MS);
-    return () => window.clearInterval(swapTimer);
-  }, []);
+  const handleHeroEnded = () => {
+    setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
+  };
 
   useEffect(() => {
     document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
@@ -163,9 +160,9 @@ const Landing = () => {
             poster={heroRunner}
             autoPlay
             muted
-            loop
             playsInline
             preload="auto"
+            onEnded={handleHeroEnded}
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover"
           />
