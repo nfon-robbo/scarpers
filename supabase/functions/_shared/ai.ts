@@ -118,6 +118,7 @@ export async function callAI(opts: AICallOpts): Promise<Response> {
     headers: {
       Authorization: `Bearer ${lovableKey}`,
       "Content-Type": "application/json",
+      ...(stream ? { "Accept": "text/event-stream" } : {}),
     },
     body: JSON.stringify({
       model: opts.lovableModel || "google/gemini-3-flash-preview",
