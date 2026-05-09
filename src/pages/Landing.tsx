@@ -177,7 +177,15 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
+  const [watchScreenIdx, setWatchScreenIdx] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setWatchScreenIdx((i) => (i + 1) % WATCH_SCREENS.length);
+    }, 2200);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleHeroEnded = (endedIndex: number) => {
     if (endedIndex !== heroIdx) return;
