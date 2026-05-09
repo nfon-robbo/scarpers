@@ -416,22 +416,14 @@ const Landing = () => {
             <SectionLabel>On Your Watch</SectionLabel>
             <H2>Your AI plan, right on your wrist</H2>
             <p className="mt-5 text-muted-foreground leading-relaxed">
-              Every Scarpers workout exports as a structured Garmin workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your Forerunner or Fenix.
+              Every Scarpers workout exports as a structured workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your wrist.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-6 items-end max-w-4xl mx-auto">
-            <WatchMockup
-              frame={watchFr970}
-              frameAlt="Garmin Forerunner 970 showing a Scarpers workout"
-              modelLabel="Forerunner 970"
-              screenIndex={watchScreenIdx}
-              screenStyle={FR970_SCREEN}
-            />
+          <div className="flex justify-center max-w-4xl mx-auto">
             <WatchMockup
               frame={watchFenix8}
-              frameAlt="Garmin Fenix 8 showing a Scarpers workout"
-              modelLabel="Fenix 8"
-              screenIndex={(watchScreenIdx + 4) % WATCH_SCREENS.length}
+              frameAlt="Smartwatch showing a Scarpers workout"
+              screenIndex={watchScreenIdx}
               screenStyle={FENIX8_SCREEN}
             />
           </div>
