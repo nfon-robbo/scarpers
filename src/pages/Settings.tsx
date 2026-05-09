@@ -295,6 +295,27 @@ const Settings = () => {
   const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
   const [savingAi, setSavingAi] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [showEmails, setShowEmails] = useState(false);
+  const [userEmails, setUserEmails] = useState<{ email: string; created_at: string }[] | null>(null);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  const toggleEmails = async () => {
+    if (showEmails) { setShowEmails(false); return; }
+    if (!userEmails) {
+      setLoadingEmails(true);
+      try {
+        const { data, error } = await supabase.rpc("get_user_emails" as any);
+        if (error) throw error;
+        setUserEmails((data as any) || []);
+      } catch (e: any) {
+        toast({ title: "Failed to load emails", description: e.message, variant: "destructive" });
+        return;
+      } finally {
+        setLoadingEmails(false);
+      }
+    }
+    setShowEmails(true);
+  };
 
   useEffect(() => {
     (async () => {
@@ -507,9 +528,26 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
-              <span className="text-sm text-muted-foreground">Registered users</span>
-              <span className="text-sm font-semibold">{userCount ?? "—"}</span>
+            <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Registered users</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{userCount ?? "—"}</span>
+                  <Button size="sm" variant="ghost" onClick={toggleEmails} disabled={loadingEmails}>
+                    {loadingEmails ? <Loader2 className="w-3 h-3 animate-spin" /> : showEmails ? "Hide" : "Show"}
+                  </Button>
+                </div>
+              </div>
+              {showEmails && userEmails && (
+                <ul className="text-xs space-y-1 max-h-60 overflow-auto pt-1 border-t border-border/50">
+                  {userEmails.map((u, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span className="truncate">{u.email}</span>
+                      <span className="text-muted-foreground shrink-0">{new Date(u.created_at).toLocaleDateString("en-GB")}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Provider</Label>
