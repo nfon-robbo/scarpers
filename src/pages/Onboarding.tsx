@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ const loadState = (): Partial<OnboardingState> => {
 };
 
 const Onboarding = () => {
+  const { user, loading: authLoading } = useAuth();
   const initial = loadState();
   const [step, setStep] = useState<number>(initial.step ?? 0);
   // About you
@@ -145,6 +147,15 @@ const Onboarding = () => {
     if (step === 0) return name.trim().length > 0;
     return true;
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/auth" replace />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
