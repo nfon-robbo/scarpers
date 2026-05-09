@@ -366,7 +366,7 @@ const AIChatbot = () => {
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const isConcrete = isConcreteWorkoutEdit(cleaned);
             const showActions = hasAction && isConcrete && isLastAssistant && !loading;
-            const showNoChange = msg.role === "assistant" && !isConcrete && !hasUndo && cleaned.length > 0;
+            const showNoChange = hasAction && !isConcrete && isLastAssistant && !loading;
             const showUndo = hasUndo && isLastAssistant && !loading && !!lastUndo;
             const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
               ? { kind: "day", dateUk: dayMatch[1] }
