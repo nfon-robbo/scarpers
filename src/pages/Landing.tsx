@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,11 @@ import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunner from "@/assets/hero-runner.jpg";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
+import heroFeetVideo from "@/assets/hero-feet.mp4.asset.json";
+import heroMarathonVideo from "@/assets/hero-marathon.mp4.asset.json";
+
+const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
+const HERO_INTERVAL_MS = 3333;
 
 const FAQS = [
   {
@@ -106,27 +111,20 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const heroVideoRef = useRef<HTMLVideoElement | null>(null);
-  const [heroLoopFading, setHeroLoopFading] = useState(false);
+  const [heroIdx, setHeroIdx] = useState(0);
+  const [heroFading, setHeroFading] = useState(false);
 
-  const handleHeroVideoTimeUpdate = () => {
-    const video = heroVideoRef.current;
-    if (!video?.duration) return;
-
-    const shouldFade = video.currentTime >= video.duration - 0.85;
-    setHeroLoopFading((current) => (current === shouldFade ? current : shouldFade));
-  };
-
-  const handleHeroVideoEnded = () => {
-    const video = heroVideoRef.current;
-    if (!video) return;
-
-    setHeroLoopFading(true);
-    video.currentTime = 0;
-    void video.play();
-
-    window.setTimeout(() => setHeroLoopFading(false), 280);
-  };
+  useEffect(() => {
+    const fadeTimer = window.setInterval(() => setHeroFading(true), HERO_INTERVAL_MS - 280);
+    const swapTimer = window.setInterval(() => {
+      setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
+      setHeroFading(false);
+    }, HERO_INTERVAL_MS);
+    return () => {
+      window.clearInterval(fadeTimer);
+      window.clearInterval(swapTimer);
+    };
+  }, []);
 
   useEffect(() => {
     document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
@@ -167,17 +165,16 @@ const Landing = () => {
         {/* Background video + overlays */}
         <div className="absolute inset-0 z-0 bg-background">
           <video
-            ref={heroVideoRef}
-            src={heroRunnerVideo.url}
+            key={heroIdx}
+            src={HERO_VIDEOS[heroIdx]}
             poster={heroRunner}
             autoPlay
             muted
+            loop
             playsInline
             preload="auto"
-            onTimeUpdate={handleHeroVideoTimeUpdate}
-            onEnded={handleHeroVideoEnded}
             aria-hidden="true"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${heroLoopFading ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${heroFading ? "opacity-0" : "opacity-100"}`}
           />
         </div>
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/55 via-background/20 to-transparent pointer-events-none" />
