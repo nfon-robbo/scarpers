@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
-import heroRunner from "@/assets/hero-runner.jpg";
+
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
@@ -157,7 +157,7 @@ const Landing = () => {
           <video
             key={heroIdx}
             src={HERO_VIDEOS[heroIdx]}
-            poster={heroRunner}
+            
             autoPlay
             muted
             playsInline
