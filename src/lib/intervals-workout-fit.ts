@@ -108,14 +108,14 @@ function buildOpenStep(durationMs: number, intensity: string, label: string): Wo
 }
 
 function buildSpeedFitStep(durationMs: number, pace: string, intensity: string): WorkoutStep | null {
-  // Warmup/cooldown/recovery/rest get a fixed easy walking pace of 9:25/km
   const normalized = (intensity || "").toLowerCase();
-  const effectivePace = ["warmup", "cooldown", "recovery", "rest"].includes(normalized)
-    ? "9:25/km"
-    : pace;
-  const speed = paceToSpeedMps(effectivePace);
+  // Warmup/cooldown/recovery/rest get NO target — open step
+  if (["warmup", "cooldown", "recovery", "rest"].includes(normalized)) {
+    return buildOpenStep(durationMs, intensity, "");
+  }
+  const speed = paceToSpeedMps(pace);
   if (!speed) return null;
-  const targetPace = effectivePace.replace(/\s+/g, "").replace(/\s*Pace$/i, "");
+  const targetPace = pace.replace(/\s+/g, "").replace(/\s*Pace$/i, "");
   const speedFitValue = speed * 1000;
   return {
     name: stepName(intensity, targetPace),
