@@ -39,8 +39,8 @@ const WATCH_SCREENS = [
   watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
 ];
 
-// Circular screen position as % of frame image (1024x1536)
-const FENIX8_SCREEN = { top: "23.2%", left: "16.4%", width: "67.4%", height: "44.9%" };
+// Circular screen position as % of frame image (600x600)
+const FENIX8_SCREEN = { top: "22.2%", left: "26.7%", width: "46.0%", height: "44.0%" };
 
 function WatchMockup({
   frame,
