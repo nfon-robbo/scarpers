@@ -46,6 +46,7 @@ const loadState = (): Partial<OnboardingState> => {
 };
 
 const Onboarding = () => {
+  const { user, loading: authLoading } = useAuth();
   const initial = loadState();
   const [step, setStep] = useState<number>(initial.step ?? 0);
   // About you
