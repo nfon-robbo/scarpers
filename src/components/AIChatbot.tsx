@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { MessageCircle, Send, Loader2, X, Minimize2 } from "lucide-react";
+import { MessageCircle, Send, Loader2, X, Minimize2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
@@ -364,7 +364,9 @@ const AIChatbot = () => {
                   .trim()
               : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
-            const showActions = hasAction && isConcreteWorkoutEdit(cleaned) && isLastAssistant && !loading;
+            const isConcrete = isConcreteWorkoutEdit(cleaned);
+            const showActions = hasAction && isConcrete && isLastAssistant && !loading;
+            const showNoChange = hasAction && !isConcrete && isLastAssistant && !loading;
             const showUndo = hasUndo && isLastAssistant && !loading && !!lastUndo;
             const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
               ? { kind: "day", dateUk: dayMatch[1] }
@@ -411,6 +413,14 @@ const AIChatbot = () => {
                           Keep as it is
                         </Button>
                       </div>
+                    </div>
+                  )}
+                  {showNoChange && (
+                    <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-background/40 px-2.5 py-1.5">
+                      <Check className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        No changes needed
+                      </span>
                     </div>
                   )}
                 </div>
