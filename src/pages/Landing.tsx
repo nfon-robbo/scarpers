@@ -22,8 +22,74 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
+import watchFr970 from "@/assets/watch-fr970.png";
+import watchFenix8 from "@/assets/watch-fenix8.png";
+import watchScreen1 from "@/assets/watch-screens/screen1.png";
+import watchScreen2 from "@/assets/watch-screens/screen2.png";
+import watchScreen3 from "@/assets/watch-screens/screen3.png";
+import watchScreen4 from "@/assets/watch-screens/screen4.png";
+import watchScreen5 from "@/assets/watch-screens/screen5.png";
+import watchScreen6 from "@/assets/watch-screens/screen6.png";
+import watchScreen7 from "@/assets/watch-screens/screen7.png";
+import watchScreen8 from "@/assets/watch-screens/screen8.png";
 
 const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
+
+const WATCH_SCREENS = [
+  watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
+];
+
+// Circular screen position as % of frame image (1024x1024)
+const FR970_SCREEN = { top: "23.4%", left: "28.5%", width: "43%", height: "43%" };
+const FENIX8_SCREEN = { top: "26.4%", left: "28.8%", width: "42%", height: "42%" };
+
+function WatchMockup({
+  frame,
+  frameAlt,
+  modelLabel,
+  screenIndex,
+  screenStyle,
+}: {
+  frame: string;
+  frameAlt: string;
+  modelLabel: string;
+  screenIndex: number;
+  screenStyle: React.CSSProperties;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-full max-w-[340px] aspect-square">
+        <img
+          src={frame}
+          alt={frameAlt}
+          width={1024}
+          height={1024}
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_25px_45px_rgba(0,0,0,0.5)]"
+        />
+        <div
+          className="absolute overflow-hidden rounded-full bg-black"
+          style={screenStyle}
+        >
+          {WATCH_SCREENS.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              aria-hidden={i !== screenIndex}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+                i === screenIndex ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+      <p className="mt-4 text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">
+        {modelLabel}
+      </p>
+    </div>
+  );
+}
 
 const FAQS = [
   {
@@ -111,7 +177,15 @@ const H2 = ({ children }: { children: React.ReactNode }) => (
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
+  const [watchScreenIdx, setWatchScreenIdx] = useState(0);
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setWatchScreenIdx((i) => (i + 1) % WATCH_SCREENS.length);
+    }, 2200);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleHeroEnded = (endedIndex: number) => {
     if (endedIndex !== heroIdx) return;
@@ -333,6 +407,38 @@ const Landing = () => {
                 ))}
               </ul>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== ON YOUR WATCH ====== */}
+      <section className="relative bg-card/40 border-y border-border/40">
+        <div className="absolute inset-0 -z-0 opacity-40 pointer-events-none" style={{
+          backgroundImage: "radial-gradient(circle at 20% 30%, hsl(var(--primary) / 0.18) 0%, transparent 45%), radial-gradient(circle at 80% 70%, hsl(var(--accent) / 0.18) 0%, transparent 45%)",
+        }} />
+        <div className="relative max-w-6xl mx-auto px-5 py-24">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <SectionLabel>On Your Watch</SectionLabel>
+            <H2>Your AI plan, right on your wrist</H2>
+            <p className="mt-5 text-muted-foreground leading-relaxed">
+              Every Scarpers workout exports as a structured Garmin workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your Forerunner or Fenix.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-6 items-end max-w-4xl mx-auto">
+            <WatchMockup
+              frame={watchFr970}
+              frameAlt="Garmin Forerunner 970 showing a Scarpers workout"
+              modelLabel="Forerunner 970"
+              screenIndex={watchScreenIdx}
+              screenStyle={FR970_SCREEN}
+            />
+            <WatchMockup
+              frame={watchFenix8}
+              frameAlt="Garmin Fenix 8 showing a Scarpers workout"
+              modelLabel="Fenix 8"
+              screenIndex={(watchScreenIdx + 4) % WATCH_SCREENS.length}
+              screenStyle={FENIX8_SCREEN}
+            />
           </div>
         </div>
       </section>
