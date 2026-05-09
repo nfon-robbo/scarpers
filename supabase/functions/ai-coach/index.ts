@@ -1209,7 +1209,13 @@ ${upcoming.join("\n")}
       throw new Error("AI gateway error");
     }
 
-    return new Response(response.body, {
+    // Pipe upstream body through a passthrough TransformStream — this forces
+    // Deno Deploy / Supabase Edge to use chunked transfer encoding and flush
+    // each delta byte to the client immediately instead of buffering.
+    const { readable, writable } = new TransformStream();
+    response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
+
+    return new Response(readable, {
       headers: {
         ...corsHeaders,
         "Content-Type": "text/event-stream",

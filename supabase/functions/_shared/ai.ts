@@ -77,6 +77,7 @@ export async function callAI(opts: AICallOpts): Promise<Response> {
         "x-api-key": key,
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
+        ...(stream ? { "Accept": "text/event-stream" } : {}),
       },
       body: JSON.stringify(body),
     });
@@ -117,6 +118,7 @@ export async function callAI(opts: AICallOpts): Promise<Response> {
     headers: {
       Authorization: `Bearer ${lovableKey}`,
       "Content-Type": "application/json",
+      ...(stream ? { "Accept": "text/event-stream" } : {}),
     },
     body: JSON.stringify({
       model: opts.lovableModel || "google/gemini-3-flash-preview",
