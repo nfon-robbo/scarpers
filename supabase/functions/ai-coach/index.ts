@@ -1160,11 +1160,32 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
           // Drop the trailing user turn — we send it as the final userPrompt below.
           .slice(0, -1)
       : [];
+    // Universal date/time prelude — every AI call (chat, analysis, plan
+    // generation, day-ahead, review) gets the current date, time, weekday,
+    // and a forward-looking 14-day calendar so it can never hallucinate dates.
+    const nowPrelude = (() => {
+      const now = new Date();
+      const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+      const fmt = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+      const ukTime = now.toLocaleString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false });
+      const upcoming: string[] = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(now); d.setDate(now.getDate() + i);
+        upcoming.push(`  - ${i === 0 ? "Today" : i === 1 ? "Tomorrow" : `+${i}d`}: ${dayNames[d.getDay()]} ${fmt(d)}`);
+      }
+      return `CURRENT DATE & TIME (authoritative — never contradict this):
+- Now: ${dayNames[now.getDay()]} ${fmt(now)} ${ukTime} (Europe/London, UK format DD/MM/YYYY)
+- Upcoming 14 days:
+${upcoming.join("\n")}
+- When the user names a weekday without a date, resolve it against this calendar. Never guess a date.
+
+`;
+    })();
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: nowPrelude + systemPrompt },
         ...priorTurns,
         { role: "user", content: userPrompt },
       ],
