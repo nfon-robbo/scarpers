@@ -777,6 +777,13 @@ export type Database = {
         Returns: number
       }
       get_user_count: { Args: never; Returns: number }
+      get_user_emails: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
