@@ -2,7 +2,7 @@
   "name": "Scarpers — AI Running Coach",
   "short_name": "Scarpers",
   "description": "AI running coach with personalised training plans, FIT/Strava import, and readiness tracking.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
