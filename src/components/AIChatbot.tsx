@@ -21,6 +21,9 @@ const ACTION_MARKER_REGEX = /\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|reco
 
 const isConcreteWorkoutEdit = (text: string) => {
   const lower = text.toLowerCase();
+  if (/\b(no change needed|nothing needs to (?:be )?chang(?:e|ed)|do not change|don't change|wouldn't change|keep (?:it|the session|this) as (?:it is|planned)|intensity was appropriate|well-managed|not too intense)\b/.test(lower)) {
+    return false;
+  }
   return /\b(swap|replace|change|cut|reduce|shorten|postpone|move|reschedule|skip|remove|drop|add|extend|increase|scale|modify|convert|turn)\b/.test(lower)
     || /\b(rest day|easy run|walk-only|walk\/run|walk-run|fewer reps|less volume|lower intensity|make it shorter|make this shorter)\b/.test(lower);
 };
@@ -282,12 +285,13 @@ const AIChatbot = () => {
         copy[copy.length - 1] = { role: "assistant", content: finalContent };
         return copy;
       });
-    } catch (e: any) {
-      toast({ title: "Chat failed", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Request failed";
+      toast({ title: "Chat failed", description: message, variant: "destructive" });
     }
 
     setLoading(false);
-  }, [input, loading, toast]);
+  }, [input, loading, messages, toast]);
 
   if (!open) {
     return (
