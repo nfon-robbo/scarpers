@@ -54,8 +54,8 @@ function WatchMockup({
   screenStyle: React.CSSProperties;
 }) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[360px]" style={{ aspectRatio: "726 / 1000" }}>
+    <div className="flex w-full flex-col items-center">
+      <div className="relative w-[min(76vw,360px)]" style={{ aspectRatio: "726 / 1000" }}>
         <img
           src={frame}
           alt={frameAlt}
