@@ -316,7 +316,7 @@ const Landing = () => {
       </section>
 
       {/* ====== HERO 2 — ON YOUR WATCH ====== */}
-      <section id="watch" className="relative overflow-hidden bg-background border-b border-border/40 scroll-mt-0">
+      <section id="watch" className="relative overflow-hidden bg-gradient-to-b from-background via-card/60 to-background border-y border-border/60 scroll-mt-0">
         <div className="absolute inset-0 pointer-events-none opacity-60" style={{
           backgroundImage: "radial-gradient(circle at 15% 30%, hsl(var(--primary) / 0.25) 0%, transparent 50%), radial-gradient(circle at 85% 75%, hsl(var(--accent) / 0.22) 0%, transparent 50%)",
         }} />
@@ -372,7 +372,7 @@ const Landing = () => {
       </section>
 
       {/* ====== PLANS — tinted card band ====== */}
-      <section id="plans" className="relative bg-card/40 border-y border-border/40">
+      <section id="plans" className="relative bg-gradient-to-br from-primary/15 via-card/80 to-accent/15 border-y border-border/60">
         <div className="absolute inset-0 -z-0 opacity-40 pointer-events-none" style={{
           backgroundImage: "radial-gradient(circle at 10% 20%, hsl(var(--primary) / 0.15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, hsl(var(--accent) / 0.15) 0%, transparent 40%)",
         }} />
@@ -492,7 +492,7 @@ const Landing = () => {
       </section>
 
       {/* ====== FAQ — tinted card band ====== */}
-      <section id="faq" className="bg-card/40 border-y border-border/40">
+      <section id="faq" className="bg-gradient-to-b from-background via-card/70 to-background border-y border-border/60">
         <div className="max-w-3xl mx-auto px-5 py-24">
           <div className="text-center mb-14">
             <SectionLabel>FAQ</SectionLabel>
