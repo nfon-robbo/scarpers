@@ -315,6 +315,10 @@ const Settings = () => {
         setAiProvider(((settings as any).ai_provider as "lovable" | "claude") ?? "lovable");
         setClaudeModel((settings as any).claude_model ?? "claude-haiku-4-5");
       }
+      if (roleRow) {
+        const { data: count } = await supabase.rpc("get_user_count" as any);
+        if (typeof count === "number") setUserCount(count);
+      }
     })();
   }, [user]);
 
