@@ -54,8 +54,11 @@ function paceRange(pace: string): string {
   const cleaned = pace.replace(/\s+/g, "");
   const m = cleaned.match(/^(\d{1,2}):(\d{2})(?:\/(km|mi))?$/i);
   if (!m) return cleaned.replace(/\/$/, "");
-  const fastSec = Number(m[1]) * 60 + Number(m[2]);
-  const slowSec = fastSec + 60;
+  // Centre the range on the target pace so Garmin's displayed (midpoint)
+  // pace matches what the app shows. ±15s/km gives a sensible window.
+  const targetSec = Number(m[1]) * 60 + Number(m[2]);
+  const fastSec = Math.max(1, targetSec - 15);
+  const slowSec = targetSec + 15;
   const unit = (m[3] || "km").toLowerCase();
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   // intervals.icu absolute pace range syntax confirmed working in forum:
