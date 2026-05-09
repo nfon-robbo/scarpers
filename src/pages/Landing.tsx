@@ -315,6 +315,40 @@ const Landing = () => {
         </a>
       </section>
 
+      {/* ====== HERO 2 — ON YOUR WATCH ====== */}
+      <section className="relative overflow-hidden bg-background border-b border-border/40">
+        <div className="absolute inset-0 pointer-events-none opacity-60" style={{
+          backgroundImage: "radial-gradient(circle at 15% 30%, hsl(var(--primary) / 0.25) 0%, transparent 50%), radial-gradient(circle at 85% 75%, hsl(var(--accent) / 0.22) 0%, transparent 50%)",
+        }} />
+        <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+            <div className="order-2 lg:order-1">
+              <SectionLabel>On Your Watch</SectionLabel>
+              <h2 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                Your AI plan,<br />
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">right on your wrist</span>
+              </h2>
+              <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
+                Every Scarpers workout exports as a structured workout — warm-ups, intervals, recoveries and pace targets all show up step-by-step on your wrist.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base">
+                  <Link to="/auth">Get Your Plan</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2 flex justify-center">
+              <WatchMockup
+                frame={watchFenix8}
+                frameAlt="Smartwatch showing a Scarpers workout"
+                screenIndex={watchScreenIdx}
+                screenStyle={FENIX8_SCREEN}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ====== HOW IT WORKS — default dark band ====== */}
       <section id="how" className="bg-background">
         <div className="max-w-6xl mx-auto px-5 py-24 sm:py-32">
