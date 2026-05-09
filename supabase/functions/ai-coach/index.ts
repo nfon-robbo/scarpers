@@ -420,7 +420,8 @@ CONVERSATION CONTEXT (CRITICAL):
 
 ${athleteContext}
 
-${dataContext}`;
+${dataContext}
+${chatPlanContext}`;
 
       userPrompt = chatMessages || "Hello, I'd like some coaching advice.";
     } else if (type === "analysis") {
