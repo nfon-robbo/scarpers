@@ -13,9 +13,9 @@ export async function startStravaBackgroundImport(accessToken: string) {
   }
   running = true;
 
-  const toastId = toast.loading("Importing Strava activities…", {
-    description: "This will keep running while you use the app.",
-    duration: Infinity,
+  toast.success("Strava import started", {
+    description: "Running in the background — we'll let you know when it's done.",
+    duration: 4000,
   });
 
   let totalImported = 0;
@@ -46,24 +46,16 @@ export async function startStravaBackgroundImport(accessToken: string) {
       totalImported += result.imported || 0;
       totalSkipped += result.skipped || 0;
 
-      toast.loading(`Importing Strava… ${totalImported} so far`, {
-        id: toastId,
-        description: `Page ${page} processed`,
-        duration: Infinity,
-      });
-
       if (!result.has_more) break;
       page++;
     }
 
     toast.success("Strava import complete", {
-      id: toastId,
       description: `${totalImported} new activities imported${totalSkipped > 0 ? `, ${totalSkipped} already existed` : ""}.`,
       duration: 6000,
     });
   } catch (e: any) {
     toast.error("Strava import failed", {
-      id: toastId,
       description: e?.message ?? "Unknown error",
       duration: 6000,
     });
@@ -71,3 +63,4 @@ export async function startStravaBackgroundImport(accessToken: string) {
     running = false;
   }
 }
+
