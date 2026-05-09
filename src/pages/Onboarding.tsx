@@ -128,6 +128,7 @@ const Onboarding = () => {
         .eq("user_id", user.id);
 
       if (error) throw error;
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
       navigate("/dashboard");
     } catch (error: any) {
       toast({
