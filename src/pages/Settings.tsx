@@ -295,6 +295,27 @@ const Settings = () => {
   const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
   const [savingAi, setSavingAi] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [showEmails, setShowEmails] = useState(false);
+  const [userEmails, setUserEmails] = useState<{ email: string; created_at: string }[] | null>(null);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  const toggleEmails = async () => {
+    if (showEmails) { setShowEmails(false); return; }
+    if (!userEmails) {
+      setLoadingEmails(true);
+      try {
+        const { data, error } = await supabase.rpc("get_user_emails" as any);
+        if (error) throw error;
+        setUserEmails((data as any) || []);
+      } catch (e: any) {
+        toast({ title: "Failed to load emails", description: e.message, variant: "destructive" });
+        return;
+      } finally {
+        setLoadingEmails(false);
+      }
+    }
+    setShowEmails(true);
+  };
 
   useEffect(() => {
     (async () => {
