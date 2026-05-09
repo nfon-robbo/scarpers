@@ -464,12 +464,24 @@ CONVERSATION CONTEXT (CRITICAL):
 - In that case, reuse that exact same DD/MM/YYYY in your [[ACTION:day:...]] marker. Do NOT pick a different date and do NOT say "couldn't find a workout" — just apply the change to the remembered session.
 - Only switch to a different date if the user explicitly names a new date or session.
 
-DAY-NAME RESOLUTION (CRITICAL):
-- Today is ${new Date().toLocaleDateString("en-GB", { weekday: "long" })}, ${String(new Date().getDate()).padStart(2, "0")}/${String(new Date().getMonth() + 1).padStart(2, "0")}/${new Date().getFullYear()}.
-- When the user names a weekday without a date (e.g. "my workout on Wednesday", "what's Friday?", "Sunday's run"), resolve it to the NEXT occurrence of that weekday from today (inclusive of today only if today matches that weekday and the user is clearly asking about today).
-- If today is Thursday and the user says "Wednesday", that means the upcoming Wednesday (6 days away), NOT the Wednesday that just passed.
-- Only treat a weekday as referring to the past week if the user explicitly says "last <day>", "this past <day>", or names a date that has already happened.
-- Use that resolved DD/MM/YYYY in any [[ACTION:day:...]] marker and when looking up the workout in the plan content.
+${(() => {
+  const today = new Date();
+  const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const fmt = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  const todayName = dayNames[today.getDay()];
+  const lines = dayNames.map((name, idx) => {
+    const diff = (idx - today.getDay() + 7) % 7 || 7; // next occurrence (not today)
+    const next = new Date(today); next.setDate(today.getDate() + diff);
+    return `  - Next ${name}: ${fmt(next)}`;
+  });
+  return `DAY-NAME RESOLUTION (CRITICAL):
+- Today is ${todayName}, ${fmt(today)}.
+- When the user names a weekday WITHOUT a date (e.g. "my workout on Friday", "what's Wednesday?", "Sunday's run"), use the NEXT upcoming occurrence below — NOT a past one:
+${lines.join("\n")}
+- If today matches the named weekday AND the user is clearly asking about today, use today's date instead.
+- Only treat a weekday as past if the user explicitly says "last <day>", "this past <day>", or names a date that has already happened.
+- Use the resolved DD/MM/YYYY in any [[ACTION:day:...]] marker and when looking up the workout in the plan content above.`;
+})()}
 
 ${athleteContext}
 
