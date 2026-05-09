@@ -178,14 +178,15 @@ const AIChatbot = () => {
       onDone: async () => {
         if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
         await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
-        const { data: inserted } = await supabase.from("training_plans").insert({
+        const newPlan = {
           user_id: session.user.id,
           race_distance: plan.race_distance,
           goal_time: plan.goal_time,
           training_days: plan.training_days,
           start_date: plan.start_date,
           content: revised,
-        } as any).select("id").maybeSingle();
+        };
+        const { data: inserted } = await supabase.from("training_plans").insert(newPlan).select("id").maybeSingle();
         if (inserted?.id) {
           pushUndoEntry(inserted.id, plan.content!, "full plan rewrite");
         }
