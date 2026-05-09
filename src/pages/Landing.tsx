@@ -54,8 +54,8 @@ function WatchMockup({
   screenStyle: React.CSSProperties;
 }) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-full max-w-[360px]" style={{ aspectRatio: "726 / 1000" }}>
+    <div className="flex w-full flex-col items-center">
+      <div className="relative w-[min(76vw,360px)]" style={{ aspectRatio: "726 / 1000" }}>
         <img
           src={frame}
           alt={frameAlt}
@@ -304,19 +304,19 @@ const Landing = () => {
                 <Link to="/auth">Get Your Plan</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur border-foreground/20">
-                <a href="#how">See How It Works</a>
+                <a href="#watch">See It On Watch</a>
               </Button>
             </div>
           </div>
         </div>
 
-        <a href="#how" aria-label="Scroll" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-foreground/70 animate-bounce z-10">
+        <a href="#watch" aria-label="Scroll to watch preview" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-foreground/70 animate-bounce z-10">
           <ChevronDown className="w-5 h-5" />
         </a>
       </section>
 
       {/* ====== HERO 2 — ON YOUR WATCH ====== */}
-      <section className="relative overflow-hidden bg-background border-b border-border/40">
+      <section id="watch" className="relative overflow-hidden bg-background border-b border-border/40 scroll-mt-0">
         <div className="absolute inset-0 pointer-events-none opacity-60" style={{
           backgroundImage: "radial-gradient(circle at 15% 30%, hsl(var(--primary) / 0.25) 0%, transparent 50%), radial-gradient(circle at 85% 75%, hsl(var(--accent) / 0.22) 0%, transparent 50%)",
         }} />
