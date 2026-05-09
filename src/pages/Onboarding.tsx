@@ -15,29 +15,71 @@ import StravaConnect from "@/components/StravaConnect";
 
 const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Integrations"];
 
+const STORAGE_KEY = "scarpers:onboarding-state";
+
+type OnboardingState = {
+  step: number;
+  name: string;
+  sex: string;
+  dob: string;
+  heightCm: string;
+  heightFt: string;
+  heightIn: string;
+  weightKg: string;
+  weightLbs: string;
+  weightSt: string;
+  weightStLbs: string;
+  experienceLevel: string;
+  trainingGoals: string;
+  injuries: string;
+  athleteContext: string;
+};
+
+const loadState = (): Partial<OnboardingState> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
 const Onboarding = () => {
-  const [step, setStep] = useState(0);
+  const initial = loadState();
+  const [step, setStep] = useState<number>(initial.step ?? 0);
   // About you
-  const [name, setName] = useState("");
-  const [sex, setSex] = useState<string>("");
-  const [dob, setDob] = useState("");
-  const [heightCm, setHeightCm] = useState("");
-  const [heightFt, setHeightFt] = useState("");
-  const [heightIn, setHeightIn] = useState("");
-  const [weightKg, setWeightKg] = useState("");
-  const [weightLbs, setWeightLbs] = useState("");
-  const [weightSt, setWeightSt] = useState("");
-  const [weightStLbs, setWeightStLbs] = useState("");
+  const [name, setName] = useState(initial.name ?? "");
+  const [sex, setSex] = useState<string>(initial.sex ?? "");
+  const [dob, setDob] = useState(initial.dob ?? "");
+  const [heightCm, setHeightCm] = useState(initial.heightCm ?? "");
+  const [heightFt, setHeightFt] = useState(initial.heightFt ?? "");
+  const [heightIn, setHeightIn] = useState(initial.heightIn ?? "");
+  const [weightKg, setWeightKg] = useState(initial.weightKg ?? "");
+  const [weightLbs, setWeightLbs] = useState(initial.weightLbs ?? "");
+  const [weightSt, setWeightSt] = useState(initial.weightSt ?? "");
+  const [weightStLbs, setWeightStLbs] = useState(initial.weightStLbs ?? "");
   // Experience & goals
-  const [experienceLevel, setExperienceLevel] = useState("intermediate");
-  const [trainingGoals, setTrainingGoals] = useState("");
-  const [injuries, setInjuries] = useState("");
-  const [athleteContext, setAthleteContext] = useState("");
+  const [experienceLevel, setExperienceLevel] = useState(initial.experienceLevel ?? "intermediate");
+  const [trainingGoals, setTrainingGoals] = useState(initial.trainingGoals ?? "");
+  const [injuries, setInjuries] = useState(initial.injuries ?? "");
+  const [athleteContext, setAthleteContext] = useState(initial.athleteContext ?? "");
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { units, setUnit } = useUnits();
+
+  // Persist onboarding state so OAuth redirects (Google Fit / Strava) don't reset progress
+  useEffect(() => {
+    const state: OnboardingState = {
+      step, name, sex, dob,
+      heightCm, heightFt, heightIn,
+      weightKg, weightLbs, weightSt, weightStLbs,
+      experienceLevel, trainingGoals, injuries, athleteContext,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext]);
+
 
   const handleComplete = async () => {
     setLoading(true);
