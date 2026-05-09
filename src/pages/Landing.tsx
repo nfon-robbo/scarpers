@@ -20,11 +20,10 @@ import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunner from "@/assets/hero-runner.jpg";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
-import heroFeetVideo from "@/assets/hero-feet.mp4.asset.json";
-import heroMarathonVideo from "@/assets/hero-marathon.mp4.asset.json";
+import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
+import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
 
 const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
-const HERO_INTERVAL_MS = 3333;
 
 const FAQS = [
   {
@@ -113,12 +112,9 @@ const Landing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [heroIdx, setHeroIdx] = useState(0);
 
-  useEffect(() => {
-    const swapTimer = window.setInterval(() => {
-      setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
-    }, HERO_INTERVAL_MS);
-    return () => window.clearInterval(swapTimer);
-  }, []);
+  const handleHeroEnded = () => {
+    setHeroIdx((i) => (i + 1) % HERO_VIDEOS.length);
+  };
 
   useEffect(() => {
     document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
@@ -164,9 +160,9 @@ const Landing = () => {
             poster={heroRunner}
             autoPlay
             muted
-            loop
             playsInline
             preload="auto"
+            onEnded={handleHeroEnded}
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover"
           />
