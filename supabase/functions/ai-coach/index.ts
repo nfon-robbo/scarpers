@@ -375,6 +375,7 @@ RECOMMENDATION ACTIONS:
   • [[ACTION:plan]]              ← use this ONLY when the change requires rewriting multiple weeks/sessions of the plan (e.g. "reduce overall volume across the next 4 weeks").
 - Default to [[ACTION:day:...]] whenever possible. Only use [[ACTION:plan]] when a single-day edit cannot capture the change.
 - Do NOT include any marker for general advice, education, or questions that don't change the plan.
+- CRITICAL: Only emit a marker if you are PROPOSING A CONCRETE EDIT to a workout (e.g. "swap to easy run", "cut to 20 minutes", "reduce reps to 4"). If your reply only ANALYSES, REASSURES, or CONCLUDES the workout was fine/appropriate/well-managed/no change needed, DO NOT emit any marker. Examples that must NOT have a marker: "The intensity was appropriate", "This looks well-managed", "You're on track", "No change needed", any post-hoc analysis of a completed workout the user is asking about.
 - Never wrap the marker in code fences. Always plain text on the last line.
 
 CONVERSATION CONTEXT (CRITICAL):
