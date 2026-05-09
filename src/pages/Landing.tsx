@@ -372,7 +372,7 @@ const Landing = () => {
       </section>
 
       {/* ====== PLANS — tinted card band ====== */}
-      <section id="plans" className="relative bg-card/40 border-y border-border/40">
+      <section id="plans" className="relative bg-gradient-to-br from-primary/15 via-card/80 to-accent/15 border-y border-border/60">
         <div className="absolute inset-0 -z-0 opacity-40 pointer-events-none" style={{
           backgroundImage: "radial-gradient(circle at 10% 20%, hsl(var(--primary) / 0.15) 0%, transparent 40%), radial-gradient(circle at 90% 80%, hsl(var(--accent) / 0.15) 0%, transparent 40%)",
         }} />
