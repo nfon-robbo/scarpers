@@ -100,7 +100,7 @@ const FAQS = [
   },
   {
     q: "Which devices and apps does it work with?",
-    a: "Anything that exports a .FIT file — Garmin, Coros, Polar, Suunto, Wahoo, Apple Watch — plus direct Strava import and Apple Health / Google Fit sleep sync.",
+    a: "Anything that exports a .FIT file from Garmin, plus direct Strava import and Google Fit sleep sync.",
   },
   {
     q: "Can a beginner follow a marathon training plan?",
@@ -145,7 +145,7 @@ const FEATURES = [
   { icon: Brain, title: "Personalised AI Training Plan", body: "Every plan is unique — built from your real running data, not generic templates." },
   { icon: Heart, title: "Daily Readiness Score", body: "Sleep, resting HR, HRV and load combined into one honest push-or-back-off score." },
   { icon: LineChart, title: "Running IQ", body: "A 0–200 score across durability, consistency, progression, recovery and pace." },
-  { icon: Moon, title: "Sleep Tracking", body: "365-day sleep calendar with stages from Apple Health, Google Fit and your watch." },
+  { icon: Moon, title: "Sleep Tracking", body: "365-day sleep calendar with stages from Google Fit and your watch." },
   { icon: Sparkles, title: "Day-Ahead Coach", body: "Wake up to a smart preview of today's run, adapted to last night's sleep." },
   { icon: Activity, title: "Post-Run Reviews", body: "Every run gets an AI debrief: what went well, what to build on, what's next." },
 ];
@@ -407,7 +407,7 @@ const Landing = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-3xl border border-border/50 bg-gradient-to-br from-card/80 to-card/40 backdrop-blur p-8">
               <div className="grid grid-cols-2 gap-3">
-                {["Garmin","Strava","Apple Watch","Coros","Polar","Suunto","Wahoo","Intervals.icu"].map((b) => (
+                {["Garmin","Strava","Google Fit","Intervals.icu"].map((b) => (
                   <div key={b} className="rounded-xl border border-border/40 bg-background/60 p-4 flex items-center gap-2 text-sm font-medium">
                     <Watch className="w-4 h-4 text-primary shrink-0" />
                     {b}
@@ -419,13 +419,13 @@ const Landing = () => {
               <SectionLabel>One Tap Import</SectionLabel>
               <H2>Bring your runs from anywhere</H2>
               <p className="mt-5 text-muted-foreground leading-relaxed">
-                Drop a .FIT file or connect Strava once — Scarpers de-duplicates, parses GPS, heart rate and pace, and starts learning how you actually run. Apple Health and Google Fit sleep sync automatically.
+                Drop a .FIT file from your Garmin or connect Strava once — Scarpers de-duplicates, parses GPS, heart rate and pace, and starts learning how you actually run. Google Fit sleep syncs automatically.
               </p>
               <ul className="mt-6 space-y-3 text-sm">
                 {[
                   "FIT files always take priority over duplicates",
                   "Strava OAuth — no manual exports",
-                  "Apple Health & Google Fit sleep sync",
+                  "Google Fit sleep sync",
                   "Auto-merges sensor and watch data",
                 ].map((b) => (
                   <li key={b} className="flex items-start gap-3">
