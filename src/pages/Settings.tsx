@@ -738,116 +738,118 @@ const Settings = () => {
         ))}
       </CollapsibleSection>
 
-      {/* Previous Plans Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Archive className="w-5 h-5" />
-            Previous Plans
-          </CardTitle>
-          <CardDescription>
-            Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {archivedPlans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No previous plans yet.</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={selectMode ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectMode((v) => !v);
-                      setSelectedIds(new Set());
-                    }}
-                  >
-                    {selectMode ? "Cancel" : "Select"}
-                  </Button>
-                  {selectMode && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedIds.size === archivedPlans.length) {
-                          setSelectedIds(new Set());
-                        } else {
-                          setSelectedIds(new Set(archivedPlans.map((p) => p.id)));
-                        }
-                      }}
-                    >
-                      {selectedIds.size === archivedPlans.length ? "Clear all" : "Select all"}
-                    </Button>
-                  )}
-                </div>
+      {/* Previous Plans */}
+      <CollapsibleSection
+        title="Previous Plans"
+        icon={Archive}
+        description="Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today."
+      >
+        {archivedPlans.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No previous plans yet.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={selectMode ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setSelectMode((v) => !v);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  {selectMode ? "Cancel" : "Select"}
+                </Button>
                 {selectMode && (
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
-                    disabled={selectedIds.size === 0 || bulkDeleting}
-                    onClick={() => setConfirmBulkDelete(true)}
+                    onClick={() => {
+                      if (selectedIds.size === archivedPlans.length) {
+                        setSelectedIds(new Set());
+                      } else {
+                        setSelectedIds(new Set(archivedPlans.map((p) => p.id)));
+                      }
+                    }}
                   >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                    {selectedIds.size === archivedPlans.length ? "Clear all" : "Select all"}
                   </Button>
                 )}
               </div>
-              {archivedPlans.map((plan) => (
-                <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                  {selectMode && (
-                    <Checkbox
-                      checked={selectedIds.has(plan.id)}
-                      onCheckedChange={() => toggleSelected(plan.id)}
-                      aria-label="Select plan"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{plan.race_distance}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
-                      {plan.race_date && plan.race_date !== "ai-recommend" && (
-                        <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
-                      )}
-                      {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
-                    </p>
-                  </div>
-                  {!selectMode && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => resumePlan(plan)}
-                        disabled={planActionId === plan.id}
-                      >
-                        <Play className="w-3.5 h-3.5 mr-1" /> Resume
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => restartPlan(plan)}
-                        disabled={planActionId === plan.id}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmDelete(plan)}
-                        disabled={planActionId === plan.id}
-                        aria-label="Delete permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {selectMode && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedIds.size === 0 || bulkDeleting}
+                  onClick={() => setConfirmBulkDelete(true)}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                </Button>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {archivedPlans.map((plan) => (
+              <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                {selectMode && (
+                  <Checkbox
+                    checked={selectedIds.has(plan.id)}
+                    onCheckedChange={() => toggleSelected(plan.id)}
+                    aria-label="Select plan"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{plan.race_distance}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
+                    {plan.race_date && plan.race_date !== "ai-recommend" && (
+                      <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
+                    )}
+                    {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
+                  </p>
+                </div>
+                {!selectMode && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resumePlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => restartPlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(plan)}
+                      disabled={planActionId === plan.id}
+                      aria-label="Delete permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Previous Chats */}
+      <CollapsibleSection
+        title="Previous chats"
+        icon={MessageCircle}
+        description="Resume a past conversation with the AI coach."
+      >
+        <PastChats bare />
+      </CollapsibleSection>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
