@@ -480,9 +480,15 @@ const AIChatbot = () => {
             disabled={loading}
             className="text-sm"
           />
-          <Button size="icon" onClick={sendMessage} disabled={loading || !input.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+          {loading ? (
+            <Button size="icon" variant="destructive" onClick={stopReply} title="Stop reply">
+              <Square className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button size="icon" onClick={sendMessage} disabled={!input.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
