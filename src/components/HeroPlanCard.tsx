@@ -5,6 +5,7 @@ import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, Chevr
 import type { ParsedWorkout } from "@/lib/plan-export";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
+import { expandWorkoutSteps, expandedToSegments } from "@/lib/plan-step-expand";
 
 interface HeroPlanCardProps {
   name: string | null;
