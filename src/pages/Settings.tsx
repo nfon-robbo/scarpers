@@ -11,13 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight } from "lucide-react";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
 import PastChats from "@/components/PastChats";
+import CollapsibleSection from "@/components/CollapsibleSection";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
@@ -537,330 +538,318 @@ const Settings = () => {
         </Link>
       )}
 
-      <PastChats />
-
       {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Gauge className="w-5 h-5" />
-              AI Provider <Badge variant="secondary">Admin</Badge>
-            </CardTitle>
-            <CardDescription>
-              Switch the AI engine used site-wide for plan generation, chat, reviews and insights.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Registered users</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{userCount ?? "—"}</span>
-                  <Button size="sm" variant="ghost" onClick={toggleEmails} disabled={loadingEmails}>
-                    {loadingEmails ? <Loader2 className="w-3 h-3 animate-spin" /> : showEmails ? "Hide" : "Show"}
-                  </Button>
-                </div>
+        <CollapsibleSection
+          title="AI Provider"
+          icon={Gauge}
+          description="Switch the AI engine used site-wide for plan generation, chat, reviews and insights."
+          headerExtra={<Badge variant="secondary">Admin</Badge>}
+          contentClassName="space-y-4"
+        >
+          <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Registered users</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">{userCount ?? "—"}</span>
+                <Button size="sm" variant="ghost" onClick={toggleEmails} disabled={loadingEmails}>
+                  {loadingEmails ? <Loader2 className="w-3 h-3 animate-spin" /> : showEmails ? "Hide" : "Show"}
+                </Button>
               </div>
-              {showEmails && userEmails && (
-                <ul className="text-xs space-y-1 max-h-60 overflow-auto pt-1 border-t border-border/50">
-                  {userEmails.map((u, i) => (
-                    <li key={i} className="flex justify-between gap-2">
-                      <span className="truncate">{u.email}</span>
-                      <span className="text-muted-foreground shrink-0">{new Date(u.created_at).toLocaleDateString("en-GB")}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
+            {showEmails && userEmails && (
+              <ul className="text-xs space-y-1 max-h-60 overflow-auto pt-1 border-t border-border/50">
+                {userEmails.map((u, i) => (
+                  <li key={i} className="flex justify-between gap-2">
+                    <span className="truncate">{u.email}</span>
+                    <span className="text-muted-foreground shrink-0">{new Date(u.created_at).toLocaleDateString("en-GB")}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Provider</Label>
+            <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as "lovable" | "claude")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lovable">Lovable AI (Gemini / GPT)</SelectItem>
+                <SelectItem value="claude">Anthropic Claude</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {aiProvider === "claude" && (
             <div className="space-y-2">
-              <Label>Provider</Label>
-              <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as "lovable" | "claude")}>
+              <Label>Claude model</Label>
+              <Select value={claudeModel} onValueChange={setClaudeModel}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lovable">Lovable AI (Gemini / GPT)</SelectItem>
-                  <SelectItem value="claude">Anthropic Claude</SelectItem>
+                  <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (fast, cheap)</SelectItem>
+                  <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5 (balanced)</SelectItem>
+                  <SelectItem value="claude-opus-4-5">Claude Opus 4.5 (most capable)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {aiProvider === "claude" && (
-              <div className="space-y-2">
-                <Label>Claude model</Label>
-                <Select value={claudeModel} onValueChange={setClaudeModel}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="claude-haiku-4-5">Claude Haiku 4.5 (fast, cheap)</SelectItem>
-                    <SelectItem value="claude-sonnet-4-5">Claude Sonnet 4.5 (balanced)</SelectItem>
-                    <SelectItem value="claude-opus-4-5">Claude Opus 4.5 (most capable)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex justify-end">
-              <Button onClick={saveAiSettings} disabled={savingAi}>
-                {savingAi ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save provider
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Personal Details
-          </CardTitle>
-          <CardDescription>
-            Used to personalise your AI training plan (HR zones, pacing, calories)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sex">Sex</Label>
-              <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
-                <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other / prefer not to say</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dob">Date of birth</Label>
-              <Input
-                id="dob"
-                type="date"
-                value={personal.date_of_birth}
-                onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Height {units.height === "ft" ? "(ft / in)" : "(cm)"}</Label>
-              {units.height === "ft" ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="8"
-                    placeholder="ft"
-                    value={heightFt}
-                    onChange={(e) => { setHeightFt(e.target.value); commitHeight(e.target.value, heightIn); }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="11"
-                    placeholder="in"
-                    value={heightIn}
-                    onChange={(e) => { setHeightIn(e.target.value); commitHeight(heightFt, e.target.value); }}
-                  />
-                </div>
-              ) : (
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min="50"
-                  max="250"
-                  value={personal.height_cm}
-                  onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
-                />
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Weight {units.weight === "kg" ? "(kg)" : units.weight === "lbs" ? "(lbs)" : "(st / lb)"}</Label>
-              {units.weight === "st" ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    placeholder="st"
-                    value={weightDisplay}
-                    onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value, weightStLb); }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="13.9"
-                    step="0.1"
-                    placeholder="lb"
-                    value={weightStLb}
-                    onChange={(e) => { setWeightStLb(e.target.value); commitWeight(weightDisplay, e.target.value); }}
-                  />
-                </div>
-              ) : (
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min="20"
-                  max="600"
-                  step="0.1"
-                  value={weightDisplay}
-                  onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value); }}
-                />
-              )}
-            </div>
-          </div>
+          )}
           <div className="flex justify-end">
-            <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
-              {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              {savingPersonal ? "Saving..." : "Save Details"}
+            <Button onClick={saveAiSettings} disabled={savingAi}>
+              {savingAi ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Save provider
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </CollapsibleSection>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Units of Measurement</CardTitle>
-          <CardDescription>Choose your preferred units for each metric type</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {unitSettings.map(({ key, label, icon: Icon, description, options }) => (
-            <div key={key} className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <Icon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
+      <CollapsibleSection
+        title="Personal Details"
+        icon={User}
+        description="Used to personalise your AI training plan (HR zones, pacing, calories)"
+        contentClassName="space-y-4"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="sex">Sex</Label>
+            <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
+              <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other / prefer not to say</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dob">Date of birth</Label>
+            <Input
+              id="dob"
+              type="date"
+              value={personal.date_of_birth}
+              onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Height {units.height === "ft" ? "(ft / in)" : "(cm)"}</Label>
+            {units.height === "ft" ? (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="8"
+                  placeholder="ft"
+                  value={heightFt}
+                  onChange={(e) => { setHeightFt(e.target.value); commitHeight(e.target.value, heightIn); }}
+                />
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="11"
+                  placeholder="in"
+                  value={heightIn}
+                  onChange={(e) => { setHeightIn(e.target.value); commitHeight(heightFt, e.target.value); }}
+                />
               </div>
-              <Select
-                value={units[key]}
-                onValueChange={(v) => setUnit(key, v as any)}
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            ) : (
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="50"
+                max="250"
+                value={personal.height_cm}
+                onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
+              />
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Weight {units.weight === "kg" ? "(kg)" : units.weight === "lbs" ? "(lbs)" : "(st / lb)"}</Label>
+            {units.weight === "st" ? (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="st"
+                  value={weightDisplay}
+                  onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value, weightStLb); }}
+                />
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="13.9"
+                  step="0.1"
+                  placeholder="lb"
+                  value={weightStLb}
+                  onChange={(e) => { setWeightStLb(e.target.value); commitWeight(weightDisplay, e.target.value); }}
+                />
+              </div>
+            ) : (
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="20"
+                max="600"
+                step="0.1"
+                value={weightDisplay}
+                onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value); }}
+              />
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
+            {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+            {savingPersonal ? "Saving..." : "Save Details"}
+          </Button>
+        </div>
+      </CollapsibleSection>
 
-      {/* Previous Plans Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Archive className="w-5 h-5" />
-            Previous Plans
-          </CardTitle>
-          <CardDescription>
-            Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {archivedPlans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No previous plans yet.</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={selectMode ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setSelectMode((v) => !v);
-                      setSelectedIds(new Set());
-                    }}
-                  >
-                    {selectMode ? "Cancel" : "Select"}
-                  </Button>
-                  {selectMode && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedIds.size === archivedPlans.length) {
-                          setSelectedIds(new Set());
-                        } else {
-                          setSelectedIds(new Set(archivedPlans.map((p) => p.id)));
-                        }
-                      }}
-                    >
-                      {selectedIds.size === archivedPlans.length ? "Clear all" : "Select all"}
-                    </Button>
-                  )}
-                </div>
+      <CollapsibleSection
+        title="Units of Measurement"
+        icon={Ruler}
+        description="Choose your preferred units for each metric type"
+        contentClassName="space-y-6"
+      >
+        {unitSettings.map(({ key, label, icon: Icon, description, options }) => (
+          <div key={key} className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Icon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
+              </div>
+            </div>
+            <Select
+              value={units[key]}
+              onValueChange={(v) => setUnit(key, v as any)}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))}
+      </CollapsibleSection>
+
+      {/* Previous Plans */}
+      <CollapsibleSection
+        title="Previous Plans"
+        icon={Archive}
+        description="Plans you've deleted or replaced. Resume to continue from where you left off, or restart from today."
+      >
+        {archivedPlans.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No previous plans yet.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={selectMode ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setSelectMode((v) => !v);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  {selectMode ? "Cancel" : "Select"}
+                </Button>
                 {selectMode && (
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
-                    disabled={selectedIds.size === 0 || bulkDeleting}
-                    onClick={() => setConfirmBulkDelete(true)}
+                    onClick={() => {
+                      if (selectedIds.size === archivedPlans.length) {
+                        setSelectedIds(new Set());
+                      } else {
+                        setSelectedIds(new Set(archivedPlans.map((p) => p.id)));
+                      }
+                    }}
                   >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                    {selectedIds.size === archivedPlans.length ? "Clear all" : "Select all"}
                   </Button>
                 )}
               </div>
-              {archivedPlans.map((plan) => (
-                <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                  {selectMode && (
-                    <Checkbox
-                      checked={selectedIds.has(plan.id)}
-                      onCheckedChange={() => toggleSelected(plan.id)}
-                      aria-label="Select plan"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{plan.race_distance}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
-                      {plan.race_date && plan.race_date !== "ai-recommend" && (
-                        <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
-                      )}
-                      {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
-                    </p>
-                  </div>
-                  {!selectMode && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => resumePlan(plan)}
-                        disabled={planActionId === plan.id}
-                      >
-                        <Play className="w-3.5 h-3.5 mr-1" /> Resume
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => restartPlan(plan)}
-                        disabled={planActionId === plan.id}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmDelete(plan)}
-                        disabled={planActionId === plan.id}
-                        aria-label="Delete permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {selectMode && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedIds.size === 0 || bulkDeleting}
+                  onClick={() => setConfirmBulkDelete(true)}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                </Button>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {archivedPlans.map((plan) => (
+              <div key={plan.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                {selectMode && (
+                  <Checkbox
+                    checked={selectedIds.has(plan.id)}
+                    onCheckedChange={() => toggleSelected(plan.id)}
+                    aria-label="Select plan"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{plan.race_distance}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Started {new Date(plan.start_date).toLocaleDateString("en-GB")}
+                    {plan.race_date && plan.race_date !== "ai-recommend" && (
+                      <> · Race {new Date(plan.race_date).toLocaleDateString("en-GB")}</>
+                    )}
+                    {" · "}{plan.training_days.length} day{plan.training_days.length === 1 ? "" : "s"}/wk
+                  </p>
+                </div>
+                {!selectMode && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resumePlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => restartPlan(plan)}
+                      disabled={planActionId === plan.id}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restart
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(plan)}
+                      disabled={planActionId === plan.id}
+                      aria-label="Delete permanently"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Previous Chats */}
+      <CollapsibleSection
+        title="Previous chats"
+        icon={MessageCircle}
+        description="Resume a past conversation with the AI coach."
+      >
+        <PastChats bare />
+      </CollapsibleSection>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
@@ -896,186 +885,173 @@ const Settings = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <IntervalsCredentials />
+      <CollapsibleSection
+        title="intervals.icu"
+        description="Connect using your own intervals.icu API key so wellness data and workout sync use your account."
+      >
+        <IntervalsCredentials bare />
+      </CollapsibleSection>
 
-      {/* Auto-Sync Schedule Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Timer className="w-5 h-5" />
-            Auto-Sync Schedule
-          </CardTitle>
-          <CardDescription>
-            Enable automatic background syncing for your connected data sources
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Strava */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.strava_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, strava_enabled: v }))}
-                  disabled={!stravaConnected}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Strava Activities</p>
-                  {!stravaConnected && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <AlertCircle className="w-3 h-3" /> Not connected
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Import new activities automatically</p>
-              </div>
+      {/* Auto-Sync Schedule */}
+      <CollapsibleSection
+        title="Auto-Sync Schedule"
+        icon={Timer}
+        description="Enable automatic background syncing for your connected data sources"
+        contentClassName="space-y-5"
+      >
+        {/* Strava */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.strava_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, strava_enabled: v }))}
+                disabled={!stravaConnected}
+              />
             </div>
-            <Select
-              value={String(schedule.strava_interval_hours)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, strava_interval_hours: Number(v) }))}
-              disabled={!schedule.strava_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Every 1 hour</SelectItem>
-                <SelectItem value="2">Every 2 hours</SelectItem>
-                <SelectItem value="4">Every 4 hours</SelectItem>
-                <SelectItem value="6">Every 6 hours</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Intervals.icu */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.intervals_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, intervals_enabled: v }))}
-                />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Strava Activities</p>
+                {!stravaConnected && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <AlertCircle className="w-3 h-3" /> Not connected
+                  </Badge>
+                )}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Intervals.icu Wellness</p>
-                <p className="text-xs text-muted-foreground">Sync HRV, resting HR, steps, weight & more</p>
-              </div>
+              <p className="text-xs text-muted-foreground">Import new activities automatically</p>
             </div>
-            <Select
-              value={String(schedule.intervals_interval_hours)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, intervals_interval_hours: Number(v) }))}
-              disabled={!schedule.intervals_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4">Every 4 hours</SelectItem>
-                <SelectItem value="6">Every 6 hours</SelectItem>
-                <SelectItem value="12">Every 12 hours</SelectItem>
-                <SelectItem value="24">Every 24 hours</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
+          <Select
+            value={String(schedule.strava_interval_hours)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, strava_interval_hours: Number(v) }))}
+            disabled={!schedule.strava_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Every 1 hour</SelectItem>
+              <SelectItem value="2">Every 2 hours</SelectItem>
+              <SelectItem value="4">Every 4 hours</SelectItem>
+              <SelectItem value="6">Every 6 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Google Fit */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.google_fit_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
-                  disabled={!googleFitConnected}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Google Fit Sleep</p>
-                  {!googleFitConnected && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <AlertCircle className="w-3 h-3" /> Not connected
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
-              </div>
+        {/* Intervals.icu */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.intervals_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, intervals_enabled: v }))}
+              />
             </div>
-            <Select
-              value={String(schedule.google_fit_hour_utc)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
-              disabled={!schedule.google_fit_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Time">
-                  {formatHourUtc(schedule.google_fit_hour_utc)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                  <SelectItem key={h} value={String(h)}>
-                    {formatHourUtc(h)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Intervals.icu Wellness</p>
+              <p className="text-xs text-muted-foreground">Sync HRV, resting HR, steps, weight & more</p>
+            </div>
           </div>
+          <Select
+            value={String(schedule.intervals_interval_hours)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, intervals_interval_hours: Number(v) }))}
+            disabled={!schedule.intervals_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="4">Every 4 hours</SelectItem>
+              <SelectItem value="6">Every 6 hours</SelectItem>
+              <SelectItem value="12">Every 12 hours</SelectItem>
+              <SelectItem value="24">Every 24 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div className="pt-2 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Syncs run automatically in the background. You can still trigger manual syncs anytime.
-            </p>
-            <Button onClick={saveSchedule} disabled={savingSchedule} size="sm">
-              {savingSchedule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              {savingSchedule ? "Saving..." : "Save & Apply"}
-            </Button>
+        {/* Google Fit */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.google_fit_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
+                disabled={!googleFitConnected}
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Google Fit Sleep</p>
+                {!googleFitConnected && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <AlertCircle className="w-3 h-3" /> Not connected
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Select
+            value={String(schedule.google_fit_hour_utc)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
+            disabled={!schedule.google_fit_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Time">
+                {formatHourUtc(schedule.google_fit_hour_utc)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                <SelectItem key={h} value={String(h)}>
+                  {formatHourUtc(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Moon className="w-5 h-5" />
-            Sleep & Wellness Sync
-          </CardTitle>
-          <CardDescription>
-            Sync sleep, steps, HRV, resting HR, and weight from Intervals.icu (last 90 days)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={syncWellness} disabled={syncing}>
-            {syncing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {syncing ? "Syncing..." : "Sync Wellness Data"}
-          </Button>
-          <p className="text-xs text-muted-foreground mt-2">
-            Pulls sleep duration, sleep score, HRV, resting heart rate, steps, weight, and stress data.
+        <div className="pt-2 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Syncs run automatically in the background. You can still trigger manual syncs anytime.
           </p>
-        </CardContent>
-      </Card>
-
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-            <Trash2 className="w-5 h-5" />
-            Danger Zone
-          </CardTitle>
-          <CardDescription>
-            Permanently delete your account and all associated data. This cannot be undone.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={() => setConfirmDeleteAccount(true)}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete My Profile
+          <Button onClick={saveSchedule} disabled={savingSchedule} size="sm">
+            {savingSchedule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+            {savingSchedule ? "Saving..." : "Save & Apply"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Sleep & Wellness Sync"
+        icon={Moon}
+        description="Sync sleep, steps, HRV, resting HR, and weight from Intervals.icu (last 90 days)"
+      >
+        <Button onClick={syncWellness} disabled={syncing}>
+          {syncing ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          {syncing ? "Syncing..." : "Sync Wellness Data"}
+        </Button>
+        <p className="text-xs text-muted-foreground mt-2">
+          Pulls sleep duration, sleep score, HRV, resting heart rate, steps, weight, and stress data.
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Danger Zone"
+        icon={Trash2}
+        description="Permanently delete your account and all associated data. This cannot be undone."
+        className="border-destructive/40"
+        titleClassName="text-destructive"
+      >
+        <Button variant="destructive" onClick={() => setConfirmDeleteAccount(true)}>
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete My Profile
+        </Button>
+      </CollapsibleSection>
 
       <AlertDialog open={confirmDeleteAccount} onOpenChange={(o) => !o && setConfirmDeleteAccount(false)}>
         <AlertDialogContent>
