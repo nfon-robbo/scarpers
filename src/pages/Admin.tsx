@@ -99,21 +99,25 @@ const AdminPage = () => {
 
   const [aiUsage, setAiUsage] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
+  const [feedback, setFeedback] = useState<any | null>(null);
 
   const loadStats = async () => {
     setLoadingStats(true);
     try {
-      const [{ data, error }, { data: usage, error: uErr }, { data: h, error: hErr }] = await Promise.all([
+      const [{ data, error }, { data: usage, error: uErr }, { data: h, error: hErr }, { data: fb, error: fErr }] = await Promise.all([
         supabase.rpc("admin_dashboard_stats" as any),
         supabase.rpc("admin_ai_usage_stats" as any),
         supabase.rpc("admin_system_health_stats" as any),
+        supabase.rpc("admin_feedback_stats" as any),
       ]);
       if (error) throw error;
       if (uErr) console.warn("ai usage stats failed", uErr);
       if (hErr) console.warn("health stats failed", hErr);
+      if (fErr) console.warn("feedback stats failed", fErr);
       setStats(data as unknown as Stats);
       setAiUsage(usage ?? null);
       setHealth(h ?? null);
+      setFeedback(fb ?? null);
     } catch (e: any) {
       toast({ title: "Failed to load stats", description: e.message, variant: "destructive" });
     } finally {
@@ -493,8 +497,40 @@ const AdminPage = () => {
                 <NotTracked note="needs a skip_reason capture in workout flow" />
               </div>
               <div>
-                <h3 className="text-sm font-medium mb-2">User feedback / RPE</h3>
-                <NotTracked note="add an rpe column to activities or a feedback table" />
+                <h3 className="text-sm font-medium mb-2">User feedback</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Stat label="Total" value={feedback?.total ?? "—"} />
+                  <Stat label="Last 7d" value={feedback?.count_7d ?? "—"} />
+                  <Stat label="Last 30d" value={feedback?.count_30d ?? "—"} />
+                  <Stat label="Avg rating" value={feedback?.avg_rating ? `${feedback.avg_rating} ★` : "—"} />
+                </div>
+                {feedback?.by_category && Object.keys(feedback.by_category).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {Object.entries(feedback.by_category)
+                      .sort((a: any, b: any) => Number(b[1]) - Number(a[1]))
+                      .map(([cat, c]: any) => (
+                        <Badge key={cat} variant="secondary" className="text-sm py-1.5 px-3">
+                          {cat}: <span className="ml-1 font-semibold">{c}</span>
+                        </Badge>
+                      ))}
+                  </div>
+                )}
+                {Array.isArray(feedback?.recent) && feedback.recent.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {feedback.recent.map((f: any) => (
+                      <div key={f.id} className="rounded-lg border border-border/50 p-3 bg-card/60">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                          <span className="font-mono">{new Date(f.created_at).toLocaleString("en-GB")}</span>
+                          {f.category && <Badge variant="outline" className="text-[10px] py-0">{f.category}</Badge>}
+                          {f.rating && <span className="text-yellow-400">{"★".repeat(f.rating)}</span>}
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{f.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-2">No feedback yet.</p>
+                )}
               </div>
             </CardContent>
           </Card>
