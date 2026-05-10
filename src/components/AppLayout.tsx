@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,6 +19,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -30,10 +33,23 @@ const navItems = [
 ];
 
 const AppLayout = () => {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { theme, toggleTheme } = useTheme();
-  
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!data);
+    })();
+  }, [user]);
 
   return (
     <div className="flex min-h-screen bg-background">
