@@ -200,9 +200,14 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
         </h2>
 
         {weather && WIcon && (
-          <div className="absolute top-5 right-5 sm:top-6 sm:right-6 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20">
-            <WIcon className="w-4 h-4 text-yellow-200" />
-            <span className="text-sm font-semibold">{weather.tempC}°C</span>
+          <div className="absolute top-5 right-5 sm:top-6 sm:right-6 flex flex-col items-end gap-0.5 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20">
+            <div className="flex items-center gap-1.5">
+              <WIcon className="w-4 h-4 text-yellow-200" />
+              <span className="text-sm font-semibold">{weather.tempC}°C</span>
+            </div>
+            <span className="text-[10px] font-medium text-white/85 leading-none">
+              {weatherLabel(weather.code)}
+            </span>
           </div>
         )}
 
