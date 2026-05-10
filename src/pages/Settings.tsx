@@ -18,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
 import PastChats from "@/components/PastChats";
+import CollapsibleSection from "@/components/CollapsibleSection";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
