@@ -4,6 +4,7 @@ import heroRunner from "@/assets/hero-runner.jpg";
 import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
 import type { ParsedWorkout } from "@/lib/plan-export";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
 
 interface HeroPlanCardProps {
   name: string | null;
@@ -370,6 +371,8 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
 
               {selectedWorkout.segments.length > 0 ? (
                 <div className="space-y-2 mt-2">
+                  <WorkoutIntervalChart segments={selectedWorkout.segments} />
+
                   {selectedWorkout.segments.map((seg, i) => (
                     <div key={i} className="rounded-lg border bg-muted/30 p-3 space-y-1">
                       <div className="flex items-center justify-between">
