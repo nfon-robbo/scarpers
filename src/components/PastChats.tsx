@@ -38,7 +38,7 @@ const fmtRelative = (iso: string) => {
   return `${dd}/${mm}/${d.getFullYear()}`;
 };
 
-const PastChats = () => {
+const PastChats = ({ bare = false }: { bare?: boolean } = {}) => {
   const { toast } = useToast();
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [loading, setLoading] = useState(true);
