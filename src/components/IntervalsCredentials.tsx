@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, Unlink } from "lucide-react";
 
-const IntervalsCredentials = () => {
+const IntervalsCredentials = ({ bare = false }: { bare?: boolean } = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [athleteId, setAthleteId] = useState("");
