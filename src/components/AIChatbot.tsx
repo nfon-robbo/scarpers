@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { MessageCircle, Send, Loader2, X, Minimize2, Check, Square } from "lucide-react";
+import { MessageCircle, Send, Loader2, X, Minimize2, Check, Square, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
@@ -37,6 +37,7 @@ const AIChatbot = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -45,6 +46,46 @@ const AIChatbot = () => {
     abortRef.current?.abort();
     abortRef.current = null;
   }, []);
+
+  const startNewChat = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setThreadId(null);
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+  }, []);
+
+  // Load a thread's messages from the database.
+  const loadThread = useCallback(async (id: string) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setThreadId(id);
+    setMessages([]);
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("role, content, created_at")
+      .eq("thread_id", id)
+      .order("created_at", { ascending: true });
+    if (error) {
+      toast({ title: "Couldn't load chat", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMessages((data || []).map(m => ({ role: m.role as "user" | "assistant", content: m.content })));
+  }, [toast]);
+
+  // Listen for "open-chat-thread" events fired from Settings.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ threadId: string }>).detail;
+      if (!detail?.threadId) return;
+      setOpen(true);
+      loadThread(detail.threadId);
+    };
+    window.addEventListener("open-chat-thread", handler);
+    return () => window.removeEventListener("open-chat-thread", handler);
+  }, [loadThread]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -218,6 +259,33 @@ const AIChatbot = () => {
     setInput("");
     setLoading(true);
 
+    // Ensure a thread exists for this conversation; create on first message.
+    let activeThreadId = threadId;
+    if (!activeThreadId) {
+      const title = text.length > 60 ? text.slice(0, 57) + "…" : text;
+      const { data: created, error: threadErr } = await supabase
+        .from("chat_threads")
+        .insert({ user_id: session.user.id, title })
+        .select("id")
+        .maybeSingle();
+      if (threadErr || !created?.id) {
+        console.error("Failed to create chat thread:", threadErr);
+      } else {
+        activeThreadId = created.id;
+        setThreadId(created.id);
+      }
+    }
+
+    // Persist the user message immediately.
+    if (activeThreadId) {
+      void supabase.from("chat_messages").insert({
+        thread_id: activeThreadId,
+        user_id: session.user.id,
+        role: "user",
+        content: text,
+      });
+    }
+
     // Two buffers:
     //   received → everything we've got back from the model so far
     //   typed    → what we've revealed to the user (chases `received`)
@@ -332,31 +400,55 @@ const AIChatbot = () => {
         ? received
         : stripActionMarkers(received);
       updateMessage(finalContent);
+
+      // Persist assistant reply + bump thread updated_at.
+      if (activeThreadId && finalContent.trim()) {
+        void supabase.from("chat_messages").insert({
+          thread_id: activeThreadId,
+          user_id: session.user.id,
+          role: "assistant",
+          content: finalContent,
+        });
+        void supabase.from("chat_threads")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", activeThreadId);
+      }
     } catch (e: unknown) {
       streamDone = true;
-      if ((e as { name?: string })?.name === "AbortError") {
-        await typewriter;
+      const isAbort = (e as { name?: string })?.name === "AbortError";
+      await typewriter;
+      let stoppedContent = "";
+      if (isAbort) {
+        stoppedContent = (received || "").trim() + "\n\n_⏹ Stopped_";
         setMessages(prev => {
           const copy = [...prev];
           const last = copy[copy.length - 1];
           if (last?.role === "assistant") {
-            copy[copy.length - 1] = {
-              role: "assistant",
-              content: (last.content || "").trim() + "\n\n_⏹ Stopped_",
-            };
+            copy[copy.length - 1] = { role: "assistant", content: stoppedContent };
           }
           return copy;
         });
       } else {
-        await typewriter;
         const message = e instanceof Error ? e.message : "Request failed";
         toast({ title: "Chat failed", description: message, variant: "destructive" });
+      }
+      // Persist whatever the user sees (stopped or partial).
+      if (isAbort && activeThreadId && stoppedContent.trim()) {
+        void supabase.from("chat_messages").insert({
+          thread_id: activeThreadId,
+          user_id: session.user.id,
+          role: "assistant",
+          content: stoppedContent,
+        });
+        void supabase.from("chat_threads")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", activeThreadId);
       }
     }
 
     abortRef.current = null;
     setLoading(false);
-  }, [input, loading, messages, toast]);
+  }, [input, loading, messages, toast, threadId]);
 
   if (!open) {
     return (
@@ -377,9 +469,21 @@ const AIChatbot = () => {
           <MessageCircle className="w-4 h-4 text-primary" />
           Scarpers Chat
         </CardTitle>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={startNewChat}
+            disabled={loading}
+            title="New chat"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
