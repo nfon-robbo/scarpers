@@ -358,7 +358,7 @@ export function expandedToSegments(steps: ExpandedStep[]): ParsedSegment[] {
   return steps.map((s) => ({
     segment: s.label,
     duration: `${s.duration} sec`,
-    target: /warmup|cooldown|recovery|rest/i.test(s.intensity) ? "" : s.pace,
+    target: s.pace,
     hrZone: s.hrZone,
     notes: s.intensity,
   }));
