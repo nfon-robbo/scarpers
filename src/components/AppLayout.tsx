@@ -123,36 +123,6 @@ const AppLayout = () => {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 glass-strong">
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-1.5">
-            <img src={scarpersIcon} alt="" className="h-9 w-9 object-contain" />
-            <img src={scarpersWordmark} alt="Scarpers" className="h-5 w-auto object-contain" />
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="rounded-xl text-muted-foreground"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={signOut}
-              className="rounded-xl text-muted-foreground hover:text-destructive"
-              aria-label="Sign out"
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
       {/* Mobile Bottom Tab Bar */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-border/50"
@@ -180,7 +150,7 @@ const AppLayout = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14 pb-20 md:pb-0 flex flex-col min-h-0">
+      <main className="flex-1 overflow-y-auto md:ml-[260px] pt-0 pb-20 md:pb-0 flex flex-col min-h-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <Outlet />
         </div>

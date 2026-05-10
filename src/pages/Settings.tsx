@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle } from "lucide-react";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, Sun, Monitor, LogOut, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle, Palette } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -114,7 +115,8 @@ const defaultSchedule: SyncSchedule = {
 
 const Settings = () => {
   const { units, setUnit } = useUnits();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { profile, refresh: refreshProfile } = useProfile();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
@@ -600,6 +602,41 @@ const Settings = () => {
       )}
 
       <CollapsibleSection
+        title="Appearance"
+        icon={Palette}
+        description="Choose how Scarpers looks on this device"
+        contentClassName="space-y-3"
+      >
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: "light", label: "Day", icon: Sun },
+            { value: "dark", label: "Dark", icon: Moon },
+            { value: "auto", label: "Auto", icon: Monitor },
+          ] as const).map(({ value, label, icon: Icon }) => {
+            const active = themePreference === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setThemePreference(value)}
+                className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 transition-all ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm font-medium">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Auto follows your device's system setting.
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title="Personal Details"
         icon={User}
         description="Used to personalise your AI training plan (HR zones, pacing, calories)"
@@ -1038,6 +1075,17 @@ const Settings = () => {
         <p className="text-xs text-muted-foreground mt-2">
           Pulls sleep duration, sleep score, HRV, resting heart rate, steps, weight, and stress data.
         </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Session"
+        icon={LogOut}
+        description="Sign out of your account on this device"
+      >
+        <Button variant="outline" onClick={signOut}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign out
+        </Button>
       </CollapsibleSection>
 
       <CollapsibleSection
