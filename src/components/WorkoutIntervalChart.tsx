@@ -91,7 +91,7 @@ function formatDuration(sec: number): string {
 
 function isNoPaceSegment(seg: ParsedSegment): boolean {
   const t = `${seg.segment} ${seg.notes ?? ""}`.toLowerCase();
-  return /warm\s*-?\s*up|cool\s*-?\s*down|rest/.test(t);
+  return /warm\s*-?\s*up|cool\s*-?\s*down|rest|recovery|walk/.test(t);
 }
 
 function shortTarget(seg: ParsedSegment): string {
