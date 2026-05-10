@@ -37,6 +37,7 @@ const AIChatbot = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -45,6 +46,46 @@ const AIChatbot = () => {
     abortRef.current?.abort();
     abortRef.current = null;
   }, []);
+
+  const startNewChat = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setThreadId(null);
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+  }, []);
+
+  // Load a thread's messages from the database.
+  const loadThread = useCallback(async (id: string) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setThreadId(id);
+    setMessages([]);
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("role, content, created_at")
+      .eq("thread_id", id)
+      .order("created_at", { ascending: true });
+    if (error) {
+      toast({ title: "Couldn't load chat", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMessages((data || []).map(m => ({ role: m.role as "user" | "assistant", content: m.content })));
+  }, [toast]);
+
+  // Listen for "open-chat-thread" events fired from Settings.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ threadId: string }>).detail;
+      if (!detail?.threadId) return;
+      setOpen(true);
+      loadThread(detail.threadId);
+    };
+    window.addEventListener("open-chat-thread", handler);
+    return () => window.removeEventListener("open-chat-thread", handler);
+  }, [loadThread]);
 
   useEffect(() => {
     if (scrollRef.current) {
