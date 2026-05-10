@@ -53,6 +53,7 @@ interface PlanRow {
   content: string;
   start_date: string;
   training_days: string[];
+  race_distance: string | null;
 }
 
 // ── Motivational quotes ──
