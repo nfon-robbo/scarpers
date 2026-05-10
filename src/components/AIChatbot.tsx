@@ -39,6 +39,12 @@ const AIChatbot = () => {
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopReply = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
