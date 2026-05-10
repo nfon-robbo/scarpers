@@ -115,7 +115,8 @@ const defaultSchedule: SyncSchedule = {
 
 const Settings = () => {
   const { units, setUnit } = useUnits();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { profile, refresh: refreshProfile } = useProfile();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
