@@ -8,6 +8,7 @@ import { ParsedWorkout } from "@/lib/plan-export";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
 
 interface PlanCalendarViewProps {
   workouts: ParsedWorkout[];
