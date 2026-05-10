@@ -877,6 +877,7 @@ export type Database = {
     Functions: {
       admin_ai_usage_stats: { Args: never; Returns: Json }
       admin_dashboard_stats: { Args: never; Returns: Json }
+      admin_system_health_stats: { Args: never; Returns: Json }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

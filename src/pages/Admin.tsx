@@ -98,18 +98,22 @@ const AdminPage = () => {
   }, [user, authLoading]);
 
   const [aiUsage, setAiUsage] = useState<any | null>(null);
+  const [health, setHealth] = useState<any | null>(null);
 
   const loadStats = async () => {
     setLoadingStats(true);
     try {
-      const [{ data, error }, { data: usage, error: uErr }] = await Promise.all([
+      const [{ data, error }, { data: usage, error: uErr }, { data: h, error: hErr }] = await Promise.all([
         supabase.rpc("admin_dashboard_stats" as any),
         supabase.rpc("admin_ai_usage_stats" as any),
+        supabase.rpc("admin_system_health_stats" as any),
       ]);
       if (error) throw error;
       if (uErr) console.warn("ai usage stats failed", uErr);
+      if (hErr) console.warn("health stats failed", hErr);
       setStats(data as unknown as Stats);
       setAiUsage(usage ?? null);
+      setHealth(h ?? null);
     } catch (e: any) {
       toast({ title: "Failed to load stats", description: e.message, variant: "destructive" });
     } finally {
@@ -372,19 +376,104 @@ const AdminPage = () => {
         {/* Health */}
         <TabsContent value="health" className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>System Health</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardHeader>
+              <CardTitle>System Health</CardTitle>
+              <CardDescription>Derived from AI usage logs (last 24 hours unless noted)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div>
                 <h3 className="text-sm font-medium mb-2">API response times</h3>
-                <NotTracked note="available in Lovable Cloud edge function logs" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Stat label="Avg latency" value={health?.latency?.avg_ms_24h != null ? `${health.latency.avg_ms_24h} ms` : "—"} />
+                  <Stat label="p95 latency" value={health?.latency?.p95_ms_24h != null ? `${health.latency.p95_ms_24h} ms` : "—"} />
+                  <Stat label="Max latency" value={health?.latency?.max_ms_24h != null ? `${health.latency.max_ms_24h} ms` : "—"} />
+                  <Stat label="Calls (24h)" value={health?.latency?.calls_24h ?? "—"} />
+                </div>
+                {health?.latency?.avg_by_label && Object.keys(health.latency.avg_by_label).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {Object.entries(health.latency.avg_by_label)
+                      .sort((a: any, b: any) => Number(b[1]) - Number(a[1]))
+                      .map(([label, ms]: any) => (
+                        <Badge key={label} variant="secondary" className="text-sm py-1.5 px-3">
+                          {label}: <span className="ml-1 font-semibold">{ms} ms</span>
+                        </Badge>
+                      ))}
+                  </div>
+                )}
               </div>
+
               <div>
                 <h3 className="text-sm font-medium mb-2">Error logs</h3>
-                <NotTracked note="available in Lovable Cloud edge function logs" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <Stat label="Errors (24h)" value={health?.errors?.count_24h ?? "—"} />
+                  <Stat label="Errors (7d)" value={health?.errors?.count_7d ?? "—"} />
+                  <Stat label="Error rate (24h)" value={health?.errors?.rate_24h != null ? `${health.errors.rate_24h}%` : "—"} />
+                </div>
+                {Array.isArray(health?.errors?.recent) && health.errors.recent.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-border/50 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/40">
+                        <tr className="text-left">
+                          <th className="px-3 py-2">Time</th>
+                          <th className="px-3 py-2">Provider</th>
+                          <th className="px-3 py-2">Label</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {health.errors.recent.map((e: any, i: number) => (
+                          <tr key={i} className="border-t border-border/30">
+                            <td className="px-3 py-2 font-mono">{new Date(e.created_at).toLocaleString("en-GB")}</td>
+                            <td className="px-3 py-2">{e.provider}</td>
+                            <td className="px-3 py-2">{e.label ?? "—"}</td>
+                            <td className="px-3 py-2"><Badge variant="destructive">{e.status}</Badge></td>
+                            <td className="px-3 py-2">{e.latency_ms ? `${e.latency_ms} ms` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-2">No errors logged.</p>
+                )}
               </div>
+
               <div>
                 <h3 className="text-sm font-medium mb-2">Failed plan generations</h3>
-                <NotTracked note="add a plan_generation_log table to capture failures" />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <Stat label="Failed (24h)" value={health?.plan_failures?.count_24h ?? "—"} />
+                  <Stat label="Failed (7d)" value={health?.plan_failures?.count_7d ?? "—"} />
+                  <Stat label="Failed (30d)" value={health?.plan_failures?.count_30d ?? "—"} />
+                </div>
+                {Array.isArray(health?.plan_failures?.recent) && health.plan_failures.recent.length > 0 ? (
+                  <div className="mt-3 rounded-xl border border-border/50 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/40">
+                        <tr className="text-left">
+                          <th className="px-3 py-2">Time</th>
+                          <th className="px-3 py-2">Provider</th>
+                          <th className="px-3 py-2">Model</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {health.plan_failures.recent.map((e: any, i: number) => (
+                          <tr key={i} className="border-t border-border/30">
+                            <td className="px-3 py-2 font-mono">{new Date(e.created_at).toLocaleString("en-GB")}</td>
+                            <td className="px-3 py-2">{e.provider}</td>
+                            <td className="px-3 py-2">{e.model ?? "—"}</td>
+                            <td className="px-3 py-2"><Badge variant="destructive">{e.status}</Badge></td>
+                            <td className="px-3 py-2">{e.latency_ms ? `${e.latency_ms} ms` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-2">No failed plan generations.</p>
+                )}
               </div>
             </CardContent>
           </Card>
