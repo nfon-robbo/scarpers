@@ -299,6 +299,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
             })}
           </div>
         </div>
+      </div>
 
       {/* Workout detail dialog */}
       <Dialog open={!!selectedWorkout} onOpenChange={(o) => !o && setSelectedWorkout(null)}>
