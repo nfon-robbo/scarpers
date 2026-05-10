@@ -63,6 +63,11 @@ const AdminPage = () => {
   // Sitemap
   const sitemapUrl = `${window.location.origin}/sitemap.xml`;
 
+  // USD → GBP conversion (approximate, fixed rate)
+  const USD_TO_GBP = 0.79;
+  const fmtGBP = (usd: any) =>
+    `£${(Number(usd ?? 0) * USD_TO_GBP).toFixed(2)}`;
+
   useEffect(() => {
     if (authLoading) return;
     (async () => {
@@ -267,9 +272,9 @@ const AdminPage = () => {
                 <Stat label="API calls this month" value={aiUsage?.calls_month ?? "—"} />
                 <Stat label="Tokens today" value={Number(aiUsage?.tokens_today ?? 0).toLocaleString()} />
                 <Stat label="Tokens this month" value={Number(aiUsage?.tokens_month ?? 0).toLocaleString()} />
-                <Stat label="Cost today" value={`$${Number(aiUsage?.cost_today ?? 0).toFixed(2)}`} />
-                <Stat label="Cost this month" value={`$${Number(aiUsage?.cost_month ?? 0).toFixed(2)}`} />
-                <Stat label="Cost (30d)" value={`$${Number(aiUsage?.cost_30d ?? 0).toFixed(2)}`} />
+                <Stat label="Cost today" value={fmtGBP(aiUsage?.cost_today)} />
+                <Stat label="Cost this month" value={fmtGBP(aiUsage?.cost_month)} />
+                <Stat label="Cost (30d)" value={fmtGBP(aiUsage?.cost_30d)} />
                 <Stat label="Avg tokens / plan" value={Number(aiUsage?.avg_tokens_per_plan ?? 0).toLocaleString()} />
               </div>
 
@@ -281,7 +286,7 @@ const AdminPage = () => {
                       <div key={prov} className="rounded-xl border border-border/50 p-4 bg-card/60">
                         <p className="text-sm font-medium capitalize">{prov}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {v.calls} calls · {Number(v.tokens).toLocaleString()} tokens · ${Number(v.cost).toFixed(2)}
+                          {v.calls} calls · {Number(v.tokens).toLocaleString()} tokens · {fmtGBP(v.cost)}
                         </p>
                       </div>
                     ))}
