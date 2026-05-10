@@ -2,21 +2,17 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 
 type Row = {
   date: string;
   hours: number;
   score: number | null;
-  deep: number | null;
-  rem: number | null;
-  light: number | null;
-  awake: number | null;
+  avgHr: number | null;
 };
 
 const fmtH = (h: number) => `${Math.floor(h)}:${String(Math.round((h - Math.floor(h)) * 60)).padStart(2, "0")}`;
-const fmtMin = (m: number | null) => (m == null ? <span className="text-muted-foreground/40">—</span> : `${Math.round(m)}m`);
 
 const SleepSourcesPanel = () => {
   const { user } = useAuth();
@@ -29,7 +25,7 @@ const SleepSourcesPanel = () => {
       const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
       const { data: dm } = await supabase
         .from("daily_metrics")
-        .select("date, sleep_duration_seconds, sleep_score, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes, source_file")
+        .select("date, sleep_duration_seconds, sleep_score, raw_data, source_file")
         .eq("user_id", user.id)
         .gte("date", since)
         .not("sleep_duration_seconds", "is", null);
@@ -40,10 +36,7 @@ const SleepSourcesPanel = () => {
           date: m.date,
           hours: (m.sleep_duration_seconds ?? 0) / 3600,
           score: m.sleep_score,
-          deep: m.deep_sleep_minutes,
-          rem: m.rem_sleep_minutes,
-          light: m.light_sleep_minutes,
-          awake: m.awake_during_night_minutes,
+          avgHr: m.raw_data?.avgSleepingHR ?? null,
         }))
         .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -56,7 +49,7 @@ const SleepSourcesPanel = () => {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Sleep — Intervals.icu</CardTitle>
-        <CardDescription>Last 7 nights · duration, score and stage breakdown</CardDescription>
+        <CardDescription>Last 7 nights · duration, score and avg sleeping HR</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -71,10 +64,7 @@ const SleepSourcesPanel = () => {
                   <th className="px-2 py-2">Date</th>
                   <th className="px-2 py-2">Duration</th>
                   <th className="px-2 py-2">Score</th>
-                  <th className="px-2 py-2">Deep</th>
-                  <th className="px-2 py-2">REM</th>
-                  <th className="px-2 py-2">Light</th>
-                  <th className="px-2 py-2">Awake</th>
+                  <th className="px-2 py-2">Avg sleeping HR</th>
                 </tr>
               </thead>
               <tbody>
@@ -83,14 +73,15 @@ const SleepSourcesPanel = () => {
                     <td className="px-2 py-2 font-mono">{format(parseISO(r.date), "dd/MM/yyyy")}</td>
                     <td className="px-2 py-2 font-semibold">{fmtH(r.hours)}</td>
                     <td className="px-2 py-2">{r.score ?? <span className="text-muted-foreground/40">—</span>}</td>
-                    <td className="px-2 py-2">{fmtMin(r.deep)}</td>
-                    <td className="px-2 py-2">{fmtMin(r.rem)}</td>
-                    <td className="px-2 py-2">{fmtMin(r.light)}</td>
-                    <td className="px-2 py-2">{fmtMin(r.awake)}</td>
+                    <td className="px-2 py-2">{r.avgHr != null ? `${Math.round(r.avgHr)} bpm` : <span className="text-muted-foreground/40">—</span>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="flex items-start gap-2 text-[11px] text-muted-foreground mt-3">
+              <Info className="w-3 h-3 mt-0.5 shrink-0" />
+              <span>Intervals.icu's wellness API doesn't expose deep/REM/light/awake stage breakdowns — only total duration and score. Stages are not available from this source.</span>
+            </p>
           </div>
         )}
       </CardContent>
