@@ -92,12 +92,19 @@ const AdminPage = () => {
     })();
   }, [user, authLoading]);
 
+  const [aiUsage, setAiUsage] = useState<any | null>(null);
+
   const loadStats = async () => {
     setLoadingStats(true);
     try {
-      const { data, error } = await supabase.rpc("admin_dashboard_stats" as any);
+      const [{ data, error }, { data: usage, error: uErr }] = await Promise.all([
+        supabase.rpc("admin_dashboard_stats" as any),
+        supabase.rpc("admin_ai_usage_stats" as any),
+      ]);
       if (error) throw error;
+      if (uErr) console.warn("ai usage stats failed", uErr);
       setStats(data as unknown as Stats);
+      setAiUsage(usage ?? null);
     } catch (e: any) {
       toast({ title: "Failed to load stats", description: e.message, variant: "destructive" });
     } finally {
