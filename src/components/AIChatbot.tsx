@@ -259,6 +259,33 @@ const AIChatbot = () => {
     setInput("");
     setLoading(true);
 
+    // Ensure a thread exists for this conversation; create on first message.
+    let activeThreadId = threadId;
+    if (!activeThreadId) {
+      const title = text.length > 60 ? text.slice(0, 57) + "…" : text;
+      const { data: created, error: threadErr } = await supabase
+        .from("chat_threads")
+        .insert({ user_id: session.user.id, title })
+        .select("id")
+        .maybeSingle();
+      if (threadErr || !created?.id) {
+        console.error("Failed to create chat thread:", threadErr);
+      } else {
+        activeThreadId = created.id;
+        setThreadId(created.id);
+      }
+    }
+
+    // Persist the user message immediately.
+    if (activeThreadId) {
+      void supabase.from("chat_messages").insert({
+        thread_id: activeThreadId,
+        user_id: session.user.id,
+        role: "user",
+        content: text,
+      });
+    }
+
     // Two buffers:
     //   received → everything we've got back from the model so far
     //   typed    → what we've revealed to the user (chases `received`)
