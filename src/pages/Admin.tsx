@@ -92,12 +92,19 @@ const AdminPage = () => {
     })();
   }, [user, authLoading]);
 
+  const [aiUsage, setAiUsage] = useState<any | null>(null);
+
   const loadStats = async () => {
     setLoadingStats(true);
     try {
-      const { data, error } = await supabase.rpc("admin_dashboard_stats" as any);
+      const [{ data, error }, { data: usage, error: uErr }] = await Promise.all([
+        supabase.rpc("admin_dashboard_stats" as any),
+        supabase.rpc("admin_ai_usage_stats" as any),
+      ]);
       if (error) throw error;
+      if (uErr) console.warn("ai usage stats failed", uErr);
       setStats(data as unknown as Stats);
+      setAiUsage(usage ?? null);
     } catch (e: any) {
       toast({ title: "Failed to load stats", description: e.message, variant: "destructive" });
     } finally {
@@ -252,17 +259,56 @@ const AdminPage = () => {
           <Card>
             <CardHeader>
               <CardTitle>AI Usage & Cost</CardTitle>
-              <CardDescription>Monitor API spend</CardDescription>
+              <CardDescription>Monitor API spend (Claude billed; Lovable Gateway included in plan)</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <NotTracked note="add an ai_usage_log table that records each call's tokens & estimated cost" />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 opacity-60">
-                <Stat label="API calls today" value="—" />
-                <Stat label="API calls this month" value="—" />
-                <Stat label="Tokens used" value="—" />
-                <Stat label="Est. cost" value="—" />
-                <Stat label="Avg tokens / plan" value="—" />
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="API calls today" value={aiUsage?.calls_today ?? "—"} />
+                <Stat label="API calls this month" value={aiUsage?.calls_month ?? "—"} />
+                <Stat label="Tokens today" value={Number(aiUsage?.tokens_today ?? 0).toLocaleString()} />
+                <Stat label="Tokens this month" value={Number(aiUsage?.tokens_month ?? 0).toLocaleString()} />
+                <Stat label="Cost today" value={`$${Number(aiUsage?.cost_today ?? 0).toFixed(2)}`} />
+                <Stat label="Cost this month" value={`$${Number(aiUsage?.cost_month ?? 0).toFixed(2)}`} />
+                <Stat label="Cost (30d)" value={`$${Number(aiUsage?.cost_30d ?? 0).toFixed(2)}`} />
+                <Stat label="Avg tokens / plan" value={Number(aiUsage?.avg_tokens_per_plan ?? 0).toLocaleString()} />
               </div>
+
+              {aiUsage?.by_provider && Object.keys(aiUsage.by_provider).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">By provider (this month)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.entries(aiUsage.by_provider).map(([prov, v]: any) => (
+                      <div key={prov} className="rounded-xl border border-border/50 p-4 bg-card/60">
+                        <p className="text-sm font-medium capitalize">{prov}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {v.calls} calls · {Number(v.tokens).toLocaleString()} tokens · ${Number(v.cost).toFixed(2)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {aiUsage?.by_label && Object.keys(aiUsage.by_label).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">By feature (30d)</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(aiUsage.by_label)
+                      .sort((a: any, b: any) => Number(b[1]) - Number(a[1]))
+                      .map(([label, c]: any) => (
+                        <Badge key={label} variant="secondary" className="text-sm py-1.5 px-3">
+                          {label}: <span className="ml-1 font-semibold">{c}</span>
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {(!aiUsage || aiUsage.calls_month === 0) && (
+                <p className="text-xs text-muted-foreground">
+                  No AI calls logged yet. Logging starts now — make a coach request to populate the dashboard.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
