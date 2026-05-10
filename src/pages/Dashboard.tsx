@@ -517,15 +517,17 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-4 pb-8 animate-fade-in">
-      {/* ── Hero Plan Card ── */}
-      <HeroPlanCard
-        name={profile?.name || null}
-        raceDistance={plan?.race_distance || null}
-        planStartDate={plan?.start_date || null}
-        nextRunDate={todaysWorkout?.workout?.dateObj || null}
-        completedDates={heroData.completed}
-        workouts={heroData.workouts}
-      />
+      {/* ── Hero Plan Card (full-bleed) ── */}
+      <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-6">
+        <HeroPlanCard
+          name={profile?.name || null}
+          raceDistance={plan?.race_distance || null}
+          planStartDate={plan?.start_date || null}
+          nextRunDate={todaysWorkout?.workout?.dateObj || null}
+          completedDates={heroData.completed}
+          workouts={heroData.workouts}
+        />
+      </div>
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
