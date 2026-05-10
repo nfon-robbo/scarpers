@@ -254,7 +254,7 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
 
               {selectedWorkout.segments.length > 0 ? (
                 <div className="space-y-2 mt-2">
-                  <WorkoutIntervalChart segments={selectedWorkout.segments} />
+                  <WorkoutIntervalChart segments={expandedToSegments(expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? ""))} />
                   {selectedWorkout.segments.map((seg, i) => (
                     <div key={i} className="rounded-lg border bg-muted/30 p-3 space-y-1">
                       <div className="flex items-center justify-between">
