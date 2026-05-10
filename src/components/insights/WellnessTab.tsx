@@ -181,6 +181,7 @@ const WellnessTab = () => {
         </div>
       )}
 
+      <SleepSourcesPanel />
       <SleepCalendar />
       <SleepStagesChart />
 
