@@ -469,9 +469,21 @@ const AIChatbot = () => {
           <MessageCircle className="w-4 h-4 text-primary" />
           Scarpers Chat
         </CardTitle>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
-          <X className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={startNewChat}
+            disabled={loading}
+            title="New chat"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
