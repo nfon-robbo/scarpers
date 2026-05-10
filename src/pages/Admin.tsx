@@ -63,6 +63,11 @@ const AdminPage = () => {
   // Sitemap
   const sitemapUrl = `${window.location.origin}/sitemap.xml`;
 
+  // USD → GBP conversion (approximate, fixed rate)
+  const USD_TO_GBP = 0.79;
+  const fmtGBP = (usd: any) =>
+    `£${(Number(usd ?? 0) * USD_TO_GBP).toFixed(2)}`;
+
   useEffect(() => {
     if (authLoading) return;
     (async () => {
