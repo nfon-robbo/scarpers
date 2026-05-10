@@ -121,7 +121,9 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
       } catch {}
     }
 
-    if ("geolocation" in navigator) {
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    const isMobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if ((isNative || isMobileUA) && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
         () => { fetchByIp(); },
