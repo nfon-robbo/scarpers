@@ -479,6 +479,26 @@ const Dashboard = () => {
     return withRHR.length > 0 ? withRHR[withRHR.length - 1].resting_heart_rate : null;
   }, [metrics]);
 
+  // Completed run dates + planned (non-rest) dates for hero strip
+  const heroDateSets = useMemo(() => {
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const completed = new Set<string>();
+    for (const a of activities) {
+      if (!a.start_time) continue;
+      if (/walk/i.test(a.activity_type || "")) continue;
+      if (!a.distance_meters || !a.duration_seconds) continue;
+      completed.add(ymd(new Date(a.start_time)));
+    }
+    const planned = new Set<string>();
+    if (plan?.content) {
+      for (const w of parseWorkoutsFromPlan(plan.content)) {
+        if (w.dateObj && !/rest/i.test(w.title)) planned.add(ymd(w.dateObj));
+      }
+    }
+    return { completed, planned };
+  }, [activities, plan]);
+
   const hasData = stats && stats.count > 0;
 
   const greeting = useMemo(() => {
