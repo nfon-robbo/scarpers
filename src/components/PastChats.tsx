@@ -73,6 +73,56 @@ const PastChats = ({ bare = false }: { bare?: boolean } = {}) => {
     toast({ title: "Chat deleted" });
   };
 
+  const body = (
+    loading ? (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+      </div>
+    ) : threads.length === 0 ? (
+      <p className="text-sm text-muted-foreground py-2">
+        No previous chats yet. Start a conversation with the chat bubble.
+      </p>
+    ) : (
+      <ul className="divide-y divide-border/50 -my-2">
+        {threads.map(t => (
+          <li key={t.id} className="flex items-center gap-2 py-2">
+            <button
+              onClick={() => resume(t.id)}
+              className="flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-accent transition-colors"
+            >
+              <p className="text-sm font-medium truncate">{t.title}</p>
+              <p className="text-xs text-muted-foreground">{fmtRelative(t.updated_at)}</p>
+            </button>
+            <Button size="sm" variant="ghost" onClick={() => resume(t.id)}>
+              Continue
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete "{t.title}" and all its messages. This can't be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => remove(t.id)}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </li>
+        ))}
+      </ul>
+    )
+  );
+
+  if (bare) return <>{body}</>;
+
   return (
     <Card>
       <CardHeader>
@@ -82,53 +132,7 @@ const PastChats = ({ bare = false }: { bare?: boolean } = {}) => {
         </CardTitle>
         <CardDescription>Resume a past conversation with the AI coach.</CardDescription>
       </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-          </div>
-        ) : threads.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-2">
-            No previous chats yet. Start a conversation with the chat bubble.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border/50 -my-2">
-            {threads.map(t => (
-              <li key={t.id} className="flex items-center gap-2 py-2">
-                <button
-                  onClick={() => resume(t.id)}
-                  className="flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-accent transition-colors"
-                >
-                  <p className="text-sm font-medium truncate">{t.title}</p>
-                  <p className="text-xs text-muted-foreground">{fmtRelative(t.updated_at)}</p>
-                </button>
-                <Button size="sm" variant="ghost" onClick={() => resume(t.id)}>
-                  Continue
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete "{t.title}" and all its messages. This can't be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => remove(t.id)}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 };
