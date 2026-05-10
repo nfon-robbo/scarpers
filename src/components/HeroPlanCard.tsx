@@ -269,8 +269,13 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
                         <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
                       </div>
                     ) : hasWorkout ? (
-                      <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide truncate max-w-full px-0.5">
-                        {shortLabel(workout!.title)}
+                      <span
+                        aria-label={shortLabel(workout!.title)}
+                        title={shortLabel(workout!.title)}
+                        className="w-4 h-4 rounded-full bg-white/95 text-primary flex items-center justify-center text-[10px] font-extrabold shadow-sm"
+                        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      >
+                        S
                       </span>
                     ) : null}
                   </div>
