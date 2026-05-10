@@ -1,0 +1,1 @@
+UPDATE public.ai_usage_log SET label = 'ai-coach:chat' WHERE label IS NULL;
