@@ -90,7 +90,7 @@ const AdminPage = () => {
         loadStats();
       }
     })();
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadStats = async () => {
     setLoadingStats(true);
