@@ -599,116 +599,110 @@ const Settings = () => {
         </CollapsibleSection>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Personal Details
-          </CardTitle>
-          <CardDescription>
-            Used to personalise your AI training plan (HR zones, pacing, calories)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sex">Sex</Label>
-              <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
-                <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other / prefer not to say</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dob">Date of birth</Label>
+      <CollapsibleSection
+        title="Personal Details"
+        icon={User}
+        description="Used to personalise your AI training plan (HR zones, pacing, calories)"
+        contentClassName="space-y-4"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="sex">Sex</Label>
+            <Select value={personal.sex || undefined} onValueChange={(v) => setPersonal((p) => ({ ...p, sex: v }))}>
+              <SelectTrigger id="sex"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other / prefer not to say</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dob">Date of birth</Label>
+            <Input
+              id="dob"
+              type="date"
+              value={personal.date_of_birth}
+              onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Height {units.height === "ft" ? "(ft / in)" : "(cm)"}</Label>
+            {units.height === "ft" ? (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="8"
+                  placeholder="ft"
+                  value={heightFt}
+                  onChange={(e) => { setHeightFt(e.target.value); commitHeight(e.target.value, heightIn); }}
+                />
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max="11"
+                  placeholder="in"
+                  value={heightIn}
+                  onChange={(e) => { setHeightIn(e.target.value); commitHeight(heightFt, e.target.value); }}
+                />
+              </div>
+            ) : (
               <Input
-                id="dob"
-                type="date"
-                value={personal.date_of_birth}
-                onChange={(e) => setPersonal((p) => ({ ...p, date_of_birth: e.target.value }))}
+                type="number"
+                inputMode="decimal"
+                min="50"
+                max="250"
+                value={personal.height_cm}
+                onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Height {units.height === "ft" ? "(ft / in)" : "(cm)"}</Label>
-              {units.height === "ft" ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="8"
-                    placeholder="ft"
-                    value={heightFt}
-                    onChange={(e) => { setHeightFt(e.target.value); commitHeight(e.target.value, heightIn); }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    max="11"
-                    placeholder="in"
-                    value={heightIn}
-                    onChange={(e) => { setHeightIn(e.target.value); commitHeight(heightFt, e.target.value); }}
-                  />
-                </div>
-              ) : (
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Weight {units.weight === "kg" ? "(kg)" : units.weight === "lbs" ? "(lbs)" : "(st / lb)"}</Label>
+            {units.weight === "st" ? (
+              <div className="flex gap-2">
                 <Input
                   type="number"
-                  inputMode="decimal"
-                  min="50"
-                  max="250"
-                  value={personal.height_cm}
-                  onChange={(e) => setPersonal((p) => ({ ...p, height_cm: e.target.value }))}
-                />
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Weight {units.weight === "kg" ? "(kg)" : units.weight === "lbs" ? "(lbs)" : "(st / lb)"}</Label>
-              {units.weight === "st" ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    placeholder="st"
-                    value={weightDisplay}
-                    onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value, weightStLb); }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="13.9"
-                    step="0.1"
-                    placeholder="lb"
-                    value={weightStLb}
-                    onChange={(e) => { setWeightStLb(e.target.value); commitWeight(weightDisplay, e.target.value); }}
-                  />
-                </div>
-              ) : (
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min="20"
-                  max="600"
-                  step="0.1"
+                  inputMode="numeric"
+                  min="0"
+                  placeholder="st"
                   value={weightDisplay}
-                  onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value); }}
+                  onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value, weightStLb); }}
                 />
-              )}
-            </div>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="13.9"
+                  step="0.1"
+                  placeholder="lb"
+                  value={weightStLb}
+                  onChange={(e) => { setWeightStLb(e.target.value); commitWeight(weightDisplay, e.target.value); }}
+                />
+              </div>
+            ) : (
+              <Input
+                type="number"
+                inputMode="decimal"
+                min="20"
+                max="600"
+                step="0.1"
+                value={weightDisplay}
+                onChange={(e) => { setWeightDisplay(e.target.value); commitWeight(e.target.value); }}
+              />
+            )}
           </div>
-          <div className="flex justify-end">
-            <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
-              {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              {savingPersonal ? "Saving..." : "Save Details"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={savePersonal} disabled={savingPersonal} size="sm">
+            {savingPersonal ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+            {savingPersonal ? "Saving..." : "Save Details"}
+          </Button>
+        </div>
+      </CollapsibleSection>
 
       <Card>
         <CardHeader>
