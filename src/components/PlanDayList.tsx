@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
-import { expandWorkoutSteps } from "@/lib/plan-step-expand";
+import { expandWorkoutSteps, expandedToSegments } from "@/lib/plan-step-expand";
 import {
   loadCustomSteps, saveCustomSteps, defaultsFor, customToExpanded,
   type CustomStep, type CustomStepKind, type CustomStepsMap,
@@ -802,7 +802,18 @@ export default function PlanDayList({
 
               {selectedWorkout.segments.length > 0 ? (
                 <>
-                <div className="mt-2"><WorkoutIntervalChart segments={selectedWorkout.segments} /></div>
+                {(() => {
+                  const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+                  const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
+                  const aiExpanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
+                  const myCustom = customSteps[workoutKey(selectedWorkout)] || [];
+                  const customExpanded = customToExpanded(myCustom);
+                  const combined = [...aiExpanded, ...customExpanded];
+                  return (
+                    <>
+                    <div className="mt-2"><WorkoutIntervalChart segments={expandedToSegments(combined)} /></div></>
+                  );
+                })()}
                 {(() => {
                   const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
                   const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");

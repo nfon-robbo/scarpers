@@ -348,3 +348,18 @@ export function expandWorkoutSteps(
 
   return out;
 }
+
+/**
+ * Convert expanded steps back into a ParsedSegment-shaped array so the
+ * interval chart can render each individual rep (otherwise repeat blocks
+ * render as a single bar and the chart looks incomplete).
+ */
+export function expandedToSegments(steps: ExpandedStep[]): ParsedSegment[] {
+  return steps.map((s) => ({
+    segment: s.label,
+    duration: `${s.duration} sec`,
+    target: /warmup|cooldown|recovery|rest/i.test(s.intensity) ? "" : s.pace,
+    hrZone: s.hrZone,
+    notes: s.intensity,
+  }));
+}
