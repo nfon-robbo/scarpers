@@ -400,31 +400,55 @@ const AIChatbot = () => {
         ? received
         : stripActionMarkers(received);
       updateMessage(finalContent);
+
+      // Persist assistant reply + bump thread updated_at.
+      if (activeThreadId && finalContent.trim()) {
+        void supabase.from("chat_messages").insert({
+          thread_id: activeThreadId,
+          user_id: session.user.id,
+          role: "assistant",
+          content: finalContent,
+        });
+        void supabase.from("chat_threads")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", activeThreadId);
+      }
     } catch (e: unknown) {
       streamDone = true;
-      if ((e as { name?: string })?.name === "AbortError") {
-        await typewriter;
+      const isAbort = (e as { name?: string })?.name === "AbortError";
+      await typewriter;
+      let stoppedContent = "";
+      if (isAbort) {
+        stoppedContent = (received || "").trim() + "\n\n_⏹ Stopped_";
         setMessages(prev => {
           const copy = [...prev];
           const last = copy[copy.length - 1];
           if (last?.role === "assistant") {
-            copy[copy.length - 1] = {
-              role: "assistant",
-              content: (last.content || "").trim() + "\n\n_⏹ Stopped_",
-            };
+            copy[copy.length - 1] = { role: "assistant", content: stoppedContent };
           }
           return copy;
         });
       } else {
-        await typewriter;
         const message = e instanceof Error ? e.message : "Request failed";
         toast({ title: "Chat failed", description: message, variant: "destructive" });
+      }
+      // Persist whatever the user sees (stopped or partial).
+      if (isAbort && activeThreadId && stoppedContent.trim()) {
+        void supabase.from("chat_messages").insert({
+          thread_id: activeThreadId,
+          user_id: session.user.id,
+          role: "assistant",
+          content: stoppedContent,
+        });
+        void supabase.from("chat_threads")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", activeThreadId);
       }
     }
 
     abortRef.current = null;
     setLoading(false);
-  }, [input, loading, messages, toast]);
+  }, [input, loading, messages, toast, threadId]);
 
   if (!open) {
     return (
