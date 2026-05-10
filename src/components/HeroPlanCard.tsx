@@ -45,8 +45,10 @@ function weatherIcon(code: number) {
   return CloudSun;
 }
 
-export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate }: HeroPlanCardProps) {
+export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate, completedDates, plannedDates }: HeroPlanCardProps) {
   const [weather, setWeather] = useState<Weather | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const todayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
