@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
-import { expandWorkoutSteps } from "@/lib/plan-step-expand";
+import { expandWorkoutSteps, expandedToSegments } from "@/lib/plan-step-expand";
 import {
   loadCustomSteps, saveCustomSteps, defaultsFor, customToExpanded,
   type CustomStep, type CustomStepKind, type CustomStepsMap,
