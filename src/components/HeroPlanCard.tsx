@@ -114,29 +114,37 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
     return { dateLabel: null as string | null, dateValue: null as Date | null };
   }, [planStartDate, nextRunDate]);
 
-  // Only show non-rest plan workouts, sorted ascending by date
-  const planItems = useMemo(() => {
-    return workouts
-      .filter((w) => w.dateObj && !/rest/i.test(w.title))
-      .sort((a, b) => a.dateObj!.getTime() - b.dateObj!.getTime());
+  // Map workouts by yyyy-MM-dd for quick lookup
+  const workoutByDate = useMemo(() => {
+    const m = new Map<string, ParsedWorkout>();
+    for (const w of workouts) {
+      if (w.dateObj && !/rest/i.test(w.title)) m.set(ymd(w.dateObj), w);
+    }
+    return m;
   }, [workouts]);
 
-  // Auto-scroll to next upcoming (or today's) workout
+  // Build a full date strip: 21 days before today → 60 days after
+  const stripDays = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days: Date[] = [];
+    for (let i = -21; i <= 60; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, []);
+
+  const today = startOfDay(new Date());
+
+  // Auto-scroll to center today on mount
   useEffect(() => {
     if (scrollerRef.current && focusRef.current) {
       const s = scrollerRef.current;
       const t = focusRef.current;
       s.scrollLeft = t.offsetLeft - s.clientWidth / 2 + t.clientWidth / 2;
     }
-  }, [planItems.length]);
-
-  const today = startOfDay(new Date());
-  const focusIdx = useMemo(() => {
-    const idx = planItems.findIndex(
-      (w) => w.dateObj && (isSameDay(w.dateObj, today) || w.dateObj >= today)
-    );
-    return idx === -1 ? planItems.length - 1 : idx;
-  }, [planItems, today]);
+  }, [stripDays.length]);
 
   const scrollBy = (delta: number) => {
     scrollerRef.current?.scrollBy({ left: delta, behavior: "smooth" });
