@@ -98,18 +98,22 @@ const AdminPage = () => {
   }, [user, authLoading]);
 
   const [aiUsage, setAiUsage] = useState<any | null>(null);
+  const [health, setHealth] = useState<any | null>(null);
 
   const loadStats = async () => {
     setLoadingStats(true);
     try {
-      const [{ data, error }, { data: usage, error: uErr }] = await Promise.all([
+      const [{ data, error }, { data: usage, error: uErr }, { data: h, error: hErr }] = await Promise.all([
         supabase.rpc("admin_dashboard_stats" as any),
         supabase.rpc("admin_ai_usage_stats" as any),
+        supabase.rpc("admin_system_health_stats" as any),
       ]);
       if (error) throw error;
       if (uErr) console.warn("ai usage stats failed", uErr);
+      if (hErr) console.warn("health stats failed", hErr);
       setStats(data as unknown as Stats);
       setAiUsage(usage ?? null);
+      setHealth(h ?? null);
     } catch (e: any) {
       toast({ title: "Failed to load stats", description: e.message, variant: "destructive" });
     } finally {
