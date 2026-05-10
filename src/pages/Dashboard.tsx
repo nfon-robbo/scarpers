@@ -870,6 +870,7 @@ const Dashboard = () => {
           )}
         </>
       )}
+      <FeedbackCard />
       <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
     </div>
   );
