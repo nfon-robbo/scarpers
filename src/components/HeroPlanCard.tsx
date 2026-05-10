@@ -84,6 +84,32 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
 
   useEffect(() => {
     let cancelled = false;
+
+    async function fetchWeather(lat: number, lon: number) {
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`
+        );
+        const j = await res.json();
+        if (cancelled || !j?.current) return;
+        const w = { tempC: Math.round(j.current.temperature_2m), code: j.current.weather_code };
+        setWeather(w);
+        sessionStorage.setItem("hero_weather", JSON.stringify({ ...w, t: Date.now() }));
+      } catch {}
+    }
+
+    async function fetchByIp() {
+      try {
+        const r = await fetch("https://get.geojs.io/v1/ip/geo.json");
+        const g = await r.json();
+        const lat = parseFloat(g.latitude);
+        const lon = parseFloat(g.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          await fetchWeather(lat, lon);
+        }
+      } catch {}
+    }
+
     const cached = sessionStorage.getItem("hero_weather");
     if (cached) {
       try {
@@ -94,24 +120,16 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
         }
       } catch {}
     }
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code`
-          );
-          const j = await res.json();
-          if (cancelled || !j?.current) return;
-          const w = { tempC: Math.round(j.current.temperature_2m), code: j.current.weather_code };
-          setWeather(w);
-          sessionStorage.setItem("hero_weather", JSON.stringify({ ...w, t: Date.now() }));
-        } catch {}
-      },
-      () => {},
-      { maximumAge: 30 * 60 * 1000, timeout: 8000 }
-    );
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        () => { fetchByIp(); },
+        { maximumAge: 30 * 60 * 1000, timeout: 6000 }
+      );
+    } else {
+      fetchByIp();
+    }
     return () => { cancelled = true; };
   }, []);
 
