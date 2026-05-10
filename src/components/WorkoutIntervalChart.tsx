@@ -46,22 +46,28 @@ function paceTargetToSecPerKm(target: string): number | null {
 
 // Map a segment to an intensity in [0, 1]. 1 = hardest.
 function segmentIntensity(seg: ParsedSegment): number {
+  // Walks, warm-ups, cool-downs and rests are always low effort, regardless
+  // of any HR zone the AI may have attached to them.
+  const label = `${seg.segment} ${seg.notes ?? ""}`.toLowerCase();
+  if (/rest/.test(label)) return 0.08;
+  if (/walk|recovery/.test(label)) return 0.18;
+  if (/warm\s*-?\s*up|cool\s*-?\s*down/.test(label)) return 0.25;
+
   const pace = paceTargetToSecPerKm(seg.target);
   if (pace != null) {
-    // Map 4:00/km → 1.0, 7:30/km → 0.15
+    // Map 4:00/km → 1.0, 7:30/km → 0.4 (runs should clearly tower over walks)
     const clamped = Math.max(240, Math.min(450, pace));
-    return 1 - (clamped - 240) / (450 - 240) * 0.85;
+    return 0.4 + (1 - (clamped - 240) / (450 - 240)) * 0.6;
   }
   const z = seg.hrZone.match(/Z\s*(\d)/i);
   if (z) {
     const zone = parseInt(z[1], 10);
-    return Math.max(0.15, Math.min(1, zone / 5));
+    return Math.max(0.4, Math.min(1, zone / 5));
   }
   const t = `${seg.target} ${seg.segment} ${seg.notes ?? ""}`.toLowerCase();
-  if (/recovery|walk|rest/.test(t)) return 0.2;
-  if (/easy|jog/.test(t)) return 0.35;
-  if (/steady|aerobic/.test(t)) return 0.5;
-  if (/tempo|threshold/.test(t)) return 0.75;
+  if (/easy|jog/.test(t)) return 0.45;
+  if (/steady|aerobic/.test(t)) return 0.6;
+  if (/tempo|threshold/.test(t)) return 0.8;
   if (/interval|vo2|hard|sprint|fast/.test(t)) return 0.95;
   return 0.5;
 }
