@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
+import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
