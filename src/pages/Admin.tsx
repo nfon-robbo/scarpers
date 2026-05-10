@@ -60,8 +60,8 @@ const AdminPage = () => {
   const [claudeModel, setClaudeModel] = useState("claude-haiku-4-5");
   const [savingAi, setSavingAi] = useState(false);
 
-  // Sitemap
-  const sitemapUrl = `${window.location.origin}/sitemap.xml`;
+  // Sitemap (always points to production domain regardless of where Admin is opened)
+  const sitemapUrl = "https://www.scarpers.co.uk/sitemap.xml";
 
   // USD → GBP conversion (approximate, fixed rate)
   const USD_TO_GBP = 0.79;
