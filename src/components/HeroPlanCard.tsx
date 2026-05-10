@@ -174,25 +174,77 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           </div>
         )}
 
-        {/* Week pills */}
-        <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2">
-          {weekDays.map((d) => {
-            const isToday = isSameDay(d, new Date());
-            const isNextRun = dateValue && isSameDay(d, dateValue);
-            const highlight = isNextRun || isToday;
-            return (
-              <div
-                key={d.toISOString()}
-                className={`flex items-start justify-center pt-2 rounded-xl h-16 sm:h-20 text-xs sm:text-sm font-semibold border transition-colors ${
-                  highlight
-                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
-                    : "bg-white/10 backdrop-blur-md text-white border-white/20"
-                }`}
-              >
-                {format(d, "EEE")}
-              </div>
-            );
-          })}
+        {/* Scrollable day strip */}
+        <div className="mt-5 relative">
+          <button
+            type="button"
+            aria-label="Previous days"
+            onClick={() => scrollBy(-200)}
+            className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next days"
+            onClick={() => scrollBy(200)}
+            className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={scrollerRef}
+            className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x scrollbar-hide [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {stripDays.map((d, idx) => {
+              const key = ymd(d);
+              const today = startOfDay(new Date());
+              const isToday = isSameDay(d, today);
+              const isPast = d < today && !isToday;
+              const isNextRun = dateValue && isSameDay(d, dateValue);
+              const isCompleted = completedDates?.has(key) ?? false;
+              const isPlanned = plannedDates?.has(key) ?? false;
+              const highlight = isNextRun || isToday;
+              const showMonth = d.getDate() === 1 || idx === 0;
+
+              return (
+                <div
+                  key={key}
+                  ref={isToday ? todayRef : undefined}
+                  className={`shrink-0 snap-start flex flex-col items-center justify-between py-2 px-0.5 rounded-xl border transition-colors w-12 sm:w-14 h-20 sm:h-24 ${
+                    highlight
+                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
+                      : isCompleted
+                      ? "bg-emerald-500/25 border-emerald-400/50 text-white"
+                      : isPast
+                      ? "bg-white/5 backdrop-blur-md text-white/60 border-white/10"
+                      : "bg-white/10 backdrop-blur-md text-white border-white/20"
+                  }`}
+                >
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                      {format(d, "EEE")}
+                    </span>
+                    <span className="text-sm sm:text-base font-bold">{format(d, "d")}</span>
+                    {showMonth && (
+                      <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
+                    )}
+                  </div>
+                  <div className="h-4 flex items-center justify-center">
+                    {isCompleted ? (
+                      <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
+                      </div>
+                    ) : isPlanned ? (
+                      <div className={`w-1.5 h-1.5 rounded-full ${highlight ? "bg-primary-foreground" : "bg-white/70"}`} />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
