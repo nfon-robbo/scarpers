@@ -218,10 +218,55 @@ const AIChatbot = () => {
     setInput("");
     setLoading(true);
 
-    let assistantContent = "";
+    // Two buffers:
+    //   received → everything we've got back from the model so far
+    //   typed    → what we've revealed to the user (chases `received`)
+    // A typewriter loop reveals chars at a steady pace so even fast models
+    // appear to "type" their answer in real time.
+    let received = "";
+    let typed = 0;
+    let streamDone = false;
+    let stopRequested = false;
 
     const controller = new AbortController();
     abortRef.current = controller;
+    controller.signal.addEventListener("abort", () => { stopRequested = true; });
+
+    const updateMessage = (visible: string) => {
+      setMessages(prev => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: "assistant", content: visible };
+        return copy;
+      });
+    };
+
+    // Add empty assistant placeholder up-front
+    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
+    // Typewriter loop — runs in parallel with the network read.
+    const typewriter = (async () => {
+      // ~80 chars/sec — close to a fast reading pace, like ChatGPT.
+      const CHARS_PER_TICK = 3;
+      const TICK_MS = 25;
+      while (true) {
+        if (stopRequested) {
+          // Reveal everything we've already received, then stop typing.
+          if (typed < received.length) {
+            typed = received.length;
+            updateMessage(received);
+          }
+          return;
+        }
+        if (typed < received.length) {
+          typed = Math.min(received.length, typed + CHARS_PER_TICK);
+          updateMessage(received.slice(0, typed));
+        } else if (streamDone) {
+          // Caught up and stream finished.
+          return;
+        }
+        await new Promise(r => setTimeout(r, TICK_MS));
+      }
+    })();
 
     try {
       const resp = await fetch(CHAT_URL, {
@@ -242,20 +287,17 @@ const AIChatbot = () => {
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Request failed" }));
         toast({ title: "Chat error", description: err.error || `Error ${resp.status}`, variant: "destructive" });
+        streamDone = true;
+        await typewriter;
         setLoading(false);
         return;
       }
 
-      if (!resp.body) { setLoading(false); return; }
+      if (!resp.body) { streamDone = true; await typewriter; setLoading(false); return; }
 
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-
-      // Add empty assistant message
-      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
-
-      let lastFlush = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -276,38 +318,24 @@ const AIChatbot = () => {
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages(prev => {
-                const copy = [...prev];
-                copy[copy.length - 1] = { role: "assistant", content: assistantContent };
-                return copy;
-              });
-              // Yield to the event loop ~every 30ms so React paints each delta
-              // instead of batching the whole stream into a single render.
-              const now = Date.now();
-              if (now - lastFlush > 30) {
-                lastFlush = now;
-                await new Promise(r => setTimeout(r, 0));
-              }
-            }
+            if (content) received += content;
           } catch {
             buffer = line + "\n" + buffer;
             break;
           }
         }
       }
-      const finalContent = isConcreteWorkoutEdit(stripActionMarkers(assistantContent))
-        ? assistantContent
-        : stripActionMarkers(assistantContent);
-      setMessages(prev => {
-        const copy = [...prev];
-        copy[copy.length - 1] = { role: "assistant", content: finalContent };
-        return copy;
-      });
+      streamDone = true;
+      await typewriter;
+
+      const finalContent = isConcreteWorkoutEdit(stripActionMarkers(received))
+        ? received
+        : stripActionMarkers(received);
+      updateMessage(finalContent);
     } catch (e: unknown) {
+      streamDone = true;
       if ((e as { name?: string })?.name === "AbortError") {
-        // User stopped the reply — append a subtle marker.
+        await typewriter;
         setMessages(prev => {
           const copy = [...prev];
           const last = copy[copy.length - 1];
@@ -320,6 +348,7 @@ const AIChatbot = () => {
           return copy;
         });
       } else {
+        await typewriter;
         const message = e instanceof Error ? e.message : "Request failed";
         toast({ title: "Chat failed", description: message, variant: "destructive" });
       }
