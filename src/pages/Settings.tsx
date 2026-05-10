@@ -537,6 +537,8 @@ const Settings = () => {
         </Link>
       )}
 
+      <PastChats />
+
       {isAdmin && (
         <Card>
           <CardHeader>
