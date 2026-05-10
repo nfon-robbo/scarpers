@@ -64,18 +64,20 @@ const AdminPage = () => {
   const sitemapUrl = `${window.location.origin}/sitemap.xml`;
 
   useEffect(() => {
+    if (authLoading) return;
     (async () => {
       if (!user) { setChecked(true); return; }
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_roles" as any)
         .select("role")
         .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      setIsAdmin(!!data);
+        .eq("role", "admin");
+      if (error) console.error("admin role check failed", error);
+      const adminRow = Array.isArray(data) && data.length > 0;
+      setIsAdmin(adminRow);
       setChecked(true);
 
-      if (data) {
+      if (adminRow) {
         const { data: settings } = await supabase
           .from("app_settings" as any)
           .select("ai_provider, claude_model")
@@ -88,7 +90,7 @@ const AdminPage = () => {
         loadStats();
       }
     })();
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadStats = async () => {
     setLoadingStats(true);
