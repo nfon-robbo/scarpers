@@ -4,6 +4,7 @@ import heroRunner from "@/assets/hero-runner.jpg";
 import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
 import type { ParsedWorkout } from "@/lib/plan-export";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
 
 interface HeroPlanCardProps {
   name: string | null;
