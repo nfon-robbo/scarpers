@@ -911,7 +911,8 @@ export default function PlanDayList({
                       </div>
                     </div>
                   );
-                })()
+                })()}
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">
                   {selectedWorkout.rawText}
