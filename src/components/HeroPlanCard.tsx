@@ -99,20 +99,30 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
     return { dateLabel: null, dateValue: null };
   }, [planStartDate, nextRunDate]);
 
-  // Days of the week (Mon–Sun), highlight today, mark next run day
-  const weekDays = useMemo(() => {
-    const today = new Date();
-    const dow = today.getDay(); // 0=Sun
-    const diffToMon = dow === 0 ? -6 : 1 - dow;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMon);
-    monday.setHours(0, 0, 0, 0);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      return d;
-    });
+  // Build a scrollable strip: 21 days before today → 35 days after
+  const stripDays = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days: Date[] = [];
+    for (let i = -21; i <= 35; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
+    return days;
   }, []);
+
+  // Auto-scroll to center today on mount
+  useEffect(() => {
+    if (scrollerRef.current && todayRef.current) {
+      const s = scrollerRef.current;
+      const t = todayRef.current;
+      s.scrollLeft = t.offsetLeft - s.clientWidth / 2 + t.clientWidth / 2;
+    }
+  }, []);
+
+  const scrollBy = (delta: number) => {
+    scrollerRef.current?.scrollBy({ left: delta, behavior: "smooth" });
+  };
 
   const WIcon = weather ? weatherIcon(weather.code) : null;
 
