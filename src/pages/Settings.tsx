@@ -637,6 +637,7 @@ const Settings = () => {
       </CollapsibleSection>
 
       <CollapsibleSection
+        title="Personal Details"
         icon={User}
         description="Used to personalise your AI training plan (HR zones, pacing, calories)"
         contentClassName="space-y-4"
