@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
+import PastChats from "@/components/PastChats";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
