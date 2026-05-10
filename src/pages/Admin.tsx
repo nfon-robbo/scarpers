@@ -152,7 +152,7 @@ const AdminPage = () => {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/dashboard"><ArrowLeft className="w-4 h-4 mr-1" /> Back</Link>
+            <Link to="/settings"><ArrowLeft className="w-4 h-4 mr-1" /> Back</Link>
           </Button>
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
