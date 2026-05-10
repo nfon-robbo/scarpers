@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay, parseISO, isAfter, startOfDay } from "date-fns";
 import heroRunner from "@/assets/hero-runner.jpg";
-import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
+import type { ParsedWorkout } from "@/lib/plan-export";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface HeroPlanCardProps {
   name: string | null;
   raceDistance: string | null;
   planStartDate: string | null;
   nextRunDate: Date | null;
-  completedDates?: Set<string>; // yyyy-MM-dd
-  plannedDates?: Set<string>;   // yyyy-MM-dd (non-rest planned workout days)
+  workouts?: ParsedWorkout[];
+  completedDates?: Set<string>; // yyyy-MM-dd of days with a logged run
 }
 
 const ymd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
 
 const distanceLabel = (d: string | null) => {
   if (!d) return "Your Goal";
@@ -34,7 +35,6 @@ interface Weather {
 }
 
 function weatherIcon(code: number) {
-  // WMO weather codes (Open-Meteo)
   if (code === 0) return Sun;
   if ([1, 2].includes(code)) return CloudSun;
   if (code === 3) return Cloud;
@@ -45,10 +45,25 @@ function weatherIcon(code: number) {
   return CloudSun;
 }
 
-export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate, completedDates, plannedDates }: HeroPlanCardProps) {
+function shortLabel(title: string): string {
+  if (/rest/i.test(title)) return "Rest";
+  if (/interval/i.test(title)) return "Intervals";
+  if (/tempo/i.test(title)) return "Tempo";
+  if (/long\s*run/i.test(title)) return "Long Run";
+  if (/easy/i.test(title)) return "Easy";
+  if (/recovery/i.test(title)) return "Recovery";
+  if (/fartlek/i.test(title)) return "Fartlek";
+  if (/hill/i.test(title)) return "Hills";
+  if (/race/i.test(title)) return "Race";
+  if (/threshold/i.test(title)) return "Threshold";
+  return title.split(/[(\-–]/)[0].trim().slice(0, 10);
+}
+
+export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate, workouts = [], completedDates }: HeroPlanCardProps) {
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const todayRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,7 +98,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
     return () => { cancelled = true; };
   }, []);
 
-  // Date to display: next run if plan has started, else plan start date
+  // Date to display
   const { dateLabel, dateValue } = useMemo(() => {
     const today = startOfDay(new Date());
     const startDate = planStartDate ? parseISO(planStartDate) : null;
@@ -96,54 +111,62 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
     if (startDate) {
       return { dateLabel: "Plan Started", dateValue: startDate };
     }
-    return { dateLabel: null, dateValue: null };
+    return { dateLabel: null as string | null, dateValue: null as Date | null };
   }, [planStartDate, nextRunDate]);
 
-  // Build a scrollable strip: 21 days before today → 35 days after
-  const stripDays = useMemo(() => {
-    const today = startOfDay(new Date());
-    const days: Date[] = [];
-    for (let i = -21; i <= 35; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      days.push(d);
-    }
-    return days;
-  }, []);
+  // Only show non-rest plan workouts, sorted ascending by date
+  const planItems = useMemo(() => {
+    return workouts
+      .filter((w) => w.dateObj && !/rest/i.test(w.title))
+      .sort((a, b) => a.dateObj!.getTime() - b.dateObj!.getTime());
+  }, [workouts]);
 
-  // Auto-scroll to center today on mount
+  // Auto-scroll to next upcoming (or today's) workout
   useEffect(() => {
-    if (scrollerRef.current && todayRef.current) {
+    if (scrollerRef.current && focusRef.current) {
       const s = scrollerRef.current;
-      const t = todayRef.current;
+      const t = focusRef.current;
       s.scrollLeft = t.offsetLeft - s.clientWidth / 2 + t.clientWidth / 2;
     }
-  }, []);
+  }, [planItems.length]);
+
+  const today = startOfDay(new Date());
+  const focusIdx = useMemo(() => {
+    const idx = planItems.findIndex(
+      (w) => w.dateObj && (isSameDay(w.dateObj, today) || w.dateObj >= today)
+    );
+    return idx === -1 ? planItems.length - 1 : idx;
+  }, [planItems, today]);
 
   const scrollBy = (delta: number) => {
     scrollerRef.current?.scrollBy({ left: delta, behavior: "smooth" });
   };
 
   const WIcon = weather ? weatherIcon(weather.code) : null;
-
   const titleDistance = distanceLabel(raceDistance);
   const displayName = name?.trim() || "Runner";
 
+  // HR zone to BPM range (for dialog)
+  function hrZoneBpm(zone: string): string | null {
+    const m = zone.match(/Z(\d)/i);
+    if (!m) return null;
+    switch (parseInt(m[1], 10)) {
+      case 1: return "100–120 bpm";
+      case 2: return "120–140 bpm";
+      case 3: return "140–160 bpm";
+      case 4: return "160–175 bpm";
+      case 5: return "175–200 bpm";
+      default: return null;
+    }
+  }
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border/30 shadow-xl">
-      {/* Background image */}
-      <img
-        src={heroRunner}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-        loading="eager"
-      />
-      {/* Dark overlay */}
+      <img src={heroRunner} alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
       <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/70 to-background/85" />
       <div className="absolute inset-0 bg-primary/20 mix-blend-multiply" />
 
       <div className="relative p-5 sm:p-6 text-white">
-        {/* Title */}
         <h2
           className="text-xl sm:text-2xl font-bold leading-tight pr-24 sm:pr-28 drop-shadow-md"
           style={{ fontFamily: "'Space Grotesk', sans-serif" }}
@@ -151,7 +174,6 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           {displayName}'s {titleDistance}{raceDistance ? " Training" : ""}
         </h2>
 
-        {/* Weather top-right */}
         {weather && WIcon && (
           <div className="absolute top-5 right-5 sm:top-6 sm:right-6 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20">
             <WIcon className="w-4 h-4 text-yellow-200" />
@@ -159,13 +181,9 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           </div>
         )}
 
-        {/* Date */}
         {dateLabel && dateValue && (
           <div className="mt-5">
-            <p
-              className="text-base sm:text-lg font-bold text-primary drop-shadow"
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-            >
+            <p className="text-base sm:text-lg font-bold text-primary drop-shadow" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {dateLabel}
             </p>
             <p className="text-sm sm:text-base text-white/90 mt-0.5">
@@ -174,79 +192,137 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           </div>
         )}
 
-        {/* Scrollable day strip */}
+        {/* Plan workouts strip */}
         <div className="mt-5 relative">
-          <button
-            type="button"
-            aria-label="Previous days"
-            onClick={() => scrollBy(-200)}
-            className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next days"
-            onClick={() => scrollBy(200)}
-            className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {planItems.length > 0 ? (
+            <>
+              <button
+                type="button"
+                aria-label="Previous"
+                onClick={() => scrollBy(-200)}
+                className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next"
+                onClick={() => scrollBy(200)}
+                className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
 
-          <div
-            ref={scrollerRef}
-            className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x scrollbar-hide [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: "none" }}
-          >
-            {stripDays.map((d, idx) => {
-              const key = ymd(d);
-              const today = startOfDay(new Date());
-              const isToday = isSameDay(d, today);
-              const isPast = d < today && !isToday;
-              const isNextRun = dateValue && isSameDay(d, dateValue);
-              const isCompleted = completedDates?.has(key) ?? false;
-              const isPlanned = plannedDates?.has(key) ?? false;
-              const highlight = isNextRun || isToday;
-              const showMonth = d.getDate() === 1 || idx === 0;
+              <div
+                ref={scrollerRef}
+                className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {planItems.map((w, idx) => {
+                  const d = w.dateObj!;
+                  const key = ymd(d);
+                  const isToday = isSameDay(d, today);
+                  const isPast = d < today && !isToday;
+                  const isCompleted = completedDates?.has(key) ?? false;
+                  const isFocus = idx === focusIdx;
 
-              return (
-                <div
-                  key={key}
-                  ref={isToday ? todayRef : undefined}
-                  className={`shrink-0 snap-start flex flex-col items-center justify-between py-2 px-0.5 rounded-xl border transition-colors w-12 sm:w-14 h-20 sm:h-24 ${
-                    highlight
-                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
-                      : isCompleted
-                      ? "bg-emerald-500/25 border-emerald-400/50 text-white"
-                      : isPast
-                      ? "bg-white/5 backdrop-blur-md text-white/60 border-white/10"
-                      : "bg-white/10 backdrop-blur-md text-white border-white/20"
-                  }`}
-                >
-                  <div className="flex flex-col items-center leading-tight">
-                    <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
-                      {format(d, "EEE")}
-                    </span>
-                    <span className="text-sm sm:text-base font-bold">{format(d, "d")}</span>
-                    {showMonth && (
-                      <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
-                    )}
-                  </div>
-                  <div className="h-4 flex items-center justify-center">
-                    {isCompleted ? (
-                      <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
+                  return (
+                    <button
+                      type="button"
+                      key={`${key}-${idx}`}
+                      ref={isFocus ? focusRef : undefined}
+                      onClick={() => setSelectedWorkout(w)}
+                      className={`shrink-0 snap-start flex flex-col items-center justify-between py-2 px-1 rounded-xl border transition-all w-16 sm:w-20 h-24 sm:h-28 hover:scale-[1.03] active:scale-95 text-left ${
+                        isFocus
+                          ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
+                          : isCompleted
+                          ? "bg-emerald-500/25 border-emerald-400/50 text-white"
+                          : isPast
+                          ? "bg-white/5 backdrop-blur-md text-white/70 border-white/10"
+                          : "bg-white/10 backdrop-blur-md text-white border-white/20"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center leading-tight">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide opacity-90">
+                          {format(d, "EEE")}
+                        </span>
+                        <span className="text-base sm:text-lg font-bold">{format(d, "d")}</span>
+                        <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
                       </div>
-                    ) : isPlanned ? (
-                      <div className={`w-1.5 h-1.5 rounded-full ${highlight ? "bg-primary-foreground" : "bg-white/70"}`} />
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      <div className="w-full px-0.5 flex flex-col items-center gap-1">
+                        <span className="text-[9px] sm:text-[10px] font-semibold truncate max-w-full">
+                          {shortLabel(w.title)}
+                        </span>
+                        {isCompleted && (
+                          <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-white/70">No planned workouts yet.</p>
+          )}
         </div>
       </div>
+
+      {/* Workout detail dialog */}
+      <Dialog open={!!selectedWorkout} onOpenChange={(o) => !o && setSelectedWorkout(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          {selectedWorkout && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Dumbbell className="w-5 h-5 text-primary" />
+                  {selectedWorkout.title}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
+                  {selectedWorkout.dateObj && completedDates?.has(ymd(selectedWorkout.dateObj)) && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-emerald-500 font-semibold">
+                      <Check className="w-3 h-3" /> Completed
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedWorkout.segments.length > 0 ? (
+                <div className="space-y-2 mt-2">
+                  {selectedWorkout.segments.map((seg, i) => (
+                    <div key={i} className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">{seg.segment}</span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {seg.duration}
+                        </span>
+                      </div>
+                      {seg.target && (
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Target:</span> {seg.target}
+                        </p>
+                      )}
+                      {seg.hrZone && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Activity className="w-3 h-3" /> {seg.hrZone}{hrZoneBpm(seg.hrZone) && ` (${hrZoneBpm(seg.hrZone)})`}
+                        </p>
+                      )}
+                      {seg.notes && <p className="text-xs text-muted-foreground italic">{seg.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">
+                  {selectedWorkout.rawText}
+                </p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
