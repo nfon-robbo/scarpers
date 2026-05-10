@@ -21,6 +21,7 @@ import FeedbackCard from "@/components/FeedbackCard";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
+import HeroPlanCard from "@/components/HeroPlanCard";
 
 
 // ── Types ──
@@ -53,6 +54,7 @@ interface PlanRow {
   content: string;
   start_date: string;
   training_days: string[];
+  race_distance: string | null;
 }
 
 // ── Motivational quotes ──
@@ -281,7 +283,7 @@ const Dashboard = () => {
     // Get latest training plan for "Today's Workout" card
     supabase
       .from("training_plans")
-      .select("content, start_date, training_days")
+      .select("content, start_date, training_days, race_distance")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
@@ -500,6 +502,14 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-4 pb-8 animate-fade-in">
+      {/* ── Hero Plan Card ── */}
+      <HeroPlanCard
+        name={profile?.name || null}
+        raceDistance={plan?.race_distance || null}
+        planStartDate={plan?.start_date || null}
+        nextRunDate={todaysWorkout?.workout?.dateObj || null}
+      />
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
