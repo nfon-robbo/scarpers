@@ -381,7 +381,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
                           <Clock className="w-3 h-3" /> {seg.duration}
                         </span>
                       </div>
-                      {seg.target && !/warm\s*-?\s*up|cool\s*-?\s*down|rest/i.test(seg.segment) && (
+                      {seg.target && !/warm\s*-?\s*up|cool\s*-?\s*down|rest|recovery|walk/i.test(seg.segment) && (
                         <p className="text-xs text-muted-foreground">
                           <span className="font-medium">Target:</span> {seg.target}
                         </p>
