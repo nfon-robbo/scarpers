@@ -704,40 +704,39 @@ const Settings = () => {
         </div>
       </CollapsibleSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Units of Measurement</CardTitle>
-          <CardDescription>Choose your preferred units for each metric type</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {unitSettings.map(({ key, label, icon: Icon, description, options }) => (
-            <div key={key} className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <Icon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
+      <CollapsibleSection
+        title="Units of Measurement"
+        icon={Ruler}
+        description="Choose your preferred units for each metric type"
+        contentClassName="space-y-6"
+      >
+        {unitSettings.map(({ key, label, icon: Icon, description, options }) => (
+          <div key={key} className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Icon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
               </div>
-              <Select
-                value={units[key]}
-                onValueChange={(v) => setUnit(key, v as any)}
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+            <Select
+              value={units[key]}
+              onValueChange={(v) => setUnit(key, v as any)}
+            >
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))}
+      </CollapsibleSection>
 
       {/* Previous Plans Card */}
       <Card>
