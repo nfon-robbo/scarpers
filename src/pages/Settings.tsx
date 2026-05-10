@@ -602,7 +602,41 @@ const Settings = () => {
       )}
 
       <CollapsibleSection
-        title="Personal Details"
+        title="Appearance"
+        icon={Palette}
+        description="Choose how Scarpers looks on this device"
+        contentClassName="space-y-3"
+      >
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: "light", label: "Day", icon: Sun },
+            { value: "dark", label: "Dark", icon: Moon },
+            { value: "auto", label: "Auto", icon: Monitor },
+          ] as const).map(({ value, label, icon: Icon }) => {
+            const active = themePreference === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setThemePreference(value)}
+                className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 transition-all ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm font-medium">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Auto follows your device's system setting.
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
         icon={User}
         description="Used to personalise your AI training plan (HR zones, pacing, calories)"
         contentClassName="space-y-4"
