@@ -1078,6 +1078,17 @@ const Settings = () => {
       </CollapsibleSection>
 
       <CollapsibleSection
+        title="Session"
+        icon={LogOut}
+        description="Sign out of your account on this device"
+      >
+        <Button variant="outline" onClick={signOut}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign out
+        </Button>
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title="Danger Zone"
         icon={Trash2}
         description="Permanently delete your account and all associated data. This cannot be undone."
