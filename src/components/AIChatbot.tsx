@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { MessageCircle, Send, Loader2, X, Minimize2, Check, Square } from "lucide-react";
+import { MessageCircle, Send, Loader2, X, Minimize2, Check, Square, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
