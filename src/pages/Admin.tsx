@@ -99,6 +99,7 @@ const AdminPage = () => {
 
   const [aiUsage, setAiUsage] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
+  const [feedback, setFeedback] = useState<any | null>(null);
 
   const loadStats = async () => {
     setLoadingStats(true);
