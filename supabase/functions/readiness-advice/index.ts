@@ -191,6 +191,7 @@ Give me your verdict.`;
     const { callAI } = await import("../_shared/ai.ts");
     const response = await callAI({
       stream: false,
+      label: "readiness-advice",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

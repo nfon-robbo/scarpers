@@ -1184,6 +1184,7 @@ ${upcoming.join("\n")}
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
+      label: `ai-coach:${type || "chat"}`,
       messages: [
         { role: "system", content: nowPrelude + systemPrompt },
         ...priorTurns,

@@ -44,6 +44,7 @@ Keep it concise, evidence-based, and actionable. Reference sleep science where r
     const { callAI } = await import("../_shared/ai.ts");
     const response = await callAI({
       stream: true,
+      label: "sleep-insight",
       messages: [
         { role: "system", content: "You are a sleep science expert drawing on research from the National Sleep Foundation, Mayo Clinic, and leading sleep researchers like Matthew Walker (UC Berkeley). Be concise and evidence-based." },
         { role: "user", content: prompt },
