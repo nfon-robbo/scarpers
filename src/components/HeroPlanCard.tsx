@@ -169,7 +169,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/30 shadow-xl">
+    <div className="relative overflow-hidden border-b border-border/30 shadow-xl">
       <img src={heroRunner} alt="" className="absolute inset-0 w-full h-full object-cover" loading="eager" />
       <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/70 to-background/85" />
       <div className="absolute inset-0 bg-primary/20 mix-blend-multiply" />
