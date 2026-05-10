@@ -230,7 +230,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
               const isPast = d < today && !isToday;
               const workout = workoutByDate.get(key);
               const hasWorkout = !!workout;
-              const isCompleted = completedDates?.has(key) ?? false;
+              const isCompleted = hasWorkout && (completedDates?.has(key) ?? false);
               const showMonth = d.getDate() === 1 || idx === 0;
 
               const baseClasses = "shrink-0 snap-start flex flex-col items-center justify-between py-2 px-0.5 rounded-xl border transition-all w-12 sm:w-14 h-20 sm:h-24 text-center";
