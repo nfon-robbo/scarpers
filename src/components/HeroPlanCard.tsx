@@ -45,6 +45,23 @@ function weatherIcon(code: number) {
   return CloudSun;
 }
 
+function weatherLabel(code: number): string {
+  if (code === 0) return "Clear";
+  if (code === 1) return "Mainly clear";
+  if (code === 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if ([45, 48].includes(code)) return "Fog";
+  if ([51, 53, 55].includes(code)) return "Drizzle";
+  if ([56, 57].includes(code)) return "Freezing drizzle";
+  if ([61, 63, 65].includes(code)) return "Rain";
+  if ([66, 67].includes(code)) return "Freezing rain";
+  if ([71, 73, 75, 77].includes(code)) return "Snow";
+  if ([80, 81, 82].includes(code)) return "Showers";
+  if ([85, 86].includes(code)) return "Snow showers";
+  if ([95, 96, 99].includes(code)) return "Thunderstorm";
+  return "—";
+}
+
 function shortLabel(title: string): string {
   if (/rest/i.test(title)) return "Rest";
   if (/interval/i.test(title)) return "Intervals";
@@ -183,9 +200,14 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
         </h2>
 
         {weather && WIcon && (
-          <div className="absolute top-5 right-5 sm:top-6 sm:right-6 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20">
-            <WIcon className="w-4 h-4 text-yellow-200" />
-            <span className="text-sm font-semibold">{weather.tempC}°C</span>
+          <div className="absolute top-5 right-5 sm:top-6 sm:right-6 flex flex-col items-end gap-0.5 px-2.5 py-1.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20">
+            <div className="flex items-center gap-1.5">
+              <WIcon className="w-4 h-4 text-yellow-200" />
+              <span className="text-sm font-semibold">{weather.tempC}°C</span>
+            </div>
+            <span className="text-[10px] font-medium text-white/85 leading-none">
+              {weatherLabel(weather.code)}
+            </span>
           </div>
         )}
 
