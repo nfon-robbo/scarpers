@@ -281,7 +281,7 @@ const AdminPage = () => {
                       <div key={prov} className="rounded-xl border border-border/50 p-4 bg-card/60">
                         <p className="text-sm font-medium capitalize">{prov}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {v.calls} calls · {Number(v.tokens).toLocaleString()} tokens · ${Number(v.cost).toFixed(2)}
+                          {v.calls} calls · {Number(v.tokens).toLocaleString()} tokens · {fmtGBP(v.cost)}
                         </p>
                       </div>
                     ))}
