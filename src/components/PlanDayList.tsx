@@ -801,7 +801,9 @@ export default function PlanDayList({
               </DialogHeader>
 
               {selectedWorkout.segments.length > 0 ? (
-                (() => {
+                <>
+                <div className="mt-2"><WorkoutIntervalChart segments={selectedWorkout.segments} /></div>
+                {(() => {
                   const fmtTime = (secs: number) => `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
                   const fmtPace = (p: string) => p.replace(/\/(km|mi)$/i, "");
                   const aiExpanded = expandWorkoutSteps(selectedWorkout.segments, selectedWorkout.title, selectedWorkout.rawText ?? "", { goalTime, raceDistance });
