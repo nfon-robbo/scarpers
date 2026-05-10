@@ -74,15 +74,45 @@ const IntervalsCredentials = ({ bare = false }: { bare?: boolean } = {}) => {
   };
 
   if (loading) {
+    const inner = (
+      <div className="flex items-center gap-3">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Loading intervals.icu settings…</span>
+      </div>
+    );
+    if (bare) return inner;
     return (
       <Card>
-        <CardContent className="p-6 flex items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Loading intervals.icu settings…</span>
-        </CardContent>
+        <CardContent className="p-6">{inner}</CardContent>
       </Card>
     );
   }
+
+  const body = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="intervals-athlete">Athlete ID</Label>
+        <Input id="intervals-athlete" placeholder="i123456" value={athleteId} onChange={(e) => setAthleteId(e.target.value)} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="intervals-key">API Key</Label>
+        <Input id="intervals-key" type="password" placeholder="••••••••" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={save} disabled={saving}>
+          {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+          {hasExisting ? "Update" : "Save"}
+        </Button>
+        {hasExisting && (
+          <Button variant="outline" onClick={disconnect}>
+            <Unlink className="w-4 h-4 mr-2" /> Disconnect
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  if (bare) return <div className="space-y-3">{body}</div>;
 
   return (
     <Card>
@@ -99,27 +129,7 @@ const IntervalsCredentials = ({ bare = false }: { bare?: boolean } = {}) => {
           . Your athlete ID is shown there too (e.g. <code>i123456</code>).
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="space-y-2">
-          <Label htmlFor="intervals-athlete">Athlete ID</Label>
-          <Input id="intervals-athlete" placeholder="i123456" value={athleteId} onChange={(e) => setAthleteId(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="intervals-key">API Key</Label>
-          <Input id="intervals-key" type="password" placeholder="••••••••" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-            {hasExisting ? "Update" : "Save"}
-          </Button>
-          {hasExisting && (
-            <Button variant="outline" onClick={disconnect}>
-              <Unlink className="w-4 h-4 mr-2" /> Disconnect
-            </Button>
-          )}
-        </div>
-      </CardContent>
+      <CardContent className="space-y-3">{body}</CardContent>
     </Card>
   );
 };
