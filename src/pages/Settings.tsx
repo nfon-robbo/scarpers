@@ -885,186 +885,173 @@ const Settings = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <IntervalsCredentials />
+      <CollapsibleSection
+        title="intervals.icu"
+        description="Connect using your own intervals.icu API key so wellness data and workout sync use your account."
+      >
+        <IntervalsCredentials bare />
+      </CollapsibleSection>
 
-      {/* Auto-Sync Schedule Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Timer className="w-5 h-5" />
-            Auto-Sync Schedule
-          </CardTitle>
-          <CardDescription>
-            Enable automatic background syncing for your connected data sources
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Strava */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.strava_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, strava_enabled: v }))}
-                  disabled={!stravaConnected}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Strava Activities</p>
-                  {!stravaConnected && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <AlertCircle className="w-3 h-3" /> Not connected
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Import new activities automatically</p>
-              </div>
+      {/* Auto-Sync Schedule */}
+      <CollapsibleSection
+        title="Auto-Sync Schedule"
+        icon={Timer}
+        description="Enable automatic background syncing for your connected data sources"
+        contentClassName="space-y-5"
+      >
+        {/* Strava */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.strava_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, strava_enabled: v }))}
+                disabled={!stravaConnected}
+              />
             </div>
-            <Select
-              value={String(schedule.strava_interval_hours)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, strava_interval_hours: Number(v) }))}
-              disabled={!schedule.strava_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Every 1 hour</SelectItem>
-                <SelectItem value="2">Every 2 hours</SelectItem>
-                <SelectItem value="4">Every 4 hours</SelectItem>
-                <SelectItem value="6">Every 6 hours</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Intervals.icu */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.intervals_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, intervals_enabled: v }))}
-                />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Strava Activities</p>
+                {!stravaConnected && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <AlertCircle className="w-3 h-3" /> Not connected
+                  </Badge>
+                )}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Intervals.icu Wellness</p>
-                <p className="text-xs text-muted-foreground">Sync HRV, resting HR, steps, weight & more</p>
-              </div>
+              <p className="text-xs text-muted-foreground">Import new activities automatically</p>
             </div>
-            <Select
-              value={String(schedule.intervals_interval_hours)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, intervals_interval_hours: Number(v) }))}
-              disabled={!schedule.intervals_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4">Every 4 hours</SelectItem>
-                <SelectItem value="6">Every 6 hours</SelectItem>
-                <SelectItem value="12">Every 12 hours</SelectItem>
-                <SelectItem value="24">Every 24 hours</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
+          <Select
+            value={String(schedule.strava_interval_hours)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, strava_interval_hours: Number(v) }))}
+            disabled={!schedule.strava_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Every 1 hour</SelectItem>
+              <SelectItem value="2">Every 2 hours</SelectItem>
+              <SelectItem value="4">Every 4 hours</SelectItem>
+              <SelectItem value="6">Every 6 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Google Fit */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="mt-0.5">
-                <Switch
-                  checked={schedule.google_fit_enabled}
-                  onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
-                  disabled={!googleFitConnected}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Google Fit Sleep</p>
-                  {!googleFitConnected && (
-                    <Badge variant="outline" className="text-xs gap-1">
-                      <AlertCircle className="w-3 h-3" /> Not connected
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
-              </div>
+        {/* Intervals.icu */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.intervals_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, intervals_enabled: v }))}
+              />
             </div>
-            <Select
-              value={String(schedule.google_fit_hour_utc)}
-              onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
-              disabled={!schedule.google_fit_enabled}
-            >
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Time">
-                  {formatHourUtc(schedule.google_fit_hour_utc)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                  <SelectItem key={h} value={String(h)}>
-                    {formatHourUtc(h)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Intervals.icu Wellness</p>
+              <p className="text-xs text-muted-foreground">Sync HRV, resting HR, steps, weight & more</p>
+            </div>
           </div>
+          <Select
+            value={String(schedule.intervals_interval_hours)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, intervals_interval_hours: Number(v) }))}
+            disabled={!schedule.intervals_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="4">Every 4 hours</SelectItem>
+              <SelectItem value="6">Every 6 hours</SelectItem>
+              <SelectItem value="12">Every 12 hours</SelectItem>
+              <SelectItem value="24">Every 24 hours</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <div className="pt-2 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Syncs run automatically in the background. You can still trigger manual syncs anytime.
-            </p>
-            <Button onClick={saveSchedule} disabled={savingSchedule} size="sm">
-              {savingSchedule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              {savingSchedule ? "Saving..." : "Save & Apply"}
-            </Button>
+        {/* Google Fit */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 flex-1">
+            <div className="mt-0.5">
+              <Switch
+                checked={schedule.google_fit_enabled}
+                onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
+                disabled={!googleFitConnected}
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Google Fit Sleep</p>
+                {!googleFitConnected && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <AlertCircle className="w-3 h-3" /> Not connected
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Select
+            value={String(schedule.google_fit_hour_utc)}
+            onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
+            disabled={!schedule.google_fit_enabled}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Time">
+                {formatHourUtc(schedule.google_fit_hour_utc)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
+                <SelectItem key={h} value={String(h)}>
+                  {formatHourUtc(h)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Moon className="w-5 h-5" />
-            Sleep & Wellness Sync
-          </CardTitle>
-          <CardDescription>
-            Sync sleep, steps, HRV, resting HR, and weight from Intervals.icu (last 90 days)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={syncWellness} disabled={syncing}>
-            {syncing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {syncing ? "Syncing..." : "Sync Wellness Data"}
-          </Button>
-          <p className="text-xs text-muted-foreground mt-2">
-            Pulls sleep duration, sleep score, HRV, resting heart rate, steps, weight, and stress data.
+        <div className="pt-2 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Syncs run automatically in the background. You can still trigger manual syncs anytime.
           </p>
-        </CardContent>
-      </Card>
-
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-            <Trash2 className="w-5 h-5" />
-            Danger Zone
-          </CardTitle>
-          <CardDescription>
-            Permanently delete your account and all associated data. This cannot be undone.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={() => setConfirmDeleteAccount(true)}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete My Profile
+          <Button onClick={saveSchedule} disabled={savingSchedule} size="sm">
+            {savingSchedule ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+            {savingSchedule ? "Saving..." : "Save & Apply"}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Sleep & Wellness Sync"
+        icon={Moon}
+        description="Sync sleep, steps, HRV, resting HR, and weight from Intervals.icu (last 90 days)"
+      >
+        <Button onClick={syncWellness} disabled={syncing}>
+          {syncing ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          )}
+          {syncing ? "Syncing..." : "Sync Wellness Data"}
+        </Button>
+        <p className="text-xs text-muted-foreground mt-2">
+          Pulls sleep duration, sleep score, HRV, resting heart rate, steps, weight, and stress data.
+        </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Danger Zone"
+        icon={Trash2}
+        description="Permanently delete your account and all associated data. This cannot be undone."
+        className="border-destructive/40"
+        titleClassName="text-destructive"
+      >
+        <Button variant="destructive" onClick={() => setConfirmDeleteAccount(true)}>
+          <Trash2 className="w-4 h-4 mr-2" />
+          Delete My Profile
+        </Button>
+      </CollapsibleSection>
 
       <AlertDialog open={confirmDeleteAccount} onOpenChange={(o) => !o && setConfirmDeleteAccount(false)}>
         <AlertDialogContent>
