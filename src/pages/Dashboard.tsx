@@ -502,6 +502,14 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-4 pb-8 animate-fade-in">
+      {/* ── Hero Plan Card ── */}
+      <HeroPlanCard
+        name={profile?.name || null}
+        raceDistance={plan?.race_distance || null}
+        planStartDate={plan?.start_date || null}
+        nextRunDate={todaysWorkout?.workout?.dateObj || null}
+      />
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
