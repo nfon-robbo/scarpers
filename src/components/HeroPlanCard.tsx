@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay, parseISO, isAfter, startOfDay } from "date-fns";
 import heroRunner from "@/assets/hero-runner.jpg";
-import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap } from "lucide-react";
+import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface HeroPlanCardProps {
   name: string | null;
   raceDistance: string | null;
   planStartDate: string | null;
   nextRunDate: Date | null;
+  completedDates?: Set<string>; // yyyy-MM-dd
+  plannedDates?: Set<string>;   // yyyy-MM-dd (non-rest planned workout days)
 }
+
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 
 const distanceLabel = (d: string | null) => {
   if (!d) return "Your Goal";
@@ -39,8 +45,10 @@ function weatherIcon(code: number) {
   return CloudSun;
 }
 
-export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate }: HeroPlanCardProps) {
+export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate, completedDates, plannedDates }: HeroPlanCardProps) {
   const [weather, setWeather] = useState<Weather | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const todayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,20 +99,30 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
     return { dateLabel: null, dateValue: null };
   }, [planStartDate, nextRunDate]);
 
-  // Days of the week (Mon–Sun), highlight today, mark next run day
-  const weekDays = useMemo(() => {
-    const today = new Date();
-    const dow = today.getDay(); // 0=Sun
-    const diffToMon = dow === 0 ? -6 : 1 - dow;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMon);
-    monday.setHours(0, 0, 0, 0);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      return d;
-    });
+  // Build a scrollable strip: 21 days before today → 35 days after
+  const stripDays = useMemo(() => {
+    const today = startOfDay(new Date());
+    const days: Date[] = [];
+    for (let i = -21; i <= 35; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
+    return days;
   }, []);
+
+  // Auto-scroll to center today on mount
+  useEffect(() => {
+    if (scrollerRef.current && todayRef.current) {
+      const s = scrollerRef.current;
+      const t = todayRef.current;
+      s.scrollLeft = t.offsetLeft - s.clientWidth / 2 + t.clientWidth / 2;
+    }
+  }, []);
+
+  const scrollBy = (delta: number) => {
+    scrollerRef.current?.scrollBy({ left: delta, behavior: "smooth" });
+  };
 
   const WIcon = weather ? weatherIcon(weather.code) : null;
 
@@ -156,25 +174,77 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           </div>
         )}
 
-        {/* Week pills */}
-        <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2">
-          {weekDays.map((d) => {
-            const isToday = isSameDay(d, new Date());
-            const isNextRun = dateValue && isSameDay(d, dateValue);
-            const highlight = isNextRun || isToday;
-            return (
-              <div
-                key={d.toISOString()}
-                className={`flex items-start justify-center pt-2 rounded-xl h-16 sm:h-20 text-xs sm:text-sm font-semibold border transition-colors ${
-                  highlight
-                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
-                    : "bg-white/10 backdrop-blur-md text-white border-white/20"
-                }`}
-              >
-                {format(d, "EEE")}
-              </div>
-            );
-          })}
+        {/* Scrollable day strip */}
+        <div className="mt-5 relative">
+          <button
+            type="button"
+            aria-label="Previous days"
+            onClick={() => scrollBy(-200)}
+            className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next days"
+            onClick={() => scrollBy(200)}
+            className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <div
+            ref={scrollerRef}
+            className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x scrollbar-hide [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {stripDays.map((d, idx) => {
+              const key = ymd(d);
+              const today = startOfDay(new Date());
+              const isToday = isSameDay(d, today);
+              const isPast = d < today && !isToday;
+              const isNextRun = dateValue && isSameDay(d, dateValue);
+              const isCompleted = completedDates?.has(key) ?? false;
+              const isPlanned = plannedDates?.has(key) ?? false;
+              const highlight = isNextRun || isToday;
+              const showMonth = d.getDate() === 1 || idx === 0;
+
+              return (
+                <div
+                  key={key}
+                  ref={isToday ? todayRef : undefined}
+                  className={`shrink-0 snap-start flex flex-col items-center justify-between py-2 px-0.5 rounded-xl border transition-colors w-12 sm:w-14 h-20 sm:h-24 ${
+                    highlight
+                      ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
+                      : isCompleted
+                      ? "bg-emerald-500/25 border-emerald-400/50 text-white"
+                      : isPast
+                      ? "bg-white/5 backdrop-blur-md text-white/60 border-white/10"
+                      : "bg-white/10 backdrop-blur-md text-white border-white/20"
+                  }`}
+                >
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                      {format(d, "EEE")}
+                    </span>
+                    <span className="text-sm sm:text-base font-bold">{format(d, "d")}</span>
+                    {showMonth && (
+                      <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
+                    )}
+                  </div>
+                  <div className="h-4 flex items-center justify-center">
+                    {isCompleted ? (
+                      <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
+                      </div>
+                    ) : isPlanned ? (
+                      <div className={`w-1.5 h-1.5 rounded-full ${highlight ? "bg-primary-foreground" : "bg-white/70"}`} />
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
