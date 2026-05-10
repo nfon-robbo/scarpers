@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { MessageCircle, Send, Loader2, X, Minimize2, Check } from "lucide-react";
+import { MessageCircle, Send, Loader2, X, Minimize2, Check, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
@@ -39,6 +39,12 @@ const AIChatbot = () => {
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopReply = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -214,6 +220,9 @@ const AIChatbot = () => {
 
     let assistantContent = "";
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
@@ -227,6 +236,7 @@ const AIChatbot = () => {
           messages: text,
           history: [...messages, userMsg].slice(-20).map(m => ({ role: m.role, content: m.content })),
         }),
+        signal: controller.signal,
       });
 
       if (!resp.ok) {
@@ -244,6 +254,8 @@ const AIChatbot = () => {
 
       // Add empty assistant message
       setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
+      let lastFlush = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -271,6 +283,13 @@ const AIChatbot = () => {
                 copy[copy.length - 1] = { role: "assistant", content: assistantContent };
                 return copy;
               });
+              // Yield to the event loop ~every 30ms so React paints each delta
+              // instead of batching the whole stream into a single render.
+              const now = Date.now();
+              if (now - lastFlush > 30) {
+                lastFlush = now;
+                await new Promise(r => setTimeout(r, 0));
+              }
             }
           } catch {
             buffer = line + "\n" + buffer;
@@ -287,10 +306,26 @@ const AIChatbot = () => {
         return copy;
       });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Request failed";
-      toast({ title: "Chat failed", description: message, variant: "destructive" });
+      if ((e as { name?: string })?.name === "AbortError") {
+        // User stopped the reply — append a subtle marker.
+        setMessages(prev => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last?.role === "assistant") {
+            copy[copy.length - 1] = {
+              role: "assistant",
+              content: (last.content || "").trim() + "\n\n_⏹ Stopped_",
+            };
+          }
+          return copy;
+        });
+      } else {
+        const message = e instanceof Error ? e.message : "Request failed";
+        toast({ title: "Chat failed", description: message, variant: "destructive" });
+      }
     }
 
+    abortRef.current = null;
     setLoading(false);
   }, [input, loading, messages, toast]);
 
@@ -445,9 +480,15 @@ const AIChatbot = () => {
             disabled={loading}
             className="text-sm"
           />
-          <Button size="icon" onClick={sendMessage} disabled={loading || !input.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+          {loading ? (
+            <Button size="icon" variant="destructive" onClick={stopReply} title="Stop reply">
+              <Square className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button size="icon" onClick={sendMessage} disabled={!input.trim()}>
+              <Send className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
