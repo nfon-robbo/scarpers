@@ -150,7 +150,7 @@ const AppLayout = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:ml-[260px] md:pt-0 pt-14 pb-20 md:pb-0 flex flex-col min-h-0">
+      <main className="flex-1 overflow-y-auto md:ml-[260px] pt-0 pb-20 md:pb-0 flex flex-col min-h-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <Outlet />
         </div>
