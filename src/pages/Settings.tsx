@@ -215,7 +215,7 @@ const Settings = () => {
     }
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/apple-health-sleep`;
+  
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);

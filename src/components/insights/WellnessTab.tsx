@@ -17,6 +17,7 @@ import GoogleFitConnect from "@/components/GoogleFitConnect";
 import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
+import SleepSourcesPanel from "@/components/insights/SleepSourcesPanel";
 
 interface MetricsRow {
   date: string;
@@ -180,6 +181,7 @@ const WellnessTab = () => {
         </div>
       )}
 
+      <SleepSourcesPanel />
       <SleepCalendar />
       <SleepStagesChart />
 

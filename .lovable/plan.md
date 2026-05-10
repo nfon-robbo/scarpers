@@ -1,31 +1,46 @@
-## Problem
+## Goal
 
-When we export workouts to Garmin (.fit), the rest/recovery steps are being sent with a pace target of "9:25/km" (walk pace). The user compared with another app that sends:
+1. Fully remove Apple Health as a sleep data source.
+2. Add a diagnostic showing which integration delivered last night's sleep (and recent nights), so it's clear where the data is coming from.
 
-- **Warm up** — no target
-- **Run** — with target (correct, leave alone)
-- **Rest** — no target (ours wrongly sets walk pace)
-- **Cool down** — no target
+## Part 1 — Remove Apple Health sleep
 
-Our current behaviour lives in `src/lib/intervals-workout-fit.ts`. In `buildSpeedFitStep` we detect warmup/cooldown/recovery/rest and force their pace to `9:25/km`, then still build a SPEED-target step. That's why the watch shows a pace target on what should be open steps.
+### Code
+- Delete edge function `supabase/functions/apple-health-sleep/` (and its config in `supabase/config.toml` if present).
+- Remove any UI references to Apple Health for sleep:
+  - Search for "Apple Health" / "apple-health" across `src/`. Remove setup card / connect block / instructions.
+  - Strip Apple Health branch from any source-merge logic in `src/components/SleepCalendar.tsx`, `src/components/insights/WellnessTab.tsx`, readiness/Running IQ helpers (`src/lib/sleep-score.ts`, `src/lib/readiness.ts`, `src/lib/running-iq.ts`).
+- Remove the `apple-health-integration` memory file and its index entry.
 
-Also `parseTextStep` rewrites walk lines to "Recovery" but still routes them through the speed step builder if a pace is present in the text.
+### Data cleanup
+- Delete existing rows in `sleep_stages` where `source = 'apple_health'` (none exist today, but run for safety).
 
-## Fix
+### Documentation
+- Update README / settings copy that mention Apple Health.
 
-In `src/lib/intervals-workout-fit.ts`:
+## Part 2 — Sleep source diagnostic
 
-1. **`buildSpeedFitStep`**: if intensity is `warmup`, `cooldown`, `recovery`, or `rest`, return an **open** step (no target) instead of a speed-target step. Use the existing `buildOpenStep` with a sensible label (e.g. "Warm up", "Cool down", "Recover").
-2. **`buildFitStep`** (HR-target branch used when API steps lack pace): same treatment — for warmup/cooldown/recovery/rest, return an open step instead of an HR-target step, so the watch shows no target on rests regardless of source.
-3. **`parseTextStep`**: when the line is a walk or the resolved intensity is non-active, skip target parsing entirely and return an open step using just the duration.
-4. Remove the now-unused "9:25/km fallback pace" branch in `buildSpeedFitStep`.
+Add a small "Sleep sources" panel on the Insights → Wellness tab (or as a new collapsible card) showing, for the last 7 nights, which integration produced data:
 
-Active/interval steps keep their pace or HR target exactly as today — only the non-working steps become open.
+```text
+Date         Intervals  Google Fit  Health Connect  Garmin ZIP
+10/05/2026   7.6h / 79   —           —               —
+09/05/2026   7.2h / 71   —           —               —
+...
+```
 
-## Files touched
+### Implementation
+- New helper that, per date, queries:
+  - `daily_metrics` grouped by `source_file` (intervals.icu, garmin export ZIP) → hours + score.
+  - `sleep_stages` grouped by `source` (`google_fit`, `health_connect`) → total minutes.
+- Render as a compact table with a tick / dash per source.
+- Place above existing sleep calendar so the user can immediately see "last night came from Intervals only".
 
-- `src/lib/intervals-workout-fit.ts` — only file affected. No DB / edge function / UI changes.
+## Open questions
 
-## Verification
+- Confirm: also remove Apple Health entirely from anywhere it appears (not just sleep)? Currently it only appears in the sleep edge function, so this is effectively the same thing — but flag if you want the connector card to remain for any future use.
 
-- Re-export a known interval workout to .fit; inspect with the existing FIT decoding (or push to the watch) and confirm warm up / rest / cool down show **No Target**, while the work intervals keep their pace target.
+## Out of scope
+
+- No changes to Google Fit, Health Connect, Garmin ZIP, or Intervals.icu sleep ingestion.
+- No change to how sleep is merged for Readiness / Running IQ scoring (still uses sleep_stages first, falls back to daily_metrics).
