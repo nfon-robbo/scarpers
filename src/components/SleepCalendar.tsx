@@ -33,72 +33,20 @@ const SleepCalendar = () => {
     if (!user) return;
     const since = subDays(new Date(), 365).toISOString().split("T")[0];
 
-    // Fetch both sources in parallel
-    const [stagesRes, metricsRes] = await Promise.all([
-      supabase
-        .from("sleep_stages")
-        .select("date, stage, duration_seconds")
-        .eq("user_id", user.id)
-        .gte("date", since)
-        .order("date", { ascending: true }),
-      supabase
-        .from("daily_metrics")
-        .select("date, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
-        .eq("user_id", user.id)
-        .gte("date", since)
-        .not("sleep_duration_seconds", "is", null)
-        .order("date", { ascending: true }),
-    ]);
+    // Only use Google Fit + Health Connect via sleep_stages
+    const { data } = await supabase
+      .from("sleep_stages")
+      .select("date, stage, duration_seconds, source")
+      .eq("user_id", user.id)
+      .in("source", ["google_fit", "health_connect"])
+      .gte("date", since)
+      .order("date", { ascending: true });
 
-    const stageRows = (stagesRes.data as SleepStageRow[]) || [];
-
-    // Identify dates where sleep_stages only has generic "sleep" (no real stages)
-    const dateStageTypes = new Map<string, Set<string>>();
-    for (const r of stageRows) {
-      if (!dateStageTypes.has(r.date)) dateStageTypes.set(r.date, new Set());
-      dateStageTypes.get(r.date)!.add(r.stage);
-    }
-
-    // A date has "real" stages if it has deep, rem, or light
-    const hasRealStages = (stages: Set<string>) =>
-      stages.has("deep") || stages.has("rem") || stages.has("light");
-
-    // Build replacement/fallback rows from daily_metrics
-    const metricsReplacements: SleepStageRow[] = [];
-    const replacedDates = new Set<string>();
-
-    for (const m of metricsRes.data || []) {
-      const deepMins = Number(m.deep_sleep_minutes || 0);
-      const remMins = Number(m.rem_sleep_minutes || 0);
-      const lightMins = Number(m.light_sleep_minutes || 0);
-      const awakeMins = Number(m.awake_during_night_minutes || 0);
-      const totalSleepSecs = Number(m.sleep_duration_seconds || 0);
-
-      const metricsHasStages = deepMins > 0 || remMins > 0 || lightMins > 0;
-      const metricsHasAnySleepData = metricsHasStages || totalSleepSecs > 0;
-      if (!metricsHasAnySleepData) continue;
-
-      const existingStages = dateStageTypes.get(m.date);
-      const existingHasReal = existingStages ? hasRealStages(existingStages) : false;
-
-      // Use daily_metrics if: no sleep_stages data, OR sleep_stages is generic but daily_metrics has real stages
-      if (!existingStages || (metricsHasStages && !existingHasReal)) {
-        if (existingStages) replacedDates.add(m.date);
-        if (metricsHasStages) {
-          if (deepMins > 0) metricsReplacements.push({ date: m.date, stage: "deep", duration_seconds: deepMins * 60 });
-          if (remMins > 0) metricsReplacements.push({ date: m.date, stage: "rem", duration_seconds: remMins * 60 });
-          if (lightMins > 0) metricsReplacements.push({ date: m.date, stage: "light", duration_seconds: lightMins * 60 });
-          if (awakeMins > 0) metricsReplacements.push({ date: m.date, stage: "awake", duration_seconds: awakeMins * 60 });
-        } else {
-          metricsReplacements.push({ date: m.date, stage: "sleep", duration_seconds: totalSleepSecs });
-        }
-      }
-    }
-
-    // Filter out sleep_stages rows for dates being replaced by better daily_metrics data
-    const filteredStageRows = stageRows.filter((r) => !replacedDates.has(r.date));
-
-    setRows([...filteredStageRows, ...metricsReplacements]);
+    setRows(((data as SleepStageRow[]) || []).map(r => ({
+      date: r.date,
+      stage: r.stage,
+      duration_seconds: r.duration_seconds,
+    })));
     setLoading(false);
   }, [user]);
 
