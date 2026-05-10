@@ -162,6 +162,23 @@ const AdminPage = () => {
         </Button>
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Site Map</CardTitle>
+          <CardDescription>Public sitemap URL for search engines</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input readOnly value={sitemapUrl} className="max-w-md font-mono text-sm" />
+            <Button variant="outline" size="sm" asChild>
+              <a href={sitemapUrl} target="_blank" rel="noopener noreferrer">
+                Open <ExternalLink className="w-3 h-3 ml-1" />
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
