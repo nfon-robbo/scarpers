@@ -420,6 +420,7 @@ ${dataContext}`;
     const { callAI } = await import("../_shared/ai.ts");
     const response = await callAI({
       stream: false,
+      label: "android-coach",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
