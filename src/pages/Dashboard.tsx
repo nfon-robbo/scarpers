@@ -528,6 +528,8 @@ const Dashboard = () => {
         raceDistance={plan?.race_distance || null}
         planStartDate={plan?.start_date || null}
         nextRunDate={todaysWorkout?.workout?.dateObj || null}
+        completedDates={heroDateSets.completed}
+        plannedDates={heroDateSets.planned}
       />
 
       {/* ── Header ── */}
