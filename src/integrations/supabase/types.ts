@@ -119,6 +119,54 @@ export type Database = {
           },
         ]
       }
+      ai_usage_log: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          id: string
+          input_tokens: number
+          label: string | null
+          latency_ms: number | null
+          model: string | null
+          output_tokens: number
+          provider: string
+          status: number | null
+          streamed: boolean
+          total_tokens: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id?: string
+          input_tokens?: number
+          label?: string | null
+          latency_ms?: number | null
+          model?: string | null
+          output_tokens?: number
+          provider: string
+          status?: number | null
+          streamed?: boolean
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id?: string
+          input_tokens?: number
+          label?: string | null
+          latency_ms?: number | null
+          model?: string | null
+          output_tokens?: number
+          provider?: string
+          status?: number | null
+          streamed?: boolean
+          total_tokens?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       analyses: {
         Row: {
           content: string
@@ -768,6 +816,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_ai_usage_stats: { Args: never; Returns: Json }
       admin_dashboard_stats: { Args: never; Returns: Json }
       delete_email: {
         Args: { message_id: number; queue_name: string }
