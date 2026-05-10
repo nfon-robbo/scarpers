@@ -267,9 +267,9 @@ const AdminPage = () => {
                 <Stat label="API calls this month" value={aiUsage?.calls_month ?? "—"} />
                 <Stat label="Tokens today" value={Number(aiUsage?.tokens_today ?? 0).toLocaleString()} />
                 <Stat label="Tokens this month" value={Number(aiUsage?.tokens_month ?? 0).toLocaleString()} />
-                <Stat label="Cost today" value={`$${Number(aiUsage?.cost_today ?? 0).toFixed(2)}`} />
-                <Stat label="Cost this month" value={`$${Number(aiUsage?.cost_month ?? 0).toFixed(2)}`} />
-                <Stat label="Cost (30d)" value={`$${Number(aiUsage?.cost_30d ?? 0).toFixed(2)}`} />
+                <Stat label="Cost today" value={fmtGBP(aiUsage?.cost_today)} />
+                <Stat label="Cost this month" value={fmtGBP(aiUsage?.cost_month)} />
+                <Stat label="Cost (30d)" value={fmtGBP(aiUsage?.cost_30d)} />
                 <Stat label="Avg tokens / plan" value={Number(aiUsage?.avg_tokens_per_plan ?? 0).toLocaleString()} />
               </div>
 
