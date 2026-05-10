@@ -200,83 +200,105 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
           </div>
         )}
 
-        {/* Plan workouts strip */}
+        {/* Day strip — all days; highlight + clickable when there's a workout */}
         <div className="mt-5 relative">
-          {planItems.length > 0 ? (
-            <>
-              <button
-                type="button"
-                aria-label="Previous"
-                onClick={() => scrollBy(-200)}
-                className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="Next"
-                onClick={() => scrollBy(200)}
-                className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+          <button
+            type="button"
+            aria-label="Previous"
+            onClick={() => scrollBy(-200)}
+            className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next"
+            onClick={() => scrollBy(200)}
+            className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 items-center justify-center rounded-full bg-background/70 backdrop-blur border border-white/20 text-white hover:bg-background/90"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
 
-              <div
-                ref={scrollerRef}
-                className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x [&::-webkit-scrollbar]:hidden"
-                style={{ scrollbarWidth: "none" }}
-              >
-                {planItems.map((w, idx) => {
-                  const d = w.dateObj!;
-                  const key = ymd(d);
-                  const isToday = isSameDay(d, today);
-                  const isPast = d < today && !isToday;
-                  const isCompleted = completedDates?.has(key) ?? false;
-                  const isFocus = idx === focusIdx;
+          <div
+            ref={scrollerRef}
+            className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {stripDays.map((d, idx) => {
+              const key = ymd(d);
+              const isToday = isSameDay(d, today);
+              const isPast = d < today && !isToday;
+              const workout = workoutByDate.get(key);
+              const hasWorkout = !!workout;
+              const isCompleted = completedDates?.has(key) ?? false;
+              const showMonth = d.getDate() === 1 || idx === 0;
 
-                  return (
-                    <button
-                      type="button"
-                      key={`${key}-${idx}`}
-                      ref={isFocus ? focusRef : undefined}
-                      onClick={() => setSelectedWorkout(w)}
-                      className={`shrink-0 snap-start flex flex-col items-center justify-between py-2 px-1 rounded-xl border transition-all w-16 sm:w-20 h-24 sm:h-28 hover:scale-[1.03] active:scale-95 text-left ${
-                        isFocus
-                          ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30"
-                          : isCompleted
-                          ? "bg-emerald-500/25 border-emerald-400/50 text-white"
-                          : isPast
-                          ? "bg-white/5 backdrop-blur-md text-white/70 border-white/10"
-                          : "bg-white/10 backdrop-blur-md text-white border-white/20"
-                      }`}
-                    >
-                      <div className="flex flex-col items-center leading-tight">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide opacity-90">
-                          {format(d, "EEE")}
-                        </span>
-                        <span className="text-base sm:text-lg font-bold">{format(d, "d")}</span>
-                        <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
+              const baseClasses = "shrink-0 snap-start flex flex-col items-center justify-between py-2 px-0.5 rounded-xl border transition-all w-12 sm:w-14 h-20 sm:h-24 text-center";
+              let toneClasses: string;
+              if (isCompleted) {
+                toneClasses = "bg-emerald-500/30 border-emerald-400/60 text-white shadow-md shadow-emerald-500/20";
+              } else if (hasWorkout && isToday) {
+                toneClasses = "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30";
+              } else if (hasWorkout && !isPast) {
+                toneClasses = "bg-primary/30 border-primary/60 text-white shadow-md shadow-primary/20";
+              } else if (hasWorkout && isPast) {
+                toneClasses = "bg-destructive/20 border-destructive/40 text-white/85";
+              } else if (isToday) {
+                toneClasses = "bg-white/20 border-white/40 text-white";
+              } else if (isPast) {
+                toneClasses = "bg-white/5 backdrop-blur-md text-white/60 border-white/10";
+              } else {
+                toneClasses = "bg-white/10 backdrop-blur-md text-white border-white/20";
+              }
+              const interactClasses = hasWorkout ? "cursor-pointer hover:scale-[1.05] active:scale-95" : "cursor-default";
+
+              const inner = (
+                <>
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide opacity-90">
+                      {format(d, "EEE")}
+                    </span>
+                    <span className="text-sm sm:text-base font-bold">{format(d, "d")}</span>
+                    {showMonth && (
+                      <span className="text-[9px] opacity-80">{format(d, "MMM")}</span>
+                    )}
+                  </div>
+                  <div className="h-4 flex items-center justify-center">
+                    {isCompleted ? (
+                      <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
                       </div>
-                      <div className="w-full px-0.5 flex flex-col items-center gap-1">
-                        <span className="text-[9px] sm:text-[10px] font-semibold truncate max-w-full">
-                          {shortLabel(w.title)}
-                        </span>
-                        {isCompleted && (
-                          <div className="w-4 h-4 rounded-full bg-emerald-400 flex items-center justify-center">
-                            <Check className="w-2.5 h-2.5 text-emerald-950" strokeWidth={3} />
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-white/70">No planned workouts yet.</p>
-          )}
+                    ) : hasWorkout ? (
+                      <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide truncate max-w-full px-0.5">
+                        {shortLabel(workout!.title)}
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              );
+
+              return hasWorkout ? (
+                <button
+                  type="button"
+                  key={key}
+                  ref={isToday ? focusRef : undefined}
+                  onClick={() => setSelectedWorkout(workout!)}
+                  className={`${baseClasses} ${toneClasses} ${interactClasses}`}
+                >
+                  {inner}
+                </button>
+              ) : (
+                <div
+                  key={key}
+                  ref={isToday ? (focusRef as unknown as React.RefObject<HTMLDivElement>) : undefined}
+                  className={`${baseClasses} ${toneClasses}`}
+                >
+                  {inner}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
       {/* Workout detail dialog */}
       <Dialog open={!!selectedWorkout} onOpenChange={(o) => !o && setSelectedWorkout(null)}>
