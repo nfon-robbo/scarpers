@@ -63,6 +63,23 @@ const AppLayout = () => {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group mb-2 border border-primary/20 ${
+                  isActive
+                    ? "bg-primary/15 text-primary glow-sm"
+                    : "bg-primary/5 text-primary hover:bg-primary/10"
+                }`
+              }
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/15">
+                <Shield className="w-[18px] h-[18px]" />
+              </div>
+              Admin
+            </NavLink>
+          )}
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
