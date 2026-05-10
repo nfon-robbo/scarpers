@@ -46,19 +46,23 @@ function paceTargetToSecPerKm(target: string): number | null {
 
 // Map a segment to an intensity in [0, 1]. 1 = hardest.
 function segmentIntensity(seg: ParsedSegment): number {
-  // Walks, warm-ups, cool-downs and rests are always low effort, regardless
-  // of any HR zone the AI may have attached to them.
   const label = `${seg.segment} ${seg.notes ?? ""}`.toLowerCase();
-  if (/rest/.test(label)) return 0.08;
-  if (/walk|recovery/.test(label)) return 0.18;
-  if (/warm\s*-?\s*up|cool\s*-?\s*down/.test(label)) return 0.25;
-
   const pace = paceTargetToSecPerKm(seg.target);
   if (pace != null) {
-    // Map 4:00/km → 1.0, 7:30/km → 0.4 (runs should clearly tower over walks)
-    const clamped = Math.max(240, Math.min(450, pace));
-    return 0.4 + (1 - (clamped - 240) / (450 - 240)) * 0.6;
+    // Pace-driven profile so slower warm-up / walk / cool-down bars sit much
+    // lower while harder running intervals still tower above them.
+    const clamped = Math.max(240, Math.min(600, pace));
+    if (clamped <= 300) return 0.8 + ((300 - clamped) / 60) * 0.15;
+    if (clamped <= 360) return 0.55 + ((360 - clamped) / 60) * 0.25;
+    if (clamped <= 450) return 0.32 + ((450 - clamped) / 90) * 0.23;
+    return 0.12 + ((600 - clamped) / 150) * 0.2;
   }
+
+  // Fallbacks when no pace exists at all.
+  if (/rest/.test(label)) return 0.05;
+  if (/walk|recovery/.test(label)) return 0.14;
+  if (/warm\s*-?\s*up|cool\s*-?\s*down/.test(label)) return 0.18;
+
   const z = seg.hrZone.match(/Z\s*(\d)/i);
   if (z) {
     const zone = parseInt(z[1], 10);
@@ -136,7 +140,7 @@ export default function WorkoutIntervalChart({ segments }: { segments: ParsedSeg
       <div className="flex items-end gap-[2px] h-32 w-full">
         {bars.map((b, i) => {
           const widthPct = (b.sec / totalSec) * 100;
-          const heightPct = 15 + b.intensity * 85; // 15%–100%
+          const heightPct = 5 + b.intensity * 95; // 5%–100%
           const target = shortTarget(b.seg);
           return (
             <div
