@@ -262,7 +262,7 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
                           <Clock className="w-3 h-3" /> {seg.duration}
                         </span>
                       </div>
-                      {seg.target && (
+                      {seg.target && !/warm\s*-?\s*up|cool\s*-?\s*down|rest/i.test(seg.segment) && (
                         <p className="text-xs text-muted-foreground">
                           <span className="font-medium">Target:</span> {seg.target}
                         </p>
