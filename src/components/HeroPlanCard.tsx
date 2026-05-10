@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay, parseISO, isAfter, startOfDay } from "date-fns";
 import heroRunner from "@/assets/hero-runner.jpg";
-import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap } from "lucide-react";
+import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface HeroPlanCardProps {
   name: string | null;
   raceDistance: string | null;
   planStartDate: string | null;
   nextRunDate: Date | null;
+  completedDates?: Set<string>; // yyyy-MM-dd
+  plannedDates?: Set<string>;   // yyyy-MM-dd (non-rest planned workout days)
 }
+
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 
 const distanceLabel = (d: string | null) => {
   if (!d) return "Your Goal";
