@@ -89,7 +89,13 @@ function formatDuration(sec: number): string {
   return `${Math.round(sec)}s`;
 }
 
+function isNoPaceSegment(seg: ParsedSegment): boolean {
+  const t = `${seg.segment} ${seg.notes ?? ""}`.toLowerCase();
+  return /warm\s*-?\s*up|cool\s*-?\s*down|rest/.test(t);
+}
+
 function shortTarget(seg: ParsedSegment): string {
+  if (isNoPaceSegment(seg)) return "";
   if (seg.target) {
     // Extract pace if present
     const p = seg.target.match(/(\d{1,2}:\d{2}(?:-\d{1,2}:\d{2})?\s*\/?\s*km)/i);
