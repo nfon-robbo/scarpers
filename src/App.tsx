@@ -14,6 +14,7 @@ import Activities from "./pages/Activities";
 import InsightsPage from "./pages/Insights";
 import TrainingPlanPage from "./pages/TrainingPlan";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/training-plan" element={<TrainingPlanPage />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/privacy" element={<Privacy />} />
             </Route>
             <Route path="*" element={<NotFound />} />

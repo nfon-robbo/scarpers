@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,6 +19,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -30,10 +33,23 @@ const navItems = [
 ];
 
 const AppLayout = () => {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { theme, toggleTheme } = useTheme();
-  
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!data);
+    })();
+  }, [user]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -47,6 +63,23 @@ const AppLayout = () => {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group mb-2 border border-primary/20 ${
+                  isActive
+                    ? "bg-primary/15 text-primary glow-sm"
+                    : "bg-primary/5 text-primary hover:bg-primary/10"
+                }`
+              }
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-primary/15">
+                <Shield className="w-[18px] h-[18px]" />
+              </div>
+              Admin
+            </NavLink>
+          )}
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
