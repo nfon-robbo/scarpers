@@ -680,7 +680,7 @@ const Dashboard = () => {
                   variant="ghost"
                   size="sm"
                   className="w-full mt-3 text-xs gap-1.5 bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 rounded-xl"
-                  onClick={() => navigate("/training-plan")}
+                  onClick={(e) => { e.stopPropagation(); navigate("/training-plan"); }}
                 >
                   <Calendar className="w-3 h-3" />
                   View Plan
