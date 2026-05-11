@@ -678,7 +678,7 @@ const TrainingPlanPage = () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        savePlan(accumulated);
+        savePlan(accumulated, { inPlace: true });
         toast({ title: "Plan updated", description: "Your adjusted training plan has been saved." });
       },
       onError: (err) => {
