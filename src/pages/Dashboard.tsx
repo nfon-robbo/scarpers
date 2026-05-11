@@ -23,6 +23,7 @@ import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import HeroPlanCard from "@/components/HeroPlanCard";
 import BlogPreview from "@/components/BlogPreview";
+import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 
 
 // ── Types ──
@@ -474,6 +475,18 @@ const Dashboard = () => {
     });
   }, [activities]);
 
+  // Today's completed activity (full row) — used for the review dialog
+  const todaysActivity = useMemo(() => {
+    return activities.find((a) => {
+      if (!a.start_time) return false;
+      if (/walk/i.test(a.activity_type || "")) return false;
+      if (!a.distance_meters || !a.duration_seconds) return false;
+      return isToday(new Date(a.start_time));
+    }) || null;
+  }, [activities]);
+
+  const [reviewOpen, setReviewOpen] = useState(false);
+
   // Latest resting HR
   const latestRHR = useMemo(() => {
     const withRHR = metrics.filter((m) => m.resting_heart_rate);
@@ -616,7 +629,14 @@ const Dashboard = () => {
             </Card>
 
             {/* Today's Workout */}
-            <Card className="glass border-border/30 relative overflow-hidden">
+            <Card
+              className={`glass border-border/30 relative overflow-hidden ${completedToday && !todaysWorkout?.isNext ? "cursor-pointer hover:border-primary/50 transition-colors" : ""}`}
+              onClick={() => {
+                if (completedToday && !todaysWorkout?.isNext && todaysWorkout?.workout && todaysActivity) {
+                  setReviewOpen(true);
+                }
+              }}
+            >
               {completedToday && !todaysWorkout?.isNext && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                   <div
@@ -660,7 +680,7 @@ const Dashboard = () => {
                   variant="ghost"
                   size="sm"
                   className="w-full mt-3 text-xs gap-1.5 bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 rounded-xl"
-                  onClick={() => navigate("/training-plan")}
+                  onClick={(e) => { e.stopPropagation(); navigate("/training-plan"); }}
                 >
                   <Calendar className="w-3 h-3" />
                   View Plan
@@ -903,6 +923,14 @@ const Dashboard = () => {
       <FeedbackCard />
       <BlogPreview className="mt-2" />
       <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
+      <WorkoutReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        workout={todaysWorkout?.workout || null}
+        activity={todaysActivity}
+        workoutDate={todaysWorkout?.workout?.dateObj || new Date()}
+        workoutTitle={todaysWorkout?.workout?.title?.replace(/\s*\(Total:.*?\)/, "") || "Today's Run"}
+      />
     </div>
   );
 };
