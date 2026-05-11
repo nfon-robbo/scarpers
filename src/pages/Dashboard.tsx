@@ -474,6 +474,18 @@ const Dashboard = () => {
     });
   }, [activities]);
 
+  // Today's completed activity (full row) — used for the review dialog
+  const todaysActivity = useMemo(() => {
+    return activities.find((a) => {
+      if (!a.start_time) return false;
+      if (/walk/i.test(a.activity_type || "")) return false;
+      if (!a.distance_meters || !a.duration_seconds) return false;
+      return isToday(new Date(a.start_time));
+    }) || null;
+  }, [activities]);
+
+  const [reviewOpen, setReviewOpen] = useState(false);
+
   // Latest resting HR
   const latestRHR = useMemo(() => {
     const withRHR = metrics.filter((m) => m.resting_heart_rate);
