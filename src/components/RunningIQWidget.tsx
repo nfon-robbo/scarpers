@@ -3,8 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, TrendingUp, ChevronRight } from "lucide-react";
+import { Loader2, TrendingUp, ChevronRight, History } from "lucide-react";
 import { computeRunningIQ, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
 import { calculateSleepScore } from "@/lib/sleep-score";
 
@@ -61,6 +62,7 @@ const RunningIQWidget = () => {
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<RunningIQResult | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -279,8 +281,27 @@ const RunningIQWidget = () => {
               <PillarBar key={p.name} {...p} />
             ))}
           </div>
+
+          {/* History / explainer link */}
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            className="mt-5 w-full flex items-center justify-between text-xs font-medium text-primary hover:text-primary/80 transition-colors group"
+          >
+            <span className="flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5" />
+              View history & what your score means
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </CardContent>
       </Card>
+
+      <RunningIQHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        current={result}
+      />
     </div>
   );
 };
