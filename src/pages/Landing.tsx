@@ -304,10 +304,10 @@ const Landing = () => {
               AI running coach · Beta
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              AI<br />Running Plan
+              AI Running<br />Coach
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra.
+              Free personalised running plans for 5K, 10K, half, marathon &amp; ultra — built around your fitness, injuries and goals.
             </p>
             <p className="mt-3 text-sm sm:text-base text-white/90 max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Available on desktop, mobile and tablet.
