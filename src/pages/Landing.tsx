@@ -94,7 +94,7 @@ const FAQS = [
   },
   {
     q: "Is Scarpers free?",
-    a: "Yes. Scarpers is free to use — sign up, complete onboarding and your personalised AI running plan is generated in under two minutes.",
+    a: "Currently, yes — while we go through beta testing. The first 10 people who sign up to the beta will get Scarpers free for life and a unique founders badge.",
   },
   {
     q: "How does the AI generate my plan?",
