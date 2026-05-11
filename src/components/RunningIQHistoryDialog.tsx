@@ -191,6 +191,32 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
           </DialogDescription>
         </DialogHeader>
 
+        {/* AI coaching advice — how to raise your score */}
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-accent/5">
+          <CardContent className="pt-5 space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              How to raise your score
+            </h3>
+            {adviceLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Coach is thinking…
+              </div>
+            ) : adviceError ? (
+              <p className="text-xs text-muted-foreground">{adviceError}</p>
+            ) : advice ? (
+              <div className="text-xs leading-relaxed">
+                <MarkdownRenderer content={advice} />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Coaching advice will appear here once your score is calculated.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Timeline */}
         <Card>
           <CardContent className="pt-5 pb-2 pr-2">
