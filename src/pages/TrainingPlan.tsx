@@ -325,11 +325,29 @@ const TrainingPlanPage = () => {
     return () => window.removeEventListener("plan-undo-changed", onPlanChange);
   }, [loadSavedPlan]);
 
-  const savePlan = async (planContent: string) => {
+  const savePlan = async (planContent: string, options: { inPlace?: boolean } = {}) => {
     if (!user) return;
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
 
-    // Archive old plan instead of deleting, then insert new one
+    // In-place edit: update the existing plan row so linked activities (training_plan_id)
+    // continue to register as completed. Used by day-adjust, day-ahead, plan-review etc.
+    if (options.inPlace && savedPlanId) {
+      const { error } = await supabase
+        .from("training_plans")
+        .update({
+          race_distance: raceDistance,
+          goal_time: goalTime || null,
+          training_days: trainingDays,
+          start_date: toLocalISODate(startDate),
+          race_date: raceDateValue,
+          content: planContent,
+        } as any)
+        .eq("id", savedPlanId);
+      if (error) console.error("In-place plan update failed:", error);
+      return;
+    }
+
+    // Archive old plan instead of deleting, then insert new one (new plan generations)
     if (savedPlanId) {
       await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
     }
