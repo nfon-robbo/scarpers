@@ -308,8 +308,8 @@ const Landing = () => {
               <Zap className="w-3 h-3 text-primary" />
               AI running coach · Beta
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
-              Built for<br />Your Run
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg whitespace-nowrap" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+              Built for Your Run
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Free personalised running plans for 5K, 10K, half, marathon &amp; ultra — built around your fitness, injuries and goals.
