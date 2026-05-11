@@ -573,6 +573,7 @@ const TrainingPlanPage = () => {
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
+  const [dayAdjustTargetDate, setDayAdjustTargetDate] = useState<Date>(new Date());
 
   const reviewProgress = async () => {
     if (!user || !content) return;
