@@ -264,7 +264,10 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
                 <Button
                   size="sm"
                   className="flex-1"
-                  onClick={() => { onOpenChange(false); navigate("/training-plan"); }}
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate("/training-plan", { state: { applyRecommendation: coachContent } });
+                  }}
                 >
                   Yes, adjust my plan
                 </Button>
