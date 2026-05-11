@@ -3,8 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, TrendingUp, ChevronRight } from "lucide-react";
+import { Loader2, TrendingUp, ChevronRight, History } from "lucide-react";
 import { computeRunningIQ, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
 import { calculateSleepScore } from "@/lib/sleep-score";
 
