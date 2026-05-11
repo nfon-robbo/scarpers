@@ -9,7 +9,7 @@ const TenKTrainingPlan = () => (
     canonicalPath="/10k-training-plan"
   >
     <article className="prose prose-invert max-w-none">
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4" style={{ fontFamily: "'Clash Display', sans-serif" }}>
+      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
         Free Personalised 10K Training Plan
       </h1>
       <p className="text-lg text-muted-foreground leading-relaxed">
