@@ -629,7 +629,14 @@ const Dashboard = () => {
             </Card>
 
             {/* Today's Workout */}
-            <Card className="glass border-border/30 relative overflow-hidden">
+            <Card
+              className={`glass border-border/30 relative overflow-hidden ${completedToday && !todaysWorkout?.isNext ? "cursor-pointer hover:border-primary/50 transition-colors" : ""}`}
+              onClick={() => {
+                if (completedToday && !todaysWorkout?.isNext && todaysWorkout?.workout && todaysActivity) {
+                  setReviewOpen(true);
+                }
+              }}
+            >
               {completedToday && !todaysWorkout?.isNext && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                   <div
