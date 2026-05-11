@@ -134,6 +134,38 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
       });
   }, [open, user]);
 
+  // Fetch AI advice on how to improve
+  useEffect(() => {
+    if (!open || !current) return;
+    let cancelled = false;
+    setAdvice("");
+    setAdviceError("");
+    setAdviceLoading(true);
+    supabase.functions
+      .invoke("running-iq-advice", {
+        body: {
+          score: current.adjustedScore,
+          label: current.label,
+          pillars: current.pillars,
+          lowest_pillar: current.lowestPillar,
+        },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data?.advice) {
+          setAdviceError("Couldn't load coaching advice right now.");
+        } else {
+          setAdvice(data.advice);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAdviceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, current?.adjustedScore, current?.lowestPillar]);
+
   const timeline = useMemo(
     () =>
       snapshots.map((s) => ({
