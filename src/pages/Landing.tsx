@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
+import BlogPreview from "@/components/BlogPreview";
 
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
@@ -505,6 +506,16 @@ const Landing = () => {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ====== Blog preview ====== */}
+      <section className="border-t border-border/40">
+        <div className="max-w-6xl mx-auto px-5 py-20">
+          <BlogPreview
+            heading="From the Scarpers blog"
+            subheading="Training advice, race day tips and AI coaching insights."
+          />
         </div>
       </section>
 
