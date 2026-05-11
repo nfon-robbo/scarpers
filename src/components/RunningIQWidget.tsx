@@ -62,6 +62,7 @@ const RunningIQWidget = () => {
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<RunningIQResult | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
