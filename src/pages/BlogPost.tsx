@@ -170,6 +170,8 @@ const BlogPost = () => {
 
         <div className="blog-content mt-8 text-foreground" dangerouslySetInnerHTML={{ __html: renderContent(post.content) }} />
       </article>
+
+      <BlogInteractions postId={post.id} postTitle={post.title} postSlug={post.slug} />
     </MarketingPageLayout>
   );
 };
