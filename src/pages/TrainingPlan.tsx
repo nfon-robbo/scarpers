@@ -1788,10 +1788,12 @@ const TrainingPlanPage = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sun className="w-5 h-5 text-primary" />
-                Day Ahead Assessment
+                {dayAdjustMode === "next" ? "Adjust Next Workout" : "Day Ahead Assessment"}
               </DialogTitle>
               <DialogDescription>
-                Analyzing your readiness for today's workout
+                {dayAdjustMode === "next"
+                  ? `Applying coach recommendation to your next session${dayAdjustTargetDate ? ` — ${format(dayAdjustTargetDate, "EEEE d MMMM")}` : ""}`
+                  : "Analyzing your readiness for today's workout"}
               </DialogDescription>
             </DialogHeader>
 
