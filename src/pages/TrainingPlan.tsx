@@ -577,6 +577,7 @@ const TrainingPlanPage = () => {
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
   const [dayAdjustTargetDate, setDayAdjustTargetDate] = useState<Date>(new Date());
+  const [dayAdjustMode, setDayAdjustMode] = useState<"today" | "next">("today");
 
   const reviewProgress = async () => {
     if (!user || !content) return;
@@ -767,6 +768,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(new Date());
+    setDayAdjustMode("today");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -838,6 +840,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustPhase("analyzing");
     setDayAdjustTargetDate(next.dateObj);
+    setDayAdjustMode("next");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -1785,10 +1788,12 @@ const TrainingPlanPage = () => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sun className="w-5 h-5 text-primary" />
-                Day Ahead Assessment
+                {dayAdjustMode === "next" ? "Adjust Next Workout" : "Day Ahead Assessment"}
               </DialogTitle>
               <DialogDescription>
-                Analyzing your readiness for today's workout
+                {dayAdjustMode === "next"
+                  ? `Applying coach recommendation to your next session${dayAdjustTargetDate ? ` — ${format(dayAdjustTargetDate, "EEEE d MMMM")}` : ""}`
+                  : "Analyzing your readiness for today's workout"}
               </DialogDescription>
             </DialogHeader>
 
@@ -1835,7 +1840,7 @@ const TrainingPlanPage = () => {
                   <>
                     <Button size="sm" onClick={applyDayAdjustment}>
                       <Check className="w-4 h-4 mr-2" />
-                      Apply Adjusted Workout
+                      {dayAdjustMode === "next" ? `Apply to ${dayAdjustTargetDate ? format(dayAdjustTargetDate, "EEE d MMM") : "next workout"}` : "Apply Adjusted Workout"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
                       <Dumbbell className="w-4 h-4 mr-2" />
