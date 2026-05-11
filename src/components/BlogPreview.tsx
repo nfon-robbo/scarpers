@@ -50,7 +50,7 @@ const BlogPreview = ({
         <div>
           <h2
             className="text-2xl sm:text-3xl font-bold tracking-tight"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            style={{ fontFamily: "'Clash Display', sans-serif" }}
           >
             {heading}
           </h2>
@@ -88,7 +88,7 @@ const BlogPreview = ({
             <div className="p-4">
               <h3
                 className="text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ fontFamily: "'Clash Display', sans-serif" }}
               >
                 {post.title}
               </h3>

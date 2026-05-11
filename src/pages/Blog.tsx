@@ -39,7 +39,7 @@ const Blog = () => {
     >
       <div className="text-center mb-10">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">From the Coach</p>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Clash Display', sans-serif" }}>
           Scarpers Running Blog
         </h1>
         <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
@@ -72,7 +72,7 @@ const Blog = () => {
                 </div>
               )}
               <div className="p-5">
-                <h2 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                <h2 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2" style={{ fontFamily: "'Clash Display', sans-serif" }}>
                   {post.title}
                 </h2>
                 {post.excerpt && (

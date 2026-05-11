@@ -216,7 +216,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
       <div className="relative p-5 sm:p-6 text-white">
         <h2
           className="text-xl sm:text-2xl font-bold leading-tight pr-24 sm:pr-28 drop-shadow-md"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ fontFamily: "'Clash Display', sans-serif" }}
         >
           {displayName}'s {titleDistance}{raceDistance ? " Training" : ""}
         </h2>
@@ -235,7 +235,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
 
         {dateLabel && dateValue && (
           <div className="mt-5">
-            <p className="text-base sm:text-lg font-bold text-primary drop-shadow" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p className="text-base sm:text-lg font-bold text-primary drop-shadow" style={{ fontFamily: "'Clash Display', sans-serif" }}>
               {dateLabel}
             </p>
             <p className="text-sm sm:text-base text-white/90 mt-0.5">
@@ -317,7 +317,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
                         aria-label={shortLabel(workout!.title)}
                         title={shortLabel(workout!.title)}
                         className="w-4 h-4 rounded-full bg-white/95 text-primary flex items-center justify-center text-[10px] font-extrabold shadow-sm"
-                        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                        style={{ fontFamily: "'Clash Display', sans-serif" }}
                       >
                         S
                       </span>
