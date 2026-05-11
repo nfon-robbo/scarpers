@@ -267,6 +267,14 @@ export function expandWorkoutSteps(
     const isRest = /rest/.test(segName);
     const isRecover = /recover/.test(segName);
     const isMain = /main|interval|rep|work/.test(segName);
+
+    // If the title's "Nx ..." repeat has already produced the main block,
+    // skip any later main/interval/recovery/rest rows — those would duplicate
+    // or contradict the reps. Only warm-up & cool-down rows survive.
+    if (mainInjected && fallback && !isWarmup && !isCooldown) {
+      continue;
+    }
+
     const hrZone = normalizeHrZone(seg.hrZone);
     const { low, high } = hrZoneToBpm(hrZone);
 
