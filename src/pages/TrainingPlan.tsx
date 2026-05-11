@@ -763,6 +763,7 @@ const TrainingPlanPage = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
     setDayAdjustPhase("sleep");
+    setDayAdjustTargetDate(new Date());
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -801,6 +802,70 @@ const TrainingPlanPage = () => {
       },
     });
   };
+
+  // Apply an elite-coach recommendation to the NEXT planned workout (skips today)
+  const adjustNextWorkout = useCallback(async (recommendation: string) => {
+    if (!user || !content) {
+      toast({ title: "No active plan", description: "There's no plan to adjust.", variant: "destructive" });
+      return;
+    }
+    const workouts = parseWorkoutsFromPlan(content);
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const next = workouts
+      .filter(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") > todayStr)
+      .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()))[0];
+    if (!next || !next.dateObj) {
+      toast({ title: "No upcoming workout", description: "Couldn't find a future workout in your plan.", variant: "destructive" });
+      return;
+    }
+
+    let workoutText = `**${next.title}**\n`;
+    if (next.segments.length > 0) {
+      workoutText += "| Segment | Duration | Target | HR Zone | Notes |\n|---|---|---|---|---|\n";
+      for (const s of next.segments) {
+        workoutText += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
+      }
+    }
+
+    const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${format(next.dateObj, "yyyy-MM-dd")}):\n${workoutText}`;
+
+    setDayAdjustDialogOpen(true);
+    setDayAdjusting(true);
+    setDayAdjustResult(null);
+    setDayAdjustIsModified(false);
+    setDayAdjustPhase("analyzing");
+    setDayAdjustTargetDate(next.dateObj);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", variant: "destructive" });
+      setDayAdjusting(false);
+      setDayAdjustDialogOpen(false);
+      return;
+    }
+
+    let accumulated = "";
+    streamAICoach({
+      type: "day-adjust",
+      token: session.access_token,
+      targetDate: format(next.dateObj, "yyyy-MM-dd"),
+      todayWorkout: injected,
+      onDelta: (text) => {
+        accumulated += text;
+        setDayAdjustResult(accumulated);
+      },
+      onDone: () => {
+        setDayAdjusting(false);
+        setDayAdjustPhase("done");
+        setDayAdjustIsModified(/Decision:\s*ADJUSTED/i.test(accumulated));
+      },
+      onError: (err) => {
+        toast({ title: "Adjustment failed", description: err, variant: "destructive" });
+        setDayAdjusting(false);
+        setDayAdjustDialogOpen(false);
+      },
+    });
+  }, [user, content, toast]);
 
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
