@@ -870,13 +870,13 @@ const TrainingPlanPage = () => {
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
 
-    const today = new Date();
+    const today = dayAdjustTargetDate || new Date();
     const todayStr = format(today, "yyyy-MM-dd");
     const workouts = parseWorkoutsFromPlan(content);
     const todayWorkout = workouts.find(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") === todayStr);
 
     if (!todayWorkout || !todayWorkout.rawText) {
-      toast({ title: "Could not find today's workout in plan", variant: "destructive" });
+      toast({ title: "Could not find that workout in your plan", variant: "destructive" });
       return;
     }
 
