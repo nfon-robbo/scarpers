@@ -1,46 +1,61 @@
-## Goal
+## SEO overhaul
 
-1. Fully remove Apple Health as a sleep data source.
-2. Add a diagnostic showing which integration delivered last night's sleep (and recent nights), so it's clear where the data is coming from.
+### 1. Meta tags (`index.html`)
+- **Title**: `Scarpers — AI Running Coach | Free Personalised 5K & 10K Training Plans`
+- **Meta description**: `Scarpers uses AI to generate personalised running plans built around your fitness level, injury history, HR zones and race goal. Get your free 5K or 10K training plan today.`
+- Mirror into Open Graph + Twitter title/description.
+- Update `SoftwareApplication` JSON-LD slightly (keep `HealthApplication` category) and add a new `FAQPage` JSON-LD node mirroring landing FAQ.
 
-## Part 1 — Remove Apple Health sleep
+### 2. Landing hero (`src/pages/Landing.tsx`)
+- H1: `AI Running Coach`
+- Subline (directly under H1): `Free personalised running plans for 5K, 10K, half, marathon & ultra — built around your fitness, injuries and goals.`
+- Existing paragraph copy stays.
 
-### Code
-- Delete edge function `supabase/functions/apple-health-sleep/` (and its config in `supabase/config.toml` if present).
-- Remove any UI references to Apple Health for sleep:
-  - Search for "Apple Health" / "apple-health" across `src/`. Remove setup card / connect block / instructions.
-  - Strip Apple Health branch from any source-merge logic in `src/components/SleepCalendar.tsx`, `src/components/insights/WellnessTab.tsx`, readiness/Running IQ helpers (`src/lib/sleep-score.ts`, `src/lib/readiness.ts`, `src/lib/running-iq.ts`).
-- Remove the `apple-health-integration` memory file and its index entry.
+### 3. FAQ section on landing
+- New `<section id="faq">` before footer using existing `CollapsibleSection` styling.
+- Questions:
+  1. What is Scarpers?
+  2. Is Scarpers free?
+  3. How does the AI generate my plan?
+  4. Can I use Scarpers if I have an injury?
+  5. Does Scarpers work with Garmin watches?
+  6. What running distances does Scarpers support?
+  7. Is Scarpers suitable for complete beginners?
+  8. How is Scarpers different from Couch to 5K?
+- Same Q&A pairs rendered as `FAQPage` JSON-LD in `index.html`.
 
-### Data cleanup
-- Delete existing rows in `sleep_stages` where `source = 'apple_health'` (none exist today, but run for safety).
+### 4. New public pages (added to `src/App.tsx` outside `ProtectedRoute`)
 
-### Documentation
-- Update README / settings copy that mention Apple Health.
+**`/5k-training-plan`** — long-form (~500+ words). H1: `Free Personalised 5K Training Plan`. Sections:
+- What the plan includes (week-by-week structure, easy runs, intervals, long runs, rest)
+- How it adapts to your current fitness from imported activities
+- Injury-aware programming (uses onboarding injury history to scale volume / swap impact sessions)
+- HR zone training (5-zone model, target zones per session)
+- Garmin sync (FIT import / Intervals.icu export so workouts appear on the watch)
+- CTA to `/auth`
 
-## Part 2 — Sleep source diagnostic
+**`/10k-training-plan`** — long-form (~500+ words). H1: `Free Personalised 10K Training Plan`. Same structural sections tuned to 10K: building aerobic base, threshold work, race-pace long runs, taper, plus adaptation/injury/HR/Garmin sections. CTA to `/auth`.
 
-Add a small "Sleep sources" panel on the Insights → Wellness tab (or as a new collapsible card) showing, for the last 7 nights, which integration produced data:
+**`/ai-running-coach`** — long-form (~500+ words). H1: `AI Running Coach`. Sections:
+- How the AI builds your plan (onboarding inputs + activity history + readiness)
+- What data it uses (FIT files, Strava, HR, sleep, readiness, Running IQ)
+- Day-ahead briefings and post-workout reviews
+- How it differs from a human coach (instant, 24/7, data-driven, free; complements rather than replaces elite human coaching)
+- CTA to `/auth`
 
-```text
-Date         Intervals  Google Fit  Health Connect  Garmin ZIP
-10/05/2026   7.6h / 79   —           —               —
-09/05/2026   7.2h / 71   —           —               —
-...
-```
+**`/blog`** — minimal "Coming soon" intro page with H1 `Scarpers Running Blog`. Includes `<meta name="robots" content="noindex, follow" />` injected via a small effect (or React Helmet-style direct `document` manipulation matching existing pattern) until real posts exist.
 
-### Implementation
-- New helper that, per date, queries:
-  - `daily_metrics` grouped by `source_file` (intervals.icu, garmin export ZIP) → hours + score.
-  - `sleep_stages` grouped by `source` (`google_fit`, `health_connect`) → total minutes.
-- Render as a compact table with a tick / dash per source.
-- Place above existing sleep calendar so the user can immediately see "last night came from Intervals only".
+All marketing pages share a lightweight header (logo + Sign in link) and footer matching Landing styling. No new colors — uses existing semantic tokens.
 
-## Open questions
+### 5. Sitemap & robots (static files exist — edit in place)
+- `public/sitemap.xml`: include `/`, `/5k-training-plan`, `/10k-training-plan`, `/ai-running-coach`, `/auth`, `/privacy`. Omit `/blog` (noindex). Update `lastmod` to today (UK date format internally, ISO in XML).
+- `public/robots.txt`: keep existing structure, ensure new marketing routes are crawlable (they already are via default `Allow: /`), add `Disallow: /blog`. Sitemap line already correct.
+- Sitemap will be served at `https://www.scarpers.co.uk/sitemap.xml` via the existing static file (already working).
 
-- Confirm: also remove Apple Health entirely from anywhere it appears (not just sleep)? Currently it only appears in the sleep edge function, so this is effectively the same thing — but flag if you want the connector card to remain for any future use.
+### 6. Structured data (`index.html`)
+- Keep `Organization`, `WebSite`, `SoftwareApplication`.
+- Add `FAQPage` graph entry with all 8 FAQ Q&A pairs so Google can show rich FAQ results.
 
-## Out of scope
-
-- No changes to Google Fit, Health Connect, Garmin ZIP, or Intervals.icu sleep ingestion.
-- No change to how sleep is merged for Readiness / Running IQ scoring (still uses sleep_stages first, falls back to daily_metrics).
+### Notes
+- Marketing/SEO-only changes. No backend, database, or business-logic edits.
+- All new pages indexable; `/blog` explicitly noindexed until content lands.

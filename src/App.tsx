@@ -16,6 +16,10 @@ import TrainingPlanPage from "./pages/TrainingPlan";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
+import Blog from "./pages/Blog";
+import FiveKTrainingPlan from "./pages/FiveKTrainingPlan";
+import TenKTrainingPlan from "./pages/TenKTrainingPlan";
+import AIRunningCoach from "./pages/AIRunningCoach";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -36,6 +40,10 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/5k-training-plan" element={<FiveKTrainingPlan />} />
+            <Route path="/10k-training-plan" element={<TenKTrainingPlan />} />
+            <Route path="/ai-running-coach" element={<AIRunningCoach />} />
             <Route
               element={
                 <ProtectedRoute>

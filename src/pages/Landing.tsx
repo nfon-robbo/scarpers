@@ -88,36 +88,36 @@ function WatchMockup({
 
 const FAQS = [
   {
-    q: "What is the best AI running coach app?",
-    a: "Scarpers is an AI running coach that builds personalised training plans for 5K, 10K, half marathon, marathon and ultra. It analyses your real running data, sleep and resting HR, then writes a week-by-week plan only you would get.",
+    q: "What is Scarpers?",
+    a: "Scarpers is an AI running coach that builds free personalised training plans for 5K, 10K, half marathon, marathon and ultra. It reads your real running data, sleep and readiness, then writes a week-by-week plan tailored to you.",
   },
   {
-    q: "How does Scarpers create a personalised training plan?",
-    a: "Answer a few questions about your goal, experience and any injuries. Scarpers reads your last 8 weeks of runs and 30 nights of sleep, then generates a personalised training plan in under two minutes.",
+    q: "Is Scarpers free?",
+    a: "Yes. Scarpers is free to use — sign up, complete onboarding and your personalised AI running plan is generated in under two minutes.",
   },
   {
-    q: "What does Scarpers include?",
-    a: "AI training plans, FIT and Strava import, sleep tracking, daily readiness and post-run reviews — all in one app.",
+    q: "How does the AI generate my plan?",
+    a: "Onboarding captures your goal, experience, weekly mileage, HR zones and any injuries. Scarpers then analyses your last 8 weeks of activities and 30 nights of sleep before writing a week-by-week plan with paces, intensities and target heart rates.",
   },
   {
-    q: "Which devices and apps does it work with?",
-    a: "Anything that exports a .FIT file from Garmin, plus direct Strava import and Google Fit sleep sync.",
+    q: "Can I use Scarpers if I have an injury?",
+    a: "Yes. Onboarding asks about current and recent injuries. The AI scales weekly volume, reduces high-impact sessions and swaps in lower-stress alternatives so you can keep training safely.",
   },
   {
-    q: "Can a beginner follow a marathon training plan?",
-    a: "Yes. Onboarding captures your experience, weekly mileage and injuries. The AI scales the plan to your current fitness and progresses load safely.",
+    q: "Does Scarpers work with Garmin watches?",
+    a: "Yes. Import .FIT files from any Garmin watch and export structured workouts to Intervals.icu — your watch then picks up the session with target heart rate zones and intervals.",
   },
   {
-    q: "Can I export my plan to Garmin or Intervals.icu?",
-    a: "One-click export to Intervals.icu using native interval syntax with target heart rate zones. Your watch then picks up the structured workouts.",
+    q: "What running distances does Scarpers support?",
+    a: "5K, 10K, half marathon, marathon and ultra (50K, 50mi, 100K trail). Plans range from 6 to 24 weeks depending on the distance and your starting fitness.",
   },
   {
-    q: "How long does it take to set up?",
-    a: "Under two minutes. Sign up, answer a few questions, drop in a FIT file or connect Strava, and your first AI training plan is ready.",
+    q: "Is Scarpers suitable for complete beginners?",
+    a: "Yes. If you're new to running, Scarpers builds a gentle run-walk progression that grows safely week by week, with easy paces and recovery built in.",
   },
   {
-    q: "Do I need a coach as well?",
-    a: "Scarpers replaces the day-to-day plan-writing and analysis a coach does, at a fraction of the cost. You get personalised workouts, daily readiness and post-run reviews 24/7.",
+    q: "How is Scarpers different from Couch to 5K?",
+    a: "Couch to 5K is a single fixed plan for everyone. Scarpers writes a unique plan from your data — fitness level, injuries, sleep, readiness and HR zones — and adapts day-to-day based on how your training is actually going.",
   },
 ];
 
@@ -229,7 +229,7 @@ const Landing = () => {
   }, [heroIdx]);
 
   useEffect(() => {
-    document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
+    document.title = "Scarpers — AI Running Coach | Free Personalised 5K & 10K Training Plans";
 
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
@@ -304,10 +304,10 @@ const Landing = () => {
               AI running coach · Beta
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              AI<br />Running Plan
+              AI Running<br />Coach
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Get a personalised training plan tailored to your goal — week by week AI plans for 5K, 10K, half marathon, marathon and ultra.
+              Free personalised running plans for 5K, 10K, half, marathon &amp; ultra — built around your fitness, injuries and goals.
             </p>
             <p className="mt-3 text-sm sm:text-base text-white/90 max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Available on desktop, mobile and tablet.
