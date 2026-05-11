@@ -9,7 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp, Sparkles } from "lucide-react";
+import MarkdownRenderer from "./MarkdownRenderer";
 import {
   AreaChart,
   Area,
@@ -111,6 +112,9 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [advice, setAdvice] = useState<string>("");
+  const [adviceLoading, setAdviceLoading] = useState(false);
+  const [adviceError, setAdviceError] = useState<string>("");
 
   useEffect(() => {
     if (!open || !user) return;
@@ -129,6 +133,38 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
         setLoading(false);
       });
   }, [open, user]);
+
+  // Fetch AI advice on how to improve
+  useEffect(() => {
+    if (!open || !current) return;
+    let cancelled = false;
+    setAdvice("");
+    setAdviceError("");
+    setAdviceLoading(true);
+    supabase.functions
+      .invoke("running-iq-advice", {
+        body: {
+          score: current.adjustedScore,
+          label: current.label,
+          pillars: current.pillars,
+          lowest_pillar: current.lowestPillar,
+        },
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data?.advice) {
+          setAdviceError("Couldn't load coaching advice right now.");
+        } else {
+          setAdvice(data.advice);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAdviceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, current?.adjustedScore, current?.lowestPillar]);
 
   const timeline = useMemo(
     () =>
@@ -154,6 +190,32 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
             How your score is built and how it has trended over the last 90 days.
           </DialogDescription>
         </DialogHeader>
+
+        {/* AI coaching advice — how to raise your score */}
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-accent/5">
+          <CardContent className="pt-5 space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              How to raise your score
+            </h3>
+            {adviceLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Coach is thinking…
+              </div>
+            ) : adviceError ? (
+              <p className="text-xs text-muted-foreground">{adviceError}</p>
+            ) : advice ? (
+              <div className="text-xs leading-relaxed">
+                <MarkdownRenderer content={advice} />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Coaching advice will appear here once your score is calculated.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Timeline */}
         <Card>
