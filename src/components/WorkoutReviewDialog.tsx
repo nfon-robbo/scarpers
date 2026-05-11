@@ -264,7 +264,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
                 <Button
                   size="sm"
                   className="flex-1"
-                  onClick={() => { onOpenChange(false); navigate("/plan"); }}
+                  onClick={() => { onOpenChange(false); navigate("/training-plan"); }}
                 >
                   Yes, adjust my plan
                 </Button>
