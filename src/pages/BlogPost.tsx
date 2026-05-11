@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Calendar, ArrowLeft } from "lucide-react";
+import { Loader2, Calendar, ArrowLeft, Pencil } from "lucide-react";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
+import BlogInteractions from "@/components/BlogInteractions";
 
 interface Post {
   id: string;
@@ -36,6 +37,16 @@ const BlogPost = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setIsAdmin(false); return; }
+      const { data } = await supabase.rpc("has_role", { _user_id: session.user.id, _role: "admin" });
+      setIsAdmin(!!data);
+    })();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -121,9 +132,19 @@ const BlogPost = () => {
       description={post.excerpt || `${post.title} — Scarpers running blog.`}
       canonicalPath={`/blog/${post.slug}`}
     >
-      <Link to="/blog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4" /> All posts
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/blog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> All posts
+        </Link>
+        {isAdmin && (
+          <Link
+            to={`/admin/blog?edit=${post.id}`}
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            <Pencil className="h-4 w-4" /> Edit post
+          </Link>
+        )}
+      </div>
 
       {isPreview && (
         <div className="rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-4 py-2 text-sm text-amber-800 dark:text-amber-200 font-medium mb-6">
@@ -149,6 +170,8 @@ const BlogPost = () => {
 
         <div className="blog-content mt-8 text-foreground" dangerouslySetInnerHTML={{ __html: renderContent(post.content) }} />
       </article>
+
+      <BlogInteractions postId={post.id} postTitle={post.title} postSlug={post.slug} />
     </MarketingPageLayout>
   );
 };
