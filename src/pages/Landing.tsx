@@ -332,6 +332,7 @@ const Landing = () => {
             />
           ))}
         </div>
+        <div className="absolute inset-0 z-[1] bg-black/60 pointer-events-none" />
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/70 via-background/30 to-transparent pointer-events-none" />
         <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background via-background/40 to-background/60 pointer-events-none" />
 
