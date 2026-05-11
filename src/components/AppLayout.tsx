@@ -85,7 +85,7 @@ const AppLayout = () => {
                   }`}>
                     <Icon className="w-[18px] h-[18px]" />
                   </div>
-                  {label}
+                  <span className="font-['Barlow_Condensed'] font-semibold tracking-wide text-base uppercase">{label}</span>
                 </>
               )}
             </NavLink>
@@ -143,7 +143,7 @@ const AppLayout = () => {
               }
             >
               <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium leading-none">{label}</span>
+              <span className="font-['Barlow_Condensed'] text-[11px] font-semibold uppercase tracking-wide leading-none">{label}</span>
             </NavLink>
           ))}
         </div>
