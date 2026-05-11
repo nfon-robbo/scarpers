@@ -870,6 +870,17 @@ const TrainingPlanPage = () => {
     });
   }, [user, content, toast]);
 
+  // Auto-apply a coach recommendation passed in via navigation state (from WorkoutReviewDialog)
+  const appliedRecRef = useRef(false);
+  useEffect(() => {
+    const rec = (location.state as any)?.applyRecommendation as string | undefined;
+    if (!rec || appliedRecRef.current || !content || initialLoading) return;
+    appliedRecRef.current = true;
+    adjustNextWorkout(rec);
+    // Clear state so refresh/back doesn't re-trigger
+    navigate(location.pathname, { replace: true });
+  }, [location.state, content, initialLoading, adjustNextWorkout, navigate, location.pathname]);
+
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
 
