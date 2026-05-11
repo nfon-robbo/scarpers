@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -181,6 +182,8 @@ const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const TrainingPlanPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -573,6 +576,7 @@ const TrainingPlanPage = () => {
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
+  const [dayAdjustTargetDate, setDayAdjustTargetDate] = useState<Date>(new Date());
 
   const reviewProgress = async () => {
     if (!user || !content) return;
@@ -762,6 +766,7 @@ const TrainingPlanPage = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
     setDayAdjustPhase("sleep");
+    setDayAdjustTargetDate(new Date());
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -801,16 +806,91 @@ const TrainingPlanPage = () => {
     });
   };
 
+  // Apply an elite-coach recommendation to the NEXT planned workout (skips today)
+  const adjustNextWorkout = useCallback(async (recommendation: string) => {
+    if (!user || !content) {
+      toast({ title: "No active plan", description: "There's no plan to adjust.", variant: "destructive" });
+      return;
+    }
+    const workouts = parseWorkoutsFromPlan(content);
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const next = workouts
+      .filter(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") > todayStr)
+      .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()))[0];
+    if (!next || !next.dateObj) {
+      toast({ title: "No upcoming workout", description: "Couldn't find a future workout in your plan.", variant: "destructive" });
+      return;
+    }
+
+    let workoutText = `**${next.title}**\n`;
+    if (next.segments.length > 0) {
+      workoutText += "| Segment | Duration | Target | HR Zone | Notes |\n|---|---|---|---|---|\n";
+      for (const s of next.segments) {
+        workoutText += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
+      }
+    }
+
+    const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${format(next.dateObj, "yyyy-MM-dd")}):\n${workoutText}`;
+
+    setDayAdjustDialogOpen(true);
+    setDayAdjusting(true);
+    setDayAdjustResult(null);
+    setDayAdjustIsModified(false);
+    setDayAdjustPhase("analyzing");
+    setDayAdjustTargetDate(next.dateObj);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast({ title: "Session expired", variant: "destructive" });
+      setDayAdjusting(false);
+      setDayAdjustDialogOpen(false);
+      return;
+    }
+
+    let accumulated = "";
+    streamAICoach({
+      type: "day-adjust",
+      token: session.access_token,
+      targetDate: format(next.dateObj, "yyyy-MM-dd"),
+      todayWorkout: injected,
+      onDelta: (text) => {
+        accumulated += text;
+        setDayAdjustResult(accumulated);
+      },
+      onDone: () => {
+        setDayAdjusting(false);
+        setDayAdjustPhase("done");
+        setDayAdjustIsModified(/Decision:\s*ADJUSTED/i.test(accumulated));
+      },
+      onError: (err) => {
+        toast({ title: "Adjustment failed", description: err, variant: "destructive" });
+        setDayAdjusting(false);
+        setDayAdjustDialogOpen(false);
+      },
+    });
+  }, [user, content, toast]);
+
+  // Auto-apply a coach recommendation passed in via navigation state (from WorkoutReviewDialog)
+  const appliedRecRef = useRef(false);
+  useEffect(() => {
+    const rec = (location.state as any)?.applyRecommendation as string | undefined;
+    if (!rec || appliedRecRef.current || !content || initialLoading) return;
+    appliedRecRef.current = true;
+    adjustNextWorkout(rec);
+    // Clear state so refresh/back doesn't re-trigger
+    navigate(location.pathname, { replace: true });
+  }, [location.state, content, initialLoading, adjustNextWorkout, navigate, location.pathname]);
+
   const applyDayAdjustment = () => {
     if (!dayAdjustResult || !content) return;
 
-    const today = new Date();
+    const today = dayAdjustTargetDate || new Date();
     const todayStr = format(today, "yyyy-MM-dd");
     const workouts = parseWorkoutsFromPlan(content);
     const todayWorkout = workouts.find(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") === todayStr);
 
     if (!todayWorkout || !todayWorkout.rawText) {
-      toast({ title: "Could not find today's workout in plan", variant: "destructive" });
+      toast({ title: "Could not find that workout in your plan", variant: "destructive" });
       return;
     }
 
