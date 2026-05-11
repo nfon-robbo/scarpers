@@ -129,7 +129,7 @@ const BlogEditor = () => {
         <button onClick={closeEditor} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="h-4 w-4" /> Back to posts
         </button>
-        <h1 className="text-2xl font-bold text-foreground mb-6" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+        <h1 className="text-2xl font-bold text-foreground mb-6" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
           {isNew ? "New Blog Post" : "Edit Post"}
         </h1>
 
@@ -335,7 +335,7 @@ const BlogEditor = () => {
       </button>
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Blog Posts</h1>
+        <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>Blog Posts</h1>
         <Button onClick={openNew} className="rounded-xl gap-2"><Plus className="h-4 w-4" /> New Post</Button>
       </div>
 
