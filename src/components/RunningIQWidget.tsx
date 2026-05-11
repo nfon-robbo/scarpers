@@ -281,8 +281,27 @@ const RunningIQWidget = () => {
               <PillarBar key={p.name} {...p} />
             ))}
           </div>
+
+          {/* History / explainer link */}
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            className="mt-5 w-full flex items-center justify-between text-xs font-medium text-primary hover:text-primary/80 transition-colors group"
+          >
+            <span className="flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5" />
+              View history & what your score means
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </CardContent>
       </Card>
+
+      <RunningIQHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        current={result}
+      />
     </div>
   );
 };
