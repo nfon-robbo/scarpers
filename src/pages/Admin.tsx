@@ -172,6 +172,25 @@ const AdminPage = () => {
 
       <Card>
         <CardHeader className="pb-3">
+          <CardTitle className="text-base">Blog</CardTitle>
+          <CardDescription>Create and manage blog posts</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button asChild>
+              <Link to="/admin/blog">Open Blog Editor</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/blog" target="_blank" rel="noopener noreferrer">
+                View public blog <ExternalLink className="w-3 h-3 ml-1" />
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base">Site Map</CardTitle>
           <CardDescription>Public sitemap URL for search engines</CardDescription>
         </CardHeader>
