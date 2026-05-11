@@ -840,6 +840,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustPhase("analyzing");
     setDayAdjustTargetDate(next.dateObj);
+    setDayAdjustMode("next");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
