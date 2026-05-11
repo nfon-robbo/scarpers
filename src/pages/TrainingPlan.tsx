@@ -943,7 +943,7 @@ const TrainingPlanPage = () => {
     const updatedContent = content.slice(0, idx) + replacement + content.slice(idx + todayWorkout.rawText.length);
 
     setContent(updatedContent);
-    savePlan(updatedContent);
+    savePlan(updatedContent, { inPlace: true });
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
     setDayAdjustDialogOpen(false);
