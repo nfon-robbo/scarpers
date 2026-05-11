@@ -509,6 +509,16 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* ====== Blog preview ====== */}
+      <section className="border-t border-border/40">
+        <div className="max-w-6xl mx-auto px-5 py-20">
+          <BlogPreview
+            heading="From the Scarpers blog"
+            subheading="Training advice, race day tips and AI coaching insights."
+          />
+        </div>
+      </section>
+
       {/* ====== FAQ — tinted card band ====== */}
       <section id="faq" className="bg-gradient-to-b from-background via-card/70 to-background border-y border-border/60">
         <div className="max-w-3xl mx-auto px-5 py-24">
