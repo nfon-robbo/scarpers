@@ -9,7 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, TrendingUp } from "lucide-react";
+import { Loader2, TrendingUp, Sparkles } from "lucide-react";
+import MarkdownRenderer from "./MarkdownRenderer";
 import {
   AreaChart,
   Area,
