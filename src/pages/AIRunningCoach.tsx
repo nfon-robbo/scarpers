@@ -72,6 +72,16 @@ const AIRunningCoach = () => (
         writing and analysis a coach would do, and frees you up to actually run.
       </p>
 
+      <h2 className="text-2xl font-semibold mt-10 mb-3">Is AI coaching safe?</h2>
+      <p className="text-muted-foreground leading-relaxed">
+        Used responsibly, yes. Scarpers respects the injury history you enter during onboarding, caps how fast weekly
+        volume can increase, and auto-deloads when readiness drops or sleep tanks. The AI is conservative by design:
+        easy days stay easy, hard days are earned. That said, AI coaching is a complement to — not a replacement for —
+        professional medical or physiotherapy advice. If you're returning from surgery, managing a chronic injury, or
+        new to exercise with underlying health conditions, please consult a qualified professional before starting any
+        training plan. Stop and seek advice if a session causes sharp pain, swelling or symptoms that don't settle.
+      </p>
+
       <h2 className="text-2xl font-semibold mt-10 mb-3">Try it free</h2>
       <p className="text-muted-foreground leading-relaxed">
         Sign up and your first personalised plan is ready in under two minutes.

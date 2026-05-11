@@ -66,6 +66,16 @@ const FiveKTrainingPlan = () => (
         watch so Scarpers always has the latest data to adapt the plan.
       </p>
 
+      <h2 className="text-2xl font-semibold mt-10 mb-3">Is a sub-30 5K achievable?</h2>
+      <p className="text-muted-foreground leading-relaxed">
+        For many runners, sub-30 is the breakthrough goal — it means averaging around 6:00/km (or 9:39/mile) for the
+        full 5K. It's absolutely achievable, but it isn't automatic. Scarpers checks your recent easy pace, your HR
+        drift and your weekly mileage to see whether sub-30 is realistic in the time frame you've chosen, then builds
+        the plan to get you there: enough easy aerobic volume to handle the pace, intervals fast enough to lift your
+        top end, and at least one weekly run at goal 5K pace so the effort feels familiar on race day. If you're
+        further out, the plan ramps conservatively first so you arrive at race week healthy rather than half-fit.
+      </p>
+
       <h2 className="text-2xl font-semibold mt-10 mb-3">Ready to start?</h2>
       <p className="text-muted-foreground leading-relaxed">
         Sign up, answer a few onboarding questions, and your free personalised 5K training plan is ready in under
