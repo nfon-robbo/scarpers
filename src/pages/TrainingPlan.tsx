@@ -1840,7 +1840,7 @@ const TrainingPlanPage = () => {
                   <>
                     <Button size="sm" onClick={applyDayAdjustment}>
                       <Check className="w-4 h-4 mr-2" />
-                      Apply Adjusted Workout
+                      {dayAdjustMode === "next" ? `Apply to ${dayAdjustTargetDate ? format(dayAdjustTargetDate, "EEE d MMM") : "next workout"}` : "Apply Adjusted Workout"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
                       <Dumbbell className="w-4 h-4 mr-2" />
