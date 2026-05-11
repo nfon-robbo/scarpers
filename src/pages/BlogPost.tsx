@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Calendar, ArrowLeft } from "lucide-react";
+import { Loader2, Calendar, ArrowLeft, Pencil } from "lucide-react";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
+import BlogInteractions from "@/components/BlogInteractions";
 
 interface Post {
   id: string;
