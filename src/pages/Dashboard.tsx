@@ -22,6 +22,7 @@ import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import HeroPlanCard from "@/components/HeroPlanCard";
+import BlogPreview from "@/components/BlogPreview";
 
 
 // ── Types ──
