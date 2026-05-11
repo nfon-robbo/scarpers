@@ -58,8 +58,15 @@ const BlogEditor = () => {
   const loadPosts = async () => {
     setLoading(true);
     const { data } = await supabase.from("blog_posts").select("*").order("created_at", { ascending: false });
-    setPosts((data as BlogPost[]) || []);
+    const list = (data as BlogPost[]) || [];
+    setPosts(list);
     setLoading(false);
+
+    const editId = new URLSearchParams(window.location.search).get("edit");
+    if (editId) {
+      const found = list.find((p) => p.id === editId);
+      if (found) openEdit(found);
+    }
   };
 
   const slugify = (text: string) =>
