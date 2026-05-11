@@ -169,7 +169,7 @@ const SectionLabel = ({ children, light }: { children: React.ReactNode; light?: 
 );
 
 const H2 = ({ children }: { children: React.ReactNode }) => (
-  <h2 className="mt-3 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.05]" style={{ fontFamily: "'Clash Display', sans-serif" }}>
+  <h2 className="mt-3 text-3xl sm:text-5xl font-bold tracking-tight leading-[1.05]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
     {children}
   </h2>
 );
@@ -308,7 +308,7 @@ const Landing = () => {
               <Zap className="w-3 h-3 text-primary" />
               AI running coach · Beta
             </div>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Clash Display', sans-serif" }}>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-lg" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
               AI Running<br />Coach
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white max-w-md leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
@@ -342,7 +342,7 @@ const Landing = () => {
           <div className="grid md:grid-cols-2 gap-12 md:gap-8 items-center">
             <div className="order-1 md:order-1">
               <SectionLabel>On Your Watch</SectionLabel>
-              <h2 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Clash Display', sans-serif" }}>
+              <h2 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[0.95]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                 Your AI plan,<br />
                 <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">right on your wrist</span>
               </h2>
@@ -381,7 +381,7 @@ const Landing = () => {
                   <s.icon className="w-7 h-7 text-primary" />
                 </div>
                 <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">{s.n}</p>
-                <h3 className="mt-2 text-xl font-bold" style={{ fontFamily: "'Clash Display', sans-serif" }}>{s.title}</h3>
+                <h3 className="mt-2 text-xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.title}</h3>
                 <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
               </article>
             ))}
@@ -410,7 +410,7 @@ const Landing = () => {
               {PLANS.map((p) => (
                 <div key={p.distance} className={`rounded-2xl border border-border/50 bg-background/70 backdrop-blur p-5 ${p.distance === "Ultra" ? "col-span-2" : ""}`}>
                   <p className="text-[11px] text-muted-foreground">{p.weeks}</p>
-                  <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Clash Display', sans-serif" }}>{p.distance}</h3>
+                  <h3 className="mt-1 text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{p.distance}</h3>
                   <p className="mt-2 text-xs text-muted-foreground">{p.who}</p>
                 </div>
               ))}
@@ -470,7 +470,7 @@ const Landing = () => {
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                   <f.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-lg font-bold" style={{ fontFamily: "'Clash Display', sans-serif" }}>{f.title}</h3>
+                <h3 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{f.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
               </article>
             ))}
@@ -500,7 +500,7 @@ const Landing = () => {
                   <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center">
                     <c.icon className="w-5 h-5 text-primary" />
                   </div>
-                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Clash Display', sans-serif" }}>{c.title}</h3>
+                  <h3 className="text-xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{c.title}</h3>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{c.body}</p>
               </article>

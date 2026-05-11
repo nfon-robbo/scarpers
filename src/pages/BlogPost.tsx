@@ -136,7 +136,7 @@ const BlogPost = () => {
           <img src={post.cover_image} alt={post.title} className="w-full h-56 md:h-80 object-cover rounded-2xl mb-8" />
         )}
 
-        <h1 className="text-3xl md:text-5xl font-bold text-foreground leading-tight tracking-tight" style={{ fontFamily: "'Clash Display', sans-serif" }}>
+        <h1 className="text-3xl md:text-5xl font-bold text-foreground leading-tight tracking-tight" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
           {post.title}
         </h1>
 

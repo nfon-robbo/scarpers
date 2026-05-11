@@ -643,7 +643,7 @@ const Dashboard = () => {
                     className="select-none -rotate-12 px-5 py-2 rounded-md border-[3px] border-emerald-500/80 text-emerald-500 font-extrabold tracking-wider uppercase text-2xl bg-background/40 backdrop-blur-[2px]"
                     style={{
                       boxShadow: "inset 0 0 0 2px hsl(var(--background) / 0.6)",
-                      fontFamily: "'Clash Display', sans-serif",
+                      fontFamily: "'Cabinet Grotesk', sans-serif",
                       textShadow: "1px 1px 0 hsl(var(--background) / 0.3)",
                     }}
                   >
