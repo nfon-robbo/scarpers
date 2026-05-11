@@ -229,7 +229,7 @@ const Landing = () => {
   }, [heroIdx]);
 
   useEffect(() => {
-    document.title = "Scarpers — AI Running Coach & Personalised Training Plans UK";
+    document.title = "Scarpers — AI Running Coach | Free Personalised 5K & 10K Training Plans";
 
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
