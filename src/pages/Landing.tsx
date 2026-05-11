@@ -332,9 +332,8 @@ const Landing = () => {
             />
           ))}
         </div>
-        <div className="absolute inset-0 z-[1] bg-black/60 pointer-events-none" />
-        <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/70 via-background/30 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 z-[1] bg-gradient-to-t from-background via-background/40 to-background/60 pointer-events-none" />
+        <div className="absolute inset-0 z-[1] bg-black/70 pointer-events-none" />
+        <div className="absolute inset-0 z-[1] bg-gradient-to-t from-black via-black/50 to-black/20 pointer-events-none" />
 
         <header className="relative z-20 px-5 sm:px-10 pt-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
