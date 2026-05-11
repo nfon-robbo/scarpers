@@ -112,6 +112,9 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
   const { user } = useAuth();
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [advice, setAdvice] = useState<string>("");
+  const [adviceLoading, setAdviceLoading] = useState(false);
+  const [adviceError, setAdviceError] = useState<string>("");
 
   useEffect(() => {
     if (!open || !user) return;
