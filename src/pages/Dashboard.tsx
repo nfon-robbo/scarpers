@@ -923,6 +923,14 @@ const Dashboard = () => {
       <FeedbackCard />
       <BlogPreview className="mt-2" />
       <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
+      <WorkoutReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        workout={todaysWorkout?.workout || null}
+        activity={todaysActivity}
+        workoutDate={todaysWorkout?.workout?.dateObj || new Date()}
+        workoutTitle={todaysWorkout?.workout?.title?.replace(/\s*\(Total:.*?\)/, "") || "Today's Run"}
+      />
     </div>
   );
 };
