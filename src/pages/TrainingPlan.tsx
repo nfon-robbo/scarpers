@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
