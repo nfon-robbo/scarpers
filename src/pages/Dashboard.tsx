@@ -901,6 +901,7 @@ const Dashboard = () => {
         </>
       )}
       <FeedbackCard />
+      <BlogPreview className="mt-2" />
       <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
     </div>
   );
