@@ -768,6 +768,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(new Date());
+    setDayAdjustMode("today");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
