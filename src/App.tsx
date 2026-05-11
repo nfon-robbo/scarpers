@@ -17,6 +17,8 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
 import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
+import BlogEditor from "./pages/BlogEditor";
 import FiveKTrainingPlan from "./pages/FiveKTrainingPlan";
 import TenKTrainingPlan from "./pages/TenKTrainingPlan";
 import AIRunningCoach from "./pages/AIRunningCoach";
@@ -41,6 +43,15 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route
+              path="/admin/blog"
+              element={
+                <ProtectedRoute>
+                  <BlogEditor />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/5k-training-plan" element={<FiveKTrainingPlan />} />
             <Route path="/10k-training-plan" element={<TenKTrainingPlan />} />
             <Route path="/ai-running-coach" element={<AIRunningCoach />} />
