@@ -64,6 +64,16 @@ const TenKTrainingPlan = () => (
         prompts. Importing your latest .FIT files back into Scarpers keeps the plan up to date.
       </p>
 
+      <h2 className="text-2xl font-semibold mt-10 mb-3">Is sub-60 a realistic 10K target?</h2>
+      <p className="text-muted-foreground leading-relaxed">
+        Sub-60 — averaging around 6:00/km (9:39/mile) for 10K — is the headline target for a huge slice of recreational
+        runners. It's challenging but achievable for most runners with a consistent 20–30km training week. Scarpers
+        looks at your recent easy pace, threshold estimate and weekly mileage to judge whether sub-60 is realistic
+        for your timeline. If it is, the plan layers in race-pace blocks during long runs and threshold sessions
+        that bridge from your current ability to goal pace. If you're further off, the plan builds aerobic capacity
+        first so you actually hold the pace on race day rather than fading hard after 7K.
+      </p>
+
       <h2 className="text-2xl font-semibold mt-10 mb-3">Start your 10K plan</h2>
       <p className="text-muted-foreground leading-relaxed">
         Sign up, complete the short onboarding flow, and your free personalised 10K plan is generated in under two

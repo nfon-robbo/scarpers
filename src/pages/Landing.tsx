@@ -119,6 +119,10 @@ const FAQS = [
     q: "How is Scarpers different from Couch to 5K?",
     a: "Couch to 5K is a single fixed plan for everyone. Scarpers writes a unique plan from your data — fitness level, injuries, sleep, readiness and HR zones — and adapts day-to-day based on how your training is actually going.",
   },
+  {
+    q: "Is AI coaching safe?",
+    a: "Used responsibly, yes. Scarpers respects your injury history, caps weekly load increases and deloads when readiness drops. It complements rather than replaces medical advice — if you're injured, returning from surgery or managing a chronic condition, check with a physio or doctor first.",
+  },
 ];
 
 const STEPS = [
