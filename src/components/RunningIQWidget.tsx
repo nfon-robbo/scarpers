@@ -254,7 +254,7 @@ const RunningIQWidget = () => {
         <CardContent className="p-5 relative z-10">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-foreground">Running IQ</h3>
+              <h3 className="text-lg font-bold text-foreground">Running IQ</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Keep running — history will appear here
               </p>
