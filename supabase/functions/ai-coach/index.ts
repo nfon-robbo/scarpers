@@ -394,7 +394,9 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
           };
           const todayInfo = dateInTz(0);
           const tomorrowInfo = dateInTz(1);
-          const planEntries = String(activePlan.content).split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi);
+          const planEntries = String(activePlan.content)
+            .split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi)
+            .filter((entry) => /^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b/m.test(entry.split("\n")[0] || ""));
           const findPlanEntry = (date: string) => planEntries.find((entry) => {
             const match = entry.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
             if (!match) return false;
@@ -436,6 +438,10 @@ When the user asks about a future or past session (e.g. "next Friday", "this Wed
       } catch (e) {
         console.error("chat plan fetch error:", e);
       }
+
+      const immediateDiaryCorrection = chatPlanContext && /\b(today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(chatMessages || "")
+        ? `${chatPlanContext.match(/TODAY\/TOMORROW STATUS:[\s\S]*?(?=\n\nWhen the user asks|$)/)?.[0] || ""}\n\nUse the status above as the source of truth for this reply. If tomorrow says NO SESSION SCHEDULED, correct the prior mistake and do not propose replacing tomorrow's workout.\n\n`
+        : "";
 
       // Fetch latest readiness, Running IQ, recent analyses, and uploads so every model sees the full app picture
       let chatExtraContext = "";
@@ -574,7 +580,7 @@ ${chatExtraContext}`;
           return `${match} (${fmt(next)})`;
         });
       };
-      userPrompt = resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
+      userPrompt = immediateDiaryCorrection + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
