@@ -177,11 +177,15 @@ ${missing_data && missing_data.length > 0 ? `\nCRITICAL: The following data has 
 
 Your job: Give a short readiness verdict — 3-4 sentences, under 75 words total.
 
+TIME-OF-DAY FOCUS (current local hour is ${current_hour_local ?? new Date().getHours()}):
+- BEFORE 12:00 (morning): Anchor the verdict in LAST NIGHT'S SLEEP. Lead with the sleep story (duration, deep/REM, bedtime/wake vs their pattern) and how it set up today's capacity.
+- FROM 12:00 ONWARDS (midday/afternoon/evening): Do NOT lead with last night's sleep. Instead, explain WHY the readiness score has DROPPED since this morning — point to the live drains: today's accumulated training load/effort, elevated stress, body battery drain, time on feet, or under-fuelling. Sleep can be mentioned as background only if directly relevant.
+
 Rules:
-- Sentence 1: headline reason for the score, citing the single most important metric (e.g. "Deep sleep was only 1% last night").
+- Sentence 1: headline reason for the score, citing the single most important metric for the time-of-day focus above.
 - Sentence 2: brief "why it matters" — connect that metric to recovery / today's capacity in plain language.
-- Sentence 3: one supporting data point (HRV trend, RHR, yesterday's load, sleep duration vs typical) for context.
-- Sentence 4: one concrete action for today (rest, easy session, hydrate, bed by Xpm, etc.).
+- Sentence 3: one supporting data point (HRV, RHR, today's load, stress trend, etc.) for context.
+- Sentence 4: one concrete action for right now (rest, easy session, hydrate, fuel, bed by Xpm, etc.).
 - No preamble ("Good morning…"), no headers, no bullet points, no lists.
 - Do NOT restate the score number or list every metric.
 - Only reference workouts that ACTUALLY appear in the plan data. If today is a rest day, do not invent one.
