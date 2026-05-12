@@ -168,7 +168,17 @@ const statusIcon = (s: "good" | "warning" | "poor") => {
   return <AlertTriangle className="w-3.5 h-3.5 text-destructive" />;
 };
 
-const ReadinessWidget = () => {
+interface ReadinessWidgetProps {
+  todayContext?: {
+    isRestDay: boolean;
+    workoutMinutes: number | null;
+    workoutTitle: string | null;
+    completedToday: boolean;
+  };
+  onReviewPlan?: () => void;
+}
+
+const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = {}) => {
   const { user } = useAuth();
   const [data, setData] = useState<ReadinessData | null>(null);
   const [loading, setLoading] = useState(true);
