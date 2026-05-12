@@ -366,9 +366,6 @@ const Landing = () => {
               <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base shadow-lg shadow-primary/30">
                 <Link to="/auth">Start Free <ArrowRight className="w-4 h-4 ml-1" /></Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="h-12 px-7 rounded-full text-base bg-background/40 backdrop-blur border-foreground/30 text-white hover:bg-background/60">
-                <Link to="/auth"><Watch className="w-4 h-4 mr-1" /> Connect Garmin</Link>
-              </Button>
             </div>
 
             {/* Integration row */}
