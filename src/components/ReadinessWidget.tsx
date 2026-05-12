@@ -651,6 +651,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               })}
             </div>
           </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
