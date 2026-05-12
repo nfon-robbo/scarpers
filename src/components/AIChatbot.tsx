@@ -405,13 +405,14 @@ const AIChatbot = () => {
 
       // Persist assistant reply + bump thread updated_at.
       if (activeThreadId && finalContent.trim()) {
-        void supabase.from("chat_messages").insert({
+        const { error: aErr } = await supabase.from("chat_messages").insert({
           thread_id: activeThreadId,
           user_id: session.user.id,
           role: "assistant",
           content: finalContent,
         });
-        void supabase.from("chat_threads")
+        if (aErr) console.error("Failed to save assistant message:", aErr);
+        await supabase.from("chat_threads")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", activeThreadId);
       }
