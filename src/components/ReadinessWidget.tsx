@@ -572,6 +572,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const handleManualRefresh = () => {
     setLastUpdated(null);
     setAiAdvice(null);
+    setAiLoading(true);
     setData(null);
     setRefreshNonce((n) => n + 1);
   };
