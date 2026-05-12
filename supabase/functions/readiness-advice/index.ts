@@ -96,7 +96,29 @@ serve(async (req) => {
       if (!tomorrowWorkout.trim() && !isTomorrowTraining) planContext += `\nTomorrow: Rest day (no workout scheduled)`;
     }
 
-    // Fetch sleep stages to determine typical bedtime/wake patterns
+    // Fetch yesterday's activities so we can describe them by ACTUAL type
+    let yesterdayContext = "";
+    {
+      const yStart = new Date(); yStart.setDate(yStart.getDate() - 1); yStart.setHours(0, 0, 0, 0);
+      const yEnd = new Date(); yEnd.setHours(0, 0, 0, 0);
+      const { data: yActs } = await supabase
+        .from("activities")
+        .select("activity_type, duration_seconds, distance_meters, start_time")
+        .eq("user_id", user.id)
+        .gte("start_time", yStart.toISOString())
+        .lt("start_time", yEnd.toISOString())
+        .order("start_time", { ascending: true });
+      if (yActs && yActs.length > 0) {
+        const lines = yActs.map((a: any) => {
+          const mins = Math.round((a.duration_seconds || 0) / 60);
+          const km = a.distance_meters ? (a.distance_meters / 1000).toFixed(1) + "km" : "";
+          return `- ${a.activity_type || "unknown"}: ${mins} min${km ? ", " + km : ""}`;
+        });
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES (use the exact activity_type — do NOT call something a "run" unless activity_type is running/run):\n${lines.join("\n")}`;
+      } else {
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES: none recorded. Do NOT mention any workout from yesterday.`;
+      }
+    }
     const { data: sleepStages } = await supabase
       .from("sleep_stages")
       .select("date, start_time, end_time, stage")
@@ -147,6 +169,8 @@ Rules:
 - Use the user's name if available
 ${sleepPatternContext}
 ${planContext}
+${yesterdayContext}
+- NEVER describe yesterday's activity as a "run" unless the activity_type above is running/run.
 ${missing_data && missing_data.length > 0 ? `\nCRITICAL: The following data has NOT been synced today: ${missing_data.join(', ')}. Do NOT reference or comment positively on any missing metric.` : ''}`
 
       : `You are a knowledgeable, practical sports science coach. Tone: supportive, clear, no fluff.
@@ -164,6 +188,8 @@ Rules:
 - Use the user's first name once, max.
 ${sleepPatternContext}
 ${planContext}
+${yesterdayContext}
+- NEVER describe yesterday's activity as a "run" unless the activity_type above is running/run. Use the exact discipline (e.g. "yesterday's 60 min cycle"). If no activity is listed, do not mention one.
 ${missing_data && missing_data.length > 0 ? `\nCRITICAL: NOT synced today: ${missing_data.join(', ')}. Never reference missing metrics.` : ''}`;
 
     const factorsText = (factors || []).map((f: any) => `${f.label}: ${f.detail} (${f.status})`).join("\n");
