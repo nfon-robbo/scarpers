@@ -11,25 +11,27 @@ import { useTheme } from "@/hooks/useTheme";
 import {
   ChevronLeft,
   ChevronRight,
+  LayoutDashboard,
+  CalendarDays,
+  ListChecks,
+  Brain,
+  Upload,
+  Settings,
+  Sun,
+  Moon,
+  LogOut,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import iconDashboard from "@/assets/nav-dashboard.png";
-import iconPlan from "@/assets/nav-plan.png";
-import iconActivities from "@/assets/nav-activities.png";
-import iconInsights from "@/assets/nav-insights.png";
-import iconImport from "@/assets/nav-import.png";
-import iconSettings from "@/assets/nav-settings.png";
-import iconTheme from "@/assets/nav-theme.png";
-import iconSignout from "@/assets/nav-signout.png";
 
-const navItems = [
-  { to: "/dashboard", img: iconDashboard, label: "Dashboard" },
-  { to: "/training-plan", img: iconPlan, label: "Plan" },
-  { to: "/activities", img: iconActivities, label: "Activities" },
-  { to: "/insights", img: iconInsights, label: "Insights" },
-  { to: "/upload", img: iconImport, label: "Import" },
-  { to: "/settings", img: iconSettings, label: "Settings" },
+const navItems: { to: string; icon: LucideIcon; label: string }[] = [
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/training-plan", icon: CalendarDays, label: "Plan" },
+  { to: "/activities", icon: ListChecks, label: "Activities" },
+  { to: "/insights", icon: Brain, label: "Insights" },
+  { to: "/upload", icon: Upload, label: "Import" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 const COLLAPSE_KEY = "scarpers_sidebar_collapsed";
@@ -94,7 +96,7 @@ const AppLayout = () => {
 
         {/* Nav */}
         <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "px-2" : "px-3")}>
-          {navItems.map(({ to, img, label }) => (
+          {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -116,7 +118,7 @@ const AppLayout = () => {
                     "w-9 h-9 rounded-lg flex items-center justify-center transition-all shrink-0",
                     isActive ? "scale-105" : "opacity-80 group-hover:opacity-100"
                   )}>
-                    <img src={img} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+                    <Icon className="w-5 h-5" strokeWidth={2} />
                   </div>
                   {!collapsed && (
                     <span className="font-['Barlow_Condensed'] font-semibold tracking-wide text-base uppercase">{label}</span>
@@ -145,7 +147,7 @@ const AppLayout = () => {
             onClick={toggleTheme}
           >
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
-              <img src={iconTheme} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </div>
             {!collapsed && (theme === "dark" ? "Light Mode" : "Dark Mode")}
           </Button>
@@ -159,7 +161,7 @@ const AppLayout = () => {
             onClick={signOut}
           >
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
-              <img src={iconSignout} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+              <LogOut className="w-5 h-5" />
             </div>
             {!collapsed && "Sign out"}
           </Button>
@@ -172,7 +174,7 @@ const AppLayout = () => {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="grid grid-cols-6 h-16">
-          {navItems.map(({ to, img, label }) => (
+          {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -185,7 +187,7 @@ const AppLayout = () => {
                 }`
               }
             >
-              <img src={img} alt="" loading="lazy" width={24} height={24} className="w-6 h-6 object-contain" />
+              <Icon className="w-5 h-5" />
               <span className="font-['Barlow_Condensed'] text-[11px] font-semibold uppercase tracking-wide leading-none">{label}</span>
             </NavLink>
           ))}
