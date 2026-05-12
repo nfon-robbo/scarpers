@@ -692,15 +692,21 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     ? "text-destructive"
                     : "text-muted-foreground";
                 return (
-                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_104px] items-center gap-3 px-3 py-2.5 text-sm">
-                    <div className="shrink-0">{statusIcon(f.status)}</div>
-                    <span className="text-foreground font-medium truncate">{f.label}</span>
-                    <div className="flex justify-center">
-                      {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
+                  <div key={f.label} className="px-3 py-2.5 text-sm space-y-1.5 sm:space-y-0 sm:grid sm:grid-cols-[20px_minmax(0,1fr)_88px_104px] sm:items-center sm:gap-3">
+                    {/* Row 1 (mobile) / left cells (desktop): icon + title */}
+                    <div className="flex items-center gap-2 sm:contents">
+                      <div className="shrink-0 sm:block">{statusIcon(f.status)}</div>
+                      <span className="text-foreground font-medium truncate">{f.label}</span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-foreground font-semibold text-xs leading-tight">{primary}</div>
-                      {sub && <div className={`text-[10px] leading-tight mt-0.5 ${subColor}`}>{sub}</div>}
+                    {/* Row 2 (mobile) / right cells (desktop): sparkline + score */}
+                    <div className="flex items-center justify-between gap-3 pl-7 sm:contents sm:pl-0">
+                      <div className="flex sm:justify-center">
+                        {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-foreground font-semibold text-xs leading-tight">{primary}</div>
+                        {sub && <div className={`text-[10px] leading-tight mt-0.5 ${subColor}`}>{sub}</div>}
+                      </div>
                     </div>
                   </div>
                 );
