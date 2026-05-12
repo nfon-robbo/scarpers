@@ -93,6 +93,12 @@ const META: Record<string, Meta> = {
   },
 };
 
+function fmt(n: number | null | undefined, decimals = 0): string {
+  if (n == null || !isFinite(n as number)) return "—";
+  const f = Math.pow(10, decimals);
+  return (Math.round((n as number) * f) / f).toString();
+}
+
 function statusColor(status: FactorStatus): string {
   if (status === "good") return "hsl(142, 70%, 50%)";
   if (status === "warning") return "hsl(45, 95%, 55%)";
