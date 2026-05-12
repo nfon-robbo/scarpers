@@ -1,0 +1,1 @@
+ALTER TABLE public.readiness_snapshots ADD COLUMN IF NOT EXISTS advice text;

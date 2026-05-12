@@ -678,6 +678,7 @@ export type Database = {
       }
       readiness_snapshots: {
         Row: {
+          advice: string | null
           created_at: string
           factors: Json | null
           hour: number
@@ -687,6 +688,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          advice?: string | null
           created_at?: string
           factors?: Json | null
           hour: number
@@ -696,6 +698,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          advice?: string | null
           created_at?: string
           factors?: Json | null
           hour?: number
