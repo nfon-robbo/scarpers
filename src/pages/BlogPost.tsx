@@ -85,25 +85,46 @@ const BlogPost = () => {
     load();
   }, [slug]);
 
-  // Inject Article JSON-LD
+  // Inject Article + BreadcrumbList JSON-LD
   useEffect(() => {
     if (!post) return;
-    const ld = document.createElement("script");
-    ld.type = "application/ld+json";
-    ld.id = "blog-post-jsonld";
-    ld.text = JSON.stringify({
+    const article = document.createElement("script");
+    article.type = "application/ld+json";
+    article.id = "blog-post-jsonld";
+    article.text = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "Article",
       headline: post.title,
       description: post.excerpt || undefined,
       image: post.cover_image || undefined,
       datePublished: post.published_at || undefined,
-      author: { "@type": "Organization", name: "Scarpers" },
+      dateModified: post.published_at || undefined,
+      author: {
+        "@type": "Person",
+        name: "Coach Claire Rayners",
+        description: "AI running coach persona at Scarpers, reviewed by the Scarpers editorial team.",
+        url: "https://www.scarpers.co.uk/about",
+      },
       publisher: { "@type": "Organization", name: "Scarpers", logo: { "@type": "ImageObject", url: "https://www.scarpers.co.uk/og-image.png" } },
       mainEntityOfPage: { "@type": "WebPage", "@id": `https://www.scarpers.co.uk/blog/${post.slug}` },
     });
-    document.head.appendChild(ld);
-    return () => { ld.remove(); };
+    document.head.appendChild(article);
+
+    const crumbs = document.createElement("script");
+    crumbs.type = "application/ld+json";
+    crumbs.id = "blog-post-breadcrumbs-jsonld";
+    crumbs.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+        { "@type": "ListItem", position: 2, name: "Blog", item: "https://www.scarpers.co.uk/blog" },
+        { "@type": "ListItem", position: 3, name: post.title, item: `https://www.scarpers.co.uk/blog/${post.slug}` },
+      ],
+    });
+    document.head.appendChild(crumbs);
+
+    return () => { article.remove(); crumbs.remove(); };
   }, [post]);
 
   if (loading) {
