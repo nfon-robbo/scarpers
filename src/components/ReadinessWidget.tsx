@@ -77,7 +77,7 @@ import {
 import { cn } from "@/lib/utils";
 
 // ── Tick-mark Circular Gauge ──
-function CircularGauge({ score, size = 220 }: { score: number; size?: number }) {
+function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: number; size?: number; statusLabel: string; subNode: React.ReactNode }) {
   const ticks = 60;
   const filled = Math.max(0, Math.min(ticks, Math.round((score / 100) * ticks)));
   const cx = size / 2;
@@ -88,12 +88,8 @@ function CircularGauge({ score, size = 220 }: { score: number; size?: number }) 
   const color =
     score >= 80 ? "hsl(142, 70%, 50%)" : score > 30 ? "hsl(180, 80%, 55%)" : "hsl(0, 75%, 55%)";
 
-  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
-  const sub = score >= 80 ? "Fully recovered" : score >= 60 ? "Train as planned" : score > 30 ? "Ready to train" : "Prioritise rest";
-
   const tickEls = [];
   for (let i = 0; i < ticks; i++) {
-    // Start from bottom-left, sweep clockwise around — rotate so 0 is at bottom-left
     const angle = (-225 + (i / (ticks - 1)) * 270) * (Math.PI / 180);
     const x1 = cx + Math.cos(angle) * innerR;
     const y1 = cy + Math.sin(angle) * innerR;
@@ -119,10 +115,10 @@ function CircularGauge({ score, size = 220 }: { score: number; size?: number }) 
       <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 16px ${color}33)` }}>
         {tickEls}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
-        <span className="text-sm font-semibold mt-2" style={{ color }}>{label}</span>
-        <span className="text-[11px] text-muted-foreground mt-0.5">{sub}</span>
+        <span className="text-sm font-semibold mt-2" style={{ color }}>{statusLabel}</span>
+        <div className="mt-1 text-[11px] text-slate-400 leading-snug">{subNode}</div>
       </div>
     </div>
   );
