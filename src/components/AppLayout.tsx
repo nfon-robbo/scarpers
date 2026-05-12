@@ -147,7 +147,7 @@ const AppLayout = () => {
             onClick={toggleTheme}
           >
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
-              <img src={iconTheme} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </div>
             {!collapsed && (theme === "dark" ? "Light Mode" : "Dark Mode")}
           </Button>
@@ -161,7 +161,7 @@ const AppLayout = () => {
             onClick={signOut}
           >
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
-              <img src={iconSignout} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+              <LogOut className="w-5 h-5" />
             </div>
             {!collapsed && "Sign out"}
           </Button>
