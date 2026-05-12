@@ -599,6 +599,15 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* ── Upward adaptation offer (one-tap accept) ── */}
+      {adaptEval?.direction === "up" && user && (
+        <PlanAdaptationBanner
+          userId={user.id}
+          detail={adaptEval.detail}
+          onDone={() => setAdaptEval(null)}
+        />
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
