@@ -391,7 +391,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const series: Record<string, SparkPoint[]> = {
         "Sleep Quality": toPoints((d) => {
           const s = stagesByDate.get(d);
-          if (s && s.total > 0) return calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem });
+          if (s && s.total > 0) return calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem, awake: 0, sleep: 0 });
           return mByDate.get(d)?.sleep_score ?? null;
         }),
         "Deep Sleep": toPoints((d) => {
