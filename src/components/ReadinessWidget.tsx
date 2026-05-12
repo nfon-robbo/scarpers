@@ -77,6 +77,7 @@ import {
 } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
 import BodyBattery48hDialog from "./BodyBattery48hDialog";
+import FactorDetailDialog from "./FactorDetailDialog";
 
 // ── Tick-mark Circular Gauge ──
 function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: number; size?: number; statusLabel: string; subNode: React.ReactNode }) {
