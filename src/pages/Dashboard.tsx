@@ -755,6 +755,9 @@ const Dashboard = () => {
             </Card>
           </div>
 
+          {/* ── Readiness ── */}
+          <ReadinessWidget />
+
           {/* ── Workouts This Week Summary ── */}
           <Card className="glass border-border/30">
             <CardContent className="flex items-center gap-4 py-4 px-5">
