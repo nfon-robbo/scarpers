@@ -11,13 +11,24 @@ const CoachClaire = () => (
     canonicalPath="/coach"
   >
     <article className="prose prose-invert max-w-none">
-      <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">Meet your coach</p>
-      <h1
-        className="text-4xl sm:text-5xl font-bold tracking-tight mb-4"
-        style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-      >
-        Coach Claire Rayners
-      </h1>
+      <div className="not-prose flex flex-col sm:flex-row sm:items-center gap-5 mb-6">
+        <img
+          src={coachClaireImg}
+          alt="Coach Claire Rayners — Scarpers AI running coach"
+          width={768}
+          height={768}
+          className="h-32 w-32 sm:h-40 sm:w-40 rounded-full object-cover border-4 border-primary/40 shadow-lg shrink-0"
+        />
+        <div>
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">Meet your coach</p>
+          <h1
+            className="text-4xl sm:text-5xl font-bold tracking-tight"
+            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+          >
+            Coach Claire Rayners
+          </h1>
+        </div>
+      </div>
       <p className="text-lg text-muted-foreground leading-relaxed">
         Claire is the programmable, system-built elite running coach at the heart of Scarpers. She writes every
         training plan, briefs you the night before each session, and breaks down what worked — and what didn't —
