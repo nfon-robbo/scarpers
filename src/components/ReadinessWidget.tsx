@@ -738,11 +738,6 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             <p className="text-sm text-muted-foreground leading-relaxed">
               Your readiness score will appear here once sleep, HRV, resting heart rate or activity data has synced.
             </p>
-          ) : aiLoading ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Coach Claire Rayners is thinking...
-            </p>
           ) : aiAdvice ? (
             <p className="text-sm text-muted-foreground leading-relaxed">{aiAdvice}</p>
           ) : (
