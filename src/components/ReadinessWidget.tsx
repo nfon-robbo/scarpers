@@ -511,18 +511,48 @@ const ReadinessWidget = () => {
                 Readiness Metrics
               </h3>
               <div className="space-y-0.5">
-                {displayResult.factors.map((f) => (
-                  <div key={f.label} className="flex items-center justify-between gap-2 py-1 text-sm">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {statusIcon(f.status)}
-                      <span className="text-foreground truncate">{f.label}</span>
+                {displayResult.factors.map((f) => {
+                  const spark = sparklines[f.label];
+                  return (
+                    <div key={f.label} className="flex items-center justify-between gap-3 py-1 text-sm border-b border-border/20 last:border-b-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {statusIcon(f.status)}
+                        <span className="text-foreground truncate">{f.label}</span>
+                      </div>
+                      {spark && <Sparkline values={spark} status={f.status} />}
+                      <span className="text-muted-foreground font-medium text-xs text-right truncate min-w-[64px]">{f.detail}</span>
                     </div>
-                    <span className="text-muted-foreground font-medium text-xs text-right truncate">{f.detail}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
+
+          {/* Bottom: 7-day readiness trend */}
+          {trend.filter((t) => t.score > 0).length >= 2 && (
+            <div className="mt-5 pt-4 border-t border-border/30">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">7 Day Trend</h4>
+              <ResponsiveContainer width="100%" height={90}>
+                <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} strokeOpacity={0.3} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} hide />
+                  <Tooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                  />
+                  <ReferenceLine y={60} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.3} />
+                  <Area type="monotone" dataKey="score" stroke="hsl(var(--chart-2))" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
 
