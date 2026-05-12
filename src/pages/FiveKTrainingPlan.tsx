@@ -1,17 +1,39 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 
-const FiveKTrainingPlan = () => (
+const LAST_UPDATED_ISO = "2026-05-12";
+
+const FiveKTrainingPlan = () => {
+  useEffect(() => {
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+        { "@type": "ListItem", position: 2, name: "5K Training Plan", item: "https://www.scarpers.co.uk/5k-training-plan" },
+      ],
+    });
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, []);
+
+  const lastUpdated = new Date(LAST_UPDATED_ISO).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+  return (
   <MarketingPageLayout
     title="Free Personalised 5K Training Plan | Scarpers AI Running Coach"
     description="Get a free personalised 5K training plan built by AI around your fitness, injury history and HR zones. Beginner-friendly, Garmin-ready, adapts week by week."
     canonicalPath="/5k-training-plan"
   >
     <article className="prose prose-invert max-w-none">
-      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+      <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-2" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
         Free Personalised 5K Training Plan
       </h1>
+      <p className="text-xs text-muted-foreground mb-4">Last updated: {lastUpdated} · Reviewed by the Scarpers team</p>
       <p className="text-lg text-muted-foreground leading-relaxed">
         Scarpers builds a free, personalised 5K training plan in under two minutes. Instead of handing you a generic
         Couch-to-5K spreadsheet, the AI reads your real running data, sleep, readiness and any injury history — then
