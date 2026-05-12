@@ -503,8 +503,7 @@ const ReadinessWidget = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Main Readiness Card */}
-      <Card className="glass border-border/30 overflow-hidden relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+      <Card className="border-border/40 overflow-hidden relative bg-[#0b1220]">
         <CardContent className="p-5 relative z-10">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -525,7 +524,7 @@ const ReadinessWidget = () => {
                 </p>
               )}
               {hasTrend && (
-                <div className="rounded-xl bg-card/40 border border-border/30 p-3">
+                <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1">7 Day Trend</h4>
                   <ResponsiveContainer width="100%" height={64}>
                     <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
@@ -549,7 +548,7 @@ const ReadinessWidget = () => {
             </div>
 
             {/* Right column: metrics list */}
-            <div className="flex-1 min-w-0 rounded-xl bg-card/40 border border-border/30 divide-y divide-border/30">
+            <div className="flex-1 min-w-0 rounded-xl bg-[#111a2e] border border-border/30 divide-y divide-border/30">
               {displayResult.factors.map((f) => {
                 const spark = sparklines[f.label];
                 const { primary, sub } = splitDetail(f.detail);
