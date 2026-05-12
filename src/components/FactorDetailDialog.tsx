@@ -242,7 +242,7 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
     trendNode = (
       <span className={`inline-flex items-center gap-1 ${cls}`}>
         <Icon className="w-3.5 h-3.5" />
-        {sign}{Math.round(diff * 10) / 10}{meta.unit} vs avg
+        {sign}{fmt(diff, 1)}{meta.unit} vs avg
       </span>
     );
   }
