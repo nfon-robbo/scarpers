@@ -19,6 +19,7 @@ import RunningIQWidget from "@/components/RunningIQWidget";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import FeedbackCard from "@/components/FeedbackCard";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
+import { calculateSleepScore } from "@/lib/sleep-score";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import HeroPlanCard from "@/components/HeroPlanCard";
@@ -283,16 +284,50 @@ const Dashboard = () => {
       .order("start_time", { ascending: true })
       .then(({ data }) => setActivities((data as ActivityRow[]) || []));
 
-    supabase
-      .from("daily_metrics")
-      .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
-      .eq("user_id", user.id)
-      .gte("date", since.toISOString().split("T")[0])
-      .order("date", { ascending: true })
-      .then(({ data }) => {
-        setMetrics((data as MetricsRow[]) || []);
-        setLoading(false);
+    Promise.all([
+      supabase
+        .from("daily_metrics")
+        .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
+        .eq("user_id", user.id)
+        .gte("date", since.toISOString().split("T")[0])
+        .order("date", { ascending: true }),
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds")
+        .eq("user_id", user.id)
+        .gte("date", since.toISOString().split("T")[0]),
+    ]).then(([metricsRes, stagesRes]) => {
+      const rows = (metricsRes.data as MetricsRow[]) || [];
+      const stagesByDate = new Map<string, { deep: number; light: number; rem: number; total: number }>();
+      ((stagesRes.data as any[]) || []).forEach((s) => {
+        const cur = stagesByDate.get(s.date) || { deep: 0, light: 0, rem: 0, total: 0 };
+        const stage = (s.stage || "").toLowerCase();
+        const dur = s.duration_seconds || 0;
+        if (stage === "deep") cur.deep += dur;
+        else if (stage === "light") cur.light += dur;
+        else if (stage === "rem") cur.rem += dur;
+        if (stage === "deep" || stage === "light" || stage === "rem") cur.total += dur;
+        stagesByDate.set(s.date, cur);
       });
+      const merged = rows.map((m) => {
+        if (m.sleep_score != null) return m;
+        const s = stagesByDate.get(m.date as any);
+        if (s && s.total > 0) {
+          return { ...m, sleep_score: calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem, awake: 0, sleep: 0 }) };
+        }
+        return m;
+      });
+      // Add rows for dates that have only sleep_stages (no daily_metrics)
+      const haveDates = new Set(rows.map((r: any) => r.date));
+      stagesByDate.forEach((s, date) => {
+        if (!haveDates.has(date) && s.total > 0) {
+          merged.push({ date, sleep_score: calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem, awake: 0, sleep: 0 }) } as any);
+        }
+      });
+      merged.sort((a: any, b: any) => (a.date < b.date ? -1 : 1));
+      setMetrics(merged);
+      setLoading(false);
+    });
 
     // Get latest training plan for "Today's Workout" card
     supabase
