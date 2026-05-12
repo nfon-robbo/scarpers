@@ -226,7 +226,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   }, [user, refreshNonce]);
 
   useEffect(() => {
-    if (!user || !cacheChecked || cached) return;
+    if (!user || !cacheChecked) return;
+    if (cached && cached.advice) return;
     setLoading(true);
     const now = new Date();
     const today = now.toISOString().split("T")[0];
