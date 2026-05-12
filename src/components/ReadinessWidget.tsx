@@ -423,7 +423,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           else passive = 28 + (hoursAwake - 16) * 3;
           const active = load != null ? Math.min(10, load * 0.1) : 0;
           if (!isToday && load == null) return null;
-          return Math.round(passive + active);
+          return Math.max(0, Math.min(100, Math.round(100 - (passive + active))));
         }),
       };
       setSparklines(series);
