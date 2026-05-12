@@ -462,7 +462,7 @@ const TrainingPlanPage = () => {
       // ignore — user may not have intervals.icu connected
     }
     try {
-      await handleSyncToIntervals(true, toIso);
+      await handleSyncToIntervals(true, toIso, newContent);
     } catch {
       // ignore — sync errors are surfaced inside handleSyncToIntervals
     }
