@@ -195,7 +195,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     factors.push({
       label: "Deep Sleep",
       status: dp >= 13 ? "good" : dp >= 10 ? "warning" : "poor",
-      detail: `${Math.round(dp)}% of sleep${dp < 10 ? " ⚠️ critically low" : ""}`,
+      detail: `${Math.round(dp)}% of sleep · ${dp < 10 ? "Critically low" : dp < 13 ? "Low" : "Healthy"}`,
     });
   } else {
     weightedSum += 25 * 0.15; // missing = assume poor but not catastrophic
