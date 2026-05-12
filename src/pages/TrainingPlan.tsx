@@ -469,7 +469,6 @@ const TrainingPlanPage = () => {
 
     toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.` });
   };
-  };
 
   const persistStartDateShift = async (newStart: Date) => {
     setUpdatingDates(true);
