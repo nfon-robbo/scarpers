@@ -172,7 +172,7 @@ const AppLayout = () => {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="grid grid-cols-6 h-16">
-          {navItems.map(({ to, icon: Icon, label }) => (
+          {navItems.map(({ to, img, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -185,7 +185,7 @@ const AppLayout = () => {
                 }`
               }
             >
-              <Icon className="w-5 h-5" />
+              <img src={img} alt="" loading="lazy" width={24} height={24} className="w-6 h-6 object-contain" />
               <span className="font-['Barlow_Condensed'] text-[11px] font-semibold uppercase tracking-wide leading-none">{label}</span>
             </NavLink>
           ))}
