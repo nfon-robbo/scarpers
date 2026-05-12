@@ -51,54 +51,53 @@ import {
 } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
 
-// ── Circular Gauge ──
-function CircularGauge({ score, size = 200 }: { score: number; size?: number }) {
-  const strokeWidth = 12;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, Math.min(100, score)) / 100;
-  const dashOffset = circumference * (1 - progress);
+// ── Tick-mark Circular Gauge ──
+function CircularGauge({ score, size = 220 }: { score: number; size?: number }) {
+  const ticks = 60;
+  const filled = Math.max(0, Math.min(ticks, Math.round((score / 100) * ticks)));
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = size / 2 - 4;
+  const innerR = outerR - 14;
 
-  // Color based on score zones
-  const gaugeColor =
-    score >= 80 ? "hsl(142, 60%, 45%)" : score > 30 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+  const color =
+    score >= 80 ? "hsl(142, 70%, 50%)" : score > 30 ? "hsl(180, 80%, 55%)" : "hsl(0, 75%, 55%)";
 
-  const glowColor =
-    score >= 80 ? "0 0 30px -5px hsla(142, 60%, 45%, 0.4)" : score > 30 ? "0 0 30px -5px hsla(45, 90%, 50%, 0.4)" : "0 0 30px -5px hsla(0, 72%, 51%, 0.4)";
+  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
+  const sub = score >= 80 ? "Fully recovered" : score >= 60 ? "Train as planned" : score > 30 ? "Ready to train" : "Prioritise rest";
+
+  const tickEls = [];
+  for (let i = 0; i < ticks; i++) {
+    // Start from bottom-left, sweep clockwise around — rotate so 0 is at bottom-left
+    const angle = (-225 + (i / (ticks - 1)) * 270) * (Math.PI / 180);
+    const x1 = cx + Math.cos(angle) * innerR;
+    const y1 = cy + Math.sin(angle) * innerR;
+    const x2 = cx + Math.cos(angle) * outerR;
+    const y2 = cy + Math.sin(angle) * outerR;
+    const active = i < filled;
+    tickEls.push(
+      <line
+        key={i}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={active ? color : "hsl(var(--muted-foreground) / 0.18)"}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    );
+  }
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size, filter: `drop-shadow(${glowColor})` }}>
-      <svg width={size} height={size} className="-rotate-90">
-        {/* Background track */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="hsl(var(--muted))"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        {/* Progress arc */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={gaugeColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          className="transition-all duration-1000 ease-out"
-        />
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 16px ${color}33)` }}>
+        {tickEls}
       </svg>
-      {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-black tracking-tight text-foreground">{score}</span>
-        <span className="text-[10px] text-muted-foreground mt-1 font-medium">
-          Updated {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
+        <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
+        <span className="text-sm font-semibold mt-2" style={{ color }}>{label}</span>
+        <span className="text-[11px] text-muted-foreground mt-0.5">{sub}</span>
       </div>
     </div>
   );
@@ -488,71 +487,94 @@ const ReadinessWidget = () => {
     fetchAdvice();
   }, [result]);
 
+  // Helper: split detail "primary · sub" into two parts
+  const splitDetail = (detail: string): { primary: string; sub: string | null } => {
+    const parts = detail.split(/\s·\s/);
+    if (parts.length >= 2) return { primary: parts[0], sub: parts.slice(1).join(" · ") };
+    // Try "(label)" pattern: "59/100 (Fair)"
+    const m = detail.match(/^(.+?)\s*\(([^)]+)\)\s*(.*)$/);
+    if (m) return { primary: `${m[1].trim()}${m[3] ? " " + m[3].trim() : ""}`, sub: m[2] };
+    return { primary: detail, sub: null };
+  };
+
+  const updatedTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const hasTrend = trend.filter((t) => t.score > 0).length >= 2;
+
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Main Gauge + Metrics Card */}
+      {/* Main Readiness Card */}
       <Card className="glass border-border/30 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-        <CardContent className="pt-6 pb-5 relative z-10">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-            {/* Left: gauge */}
-            <div className="flex flex-col items-center shrink-0">
-              <CircularGauge score={displayResult.score} size={180} />
-              {isFallback && (
-                <p className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Waiting for recovery data
-                </p>
-              )}
-            </div>
-            {/* Right: metrics matrix */}
-            <div className="flex-1 w-full min-w-0">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                Readiness Metrics
-              </h3>
-              <div className="space-y-0.5">
-                {displayResult.factors.map((f) => {
-                  const spark = sparklines[f.label];
-                  return (
-                    <div key={f.label} className="flex items-center justify-between gap-3 py-1 text-sm border-b border-border/20 last:border-b-0">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {statusIcon(f.status)}
-                        <span className="text-foreground truncate">{f.label}</span>
-                      </div>
-                      {spark && <Sparkline values={spark} status={f.status} />}
-                      <span className="text-muted-foreground font-medium text-xs text-right truncate min-w-[64px]">{f.detail}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        <CardContent className="p-5 relative z-10">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness</h3>
+            <span className="text-[11px] text-muted-foreground">Updated {updatedTime}</span>
           </div>
 
-          {/* Bottom: 7-day readiness trend */}
-          {trend.filter((t) => t.score > 0).length >= 2 && (
-            <div className="mt-5 pt-4 border-t border-border/30">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">7 Day Trend</h4>
-              <ResponsiveContainer width="100%" height={90}>
-                <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} strokeOpacity={0.3} />
-                  <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} hide />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                  />
-                  <ReferenceLine y={60} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.3} />
-                  <Area type="monotone" dataKey="score" stroke="hsl(var(--chart-2))" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+          <div className="flex flex-col md:flex-row gap-5">
+            {/* Left column: gauge + 7-day trend */}
+            <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
+              <div className="flex items-center justify-center">
+                <CircularGauge score={displayResult.score} size={200} />
+              </div>
+              {isFallback && (
+                <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Waiting for data
+                </p>
+              )}
+              {hasTrend && (
+                <div className="rounded-xl bg-card/40 border border-border/30 p-3">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1">7 Day Trend</h4>
+                  <ResponsiveContainer width="100%" height={64}>
+                    <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
+                      <defs>
+                        <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="day" tick={{ fontSize: 9 }} className="fill-muted-foreground" axisLine={false} tickLine={false} interval={0} />
+                      <YAxis domain={[0, 100]} hide />
+                      <Tooltip
+                        contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                      />
+                      <Area type="monotone" dataKey="score" stroke="hsl(180, 80%, 55%)" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2, fill: "hsl(180, 80%, 55%)" }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Right column: metrics list */}
+            <div className="flex-1 min-w-0 rounded-xl bg-card/40 border border-border/30 divide-y divide-border/30">
+              {displayResult.factors.map((f) => {
+                const spark = sparklines[f.label];
+                const { primary, sub } = splitDetail(f.detail);
+                const subColor =
+                  f.status === "good"
+                    ? "text-emerald-500"
+                    : f.status === "poor"
+                    ? "text-destructive"
+                    : "text-muted-foreground";
+                return (
+                  <div key={f.label} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                    <div className="shrink-0">{statusIcon(f.status)}</div>
+                    <span className="text-foreground font-medium truncate flex-1 min-w-0">{f.label}</span>
+                    <div className="shrink-0">
+                      {spark ? <Sparkline values={spark} status={f.status} /> : <div className="w-16" />}
+                    </div>
+                    <div className="text-right shrink-0 min-w-[72px]">
+                      <div className="text-foreground font-semibold text-xs leading-tight">{primary}</div>
+                      {sub && <div className={`text-[10px] leading-tight mt-0.5 ${subColor}`}>{sub}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
