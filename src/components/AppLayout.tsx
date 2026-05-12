@@ -144,8 +144,8 @@ const AppLayout = () => {
             )}
             onClick={toggleTheme}
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
-              {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
+              <img src={iconTheme} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
             </div>
             {!collapsed && (theme === "dark" ? "Light Mode" : "Dark Mode")}
           </Button>
