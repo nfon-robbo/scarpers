@@ -591,7 +591,7 @@ const ReadinessWidget = () => {
                     <div className="shrink-0">{statusIcon(f.status)}</div>
                     <span className="text-foreground font-medium truncate">{f.label}</span>
                     <div className="flex justify-center">
-                      {spark ? <Sparkline values={spark} status={f.status} /> : <div className="w-16 h-6" />}
+                      {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
                     </div>
                     <div className="text-right">
                       <div className="text-foreground font-semibold text-xs leading-tight truncate">{primary}</div>
