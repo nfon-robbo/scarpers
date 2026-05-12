@@ -1,8 +1,15 @@
+import MarketingPageLayout from "@/components/MarketingPageLayout";
+
 const Privacy = () => {
   const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+    <MarketingPageLayout
+      title="Privacy Policy | Scarpers"
+      description="How Scarpers collects, uses and protects your data — including activity, sleep and onboarding information used to generate AI training plans."
+      canonicalPath="/privacy"
+    >
+    <div className="space-y-6 pb-12">
       <h1 className="text-2xl font-bold">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground">Last updated: {today}</p>
 
@@ -141,6 +148,7 @@ const Privacy = () => {
         </p>
       </section>
     </div>
+    </MarketingPageLayout>
   );
 };
 
