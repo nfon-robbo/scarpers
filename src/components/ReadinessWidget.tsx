@@ -463,23 +463,6 @@ const ReadinessWidget = () => {
         </CardContent>
       </Card>
 
-      {/* Readiness Metrics */}
-      <Card>
-        <CardContent className="p-4 space-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            Readiness Metrics
-          </h3>
-          {displayResult.factors.map((f) => (
-            <div key={f.label} className="flex items-center justify-between py-1.5 text-sm">
-              <div className="flex items-center gap-2">
-                {statusIcon(f.status)}
-                <span className="text-foreground">{f.label}</span>
-              </div>
-              <span className="text-muted-foreground font-medium">{f.detail}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 };
