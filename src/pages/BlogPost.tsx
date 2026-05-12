@@ -103,7 +103,7 @@ const BlogPost = () => {
         "@type": "Person",
         name: "Coach Claire Rayners",
         description: "AI running coach persona at Scarpers, reviewed by the Scarpers editorial team.",
-        url: "https://www.scarpers.co.uk/about",
+        url: "https://www.scarpers.co.uk/coach/claire-rayners",
       },
       publisher: { "@type": "Organization", name: "Scarpers", logo: { "@type": "ImageObject", url: "https://www.scarpers.co.uk/og-image.png" } },
       mainEntityOfPage: { "@type": "WebPage", "@id": `https://www.scarpers.co.uk/blog/${post.slug}` },
