@@ -24,6 +24,16 @@ import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe"
 import HeroPlanCard from "@/components/HeroPlanCard";
 import BlogPreview from "@/components/BlogPreview";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
+import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
+import {
+  evaluateAdaptation,
+  shouldRunAdaptCheck,
+  markAdaptCheckRan,
+  isUpwardDismissedToday,
+  type AdaptEvaluation,
+} from "@/lib/plan-adaptation";
+import { pushUndoEntry } from "@/lib/plan-undo-history";
+import { toast as sonnerToast } from "sonner";
 
 
 // ── Types ──
