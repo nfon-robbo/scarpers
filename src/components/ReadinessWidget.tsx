@@ -825,6 +825,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       </Card>
 
       <BodyBattery48hDialog open={batteryDialogOpen} onOpenChange={setBatteryDialogOpen} />
+      {factorDialog && (
+        <FactorDetailDialog
+          open={!!factorDialog}
+          onOpenChange={(v) => !v && setFactorDialog(null)}
+          label={factorDialog.label}
+          status={factorDialog.status}
+          detail={factorDialog.detail}
+        />
+      )}
     </div>
   );
 };
