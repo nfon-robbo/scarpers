@@ -254,6 +254,15 @@ const ReadinessWidget = () => {
   }, [user]);
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
+  const displayResult = result ?? {
+    score: 50,
+    factors: [
+      { label: "Sleep Quality", status: "warning" as const, detail: "Waiting for sync" },
+      { label: "Resting HR", status: "warning" as const, detail: "Waiting for sync" },
+      { label: "HRV", status: "warning" as const, detail: "Waiting for sync" },
+    ],
+  };
+  const isFallback = loading || !result;
 
   // Save snapshot (throttled: max once per hour, prevent StrictMode duplicates)
   useEffect(() => {
@@ -348,15 +357,19 @@ const ReadinessWidget = () => {
     fetchAdvice();
   }, [result]);
 
-  if (loading || !result || result.factors.length === 0) return null;
-
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Main Gauge Card */}
       <Card className="glass border-border/30 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
         <CardContent className="pt-8 pb-6 flex flex-col items-center relative z-10">
-          <CircularGauge score={result.score} />
+          <CircularGauge score={displayResult.score} />
+          {isFallback && (
+            <p className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Readiness is waiting for recovery data
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -377,7 +390,11 @@ const ReadinessWidget = () => {
               </Button>
             )}
           </div>
-          {aiLoading ? (
+          {isFallback ? (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your readiness score will appear here once sleep, HRV, resting heart rate or activity data has synced.
+            </p>
+          ) : aiLoading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Coach is thinking...
@@ -391,10 +408,10 @@ const ReadinessWidget = () => {
               ) : (
                 <>
                   <p className="font-medium text-foreground">
-                    Score: {result.score}/100 — {result.score >= 80 ? "Well recovered" : result.score > 50 ? "Moderate readiness" : result.score > 30 ? "Below average" : "Low readiness"}
+                    Score: {displayResult.score}/100 — {displayResult.score >= 80 ? "Well recovered" : displayResult.score > 50 ? "Moderate readiness" : displayResult.score > 30 ? "Below average" : "Low readiness"}
                   </p>
                   <div className="space-y-0.5 text-xs">
-                    {result.factors.map((f) => (
+                    {displayResult.factors.map((f) => (
                       <div key={f.label} className="flex justify-between">
                         <span>{f.label}</span>
                         <span className="font-mono">{f.detail}</span>
@@ -412,7 +429,7 @@ const ReadinessWidget = () => {
       <Card>
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Wake Readiness</h3>
-          <ZoneBar score={result.score} />
+          <ZoneBar score={displayResult.score} />
 
           {/* Sleep contribution */}
           {data?.sleepHours != null && (
@@ -430,7 +447,7 @@ const ReadinessWidget = () => {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             Readiness Metrics
           </h3>
-          {result.factors.map((f) => (
+          {displayResult.factors.map((f) => (
             <div key={f.label} className="flex items-center justify-between py-1.5 text-sm">
               <div className="flex items-center gap-2">
                 {statusIcon(f.status)}
