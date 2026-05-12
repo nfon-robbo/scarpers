@@ -739,7 +739,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             <p className="text-sm text-muted-foreground leading-relaxed">{aiAdvice}</p>
           ) : (
             <div className="text-sm text-muted-foreground space-y-2">
-              {result.score <= 20 ? (
+              {displayResult.score <= 20 ? (
                 <p>Mate, your body is absolutely cooked. Put the trainers down and go lie on the sofa. 🛋️</p>
               ) : (
                 <>
