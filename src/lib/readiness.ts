@@ -256,7 +256,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     factors.push({
       label: "Yesterday's Load",
       status: l <= 40 ? "good" : l <= 80 ? "warning" : "poor",
-      detail: `${Math.round(l)} min training`,
+      detail: `${Math.floor(l / 60)}:${String(Math.round(l % 60)).padStart(2, "0")} training`,
     });
   } else {
     weightedSum += 50 * 0.13; // rest day = decent
@@ -352,7 +352,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     modifiers.push({
       label: "Today's Effort",
       adj: penalty,
-      detail: `${Math.round(d.todayLoad)} min (intensity-weighted)`,
+      detail: `${Math.floor(d.todayLoad / 60)}:${String(Math.round(d.todayLoad % 60)).padStart(2, "0")} (intensity-weighted)`,
     });
   }
 

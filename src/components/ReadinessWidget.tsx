@@ -16,7 +16,7 @@ function formatSparkValue(label: string, v: number): string {
   if (label === "Sleep Quality") return `${Math.round(v)}/100`;
   if (label === "Yesterday's Load" || label === "Today's Effort") return `${Math.round(v)} min`;
   if (label === "Stress") return `${Math.round(v)}`;
-  if (label === "Body Battery") return `-${Math.round(v)} pts`;
+  if (label === "Body Battery") return `${Math.round(v)}% charge`;
   return `${Math.round(v)}`;
 }
 
@@ -423,7 +423,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           else passive = 28 + (hoursAwake - 16) * 3;
           const active = load != null ? Math.min(10, load * 0.1) : 0;
           if (!isToday && load == null) return null;
-          return Math.round(passive + active);
+          return Math.max(0, Math.min(100, Math.round(100 - (passive + active))));
         }),
       };
       setSparklines(series);
