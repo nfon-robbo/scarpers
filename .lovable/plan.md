@@ -1,61 +1,105 @@
-## SEO overhaul
+## Goal
 
-### 1. Meta tags (`index.html`)
-- **Title**: `Scarpers — AI Running Coach | Free Personalised 5K & 10K Training Plans`
-- **Meta description**: `Scarpers uses AI to generate personalised running plans built around your fitness level, injury history, HR zones and race goal. Get your free 5K or 10K training plan today.`
-- Mirror into Open Graph + Twitter title/description.
-- Update `SoftwareApplication` JSON-LD slightly (keep `HealthApplication` category) and add a new `FAQPage` JSON-LD node mirroring landing FAQ.
+Make the training plan adapt automatically week-to-week based on readiness trends — both downward (auto-apply rest) and upward (offer optional bump).
 
-### 2. Landing hero (`src/pages/Landing.tsx`)
-- H1: `AI Running Coach`
-- Subline (directly under H1): `Free personalised running plans for 5K, 10K, half, marathon & ultra — built around your fitness, injuries and goals.`
-- Existing paragraph copy stays.
+## Triggers
 
-### 3. FAQ section on landing
-- New `<section id="faq">` before footer using existing `CollapsibleSection` styling.
-- Questions:
-  1. What is Scarpers?
-  2. Is Scarpers free?
-  3. How does the AI generate my plan?
-  4. Can I use Scarpers if I have an injury?
-  5. Does Scarpers work with Garmin watches?
-  6. What running distances does Scarpers support?
-  7. Is Scarpers suitable for complete beginners?
-  8. How is Scarpers different from Couch to 5K?
-- Same Q&A pairs rendered as `FAQPage` JSON-LD in `index.html`.
+**Downward (auto-apply):**
 
-### 4. New public pages (added to `src/App.tsx` outside `ProtectedRoute`)
+- Readiness < 55 for 2+ consecutive days using `readiness_snapshots` latest daily score. Only trigger if actual readings exist for both days — do not trigger on null or missing data.
+- Action: rewrite remaining sessions in the current week (today → Sunday) to reduce intensity.
 
-**`/5k-training-plan`** — long-form (~500+ words). H1: `Free Personalised 5K Training Plan`. Sections:
-- What the plan includes (week-by-week structure, easy runs, intervals, long runs, rest)
-- How it adapts to your current fitness from imported activities
-- Injury-aware programming (uses onboarding injury history to scale volume / swap impact sessions)
-- HR zone training (5-zone model, target zones per session)
-- Garmin sync (FIT import / Intervals.icu export so workouts appear on the watch)
-- CTA to `/auth`
+**Upward (offer only):**
 
-**`/10k-training-plan`** — long-form (~500+ words). H1: `Free Personalised 10K Training Plan`. Same structural sections tuned to 10K: building aerobic base, threshold work, race-pace long runs, taper, plus adaptation/injury/HR/Garmin sections. CTA to `/auth`.
+- Readiness ≥ 80 AND Running IQ trend positive (current > 7-day avg) for 3+ consecutive days.
+- Action: surface a one-tap "Bump intensity" prompt — user accepts or dismisses. No auto-apply.
 
-**`/ai-running-coach`** — long-form (~500+ words). H1: `AI Running Coach`. Sections:
-- How the AI builds your plan (onboarding inputs + activity history + readiness)
-- What data it uses (FIT files, Strava, HR, sleep, readiness, Running IQ)
-- Day-ahead briefings and post-workout reviews
-- How it differs from a human coach (instant, 24/7, data-driven, free; complements rather than replaces elite human coaching)
-- CTA to `/auth`
+## Adaptation rules (down)
 
-**`/blog`** — minimal "Coming soon" intro page with H1 `Scarpers Running Blog`. Includes `<meta name="robots" content="noindex, follow" />` injected via a small effect (or React Helmet-style direct `document` manipulation matching existing pattern) until real posts exist.
+For each remaining session in the current week's markdown table:
 
-All marketing pages share a lightweight header (logo + Sign in link) and footer matching Landing styling. No new colors — uses existing semantic tokens.
+- Interval / threshold / tempo / VO2 sessions → swap for **Easy run** at same day, duration ×0.85.
+- Long run → keep type, duration ×0.85, drop any embedded surges.
+- Easy / recovery runs → duration ×0.85 (min 20 min), no type change.
+- Rest days untouched.
+- Round durations to nearest 5 min.
 
-### 5. Sitemap & robots (static files exist — edit in place)
-- `public/sitemap.xml`: include `/`, `/5k-training-plan`, `/10k-training-plan`, `/ai-running-coach`, `/auth`, `/privacy`. Omit `/blog` (noindex). Update `lastmod` to today (UK date format internally, ISO in XML).
-- `public/robots.txt`: keep existing structure, ensure new marketing routes are crawlable (they already are via default `Allow: /`), add `Disallow: /blog`. Sitemap line already correct.
-- Sitemap will be served at `https://www.scarpers.co.uk/sitemap.xml` via the existing static file (already working).
+Then notify:
 
-### 6. Structured data (`index.html`)
-- Keep `Organization`, `WebSite`, `SoftwareApplication`.
-- Add `FAQPage` graph entry with all 8 FAQ Q&A pairs so Google can show rich FAQ results.
+> "We've adjusted this week's plan based on your recovery. Get some rest and come back stronger."
 
-### Notes
-- Marketing/SEO-only changes. No backend, database, or business-logic edits.
-- All new pages indexable; `/blog` explicitly noindexed until content lands.
+## Adaptation rules (up, on accept)
+
+- Add +5–10% duration to one quality session this week.
+- Upgrade one easy run to a steady/strides session (small bump only — never invent a new VO2/threshold).
+- Long run unchanged.
+- Confirm with toast: "Plan bumped — go get it."
+
+## Where it lives
+
+### 1. New Edge Function: `plan-auto-adapt`
+
+- Inputs: `user_id`, `mode` ('down' | 'up').
+- Fetches latest 5 days of `readiness_snapshots` + `running_iq_snapshots`.
+- Loads active (non-archived) `training_plans` row.
+- Uses Lovable AI Gateway (`google/gemini-2.5-flash`) with strict prompt: receive markdown table + week range + mode, return the modified markdown table only, preserving [Intervals.icu](http://Intervals.icu) syntax and existing rules from `mem://features/training-plans`.
+- Persists with an audit row in `plan-undo-history` so the user can revert.
+- Returns the updated plan content + a short summary.
+
+### 2. Trigger logic
+
+- New helper `src/lib/plan-adaptation.ts`:
+  - `evaluateAdaptation(snapshots, iqSnapshots)` → `{ direction: 'down' | 'up' | null, reason }`.
+  - Only evaluates when actual readiness readings exist for the relevant days — skip if any day in the window has a null score.
+  - Reads from the same data already loaded on Dashboard / TrainingPlan.
+- Called on:
+  - `Dashboard` mount (once per session, debounced by date-stamp in localStorage `lastAdaptCheck:<userId>:<yyyy-mm-dd>`).
+  - `TrainingPlan` mount.
+- 'down' → invoke function immediately, then show sonner toast with the message above + link "View changes".
+- 'up' → show a dismissible card on Dashboard (above HeroPlanCard) with Accept / Not now. Accept → invoke function in 'up' mode.
+
+### 3. UI
+
+- New component `src/components/PlanAdaptationBanner.tsx` for the upward offer (glassmorphism card matching theme).
+- Reuse sonner toast for downward notification.
+- Both link to `/training-plan` with the week highlighted.
+- New adaptation history log visible to the user — a simple timeline on the Training Plan page showing entries such as "Monday 12 May — plan reduced due to low recovery" with a one-tap revert button per entry. Builds transparency and gives users a reason to check the app daily.
+
+### 4. Safeguards
+
+- Skip if no active plan, or if plan was already adapted today (track `last_adapted_at` — see schema).
+- Skip if user is in taper/race week (last 2 weeks of plan).
+- Skip if readiness data is missing or null for any day in the trigger window.
+- Always write previous content to undo history before overwriting.
+
+## Schema change
+
+Add to `training_plans`:
+
+- `last_adapted_at timestamptz null`
+- `last_adaptation_reason text null` ('readiness_low_2d', 'readiness_high_3d_accepted')
+
+Add to `plan-undo-history`:
+
+- `adaptation_reason text null`
+- `adapted_at timestamptz null`
+- `summary text null`
+
+No RLS changes needed (existing user_id policies cover it).
+
+## Out of scope
+
+- Auto-rewriting future weeks (only the current week's remaining days).
+- Touching race week / taper.
+- Changing the existing manual "Day Ahead" flow — it stays as-is.
+
+## Files to create / edit
+
+- `supabase/migrations/<ts>_plan_adaptation.sql` — add columns to training_plans and plan-undo-history.
+- `supabase/functions/plan-auto-adapt/index.ts` — new edge function.
+- `src/lib/plan-adaptation.ts` — trigger evaluation helper with null data safeguard.
+- `src/components/PlanAdaptationBanner.tsx` — upward offer UI.
+- `src/components/AdaptationHistory.tsx` — new timeline component with revert buttons.
+- `src/pages/Dashboard.tsx` — wire up check + banner.
+- `src/pages/TrainingPlan.tsx` — wire up check + adaptation history log.
+- `mem://features/training-plans/auto-adaptation` — new memory + index update.

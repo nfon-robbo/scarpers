@@ -24,6 +24,16 @@ import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe"
 import HeroPlanCard from "@/components/HeroPlanCard";
 import BlogPreview from "@/components/BlogPreview";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
+import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
+import {
+  evaluateAdaptation,
+  shouldRunAdaptCheck,
+  markAdaptCheckRan,
+  isUpwardDismissedToday,
+  type AdaptEvaluation,
+} from "@/lib/plan-adaptation";
+import { pushUndoEntry } from "@/lib/plan-undo-history";
+import { toast as sonnerToast } from "sonner";
 
 
 // ── Types ──
@@ -142,6 +152,7 @@ const Dashboard = () => {
   const [openActivityId, setOpenActivityId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+  const [adaptEval, setAdaptEval] = useState<AdaptEvaluation | null>(null);
 
   const deleteRun = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -308,6 +319,51 @@ const Dashboard = () => {
       }
     }).catch((e) => console.error("Strava sweep failed:", e));
   }, [user]);
+
+  // ── Auto plan adaptation check (runs once per day per user) ──
+  useEffect(() => {
+    if (!user) return;
+    if (!shouldRunAdaptCheck(user.id)) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const evaluation = await evaluateAdaptation(user.id);
+        if (cancelled) return;
+        markAdaptCheckRan(user.id);
+
+        if (evaluation.direction === "down") {
+          // Auto-apply downward adaptation immediately.
+          const { data, error } = await supabase.functions.invoke("plan-auto-adapt", {
+            body: { mode: "down", reason: evaluation.reason },
+          });
+          if (error) throw error;
+          if (data?.ok) {
+            if (data.plan_id && data.prev_content) {
+              pushUndoEntry(data.plan_id, data.prev_content, "auto recovery adjustment");
+            }
+            if (data.new_content) {
+              setPlan((prev) => prev ? { ...prev, content: data.new_content } : prev);
+            }
+            sonnerToast("We've adjusted this week's plan based on your recovery.", {
+              description: "Get some rest and come back stronger.",
+              action: { label: "View", onClick: () => navigate("/training-plan") },
+              duration: 10000,
+            });
+          }
+        } else if (evaluation.direction === "up") {
+          if (!isUpwardDismissedToday(user.id)) {
+            setAdaptEval(evaluation);
+          }
+        }
+      } catch (e) {
+        console.error("Plan adaptation check failed", e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user, navigate]);
+
 
   const stats = useMemo(() => {
     if (activities.length === 0) return null;
@@ -542,6 +598,15 @@ const Dashboard = () => {
           workouts={heroData.workouts}
         />
       </div>
+
+      {/* ── Upward adaptation offer (one-tap accept) ── */}
+      {adaptEval?.direction === "up" && user && (
+        <PlanAdaptationBanner
+          userId={user.id}
+          detail={adaptEval.detail}
+          onDone={() => setAdaptEval(null)}
+        />
+      )}
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
