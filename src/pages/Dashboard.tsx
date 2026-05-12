@@ -756,7 +756,13 @@ const Dashboard = () => {
           </div>
 
           {/* ── Readiness ── */}
-          <ReadinessWidget />
+          <section className="space-y-3" aria-label="Readiness">
+            <div className="flex items-center gap-2 px-1">
+              <Heart className="h-4 w-4 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Readiness</h2>
+            </div>
+            <ReadinessWidget />
+          </section>
 
           {/* ── Workouts This Week Summary ── */}
           <Card className="glass border-border/30">
