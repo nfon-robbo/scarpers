@@ -77,7 +77,7 @@ import {
 import { cn } from "@/lib/utils";
 
 // ── Tick-mark Circular Gauge ──
-function CircularGauge({ score, size = 220 }: { score: number; size?: number }) {
+function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: number; size?: number; statusLabel: string; subNode: React.ReactNode }) {
   const ticks = 60;
   const filled = Math.max(0, Math.min(ticks, Math.round((score / 100) * ticks)));
   const cx = size / 2;
@@ -88,12 +88,8 @@ function CircularGauge({ score, size = 220 }: { score: number; size?: number }) 
   const color =
     score >= 80 ? "hsl(142, 70%, 50%)" : score > 30 ? "hsl(180, 80%, 55%)" : "hsl(0, 75%, 55%)";
 
-  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
-  const sub = score >= 80 ? "Fully recovered" : score >= 60 ? "Train as planned" : score > 30 ? "Ready to train" : "Prioritise rest";
-
   const tickEls = [];
   for (let i = 0; i < ticks; i++) {
-    // Start from bottom-left, sweep clockwise around — rotate so 0 is at bottom-left
     const angle = (-225 + (i / (ticks - 1)) * 270) * (Math.PI / 180);
     const x1 = cx + Math.cos(angle) * innerR;
     const y1 = cy + Math.sin(angle) * innerR;
@@ -119,10 +115,10 @@ function CircularGauge({ score, size = 220 }: { score: number; size?: number }) 
       <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 16px ${color}33)` }}>
         {tickEls}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
-        <span className="text-sm font-semibold mt-2" style={{ color }}>{label}</span>
-        <span className="text-[11px] text-muted-foreground mt-0.5">{sub}</span>
+        <span className="text-sm font-semibold mt-2" style={{ color }}>{statusLabel}</span>
+        <div className="mt-1 text-[11px] text-slate-400 leading-snug">{subNode}</div>
       </div>
     </div>
   );
@@ -172,7 +168,17 @@ const statusIcon = (s: "good" | "warning" | "poor") => {
   return <AlertTriangle className="w-3.5 h-3.5 text-destructive" />;
 };
 
-const ReadinessWidget = () => {
+interface ReadinessWidgetProps {
+  todayContext?: {
+    isRestDay: boolean;
+    workoutMinutes: number | null;
+    workoutTitle: string | null;
+    completedToday: boolean;
+  };
+  onReviewPlan?: () => void;
+}
+
+const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = {}) => {
   const { user } = useAuth();
   const [data, setData] = useState<ReadinessData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -539,18 +545,61 @@ const ReadinessWidget = () => {
             <span className="text-[11px] text-muted-foreground">Updated {updatedTime}</span>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-5">
-            {/* Left column: gauge + 7-day trend */}
-            <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
-              <div className="flex items-center justify-center">
-                <CircularGauge score={displayResult.score} size={200} />
+          {(() => {
+            // Compute dynamic status label + sub-message
+            const score = displayResult.score;
+            const statusLabel = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
+
+            let message = "";
+            let showReview = false;
+            const ctx = todayContext;
+            if (score >= 80) {
+              if (ctx?.completedToday) message = "Recovery on track";
+              else if (ctx && !ctx.isRestDay && ctx.workoutMinutes) message = `Ready for your ${ctx.workoutMinutes}-min session`;
+              else if (ctx && !ctx.isRestDay) message = "Ready for today's workout";
+              else message = "Fully recovered — up to 90 min easy";
+            } else if (score >= 60) {
+              if (ctx?.completedToday) message = "Nice work — stay hydrated";
+              else if (ctx && !ctx.isRestDay && ctx.workoutMinutes) message = `Cleared for ${ctx.workoutMinutes}-min session`;
+              else if (ctx && !ctx.isRestDay) message = "Cleared for today's session";
+              else message = "Easy session OK (≤45 min)";
+            } else if (score > 30) {
+              if (ctx?.completedToday) message = "Prioritise recovery now";
+              else if (ctx && !ctx.isRestDay) { message = "Today may be tough"; showReview = true; }
+              else message = "Active recovery only";
+            } else {
+              message = "You may be struggling today";
+              showReview = true;
+            }
+
+            const subNode = (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-slate-400 text-[11px] leading-snug">{message}</span>
+                {showReview && onReviewPlan && (
+                  <button
+                    type="button"
+                    onClick={onReviewPlan}
+                    className="text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                  >
+                    Review today's plan →
+                  </button>
+                )}
               </div>
-              {isFallback && (
-                <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Waiting for data
-                </p>
-              )}
+            );
+
+            return (
+              <div className="flex flex-col md:flex-row gap-5">
+                {/* Left column: gauge + 7-day trend */}
+                <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
+                  <div className="flex items-center justify-center">
+                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                  </div>
+                  {isFallback && (
+                    <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Waiting for data
+                    </p>
+                  )}
               {hasTrend && (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1">7 Day Trend</h4>
@@ -587,21 +636,23 @@ const ReadinessWidget = () => {
                     ? "text-destructive"
                     : "text-muted-foreground";
                 return (
-                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_88px] items-center gap-3 px-3 py-2.5 text-sm">
+                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_104px] items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="shrink-0">{statusIcon(f.status)}</div>
                     <span className="text-foreground font-medium truncate">{f.label}</span>
                     <div className="flex justify-center">
                       {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
                     </div>
                     <div className="text-right">
-                      <div className="text-foreground font-semibold text-xs leading-tight truncate">{primary}</div>
-                      {sub && <div className={`text-[10px] leading-tight mt-0.5 truncate ${subColor}`}>{sub}</div>}
+                      <div className="text-foreground font-semibold text-xs leading-tight">{primary}</div>
+                      {sub && <div className={`text-[10px] leading-tight mt-0.5 ${subColor}`}>{sub}</div>}
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
