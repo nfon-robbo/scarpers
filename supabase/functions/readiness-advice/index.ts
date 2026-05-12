@@ -28,7 +28,18 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { readiness_score, factors, current_hour_local, missing_data } = await req.json();
+    const { readiness_score, factors, current_hour_local, missing_data, timezone } = await req.json();
+    const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
+    const fmtLocal = (iso: string) => {
+      try {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+          weekday: "short",
+        }).formatToParts(new Date(iso));
+        const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+        return `${get("weekday")} ${get("hour")}:${get("minute")}`;
+      } catch { return iso.slice(11, 16); }
+    };
 
     // Fetch profile and active training plan in parallel
     const [profileRes, planRes] = await Promise.all([
