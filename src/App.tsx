@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
 import About from "./pages/About";
+import CoachClaire from "./pages/CoachClaire";
 import Terms from "./pages/Terms";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
