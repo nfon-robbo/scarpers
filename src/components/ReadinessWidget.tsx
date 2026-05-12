@@ -192,6 +192,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [cacheChecked, setCacheChecked] = useState(false);
+  const [batteryDialogOpen, setBatteryDialogOpen] = useState(false);
 
   // Check DB cache for readiness snapshot < 60 min old (skipped when user forces refresh)
   useEffect(() => {
