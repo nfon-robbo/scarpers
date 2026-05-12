@@ -400,6 +400,7 @@ ${body}
               </div>
               <div className="flex gap-1 shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => window.open(`/blog/${post.slug}?preview=true`, "_blank")}><Eye className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => handlePrint(post)} title="Print post"><Printer className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(post)}><Pencil className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4" /></Button>
               </div>
