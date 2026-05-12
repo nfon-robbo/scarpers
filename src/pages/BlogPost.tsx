@@ -190,7 +190,7 @@ const BlogPost = () => {
             </span>
             <span aria-hidden="true">·</span>
             <span>
-              By <Link to="/about" className="text-foreground hover:underline">Coach Claire Rayners</Link>, reviewed by the Scarpers team
+              By <Link to="/coach/claire-rayners" className="text-foreground hover:underline">Coach Claire Rayners</Link>, reviewed by the Scarpers team
             </span>
           </div>
         )}
