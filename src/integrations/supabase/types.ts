@@ -893,6 +893,8 @@ export type Database = {
           created_at: string
           goal_time: string | null
           id: string
+          last_adaptation_reason: string | null
+          last_adapted_at: string | null
           race_date: string | null
           race_distance: string
           start_date: string
@@ -905,6 +907,8 @@ export type Database = {
           created_at?: string
           goal_time?: string | null
           id?: string
+          last_adaptation_reason?: string | null
+          last_adapted_at?: string | null
           race_date?: string | null
           race_distance: string
           start_date: string
@@ -917,6 +921,8 @@ export type Database = {
           created_at?: string
           goal_time?: string | null
           id?: string
+          last_adaptation_reason?: string | null
+          last_adapted_at?: string | null
           race_date?: string | null
           race_distance?: string
           start_date?: string
