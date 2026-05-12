@@ -51,54 +51,53 @@ import {
 } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
 
-// ── Circular Gauge ──
-function CircularGauge({ score, size = 200 }: { score: number; size?: number }) {
-  const strokeWidth = 12;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, Math.min(100, score)) / 100;
-  const dashOffset = circumference * (1 - progress);
+// ── Tick-mark Circular Gauge ──
+function CircularGauge({ score, size = 220 }: { score: number; size?: number }) {
+  const ticks = 60;
+  const filled = Math.max(0, Math.min(ticks, Math.round((score / 100) * ticks)));
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerR = size / 2 - 4;
+  const innerR = outerR - 14;
 
-  // Color based on score zones
-  const gaugeColor =
-    score >= 80 ? "hsl(142, 60%, 45%)" : score > 30 ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+  const color =
+    score >= 80 ? "hsl(142, 70%, 50%)" : score > 30 ? "hsl(180, 80%, 55%)" : "hsl(0, 75%, 55%)";
 
-  const glowColor =
-    score >= 80 ? "0 0 30px -5px hsla(142, 60%, 45%, 0.4)" : score > 30 ? "0 0 30px -5px hsla(45, 90%, 50%, 0.4)" : "0 0 30px -5px hsla(0, 72%, 51%, 0.4)";
+  const label = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
+  const sub = score >= 80 ? "Fully recovered" : score >= 60 ? "Train as planned" : score > 30 ? "Ready to train" : "Prioritise rest";
+
+  const tickEls = [];
+  for (let i = 0; i < ticks; i++) {
+    // Start from bottom-left, sweep clockwise around — rotate so 0 is at bottom-left
+    const angle = (-225 + (i / (ticks - 1)) * 270) * (Math.PI / 180);
+    const x1 = cx + Math.cos(angle) * innerR;
+    const y1 = cy + Math.sin(angle) * innerR;
+    const x2 = cx + Math.cos(angle) * outerR;
+    const y2 = cy + Math.sin(angle) * outerR;
+    const active = i < filled;
+    tickEls.push(
+      <line
+        key={i}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={active ? color : "hsl(var(--muted-foreground) / 0.18)"}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    );
+  }
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size, filter: `drop-shadow(${glowColor})` }}>
-      <svg width={size} height={size} className="-rotate-90">
-        {/* Background track */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="hsl(var(--muted))"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        {/* Progress arc */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={gaugeColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          className="transition-all duration-1000 ease-out"
-        />
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 16px ${color}33)` }}>
+        {tickEls}
       </svg>
-      {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-black tracking-tight text-foreground">{score}</span>
-        <span className="text-[10px] text-muted-foreground mt-1 font-medium">
-          Updated {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
+        <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
+        <span className="text-sm font-semibold mt-2" style={{ color }}>{label}</span>
+        <span className="text-[11px] text-muted-foreground mt-0.5">{sub}</span>
       </div>
     </div>
   );
