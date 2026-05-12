@@ -583,7 +583,19 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness</h3>
-            <span className="text-[11px] text-muted-foreground">Updated {updatedTime}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted-foreground">Updated {updatedLabel}</span>
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                disabled={isFallback || aiLoading}
+                title="Recalculate now"
+                aria-label="Recalculate readiness"
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={cn("w-3 h-3", (isFallback || aiLoading) && "animate-spin")} />
+              </button>
+            </div>
           </div>
 
           {(() => {
