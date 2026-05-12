@@ -152,6 +152,7 @@ const Dashboard = () => {
   const [openActivityId, setOpenActivityId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
+  const [adaptEval, setAdaptEval] = useState<AdaptEvaluation | null>(null);
 
   const deleteRun = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
