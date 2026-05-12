@@ -194,6 +194,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [cacheChecked, setCacheChecked] = useState(false);
   const [batteryDialogOpen, setBatteryDialogOpen] = useState(false);
+  const [factorDialog, setFactorDialog] = useState<{ label: string; status: "good" | "warning" | "poor"; detail: string } | null>(null);
 
   // Check DB cache for readiness snapshot < 60 min old (skipped when user forces refresh)
   useEffect(() => {
