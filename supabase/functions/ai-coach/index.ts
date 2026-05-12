@@ -171,24 +171,28 @@ serve(async (req) => {
             : Math.max(0, 20 * (efficiency / 90) * 0.5);
           const score = Math.round(Math.min(100, durationScore + deepScore + remScore + effScore));
 
+          const fmtHM = (s: number) => {
+            const m = Math.round(s / 60);
+            return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+          };
           return {
             date,
             sleep_score: score,
             bedtime_local: stages.earliest ? fmtLocal(stages.earliest) : null,
             wake_time_local: stages.latest ? fmtLocal(stages.latest) : null,
-            total_hours: (sleepTime / 3600).toFixed(1),
-            time_in_bed_hours: (totalH).toFixed(1),
-            deep_hours: (stages.deep / 3600).toFixed(1),
-            rem_hours: (stages.rem / 3600).toFixed(1),
-            light_hours: (stages.light / 3600).toFixed(1),
-            awake_hours: (stages.awake / 3600).toFixed(1),
+            total_sleep: fmtHM(sleepTime),
+            time_in_bed: fmtHM(total),
+            deep: fmtHM(stages.deep),
+            rem: fmtHM(stages.rem),
+            light: fmtHM(stages.light),
+            awake: fmtHM(stages.awake),
             deep_pct: Math.round(deepPct),
             rem_pct: Math.round(remPct),
             efficiency: Math.round(efficiency),
           };
         });
 
-      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights). bedtime_local and wake_time_local are ALREADY in the user's local timezone (${tz}) — use them as-is, NEVER convert or adjust them, NEVER call them UTC. total_hours = ACTUAL ASLEEP time (deep+light+REM, EXCLUDES awake). time_in_bed_hours = total session length. When the user asks "how much sleep" or "total sleep", quote total_hours (asleep), not time_in_bed_hours:\n${JSON.stringify(sleepSummary, null, 2)}\n`;
+      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights). All durations are HH:MM strings — quote them EXACTLY as given (e.g. "7:31"), NEVER convert to decimal hours like "7.5h". bedtime_local and wake_time_local are ALREADY in the user's local timezone (${tz}) — use as-is, NEVER call them UTC. total_sleep = ACTUAL ASLEEP time (deep+light+REM, EXCLUDES awake). time_in_bed = total session length. When the user asks "how much sleep" or "total sleep", quote total_sleep:\n${JSON.stringify(sleepSummary, null, 2)}\n`;
     }
 
     // Build activity summary for the AI
