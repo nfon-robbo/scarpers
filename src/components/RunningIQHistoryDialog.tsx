@@ -201,7 +201,7 @@ const RunningIQHistoryDialog = ({ open, onOpenChange, current }: Props) => {
             {adviceLoading ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Coach is thinking…
+                Coach Claire Rayners is thinking…
               </div>
             ) : adviceError ? (
               <p className="text-xs text-muted-foreground">{adviceError}</p>
