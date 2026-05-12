@@ -293,6 +293,97 @@ const ReadinessWidget = () => {
     });
   }, [user]);
 
+  // Build 7-day sparkline series + readiness trend
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date();
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    }
+    const startDate = days[0];
+
+    Promise.all([
+      supabase
+        .from("daily_metrics")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score")
+        .eq("user_id", user.id)
+        .gte("date", startDate)
+        .then(({ data }) => data || []),
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds")
+        .eq("user_id", user.id)
+        .gte("date", startDate)
+        .then(({ data }) => data || []),
+      supabase
+        .from("activities")
+        .select("start_time, duration_seconds, avg_heart_rate, training_load, training_effect")
+        .eq("user_id", user.id)
+        .gte("start_time", startDate + "T00:00:00Z")
+        .then(({ data }) => data || []),
+      supabase
+        .from("readiness_snapshots")
+        .select("score, recorded_at")
+        .eq("user_id", user.id)
+        .gte("recorded_at", startDate + "T00:00:00Z")
+        .order("recorded_at", { ascending: true })
+        .then(({ data }) => data || []),
+    ]).then(([metrics, stages, acts, snaps]) => {
+      const mByDate = new Map<string, any>();
+      (metrics as any[]).forEach((m) => mByDate.set(m.date, m));
+
+      // Deep % per date
+      const stagesByDate = new Map<string, { deep: number; total: number }>();
+      (stages as any[]).forEach((s) => {
+        const cur = stagesByDate.get(s.date) || { deep: 0, total: 0 };
+        cur.total += s.duration_seconds || 0;
+        if ((s.stage || "").toLowerCase() === "deep") cur.deep += s.duration_seconds || 0;
+        stagesByDate.set(s.date, cur);
+      });
+
+      // Daily load
+      const loadByDate = new Map<string, number>();
+      (acts as any[]).forEach((a) => {
+        if (!a.start_time) return;
+        const d = a.start_time.split("T")[0];
+        const load = activityIntensityLoad(a);
+        loadByDate.set(d, (loadByDate.get(d) || 0) + load);
+      });
+
+      const series: Record<string, (number | null)[]> = {
+        "Sleep Quality": days.map((d) => mByDate.get(d)?.sleep_score ?? null),
+        "Deep Sleep": days.map((d) => {
+          const s = stagesByDate.get(d);
+          return s && s.total > 0 ? (s.deep / s.total) * 100 : null;
+        }),
+        "Resting HR": days.map((d) => mByDate.get(d)?.resting_heart_rate ?? null),
+        "HRV": days.map((d) => mByDate.get(d)?.hrv ?? null),
+        "Stress": days.map((d) => mByDate.get(d)?.stress_score ?? null),
+        "Yesterday's Load": days.map((d) => loadByDate.get(d) ?? null),
+        "Today's Effort": days.map((d) => loadByDate.get(d) ?? null),
+      };
+      setSparklines(series);
+
+      // Build daily avg snapshot trend
+      const byDay = new Map<string, number[]>();
+      (snaps as any[]).forEach((s) => {
+        const d = s.recorded_at.split("T")[0];
+        if (!byDay.has(d)) byDay.set(d, []);
+        byDay.get(d)!.push(s.score);
+      });
+      const trendArr = days.map((d) => {
+        const vals = byDay.get(d);
+        return {
+          day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
+          score: vals ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
+        };
+      });
+      setTrend(trendArr);
+    });
+  }, [user]);
+
+
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
   const displayResult = result ?? {
     score: 50,
