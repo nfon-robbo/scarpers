@@ -360,7 +360,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       });
       setLoading(false);
     });
-  }, [user, cacheChecked, cached]);
+  }, [user, cacheChecked, cached, refreshNonce]);
 
   // Build 7-day sparkline series + readiness trend
   useEffect(() => {
@@ -572,6 +572,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const handleManualRefresh = () => {
     setLastUpdated(null);
     setAiAdvice(null);
+    setAiLoading(true);
     setData(null);
     setRefreshNonce((n) => n + 1);
   };
@@ -728,14 +729,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               </Button>
             )}
           </div>
-          {isFallback ? (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Your readiness score will appear here once sleep, HRV, resting heart rate or activity data has synced.
-            </p>
-          ) : aiLoading ? (
+          {aiLoading ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               Coach Claire Rayners is thinking...
+            </p>
+          ) : isFallback ? (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your readiness score will appear here once sleep, HRV, resting heart rate or activity data has synced.
             </p>
           ) : aiAdvice ? (
             <p className="text-sm text-muted-foreground leading-relaxed">{aiAdvice}</p>
