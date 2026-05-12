@@ -113,6 +113,7 @@ const FiveKTrainingPlan = () => {
       </div>
     </article>
   </MarketingPageLayout>
-);
+  );
+};
 
 export default FiveKTrainingPlan;
