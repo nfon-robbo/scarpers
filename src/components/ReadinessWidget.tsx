@@ -636,15 +636,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     ? "text-destructive"
                     : "text-muted-foreground";
                 return (
-                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_88px] items-center gap-3 px-3 py-2.5 text-sm">
+                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_104px] items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="shrink-0">{statusIcon(f.status)}</div>
                     <span className="text-foreground font-medium truncate">{f.label}</span>
                     <div className="flex justify-center">
                       {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
                     </div>
                     <div className="text-right">
-                      <div className="text-foreground font-semibold text-xs leading-tight truncate">{primary}</div>
-                      {sub && <div className={`text-[10px] leading-tight mt-0.5 truncate ${subColor}`}>{sub}</div>}
+                      <div className="text-foreground font-semibold text-xs leading-tight">{primary}</div>
+                      {sub && <div className={`text-[10px] leading-tight mt-0.5 ${subColor}`}>{sub}</div>}
                     </div>
                   </div>
                 );
