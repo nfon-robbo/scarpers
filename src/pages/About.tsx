@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
+import CoachClaireCard from "@/components/CoachClaireCard";
 
 const About = () => (
   <MarketingPageLayout
@@ -29,6 +30,10 @@ const About = () => (
         from established endurance training literature (polarised training, heart-rate zone models, conservative
         load progression) and reviewed by the team before being shipped.
       </p>
+
+      <div className="not-prose mt-6">
+        <CoachClaireCard variant="compact" />
+      </div>
 
       <h2 className="text-2xl font-semibold mt-10 mb-3">How plans are generated</h2>
       <p className="text-muted-foreground leading-relaxed">

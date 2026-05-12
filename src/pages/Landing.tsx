@@ -27,6 +27,7 @@ import {
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import BlogPreview from "@/components/BlogPreview";
+import CoachClaireCard from "@/components/CoachClaireCard";
 
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
@@ -643,8 +644,15 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ====== Blog ====== */}
+      {/* ====== Meet the coach ====== */}
       <section className="border-t border-border/40 bg-background">
+        <div className="max-w-6xl mx-auto px-5 pt-20">
+          <CoachClaireCard />
+        </div>
+      </section>
+
+      {/* ====== Blog ====== */}
+      <section className="bg-background">
         <div className="max-w-6xl mx-auto px-5 py-20">
           <BlogPreview
             heading="From the Scarpers blog"
