@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
+import CoachClaireCard from "@/components/CoachClaireCard";
 
 const About = () => (
   <MarketingPageLayout
