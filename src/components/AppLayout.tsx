@@ -9,28 +9,27 @@ import AIChatbot from "@/components/AIChatbot";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
 import {
-  LayoutDashboard,
-  Upload,
-  Brain,
-  Calendar,
-  ListChecks,
-  Settings,
-  LogOut,
-  Moon,
-  Sun,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import iconDashboard from "@/assets/nav-dashboard.png";
+import iconPlan from "@/assets/nav-plan.png";
+import iconActivities from "@/assets/nav-activities.png";
+import iconInsights from "@/assets/nav-insights.png";
+import iconImport from "@/assets/nav-import.png";
+import iconSettings from "@/assets/nav-settings.png";
+import iconTheme from "@/assets/nav-theme.png";
+import iconSignout from "@/assets/nav-signout.png";
 
 const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/training-plan", icon: Calendar, label: "Plan" },
-  { to: "/activities", icon: ListChecks, label: "Activities" },
-  { to: "/insights", icon: Brain, label: "Insights" },
-  { to: "/upload", icon: Upload, label: "Import" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  { to: "/dashboard", img: iconDashboard, label: "Dashboard" },
+  { to: "/training-plan", img: iconPlan, label: "Plan" },
+  { to: "/activities", img: iconActivities, label: "Activities" },
+  { to: "/insights", img: iconInsights, label: "Insights" },
+  { to: "/upload", img: iconImport, label: "Import" },
+  { to: "/settings", img: iconSettings, label: "Settings" },
 ];
 
 const COLLAPSE_KEY = "scarpers_sidebar_collapsed";
