@@ -9,7 +9,6 @@ import AIChatbot from "@/components/AIChatbot";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
 import {
-  Activity,
   LayoutDashboard,
   Upload,
   Brain,
@@ -19,9 +18,11 @@ import {
   LogOut,
   Moon,
   Sun,
-  Shield,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -32,11 +33,21 @@ const navItems = [
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
+const COLLAPSE_KEY = "scarpers_sidebar_collapsed";
+
 const AppLayout = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { theme, toggleTheme } = useTheme();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(COLLAPSE_KEY) === "1";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
 
   useEffect(() => {
     if (!user) { setIsAdmin(false); return; }
@@ -51,41 +62,66 @@ const AppLayout = () => {
     })();
   }, [user]);
 
+  const sidebarWidth = collapsed ? "w-[72px]" : "w-[260px]";
+  const mainMargin = collapsed ? "md:ml-[72px]" : "md:ml-[260px]";
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-[260px] flex-col glass-strong fixed inset-y-0 left-0 z-40">
+      <aside className={cn(
+        "hidden md:flex flex-col glass-strong fixed inset-y-0 left-0 z-40 transition-[width] duration-300 ease-in-out",
+        sidebarWidth
+      )}>
         {/* Brand */}
-        <div className="flex items-center gap-2 px-5 py-5 border-b border-border/50">
+        <div className={cn(
+          "flex items-center gap-2 border-b border-border/50 relative",
+          collapsed ? "px-3 py-5 justify-center" : "px-5 py-5"
+        )}>
           <img src={scarpersIcon} alt="" className="h-11 w-11 object-contain shrink-0" />
-          <img src={scarpersWordmark} alt="Scarpers" className="h-7 w-auto object-contain" />
+          {!collapsed && (
+            <img src={scarpersWordmark} alt="Scarpers" className="h-7 w-auto object-contain" />
+          )}
         </div>
 
+        {/* Collapse toggle */}
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={() => setCollapsed((c) => !c)}
+          className="absolute top-7 -right-3 z-50 h-6 w-6 rounded-full border border-border/70 bg-background shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+        </button>
+
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "px-2" : "px-3")}>
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/dashboard"}
+              title={collapsed ? label : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
+                cn(
+                  "flex items-center rounded-xl text-sm font-medium transition-all duration-200 group",
+                  collapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
                   isActive
                     ? "bg-primary/10 text-primary glow-sm"
                     : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`
+                )
               }
             >
               {({ isActive }) => (
                 <>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                    isActive
-                      ? "bg-primary/15"
-                      : "bg-transparent group-hover:bg-muted"
-                  }`}>
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
+                    isActive ? "bg-primary/15" : "bg-transparent group-hover:bg-muted"
+                  )}>
                     <Icon className="w-[18px] h-[18px]" />
                   </div>
-                  <span className="font-['Barlow_Condensed'] font-semibold tracking-wide text-base uppercase">{label}</span>
+                  {!collapsed && (
+                    <span className="font-['Barlow_Condensed'] font-semibold tracking-wide text-base uppercase">{label}</span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -93,8 +129,8 @@ const AppLayout = () => {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-border/50 p-3 space-y-0.5">
-          {profile?.name && (
+        <div className={cn("border-t border-border/50 space-y-0.5", collapsed ? "p-2" : "p-3")}>
+          {!collapsed && profile?.name && (
             <div className="px-3 py-2 mb-1">
               <p className="text-xs text-muted-foreground truncate">Signed in as</p>
               <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
@@ -102,23 +138,31 @@ const AppLayout = () => {
           )}
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 h-10"
+            title={collapsed ? (theme === "dark" ? "Light Mode" : "Dark Mode") : undefined}
+            className={cn(
+              "w-full rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 h-10",
+              collapsed ? "justify-center px-0" : "justify-start gap-3"
+            )}
             onClick={toggleTheme}
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
               {theme === "dark" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
             </div>
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            {!collapsed && (theme === "dark" ? "Light Mode" : "Dark Mode")}
           </Button>
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-10"
+            title={collapsed ? "Sign out" : undefined}
+            className={cn(
+              "w-full rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-10",
+              collapsed ? "justify-center px-0" : "justify-start gap-3"
+            )}
             onClick={signOut}
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
               <LogOut className="w-[18px] h-[18px]" />
             </div>
-            Sign out
+            {!collapsed && "Sign out"}
           </Button>
         </div>
       </aside>
@@ -150,7 +194,10 @@ const AppLayout = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto md:ml-[260px] pt-0 pb-20 md:pb-0 flex flex-col min-h-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <main className={cn(
+        "flex-1 overflow-y-auto pt-0 pb-20 md:pb-0 flex flex-col min-h-0 transition-[margin] duration-300 ease-in-out",
+        mainMargin
+      )} style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <Outlet />
         </div>
