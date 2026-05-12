@@ -69,7 +69,10 @@ const MarketingPageLayout = ({ title, description, canonicalPath, noindex, child
           <span>© {new Date().getFullYear()} Scarpers · scarpers.co.uk</span>
           <div className="flex gap-4">
             <Link to="/" className="hover:text-foreground">Home</Link>
+            <Link to="/about" className="hover:text-foreground">About</Link>
+            <Link to="/blog" className="hover:text-foreground">Blog</Link>
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground">Terms</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>
         </div>
