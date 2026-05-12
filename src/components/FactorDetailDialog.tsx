@@ -225,7 +225,7 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
       <div className="rounded-md border border-border/60 bg-background/95 px-2.5 py-1.5 text-xs shadow-xl backdrop-blur">
         <div className="font-medium text-foreground">{p.short}</div>
         <div className="text-muted-foreground">
-          {p.value == null ? "no data" : `${p.value}${meta.unit}`}
+          {p.value == null ? "no data" : `${fmt(p.value, 1)}${meta.unit}`}
         </div>
       </div>
     );
