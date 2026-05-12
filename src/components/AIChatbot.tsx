@@ -437,13 +437,14 @@ const AIChatbot = () => {
       }
       // Persist whatever the user sees (stopped or partial).
       if (isAbort && activeThreadId && stoppedContent.trim()) {
-        void supabase.from("chat_messages").insert({
+        const { error: sErr } = await supabase.from("chat_messages").insert({
           thread_id: activeThreadId,
           user_id: session.user.id,
           role: "assistant",
           content: stoppedContent,
         });
-        void supabase.from("chat_threads")
+        if (sErr) console.error("Failed to save stopped message:", sErr);
+        await supabase.from("chat_threads")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", activeThreadId);
       }
