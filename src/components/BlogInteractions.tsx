@@ -173,11 +173,14 @@ const BlogInteractions = ({ postId, postTitle, postSlug }: Props) => {
           <Button type="button" variant="ghost" size="icon" onClick={() => share("copy")} aria-label="Copy link">
             <Link2 className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={() => share("twitter")} aria-label="Share on Twitter">
-            <Twitter className="h-4 w-4" />
+          <Button type="button" variant="ghost" size="icon" onClick={() => share("twitter")} aria-label="Share on X">
+            <XLogo className="h-4 w-4" />
           </Button>
           <Button type="button" variant="ghost" size="icon" onClick={() => share("facebook")} aria-label="Share on Facebook">
             <Facebook className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" onClick={() => window.print()} aria-label="Print post">
+            <Printer className="h-4 w-4" />
           </Button>
         </div>
       </div>
