@@ -4,7 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Heart, Share2, MessageCircle, Trash2, Twitter, Facebook, Link2, Loader2 } from "lucide-react";
+import { Heart, Share2, MessageCircle, Trash2, Facebook, Link2, Loader2, Printer } from "lucide-react";
+
+const XLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+    <path d="M18.244 2H21.5l-7.5 8.57L22.5 22h-6.91l-5.41-7.07L3.9 22H.64l8.02-9.17L.5 2h7.09l4.89 6.46L18.244 2Zm-1.21 18h1.86L7.06 4H5.1l11.93 16Z"/>
+  </svg>
+);
 import { toast } from "sonner";
 
 interface Props {
@@ -167,11 +173,14 @@ const BlogInteractions = ({ postId, postTitle, postSlug }: Props) => {
           <Button type="button" variant="ghost" size="icon" onClick={() => share("copy")} aria-label="Copy link">
             <Link2 className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={() => share("twitter")} aria-label="Share on Twitter">
-            <Twitter className="h-4 w-4" />
+          <Button type="button" variant="ghost" size="icon" onClick={() => share("twitter")} aria-label="Share on X">
+            <XLogo className="h-4 w-4" />
           </Button>
           <Button type="button" variant="ghost" size="icon" onClick={() => share("facebook")} aria-label="Share on Facebook">
             <Facebook className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" onClick={() => window.print()} aria-label="Print post">
+            <Printer className="h-4 w-4" />
           </Button>
         </div>
       </div>
