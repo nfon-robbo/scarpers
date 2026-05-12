@@ -34,6 +34,18 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === videoIdx) {
+        try { v.currentTime = 0; } catch {}
+        void v.play().catch(() => undefined);
+      } else {
+        v.pause();
+      }
+    });
+  }, [videoIdx]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
