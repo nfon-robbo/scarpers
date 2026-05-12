@@ -587,7 +587,7 @@ const ReadinessWidget = () => {
                     ? "text-destructive"
                     : "text-muted-foreground";
                 return (
-                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_72px_88px] items-center gap-3 px-3 py-2.5 text-sm">
+                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_88px] items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="shrink-0">{statusIcon(f.status)}</div>
                     <span className="text-foreground font-medium truncate">{f.label}</span>
                     <div className="flex justify-center">
