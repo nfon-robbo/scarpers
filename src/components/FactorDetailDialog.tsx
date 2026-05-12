@@ -93,6 +93,12 @@ const META: Record<string, Meta> = {
   },
 };
 
+function fmt(n: number | null | undefined, decimals = 0): string {
+  if (n == null || !isFinite(n as number)) return "—";
+  const f = Math.pow(10, decimals);
+  return (Math.round((n as number) * f) / f).toString();
+}
+
 function statusColor(status: FactorStatus): string {
   if (status === "good") return "hsl(142, 70%, 50%)";
   if (status === "warning") return "hsl(45, 95%, 55%)";
@@ -219,7 +225,7 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
       <div className="rounded-md border border-border/60 bg-background/95 px-2.5 py-1.5 text-xs shadow-xl backdrop-blur">
         <div className="font-medium text-foreground">{p.short}</div>
         <div className="text-muted-foreground">
-          {p.value == null ? "no data" : `${p.value}${meta.unit}`}
+          {p.value == null ? "no data" : `${fmt(p.value, 1)}${meta.unit}`}
         </div>
       </div>
     );
@@ -236,7 +242,7 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
     trendNode = (
       <span className={`inline-flex items-center gap-1 ${cls}`}>
         <Icon className="w-3.5 h-3.5" />
-        {sign}{Math.round(diff * 10) / 10}{meta.unit} vs avg
+        {sign}{fmt(diff, 1)}{meta.unit} vs avg
       </span>
     );
   }
@@ -267,21 +273,21 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Now</div>
                 <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats?.last != null ? `${stats.last}${meta.unit}` : "—"}
+                  {stats?.last != null ? `${fmt(stats.last, 1)}${meta.unit}` : "—"}
                 </div>
                 <div className="text-[10px] mt-0.5">{trendNode}</div>
               </div>
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">28-day avg</div>
-                <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats ? `${Math.round(stats.avg * 10) / 10}${meta.unit}` : "—"}
+                <div className="text-xl font-bold text-foreground mt-0.5 truncate">
+                  {stats ? `${fmt(stats.avg, 1)}${meta.unit}` : "—"}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">baseline</div>
               </div>
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Range</div>
-                <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats ? `${stats.min}–${stats.max}` : "—"}
+                <div className="text-xl font-bold text-foreground mt-0.5 truncate">
+                  {stats ? `${fmt(stats.min, 0)}–${fmt(stats.max, 0)}` : "—"}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">last 28 days</div>
               </div>
