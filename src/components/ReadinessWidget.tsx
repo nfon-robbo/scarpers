@@ -545,18 +545,61 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             <span className="text-[11px] text-muted-foreground">Updated {updatedTime}</span>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-5">
-            {/* Left column: gauge + 7-day trend */}
-            <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
-              <div className="flex items-center justify-center">
-                <CircularGauge score={displayResult.score} size={200} />
+          {(() => {
+            // Compute dynamic status label + sub-message
+            const score = displayResult.score;
+            const statusLabel = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
+
+            let message = "";
+            let showReview = false;
+            const ctx = todayContext;
+            if (score >= 80) {
+              if (ctx?.completedToday) message = "Recovery on track";
+              else if (ctx && !ctx.isRestDay && ctx.workoutMinutes) message = `Ready for your ${ctx.workoutMinutes}-min session`;
+              else if (ctx && !ctx.isRestDay) message = "Ready for today's workout";
+              else message = "Fully recovered — up to 90 min easy";
+            } else if (score >= 60) {
+              if (ctx?.completedToday) message = "Nice work — stay hydrated";
+              else if (ctx && !ctx.isRestDay && ctx.workoutMinutes) message = `Cleared for ${ctx.workoutMinutes}-min session`;
+              else if (ctx && !ctx.isRestDay) message = "Cleared for today's session";
+              else message = "Easy session OK (≤45 min)";
+            } else if (score > 30) {
+              if (ctx?.completedToday) message = "Prioritise recovery now";
+              else if (ctx && !ctx.isRestDay) { message = "Today may be tough"; showReview = true; }
+              else message = "Active recovery only";
+            } else {
+              message = "You may be struggling today";
+              showReview = true;
+            }
+
+            const subNode = (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-slate-400 text-[11px] leading-snug">{message}</span>
+                {showReview && onReviewPlan && (
+                  <button
+                    type="button"
+                    onClick={onReviewPlan}
+                    className="text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                  >
+                    Review today's plan →
+                  </button>
+                )}
               </div>
-              {isFallback && (
-                <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Waiting for data
-                </p>
-              )}
+            );
+
+            return (
+              <div className="flex flex-col md:flex-row gap-5">
+                {/* Left column: gauge + 7-day trend */}
+                <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
+                  <div className="flex items-center justify-center">
+                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                  </div>
+                  {isFallback && (
+                    <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Waiting for data
+                    </p>
+                  )}
               {hasTrend && (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
                   <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1">7 Day Trend</h4>
