@@ -4,6 +4,43 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+
+// ── Inline Sparkline (7-day mini trend) ──
+function Sparkline({ values, status }: { values: (number | null)[]; status: "good" | "warning" | "poor" }) {
+  const clean = values.map((v) => (typeof v === "number" && isFinite(v) ? v : null));
+  const nums = clean.filter((v): v is number => v != null);
+  if (nums.length < 2) {
+    return <div className="h-6 w-16 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">—</div>;
+  }
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min || 1;
+  const w = 64;
+  const h = 24;
+  const stepX = w / (clean.length - 1);
+  const color =
+    status === "good" ? "hsl(142, 60%, 45%)" : status === "warning" ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+
+  let lastY: number | null = null;
+  const pts: string[] = [];
+  clean.forEach((v, i) => {
+    if (v == null) return;
+    const x = i * stepX;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
+    lastY = y;
+  });
+
+  return (
+    <svg width={w} height={h} className="shrink-0 overflow-visible">
+      <path d={pts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      {lastY != null && (
+        <circle cx={w} cy={lastY} r={2} fill={color} />
+      )}
+    </svg>
+  );
+}
 import { calculateSleepScore } from "@/lib/sleep-score";
 import {
   type ReadinessData,
