@@ -8,7 +8,6 @@ Disallow: /insights
 Disallow: /training-plan
 Disallow: /settings
 Disallow: /onboarding
-Disallow: /auth
 Disallow: /admin
 
 Sitemap: https://www.scarpers.co.uk/sitemap.xml
