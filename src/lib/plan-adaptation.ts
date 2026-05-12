@@ -48,6 +48,45 @@ function reduceDaily(rows: Array<{ recorded_at: string; score: number | null }>)
   return out;
 }
 
+/**
+ * Count how many of the six core readiness factors are using missing-data
+ * defaults in the given factors array. A factor counts as "default" when it's
+ * either absent from the array, or its detail explicitly indicates missing
+ * data ("Not synced", "No data", "no baseline").
+ */
+const CORE_FACTOR_LABELS = [
+  "Sleep Quality",
+  "Deep Sleep",
+  "HRV",
+  "Resting HR",
+  "Yesterday's Load",
+  "Stress",
+] as const;
+
+export function countMissingCoreFactors(factors: unknown): number {
+  const list = Array.isArray(factors) ? (factors as Array<{ label?: string; detail?: string }>) : [];
+  const byLabel = new Map<string, string>();
+  for (const f of list) {
+    if (f && typeof f.label === "string") byLabel.set(f.label, String(f.detail ?? ""));
+  }
+  let missing = 0;
+  for (const label of CORE_FACTOR_LABELS) {
+    if (!byLabel.has(label)) {
+      missing += 1;
+      continue;
+    }
+    const detail = byLabel.get(label)!.toLowerCase();
+    if (
+      detail.includes("not synced") ||
+      detail.includes("no data") ||
+      detail.includes("no baseline")
+    ) {
+      missing += 1;
+    }
+  }
+  return missing;
+}
+
 function lastNDates(n: number): string[] {
   const out: string[] = [];
   const today = new Date();
@@ -67,7 +106,7 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
   const [readinessRes, iqRes] = await Promise.all([
     supabase
       .from("readiness_snapshots")
-      .select("recorded_at, score")
+      .select("recorded_at, score, factors")
       .eq("user_id", userId)
       .gte("recorded_at", since.toISOString())
       .order("recorded_at", { ascending: false }),
@@ -79,7 +118,11 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
       .order("recorded_at", { ascending: false }),
   ]);
 
-  const readinessRows = (readinessRes.data || []) as Array<{ recorded_at: string; score: number | null }>;
+  const readinessRows = (readinessRes.data || []) as Array<{
+    recorded_at: string;
+    score: number | null;
+    factors: unknown;
+  }>;
   const iqRows = ((iqRes.data || []) as Array<{ recorded_at: string; adjusted_score: number | null; score: number | null }>).map(
     (r) => ({ recorded_at: r.recorded_at, score: r.adjusted_score ?? r.score })
   );
@@ -92,6 +135,20 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
   const downScores = downWindow.map((d) => readinessDaily.get(d));
   const downReady = downScores.every((s) => typeof s === "number");
   if (downReady && downScores.every((s) => (s as number) < READINESS_DOWN_THRESHOLD)) {
+    // Data-completeness guard: if the most recent snapshot is missing >2 of the
+    // 6 core factors, the low score is driven by defaults — skip adaptation.
+    const latest = readinessRows[0];
+    const missingCount = latest ? countMissingCoreFactors(latest.factors) : CORE_FACTOR_LABELS.length;
+    if (missingCount > 2) {
+      console.warn(
+        `[plan-adaptation] readiness data incomplete, adaptation skipped (${missingCount}/${CORE_FACTOR_LABELS.length} core factors missing)`
+      );
+      return {
+        direction: null,
+        reason: "readiness_data_incomplete",
+        detail: `Readiness data incomplete, adaptation skipped (${missingCount} of ${CORE_FACTOR_LABELS.length} core factors missing)`,
+      };
+    }
     return {
       direction: "down",
       reason: "readiness_low_2d",
