@@ -503,7 +503,7 @@ const ReadinessWidget = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Main Readiness Card */}
-      <Card className="border-border/40 overflow-hidden relative bg-[#0b1220]">
+      <Card className="border-border/40 overflow-hidden relative bg-[#0b1220] text-white [&_.text-foreground]:text-white [&_.text-muted-foreground]:text-slate-400">
         <CardContent className="p-5 relative z-10">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
