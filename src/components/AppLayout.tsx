@@ -96,7 +96,7 @@ const AppLayout = () => {
 
         {/* Nav */}
         <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "px-2" : "px-3")}>
-          {navItems.map(({ to, img, label }) => (
+          {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -118,7 +118,7 @@ const AppLayout = () => {
                     "w-9 h-9 rounded-lg flex items-center justify-center transition-all shrink-0",
                     isActive ? "scale-105" : "opacity-80 group-hover:opacity-100"
                   )}>
-                    <img src={img} alt="" loading="lazy" width={36} height={36} className="w-9 h-9 object-contain" />
+                    <Icon className="w-5 h-5" strokeWidth={2} />
                   </div>
                   {!collapsed && (
                     <span className="font-['Barlow_Condensed'] font-semibold tracking-wide text-base uppercase">{label}</span>
