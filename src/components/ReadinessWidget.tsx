@@ -696,6 +696,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     ? "text-destructive"
                     : "text-muted-foreground";
                 const isBattery = f.label === "Body Battery";
+                const hasDetail = isBattery || [
+                  "Sleep Quality",
+                  "Deep Sleep",
+                  "Resting HR",
+                  "HRV",
+                  "Stress",
+                  "Yesterday's Load",
+                  "Today's Effort",
+                ].includes(f.label);
                 const rowContent = (
                   <>
                     {/* Row 1 (mobile) / left cells (desktop): icon + title */}
@@ -703,7 +712,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <div className="shrink-0 sm:block">{statusIcon(f.status)}</div>
                       <span className="text-foreground font-medium truncate">
                         {f.label}
-                        {isBattery && <span className="ml-1.5 text-[10px] font-normal text-cyan-400">tap →</span>}
+                        {hasDetail && <span className="ml-1.5 text-[10px] font-normal text-cyan-400">tap →</span>}
                       </span>
                     </div>
                     {/* Row 2 (mobile) / right cells (desktop): sparkline + score */}
@@ -718,12 +727,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </div>
                   </>
                 );
-                if (isBattery) {
+                if (hasDetail) {
                   return (
                     <button
                       key={f.label}
                       type="button"
-                      onClick={() => setBatteryDialogOpen(true)}
+                      onClick={() =>
+                        isBattery
+                          ? setBatteryDialogOpen(true)
+                          : setFactorDialog({ label: f.label, status: f.status, detail: f.detail })
+                      }
                       className="w-full text-left px-3 py-2.5 text-sm space-y-1.5 sm:space-y-0 sm:grid sm:grid-cols-[20px_minmax(0,1fr)_88px_104px] sm:items-center sm:gap-3 hover:bg-white/5 transition-colors cursor-pointer"
                     >
                       {rowContent}
