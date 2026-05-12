@@ -176,7 +176,8 @@ serve(async (req) => {
             sleep_score: score,
             bedtime_local: stages.earliest ? fmtLocal(stages.earliest) : null,
             wake_time_local: stages.latest ? fmtLocal(stages.latest) : null,
-            total_hours: (totalH).toFixed(1),
+            total_hours: (sleepTime / 3600).toFixed(1),
+            time_in_bed_hours: (totalH).toFixed(1),
             deep_hours: (stages.deep / 3600).toFixed(1),
             rem_hours: (stages.rem / 3600).toFixed(1),
             light_hours: (stages.light / 3600).toFixed(1),
@@ -187,7 +188,7 @@ serve(async (req) => {
           };
         });
 
-      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights). bedtime_local and wake_time_local are ALREADY in the user's local timezone (${tz}) — use them as-is, NEVER convert or adjust them, NEVER call them UTC:\n${JSON.stringify(sleepSummary, null, 2)}\n`;
+      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights). bedtime_local and wake_time_local are ALREADY in the user's local timezone (${tz}) — use them as-is, NEVER convert or adjust them, NEVER call them UTC. total_hours = ACTUAL ASLEEP time (deep+light+REM, EXCLUDES awake). time_in_bed_hours = total session length. When the user asks "how much sleep" or "total sleep", quote total_hours (asleep), not time_in_bed_hours:\n${JSON.stringify(sleepSummary, null, 2)}\n`;
     }
 
     // Build activity summary for the AI
