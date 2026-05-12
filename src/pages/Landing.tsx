@@ -360,9 +360,8 @@ const Landing = () => {
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Never guess your next run again.
-              </span>
+              Finally, a running plan<br />
+              that adjusts with you.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white/90 max-w-xl leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Adaptive running plans that adjust around your fitness, recovery, schedule and goals. Built for real runners using Garmin and Strava.
