@@ -499,7 +499,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
   // Fresh-path: when computed result is ready (and no cache), fetch AI advice + insert snapshot
   useEffect(() => {
-    if (!result || !user || cached) return;
+    if (!result || !user) return;
+    if (cached && cached.advice) return;
     let cancelled = false;
     (async () => {
       setAiLoading(true);
