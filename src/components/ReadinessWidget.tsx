@@ -375,17 +375,20 @@ const ReadinessWidget = () => {
         loadByDate.set(d, (loadByDate.get(d) || 0) + load);
       });
 
-      const series: Record<string, (number | null)[]> = {
-        "Sleep Quality": days.map((d) => mByDate.get(d)?.sleep_score ?? null),
-        "Deep Sleep": days.map((d) => {
+      const toPoints = (fn: (d: string) => number | null): SparkPoint[] =>
+        days.map((d) => ({ date: d, value: fn(d) }));
+
+      const series: Record<string, SparkPoint[]> = {
+        "Sleep Quality": toPoints((d) => mByDate.get(d)?.sleep_score ?? null),
+        "Deep Sleep": toPoints((d) => {
           const s = stagesByDate.get(d);
           return s && s.total > 0 ? (s.deep / s.total) * 100 : null;
         }),
-        "Resting HR": days.map((d) => mByDate.get(d)?.resting_heart_rate ?? null),
-        "HRV": days.map((d) => mByDate.get(d)?.hrv ?? null),
-        "Stress": days.map((d) => mByDate.get(d)?.stress_score ?? null),
-        "Yesterday's Load": days.map((d) => loadByDate.get(d) ?? null),
-        "Today's Effort": days.map((d) => loadByDate.get(d) ?? null),
+        "Resting HR": toPoints((d) => mByDate.get(d)?.resting_heart_rate ?? null),
+        "HRV": toPoints((d) => mByDate.get(d)?.hrv ?? null),
+        "Stress": toPoints((d) => mByDate.get(d)?.stress_score ?? null),
+        "Yesterday's Load": toPoints((d) => loadByDate.get(d) ?? null),
+        "Today's Effort": toPoints((d) => loadByDate.get(d) ?? null),
       };
       setSparklines(series);
 
