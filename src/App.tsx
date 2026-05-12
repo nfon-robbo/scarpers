@@ -16,6 +16,8 @@ import TrainingPlanPage from "./pages/TrainingPlan";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
+import About from "./pages/About";
+import Terms from "./pages/Terms";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import BlogEditor from "./pages/BlogEditor";
@@ -44,6 +46,9 @@ const App = () => (
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route
               path="/admin/blog"
               element={
@@ -69,7 +74,6 @@ const App = () => (
               <Route path="/training-plan" element={<TrainingPlanPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin" element={<Admin />} />
-              <Route path="/privacy" element={<Privacy />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
