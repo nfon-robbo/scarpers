@@ -320,6 +320,51 @@ const Dashboard = () => {
     }).catch((e) => console.error("Strava sweep failed:", e));
   }, [user]);
 
+  // ── Auto plan adaptation check (runs once per day per user) ──
+  useEffect(() => {
+    if (!user) return;
+    if (!shouldRunAdaptCheck(user.id)) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const evaluation = await evaluateAdaptation(user.id);
+        if (cancelled) return;
+        markAdaptCheckRan(user.id);
+
+        if (evaluation.direction === "down") {
+          // Auto-apply downward adaptation immediately.
+          const { data, error } = await supabase.functions.invoke("plan-auto-adapt", {
+            body: { mode: "down", reason: evaluation.reason },
+          });
+          if (error) throw error;
+          if (data?.ok) {
+            if (data.plan_id && data.prev_content) {
+              pushUndoEntry(data.plan_id, data.prev_content, "auto recovery adjustment");
+            }
+            if (data.new_content) {
+              setPlan((prev) => prev ? { ...prev, content: data.new_content } : prev);
+            }
+            sonnerToast("We've adjusted this week's plan based on your recovery.", {
+              description: "Get some rest and come back stronger.",
+              action: { label: "View", onClick: () => navigate("/training-plan") },
+              duration: 10000,
+            });
+          }
+        } else if (evaluation.direction === "up") {
+          if (!isUpwardDismissedToday(user.id)) {
+            setAdaptEval(evaluation);
+          }
+        }
+      } catch (e) {
+        console.error("Plan adaptation check failed", e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user, navigate]);
+
+
   const stats = useMemo(() => {
     if (activities.length === 0) return null;
 
