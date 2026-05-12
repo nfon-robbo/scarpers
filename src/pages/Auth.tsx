@@ -20,6 +20,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
+  const videoRefs = useState<(HTMLVideoElement | null)[]>(() => [])[0];
   const navigate = useNavigate();
   const { toast } = useToast();
 
