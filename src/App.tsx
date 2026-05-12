@@ -48,6 +48,8 @@ const App = () => (
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
             <Route path="/about" element={<About />} />
+            <Route path="/coach" element={<CoachClaire />} />
+            <Route path="/coach/claire-rayners" element={<CoachClaire />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route
