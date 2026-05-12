@@ -485,108 +485,68 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
-  const displayResult = result ?? {
-    score: 50,
-    factors: [
-      { label: "Sleep Quality", status: "warning" as const, detail: "Waiting for sync" },
-      { label: "Resting HR", status: "warning" as const, detail: "Waiting for sync" },
-      { label: "HRV", status: "warning" as const, detail: "Waiting for sync" },
-    ],
-  };
-  const isFallback = loading || !result;
+  const displayResult = cached
+    ? { score: cached.score, factors: cached.factors as { label: string; status: "good" | "warning" | "poor"; detail: string }[] }
+    : (result ?? {
+        score: 50,
+        factors: [
+          { label: "Sleep Quality", status: "warning" as const, detail: "Waiting for sync" },
+          { label: "Resting HR", status: "warning" as const, detail: "Waiting for sync" },
+          { label: "HRV", status: "warning" as const, detail: "Waiting for sync" },
+        ],
+      });
+  const isFallback = !cached && (loading || !result);
 
-  // Save snapshot (throttled: max once per hour, prevent StrictMode duplicates)
+  // Fresh-path: when computed result is ready (and no cache), fetch AI advice + insert snapshot
   useEffect(() => {
-    if (!result || !user) return;
-    const cacheKey = `readiness_snapshot_last_${user.id}`;
-    const last = localStorage.getItem(cacheKey);
-    const now = Date.now();
-    if (last && now - Number(last) < 3600000) return; // 1 hour throttle
-
-    // Set immediately to prevent duplicate from StrictMode re-mount
-    localStorage.setItem(cacheKey, String(now));
-
-    const hour = new Date().getHours();
-    supabase
-      .from("readiness_snapshots")
-      .insert({
+    if (!result || !user || cached) return;
+    let cancelled = false;
+    (async () => {
+      setAiLoading(true);
+      let advice: string | null = null;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              readiness_score: result.score,
+              factors: result.factors,
+              current_hour_local: new Date().getHours(),
+              missing_data: result.factors
+                .filter(f => f.status === "warning" && f.detail === "Not synced")
+                .map(f => f.label.toLowerCase()),
+            }),
+          }
+        );
+        if (resp.ok) {
+          const d = await resp.json();
+          advice = d.advice ?? null;
+        }
+      } catch { /* swallow */ }
+      if (cancelled) return;
+      setAiAdvice(advice ?? "");
+      setAiLoading(false);
+      const recordedAt = new Date();
+      setLastUpdated(recordedAt);
+      await supabase.from("readiness_snapshots").insert({
         user_id: user.id,
         score: result.score,
-        hour,
+        hour: recordedAt.getHours(),
         factors: result.factors as any,
-        recorded_at: new Date().toISOString(),
-      })
-      .then(({ error }) => {
-        if (error) localStorage.removeItem(cacheKey); // rollback on failure
-      });
-  }, [result, user]);
-
-  const fetchAdvice = async (skipCache = false) => {
-    if (!result || result.factors.length === 0) return;
-
-    const cacheKey = "readiness_advice_cache";
-    if (!skipCache) {
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        try {
-          const { advice, score, factorCount, timestamp } = JSON.parse(cached);
-          const ageMs = Date.now() - timestamp;
-          const oneHour = 60 * 60 * 1000;
-          if (ageMs < oneHour && score === result.score && factorCount === result.factors.length) {
-            setAiAdvice(advice);
-            return;
-          }
-        } catch { /* invalid cache, refetch */ }
-      }
-    }
-
-    setAiLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({
-            readiness_score: result.score,
-            factors: result.factors,
-            current_hour_local: new Date().getHours(),
-            missing_data: result.factors
-              .filter(f => f.status === "warning" && f.detail === "Not synced")
-              .map(f => f.label.toLowerCase()),
-          }),
-        }
-      );
-
-      if (resp.ok) {
-        const data = await resp.json();
-        setAiAdvice(data.advice);
-        localStorage.setItem(cacheKey, JSON.stringify({
-          advice: data.advice,
-          score: result.score,
-          factorCount: result.factors.length,
-          timestamp: Date.now(),
-        }));
-      } else {
-        setAiAdvice("");
-      }
-    } catch {
-      setAiAdvice("");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAdvice();
-  }, [result]);
+        advice,
+        recorded_at: recordedAt.toISOString(),
+      } as any);
+    })();
+    return () => { cancelled = true; };
+  }, [result, user, cached]);
 
   // Helper: split detail "primary · sub" into two parts
   const splitDetail = (detail: string): { primary: string; sub: string | null } => {
@@ -598,7 +558,21 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     return { primary: detail, sub: null };
   };
 
-  const updatedTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formatUpdated = (d: Date | null): string => {
+    if (!d) return "—";
+    const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ${mins % 60}m ago`;
+  };
+  const updatedLabel = formatUpdated(lastUpdated);
+  const handleManualRefresh = () => {
+    setLastUpdated(null);
+    setAiAdvice(null);
+    setData(null);
+    setRefreshNonce((n) => n + 1);
+  };
   const hasTrend = trend.filter((t) => t.score > 0).length >= 2;
 
   return (
