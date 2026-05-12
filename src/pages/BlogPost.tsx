@@ -183,9 +183,15 @@ const BlogPost = () => {
         </h1>
 
         {post.published_at && (
-          <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            {new Date(post.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-4 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              {new Date(post.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              By <Link to="/about" className="text-foreground hover:underline">Coach Claire Rayners</Link>, reviewed by the Scarpers team
+            </span>
           </div>
         )}
 
