@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Pencil, Trash2, Eye, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Eye, Loader2, Sparkles, Printer } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 interface BlogPost {
@@ -124,6 +124,43 @@ const BlogEditor = () => {
     await supabase.from("blog_posts").delete().eq("id", id);
     toast.success("Post deleted");
     loadPosts();
+  };
+
+  const handlePrint = (post: BlogPost) => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Pop-up blocked — allow pop-ups to print"); return; }
+    const date = post.published_at || post.created_at;
+    const dateStr = new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const body = post.content.trimStart().startsWith("<")
+      ? post.content
+      : `<p>${post.content
+          .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+          .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+          .replace(/^# (.+)$/gm, "<h2>$1</h2>")
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\*(.+?)\*/g, "<em>$1</em>")
+          .replace(/\n\n/g, "</p><p>")
+          .replace(/\n/g, "<br/>")}</p>`;
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${post.title}</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;max-width:720px;margin:32px auto;padding:0 24px;color:#111;line-height:1.6;}
+  h1{font-family:Helvetica,Arial,sans-serif;font-size:28px;margin:0 0 8px;}
+  .meta{color:#666;font-size:13px;margin-bottom:24px;}
+  img{max-width:100%;height:auto;border-radius:8px;margin:16px 0;}
+  h2{font-size:22px;margin-top:28px;}
+  h3{font-size:18px;margin-top:22px;}
+  p{margin:0 0 14px;}
+  a{color:#000;text-decoration:underline;}
+  blockquote{border-left:3px solid #ccc;margin:16px 0;padding:4px 16px;color:#444;}
+  @media print{body{margin:0;}}
+</style></head><body>
+${post.cover_image ? `<img src="${post.cover_image}" alt="">` : ""}
+<h1>${post.title}</h1>
+<div class="meta">${dateStr} · Scarpers Running Blog${post.published ? "" : " · DRAFT"}</div>
+${body}
+<script>window.onload=()=>setTimeout(()=>window.print(),300);</script>
+</body></html>`);
+    w.document.close();
   };
 
   if (loading) {
@@ -363,6 +400,7 @@ const BlogEditor = () => {
               </div>
               <div className="flex gap-1 shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => window.open(`/blog/${post.slug}?preview=true`, "_blank")}><Eye className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => handlePrint(post)} title="Print post"><Printer className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => openEdit(post)}><Pencil className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4" /></Button>
               </div>
