@@ -45,11 +45,9 @@ const PastChats = ({ bare = false }: { bare?: boolean } = {}) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // Only show threads that actually have saved messages — empty threads
-    // (e.g. created before the persistence fix) can't be resumed.
     const { data, error } = await supabase
       .from("chat_threads")
-      .select("id, title, updated_at, chat_messages!inner(id)")
+      .select("id, title, updated_at")
       .order("updated_at", { ascending: false })
       .limit(50);
     if (error) {
