@@ -363,12 +363,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const mByDate = new Map<string, any>();
       (metrics as any[]).forEach((m) => mByDate.set(m.date, m));
 
-      // Deep % per date
-      const stagesByDate = new Map<string, { deep: number; total: number }>();
+      // Per-date sleep stage aggregation (deep/light/rem/total)
+      const stagesByDate = new Map<string, { deep: number; light: number; rem: number; total: number }>();
       (stages as any[]).forEach((s) => {
-        const cur = stagesByDate.get(s.date) || { deep: 0, total: 0 };
-        cur.total += s.duration_seconds || 0;
-        if ((s.stage || "").toLowerCase() === "deep") cur.deep += s.duration_seconds || 0;
+        const cur = stagesByDate.get(s.date) || { deep: 0, light: 0, rem: 0, total: 0 };
+        const stage = (s.stage || "").toLowerCase();
+        const dur = s.duration_seconds || 0;
+        if (stage === "deep") cur.deep += dur;
+        else if (stage === "light") cur.light += dur;
+        else if (stage === "rem") cur.rem += dur;
+        if (stage === "deep" || stage === "light" || stage === "rem") cur.total += dur;
         stagesByDate.set(s.date, cur);
       });
 
@@ -385,7 +389,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         days.map((d) => ({ date: d, value: fn(d) }));
 
       const series: Record<string, SparkPoint[]> = {
-        "Sleep Quality": toPoints((d) => mByDate.get(d)?.sleep_score ?? null),
+        "Sleep Quality": toPoints((d) => {
+          const s = stagesByDate.get(d);
+          if (s && s.total > 0) return calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem });
+          return mByDate.get(d)?.sleep_score ?? null;
+        }),
         "Deep Sleep": toPoints((d) => {
           const s = stagesByDate.get(d);
           return s && s.total > 0 ? (s.deep / s.total) * 100 : null;
