@@ -278,12 +278,13 @@ const AIChatbot = () => {
 
     // Persist the user message immediately.
     if (activeThreadId) {
-      void supabase.from("chat_messages").insert({
+      const { error: insErr } = await supabase.from("chat_messages").insert({
         thread_id: activeThreadId,
         user_id: session.user.id,
         role: "user",
         content: text,
       });
+      if (insErr) console.error("Failed to save user message:", insErr);
     }
 
     // Two buffers:
