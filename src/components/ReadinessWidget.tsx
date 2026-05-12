@@ -360,7 +360,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       });
       setLoading(false);
     });
-  }, [user, cacheChecked, cached]);
+  }, [user, cacheChecked, cached, refreshNonce]);
 
   // Build 7-day sparkline series + readiness trend
   useEffect(() => {
