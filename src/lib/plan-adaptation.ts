@@ -48,6 +48,45 @@ function reduceDaily(rows: Array<{ recorded_at: string; score: number | null }>)
   return out;
 }
 
+/**
+ * Count how many of the six core readiness factors are using missing-data
+ * defaults in the given factors array. A factor counts as "default" when it's
+ * either absent from the array, or its detail explicitly indicates missing
+ * data ("Not synced", "No data", "no baseline").
+ */
+const CORE_FACTOR_LABELS = [
+  "Sleep Quality",
+  "Deep Sleep",
+  "HRV",
+  "Resting HR",
+  "Yesterday's Load",
+  "Stress",
+] as const;
+
+export function countMissingCoreFactors(factors: unknown): number {
+  const list = Array.isArray(factors) ? (factors as Array<{ label?: string; detail?: string }>) : [];
+  const byLabel = new Map<string, string>();
+  for (const f of list) {
+    if (f && typeof f.label === "string") byLabel.set(f.label, String(f.detail ?? ""));
+  }
+  let missing = 0;
+  for (const label of CORE_FACTOR_LABELS) {
+    if (!byLabel.has(label)) {
+      missing += 1;
+      continue;
+    }
+    const detail = byLabel.get(label)!.toLowerCase();
+    if (
+      detail.includes("not synced") ||
+      detail.includes("no data") ||
+      detail.includes("no baseline")
+    ) {
+      missing += 1;
+    }
+  }
+  return missing;
+}
+
 function lastNDates(n: number): string[] {
   const out: string[] = [];
   const today = new Date();
