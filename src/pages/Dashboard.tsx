@@ -1050,6 +1050,7 @@ const Dashboard = () => {
       )}
       <FeedbackCard />
       <BlogPreview className="mt-2" />
+      <CoachClaireCard className="mt-2" />
       <ActivityDetailDialog activityId={openActivityId} onClose={() => setOpenActivityId(null)} />
       <WorkoutReviewDialog
         open={reviewOpen}
