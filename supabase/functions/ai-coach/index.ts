@@ -379,7 +379,41 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
           .maybeSingle();
         if (activePlan?.content) {
           const today = new Date();
-          const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+          const dateInTz = (offsetDays = 0) => {
+            const d = new Date(today);
+            d.setDate(today.getDate() + offsetDays);
+            const parts = new Intl.DateTimeFormat("en-GB", {
+              timeZone: tz,
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              weekday: "long",
+            }).formatToParts(d);
+            const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+            return { date: `${get("day")}/${get("month")}/${get("year")}`, weekday: get("weekday") };
+          };
+          const todayInfo = dateInTz(0);
+          const tomorrowInfo = dateInTz(1);
+          const planEntries = String(activePlan.content)
+            .split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi)
+            .filter((entry) => /^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b/m.test(entry.split("\n")[0] || ""));
+          const findPlanEntry = (date: string) => planEntries.find((entry) => {
+            const match = entry.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+            if (!match) return false;
+            return `${match[1].padStart(2, "0")}/${match[2].padStart(2, "0")}/${match[3]}` === date;
+          });
+          const summariseEntry = (date: string) => {
+            const entry = findPlanEntry(date);
+            if (!entry) return `${date}: NO SESSION SCHEDULED — rest day / blank diary day.`;
+            const heading = entry.split("\n")[0]?.replace(/[#*_`]/g, "").trim() || date;
+            const title = entry.split("\n").find((line) => /total:|run|walk|interval|easy|long|rest|race/i.test(line) && !/^\s*\|/.test(line))?.replace(/[#*_`]/g, "").trim();
+            return `${date}: ${heading}${title && title !== heading ? ` — ${title}` : ""}`;
+          };
+          const diaryLookup = Array.from({ length: 14 }, (_, i) => {
+            const info = dateInTz(i);
+            return `- ${i === 0 ? "Today" : i === 1 ? "Tomorrow" : `+${i}d`} (${info.weekday} ${info.date}): ${summariseEntry(info.date)}`;
+          }).join("\n");
+          const todayStr = todayInfo.date;
           chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
 - Start date: ${activePlan.start_date || "n/a"}
 - Race date: ${activePlan.race_date || "n/a"}
@@ -390,6 +424,13 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
 PLAN CONTENT (markdown):
 ${activePlan.content}
 
+AUTHORITATIVE PLAN DIARY LOOKUP (exact dated entries only; this overrides prior chat messages and weekday assumptions):
+${diaryLookup}
+
+TODAY/TOMORROW STATUS:
+- Today is ${todayInfo.weekday} ${todayInfo.date}: ${summariseEntry(todayInfo.date)}
+- Tomorrow is ${tomorrowInfo.weekday} ${tomorrowInfo.date}: ${summariseEntry(tomorrowInfo.date)}
+
 When the user asks about a future or past session (e.g. "next Friday", "this Wednesday", "16/05/2026"), look it up in the plan content above and answer with the actual scheduled workout. Never claim you don't have access to the plan — it is provided here.`;
         } else {
           chatPlanContext = `\nACTIVE TRAINING PLAN: none (the user has no active training plan). If they ask about a scheduled session, tell them they don't have an active plan yet.`;
@@ -397,6 +438,10 @@ When the user asks about a future or past session (e.g. "next Friday", "this Wed
       } catch (e) {
         console.error("chat plan fetch error:", e);
       }
+
+      const immediateDiaryCorrection = chatPlanContext && /\b(today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(chatMessages || "")
+        ? `${chatPlanContext.match(/TODAY\/TOMORROW STATUS:[\s\S]*?(?=\n\nWhen the user asks|$)/)?.[0] || ""}\n\nUse the status above as the source of truth for this reply. If tomorrow says NO SESSION SCHEDULED, correct the prior mistake and do not propose replacing tomorrow's workout.\n\n`
+        : "";
 
       // Fetch latest readiness, Running IQ, recent analyses, and uploads so every model sees the full app picture
       let chatExtraContext = "";
@@ -466,6 +511,7 @@ BREVITY RULES (strict):
 - Be practical and actionable — no filler or preamble
 
 PLAN LOOKUP (MANDATORY BEFORE ANY DATE-BASED ADVICE):
+- The AUTHORITATIVE PLAN DIARY LOOKUP is precomputed from exact dated plan headings. Use it first for today/tomorrow. It overrides all previous assistant messages, conversation history, weekday assumptions, and training_days metadata.
 - BEFORE you suggest changing, replacing, or commenting on a session for ANY specific date (today, tomorrow, "Wednesday", "13/05", etc.), you MUST first locate that EXACT DD/MM/YYYY date as a heading in the PLAN CONTENT block above.
 - DATE ≠ WEEKDAY. Do not assume "tomorrow is Wednesday so it must have a workout" or "the next Wednesday session = tomorrow's session". The plan only contains sessions on the specific dates printed in its headings (e.g. "### **Wednesday 14/05/2026**"). If tomorrow's date is not printed as a heading, there is NO session tomorrow — say so.
 - Quote the planned workout for that exact date verbatim (or explicitly say "you have no session scheduled on DD/MM/YYYY — it's a rest day") before proposing any change.
@@ -473,7 +519,7 @@ PLAN LOOKUP (MANDATORY BEFORE ANY DATE-BASED ADVICE):
 - NEVER attach a workout from one date (e.g. 14/05) to a different date (e.g. 13/05) just because they share a weekday name or are nearby.
 - If the user has rearranged sessions, the plan content reflects that — trust the plan content over weekday assumptions.
 - If the date you're advising on is a rest day, do NOT suggest "replacing" it with something lighter — there's nothing to replace. Acknowledge it's already a rest day.
-- If you can't find a workout for the requested date in the plan content, say "You don't have a workout scheduled on DD/MM/YYYY" — do NOT guess or substitute another day's session.
+- If you can't find a workout for the requested date in the plan content, say "You don't have a workout scheduled on DD/MM/YYYY" — do NOT guess or substitute another day's session and DO NOT emit an action marker for that date.
 
 RECOMMENDATION ACTIONS:
 - WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with one of these markers on its own line:
@@ -534,7 +580,7 @@ ${chatExtraContext}`;
           return `${match} (${fmt(next)})`;
         });
       };
-      userPrompt = resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
+      userPrompt = immediateDiaryCorrection + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
