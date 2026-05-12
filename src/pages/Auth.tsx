@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -32,6 +33,18 @@ const Auth = () => {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === videoIdx) {
+        try { v.currentTime = 0; } catch {}
+        void v.play().catch(() => undefined);
+      } else {
+        v.pause();
+      }
+    });
+  }, [videoIdx]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +83,7 @@ const Auth = () => {
         {HERO_VIDEOS.map((src, index) => (
           <video
             key={src}
+            ref={(node) => { videoRefs.current[index] = node; }}
             src={src}
             autoPlay={index === 0}
             muted
