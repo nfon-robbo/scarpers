@@ -761,7 +761,24 @@ const Dashboard = () => {
               <Heart className="h-4 w-4 text-primary" />
               <h2 className="text-lg font-bold text-foreground">Readiness</h2>
             </div>
-            <ReadinessWidget />
+            {(() => {
+              const tw = todaysWorkout?.isNext ? null : todaysWorkout?.workout || null;
+              const isRest = !tw;
+              const titleStr = tw?.title || "";
+              const minMatch = titleStr.match(/Total:\s*(\d+)\s*min/i);
+              const workoutMinutes = minMatch ? parseInt(minMatch[1], 10) : null;
+              return (
+                <ReadinessWidget
+                  todayContext={{
+                    isRestDay: isRest,
+                    workoutMinutes,
+                    workoutTitle: titleStr ? titleStr.replace(/\s*\(Total:.*?\)/, "") : null,
+                    completedToday,
+                  }}
+                  onReviewPlan={() => navigate("/training-plan")}
+                />
+              );
+            })()}
           </section>
 
           {/* ── Workouts This Week Summary ── */}
