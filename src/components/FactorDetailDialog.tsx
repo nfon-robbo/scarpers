@@ -273,21 +273,21 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Now</div>
                 <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats?.last != null ? `${stats.last}${meta.unit}` : "—"}
+                  {stats?.last != null ? `${fmt(stats.last, 1)}${meta.unit}` : "—"}
                 </div>
                 <div className="text-[10px] mt-0.5">{trendNode}</div>
               </div>
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">28-day avg</div>
-                <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats ? `${Math.round(stats.avg * 10) / 10}${meta.unit}` : "—"}
+                <div className="text-xl font-bold text-foreground mt-0.5 truncate">
+                  {stats ? `${fmt(stats.avg, 1)}${meta.unit}` : "—"}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">baseline</div>
               </div>
               <div className="rounded-lg border border-border/40 bg-card/40 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Range</div>
-                <div className="text-xl font-bold text-foreground mt-0.5">
-                  {stats ? `${stats.min}–${stats.max}` : "—"}
+                <div className="text-xl font-bold text-foreground mt-0.5 truncate">
+                  {stats ? `${fmt(stats.min, 0)}–${fmt(stats.max, 0)}` : "—"}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">last 28 days</div>
               </div>
