@@ -33,7 +33,17 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone } = reqBody;
+    const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
+    const fmtLocal = (iso: string) => {
+      try {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short", day: "2-digit", month: "2-digit",
+        }).formatToParts(new Date(iso));
+        const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+        return `${get("weekday")} ${get("day")}/${get("month")} ${get("hour")}:${get("minute")}`;
+      } catch { return iso; }
+    };
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
