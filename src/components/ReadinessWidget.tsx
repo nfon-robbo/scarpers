@@ -4,6 +4,43 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+
+// ── Inline Sparkline (7-day mini trend) ──
+function Sparkline({ values, status }: { values: (number | null)[]; status: "good" | "warning" | "poor" }) {
+  const clean = values.map((v) => (typeof v === "number" && isFinite(v) ? v : null));
+  const nums = clean.filter((v): v is number => v != null);
+  if (nums.length < 2) {
+    return <div className="h-6 w-16 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">—</div>;
+  }
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const range = max - min || 1;
+  const w = 64;
+  const h = 24;
+  const stepX = w / (clean.length - 1);
+  const color =
+    status === "good" ? "hsl(142, 60%, 45%)" : status === "warning" ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+
+  let lastY: number | null = null;
+  const pts: string[] = [];
+  clean.forEach((v, i) => {
+    if (v == null) return;
+    const x = i * stepX;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
+    lastY = y;
+  });
+
+  return (
+    <svg width={w} height={h} className="shrink-0 overflow-visible">
+      <path d={pts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      {lastY != null && (
+        <circle cx={w} cy={lastY} r={2} fill={color} />
+      )}
+    </svg>
+  );
+}
 import { calculateSleepScore } from "@/lib/sleep-score";
 import {
   type ReadinessData,
@@ -117,6 +154,9 @@ const ReadinessWidget = () => {
   const [loading, setLoading] = useState(true);
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [sparklines, setSparklines] = useState<Record<string, (number | null)[]>>({});
+  const [trend, setTrend] = useState<{ day: string; score: number }[]>([]);
+
 
   useEffect(() => {
     if (!user) return;
@@ -253,6 +293,97 @@ const ReadinessWidget = () => {
     });
   }, [user]);
 
+  // Build 7-day sparkline series + readiness trend
+  useEffect(() => {
+    if (!user) return;
+    const today = new Date();
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    }
+    const startDate = days[0];
+
+    Promise.all([
+      supabase
+        .from("daily_metrics")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score")
+        .eq("user_id", user.id)
+        .gte("date", startDate)
+        .then(({ data }) => data || []),
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds")
+        .eq("user_id", user.id)
+        .gte("date", startDate)
+        .then(({ data }) => data || []),
+      supabase
+        .from("activities")
+        .select("start_time, duration_seconds, avg_heart_rate, training_load, training_effect")
+        .eq("user_id", user.id)
+        .gte("start_time", startDate + "T00:00:00Z")
+        .then(({ data }) => data || []),
+      supabase
+        .from("readiness_snapshots")
+        .select("score, recorded_at")
+        .eq("user_id", user.id)
+        .gte("recorded_at", startDate + "T00:00:00Z")
+        .order("recorded_at", { ascending: true })
+        .then(({ data }) => data || []),
+    ]).then(([metrics, stages, acts, snaps]) => {
+      const mByDate = new Map<string, any>();
+      (metrics as any[]).forEach((m) => mByDate.set(m.date, m));
+
+      // Deep % per date
+      const stagesByDate = new Map<string, { deep: number; total: number }>();
+      (stages as any[]).forEach((s) => {
+        const cur = stagesByDate.get(s.date) || { deep: 0, total: 0 };
+        cur.total += s.duration_seconds || 0;
+        if ((s.stage || "").toLowerCase() === "deep") cur.deep += s.duration_seconds || 0;
+        stagesByDate.set(s.date, cur);
+      });
+
+      // Daily load
+      const loadByDate = new Map<string, number>();
+      (acts as any[]).forEach((a) => {
+        if (!a.start_time) return;
+        const d = a.start_time.split("T")[0];
+        const load = activityIntensityLoad(a);
+        loadByDate.set(d, (loadByDate.get(d) || 0) + load);
+      });
+
+      const series: Record<string, (number | null)[]> = {
+        "Sleep Quality": days.map((d) => mByDate.get(d)?.sleep_score ?? null),
+        "Deep Sleep": days.map((d) => {
+          const s = stagesByDate.get(d);
+          return s && s.total > 0 ? (s.deep / s.total) * 100 : null;
+        }),
+        "Resting HR": days.map((d) => mByDate.get(d)?.resting_heart_rate ?? null),
+        "HRV": days.map((d) => mByDate.get(d)?.hrv ?? null),
+        "Stress": days.map((d) => mByDate.get(d)?.stress_score ?? null),
+        "Yesterday's Load": days.map((d) => loadByDate.get(d) ?? null),
+        "Today's Effort": days.map((d) => loadByDate.get(d) ?? null),
+      };
+      setSparklines(series);
+
+      // Build daily avg snapshot trend
+      const byDay = new Map<string, number[]>();
+      (snaps as any[]).forEach((s) => {
+        const d = s.recorded_at.split("T")[0];
+        if (!byDay.has(d)) byDay.set(d, []);
+        byDay.get(d)!.push(s.score);
+      });
+      const trendArr = days.map((d) => {
+        const vals = byDay.get(d);
+        return {
+          day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
+          score: vals ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
+        };
+      });
+      setTrend(trendArr);
+    });
+  }, [user]);
+
+
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
   const displayResult = result ?? {
     score: 50,
@@ -380,18 +511,48 @@ const ReadinessWidget = () => {
                 Readiness Metrics
               </h3>
               <div className="space-y-0.5">
-                {displayResult.factors.map((f) => (
-                  <div key={f.label} className="flex items-center justify-between gap-2 py-1 text-sm">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {statusIcon(f.status)}
-                      <span className="text-foreground truncate">{f.label}</span>
+                {displayResult.factors.map((f) => {
+                  const spark = sparklines[f.label];
+                  return (
+                    <div key={f.label} className="flex items-center justify-between gap-3 py-1 text-sm border-b border-border/20 last:border-b-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {statusIcon(f.status)}
+                        <span className="text-foreground truncate">{f.label}</span>
+                      </div>
+                      {spark && <Sparkline values={spark} status={f.status} />}
+                      <span className="text-muted-foreground font-medium text-xs text-right truncate min-w-[64px]">{f.detail}</span>
                     </div>
-                    <span className="text-muted-foreground font-medium text-xs text-right truncate">{f.detail}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
+
+          {/* Bottom: 7-day readiness trend */}
+          {trend.filter((t) => t.score > 0).length >= 2 && (
+            <div className="mt-5 pt-4 border-t border-border/30">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">7 Day Trend</h4>
+              <ResponsiveContainer width="100%" height={90}>
+                <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} strokeOpacity={0.3} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} hide />
+                  <Tooltip
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                  />
+                  <ReferenceLine y={60} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.3} />
+                  <Area type="monotone" dataKey="score" stroke="hsl(var(--chart-2))" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </CardContent>
       </Card>
 
