@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import coachClaireImg from "@/assets/coach-claire.png";
 
 interface Props {
   className?: string;
@@ -14,9 +15,14 @@ const CoachClaireCard = ({ className = "", variant = "default" }: Props) => (
     >
       <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
       <div className="relative flex items-start gap-4 sm:gap-5">
-        <div className="shrink-0 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
-          <Sparkles className="h-6 w-6 text-primary" />
-        </div>
+        <img
+          src={coachClaireImg}
+          alt="Coach Claire Rayners"
+          loading="lazy"
+          width={768}
+          height={768}
+          className="shrink-0 h-16 w-16 sm:h-20 sm:w-20 rounded-full object-cover border-2 border-primary/40 shadow-md"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-[10px] sm:text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Meet your coach
