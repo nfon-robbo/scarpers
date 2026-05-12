@@ -25,6 +25,7 @@ import HeroPlanCard from "@/components/HeroPlanCard";
 import BlogPreview from "@/components/BlogPreview";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
+import ReadinessWidget from "@/components/ReadinessWidget";
 import {
   evaluateAdaptation,
   shouldRunAdaptCheck,
