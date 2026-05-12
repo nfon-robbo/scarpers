@@ -7,37 +7,62 @@ import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "l
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 
 // ── Inline Sparkline (7-day mini trend) ──
-function Sparkline({ values, status }: { values: (number | null)[]; status: "good" | "warning" | "poor" }) {
-  const clean = values.map((v) => (typeof v === "number" && isFinite(v) ? v : null));
-  const nums = clean.filter((v): v is number => v != null);
-  if (nums.length < 2) {
-    return <div className="h-6 w-16 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">—</div>;
-  }
-  const min = Math.min(...nums);
-  const max = Math.max(...nums);
-  const range = max - min || 1;
-  const w = 64;
-  const h = 24;
-  const stepX = w / (clean.length - 1);
-  const color =
-    status === "good" ? "hsl(142, 60%, 45%)" : status === "warning" ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+export type SparkPoint = { date: string; value: number | null };
 
-  let lastY: number | null = null;
-  const pts: string[] = [];
-  clean.forEach((v, i) => {
-    if (v == null) return;
+function formatSparkValue(label: string, v: number): string {
+  if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
+  if (label === "Resting HR") return `${Math.round(v)} bpm`;
+  if (label === "HRV") return `${Math.round(v)} ms`;
+  if (label === "Sleep Quality") return `${Math.round(v)}/100`;
+  if (label === "Yesterday's Load" || label === "Today's Effort") return `${Math.round(v)} min`;
+  if (label === "Stress") return `${Math.round(v)}`;
+  return `${Math.round(v)}`;
+}
+
+function Sparkline({ points, status, label }: { points: SparkPoint[]; status: "good" | "warning" | "poor"; label: string }) {
+  const nums = points.filter((p) => typeof p.value === "number" && isFinite(p.value as number)) as { date: string; value: number }[];
+  if (nums.length < 2) {
+    return <div className="h-7 w-20 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">no data</div>;
+  }
+  const vals = nums.map((p) => p.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || Math.max(1, Math.abs(max) * 0.1);
+  const w = 80;
+  const h = 28;
+  const padY = 4;
+  const stepX = points.length > 1 ? w / (points.length - 1) : 0;
+  const color =
+    status === "good" ? "hsl(142, 70%, 50%)" : status === "warning" ? "hsl(45, 95%, 55%)" : "hsl(0, 80%, 60%)";
+
+  const coords: { x: number; y: number; p: SparkPoint }[] = [];
+  points.forEach((p, i) => {
+    if (p.value == null) return;
     const x = i * stepX;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
-    lastY = y;
+    const y = h - padY - ((p.value - min) / range) * (h - padY * 2);
+    coords.push({ x, y, p });
   });
+
+  const pathD = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const last = coords[coords.length - 1];
 
   return (
     <svg width={w} height={h} className="shrink-0 overflow-visible">
-      <path d={pts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      {lastY != null && (
-        <circle cx={w} cy={lastY} r={2} fill={color} />
-      )}
+      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {last && <circle cx={last.x} cy={last.y} r={2.5} fill={color} />}
+      {/* hover hit areas with native tooltip */}
+      {coords.map((c, i) => {
+        const d = new Date(c.p.date);
+        const dateLabel = d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+        return (
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r={2} fill={color} opacity={0.7} />
+            <circle cx={c.x} cy={c.y} r={8} fill="transparent" className="cursor-pointer hover:fill-white/5">
+              <title>{`${dateLabel} — ${formatSparkValue(label, c.p.value as number)}`}</title>
+            </circle>
+          </g>
+        );
+      })}
     </svg>
   );
 }
@@ -153,7 +178,7 @@ const ReadinessWidget = () => {
   const [loading, setLoading] = useState(true);
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [sparklines, setSparklines] = useState<Record<string, (number | null)[]>>({});
+  const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trend, setTrend] = useState<{ day: string; score: number }[]>([]);
 
 
@@ -350,17 +375,20 @@ const ReadinessWidget = () => {
         loadByDate.set(d, (loadByDate.get(d) || 0) + load);
       });
 
-      const series: Record<string, (number | null)[]> = {
-        "Sleep Quality": days.map((d) => mByDate.get(d)?.sleep_score ?? null),
-        "Deep Sleep": days.map((d) => {
+      const toPoints = (fn: (d: string) => number | null): SparkPoint[] =>
+        days.map((d) => ({ date: d, value: fn(d) }));
+
+      const series: Record<string, SparkPoint[]> = {
+        "Sleep Quality": toPoints((d) => mByDate.get(d)?.sleep_score ?? null),
+        "Deep Sleep": toPoints((d) => {
           const s = stagesByDate.get(d);
           return s && s.total > 0 ? (s.deep / s.total) * 100 : null;
         }),
-        "Resting HR": days.map((d) => mByDate.get(d)?.resting_heart_rate ?? null),
-        "HRV": days.map((d) => mByDate.get(d)?.hrv ?? null),
-        "Stress": days.map((d) => mByDate.get(d)?.stress_score ?? null),
-        "Yesterday's Load": days.map((d) => loadByDate.get(d) ?? null),
-        "Today's Effort": days.map((d) => loadByDate.get(d) ?? null),
+        "Resting HR": toPoints((d) => mByDate.get(d)?.resting_heart_rate ?? null),
+        "HRV": toPoints((d) => mByDate.get(d)?.hrv ?? null),
+        "Stress": toPoints((d) => mByDate.get(d)?.stress_score ?? null),
+        "Yesterday's Load": toPoints((d) => loadByDate.get(d) ?? null),
+        "Today's Effort": toPoints((d) => loadByDate.get(d) ?? null),
       };
       setSparklines(series);
 
@@ -559,11 +587,11 @@ const ReadinessWidget = () => {
                     ? "text-destructive"
                     : "text-muted-foreground";
                 return (
-                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_72px_88px] items-center gap-3 px-3 py-2.5 text-sm">
+                  <div key={f.label} className="grid grid-cols-[20px_minmax(0,1fr)_88px_88px] items-center gap-3 px-3 py-2.5 text-sm">
                     <div className="shrink-0">{statusIcon(f.status)}</div>
                     <span className="text-foreground font-medium truncate">{f.label}</span>
                     <div className="flex justify-center">
-                      {spark ? <Sparkline values={spark} status={f.status} /> : <div className="w-16 h-6" />}
+                      {spark ? <Sparkline points={spark} status={f.status} label={f.label} /> : <div className="w-20 h-7" />}
                     </div>
                     <div className="text-right">
                       <div className="text-foreground font-semibold text-xs leading-tight truncate">{primary}</div>
