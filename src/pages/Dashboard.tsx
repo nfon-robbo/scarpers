@@ -19,6 +19,7 @@ import RunningIQWidget from "@/components/RunningIQWidget";
 import ActivityDetailDialog from "@/components/ActivityDetailDialog";
 import FeedbackCard from "@/components/FeedbackCard";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
+import { calculateSleepScore } from "@/lib/sleep-score";
 import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import HeroPlanCard from "@/components/HeroPlanCard";
