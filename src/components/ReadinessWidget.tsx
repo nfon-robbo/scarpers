@@ -359,17 +359,39 @@ const ReadinessWidget = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Main Gauge Card */}
+      {/* Main Gauge + Metrics Card */}
       <Card className="glass border-border/30 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-        <CardContent className="pt-8 pb-6 flex flex-col items-center relative z-10">
-          <CircularGauge score={displayResult.score} />
-          {isFallback && (
-            <p className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Readiness is waiting for recovery data
-            </p>
-          )}
+        <CardContent className="pt-6 pb-5 relative z-10">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            {/* Left: gauge */}
+            <div className="flex flex-col items-center shrink-0">
+              <CircularGauge score={displayResult.score} size={180} />
+              {isFallback && (
+                <p className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Waiting for recovery data
+                </p>
+              )}
+            </div>
+            {/* Right: metrics matrix */}
+            <div className="flex-1 w-full min-w-0">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Readiness Metrics
+              </h3>
+              <div className="space-y-0.5">
+                {displayResult.factors.map((f) => (
+                  <div key={f.label} className="flex items-center justify-between gap-2 py-1 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {statusIcon(f.status)}
+                      <span className="text-foreground truncate">{f.label}</span>
+                    </div>
+                    <span className="text-muted-foreground font-medium text-xs text-right truncate">{f.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -441,23 +463,6 @@ const ReadinessWidget = () => {
         </CardContent>
       </Card>
 
-      {/* Readiness Metrics */}
-      <Card>
-        <CardContent className="p-4 space-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            Readiness Metrics
-          </h3>
-          {displayResult.factors.map((f) => (
-            <div key={f.label} className="flex items-center justify-between py-1.5 text-sm">
-              <div className="flex items-center gap-2">
-                {statusIcon(f.status)}
-                <span className="text-foreground">{f.label}</span>
-              </div>
-              <span className="text-muted-foreground font-medium">{f.detail}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 };
