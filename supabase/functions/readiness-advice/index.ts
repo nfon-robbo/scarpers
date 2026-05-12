@@ -96,7 +96,29 @@ serve(async (req) => {
       if (!tomorrowWorkout.trim() && !isTomorrowTraining) planContext += `\nTomorrow: Rest day (no workout scheduled)`;
     }
 
-    // Fetch sleep stages to determine typical bedtime/wake patterns
+    // Fetch yesterday's activities so we can describe them by ACTUAL type
+    let yesterdayContext = "";
+    {
+      const yStart = new Date(); yStart.setDate(yStart.getDate() - 1); yStart.setHours(0, 0, 0, 0);
+      const yEnd = new Date(); yEnd.setHours(0, 0, 0, 0);
+      const { data: yActs } = await supabase
+        .from("activities")
+        .select("activity_type, duration_seconds, distance_meters, start_time")
+        .eq("user_id", user.id)
+        .gte("start_time", yStart.toISOString())
+        .lt("start_time", yEnd.toISOString())
+        .order("start_time", { ascending: true });
+      if (yActs && yActs.length > 0) {
+        const lines = yActs.map((a: any) => {
+          const mins = Math.round((a.duration_seconds || 0) / 60);
+          const km = a.distance_meters ? (a.distance_meters / 1000).toFixed(1) + "km" : "";
+          return `- ${a.activity_type || "unknown"}: ${mins} min${km ? ", " + km : ""}`;
+        });
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES (use the exact activity_type — do NOT call something a "run" unless activity_type is running/run):\n${lines.join("\n")}`;
+      } else {
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES: none recorded. Do NOT mention any workout from yesterday.`;
+      }
+    }
     const { data: sleepStages } = await supabase
       .from("sleep_stages")
       .select("date, start_time, end_time, stage")
