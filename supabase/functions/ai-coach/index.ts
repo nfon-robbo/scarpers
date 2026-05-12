@@ -33,7 +33,17 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone } = reqBody;
+    const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
+    const fmtLocal = (iso: string) => {
+      try {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short", day: "2-digit", month: "2-digit",
+        }).formatToParts(new Date(iso));
+        const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+        return `${get("weekday")} ${get("day")}/${get("month")} ${get("hour")}:${get("minute")}`;
+      } catch { return iso; }
+    };
     // type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review"
 
     // Fetch user profile
@@ -117,18 +127,20 @@ serve(async (req) => {
     let sleepContext = "";
     const { data: sleepStages } = await supabase
       .from("sleep_stages")
-      .select("date, stage, duration_seconds")
+      .select("date, stage, duration_seconds, start_time, end_time")
       .eq("user_id", user.id)
       .order("date", { ascending: false })
       .limit(500);
 
     if (sleepStages && sleepStages.length > 0) {
       // Aggregate by date
-      const byDate: Record<string, { deep: number; light: number; rem: number; awake: number }> = {};
+      const byDate: Record<string, { deep: number; light: number; rem: number; awake: number; earliest?: string; latest?: string }> = {};
       for (const r of sleepStages) {
         if (!byDate[r.date]) byDate[r.date] = { deep: 0, light: 0, rem: 0, awake: 0 };
         const key = r.stage as "deep" | "light" | "rem" | "awake";
         if (key in byDate[r.date]) byDate[r.date][key] += r.duration_seconds;
+        if (r.start_time && (!byDate[r.date].earliest || r.start_time < byDate[r.date].earliest!)) byDate[r.date].earliest = r.start_time;
+        if (r.end_time && (!byDate[r.date].latest || r.end_time > byDate[r.date].latest!)) byDate[r.date].latest = r.end_time;
       }
 
       // Compute sleep scores using the same algorithm as the frontend
@@ -162,6 +174,8 @@ serve(async (req) => {
           return {
             date,
             sleep_score: score,
+            bedtime_local: stages.earliest ? fmtLocal(stages.earliest) : null,
+            wake_time_local: stages.latest ? fmtLocal(stages.latest) : null,
             total_hours: (totalH).toFixed(1),
             deep_hours: (stages.deep / 3600).toFixed(1),
             rem_hours: (stages.rem / 3600).toFixed(1),
@@ -173,7 +187,7 @@ serve(async (req) => {
           };
         });
 
-      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights from Google Fit):\n${JSON.stringify(sleepSummary, null, 2)}\n`;
+      sleepContext = `\nSLEEP STAGES & SCORES (last ${sleepSummary.length} nights). bedtime_local and wake_time_local are ALREADY in the user's local timezone (${tz}) — use them as-is, NEVER convert or adjust them, NEVER call them UTC:\n${JSON.stringify(sleepSummary, null, 2)}\n`;
     }
 
     // Build activity summary for the AI
