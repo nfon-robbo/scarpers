@@ -186,6 +186,8 @@ Rules:
 - Use the user's first name once, max.
 ${sleepPatternContext}
 ${planContext}
+${yesterdayContext}
+- NEVER describe yesterday's activity as a "run" unless the activity_type above is running/run. Use the exact discipline (e.g. "yesterday's 60 min cycle"). If no activity is listed, do not mention one.
 ${missing_data && missing_data.length > 0 ? `\nCRITICAL: NOT synced today: ${missing_data.join(', ')}. Never reference missing metrics.` : ''}`;
 
     const factorsText = (factors || []).map((f: any) => `${f.label}: ${f.detail} (${f.status})`).join("\n");
