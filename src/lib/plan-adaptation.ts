@@ -106,7 +106,7 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
   const [readinessRes, iqRes] = await Promise.all([
     supabase
       .from("readiness_snapshots")
-      .select("recorded_at, score")
+      .select("recorded_at, score, factors")
       .eq("user_id", userId)
       .gte("recorded_at", since.toISOString())
       .order("recorded_at", { ascending: false }),
@@ -118,7 +118,11 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
       .order("recorded_at", { ascending: false }),
   ]);
 
-  const readinessRows = (readinessRes.data || []) as Array<{ recorded_at: string; score: number | null }>;
+  const readinessRows = (readinessRes.data || []) as Array<{
+    recorded_at: string;
+    score: number | null;
+    factors: unknown;
+  }>;
   const iqRows = ((iqRes.data || []) as Array<{ recorded_at: string; adjusted_score: number | null; score: number | null }>).map(
     (r) => ({ recorded_at: r.recorded_at, score: r.adjusted_score ?? r.score })
   );
@@ -131,6 +135,20 @@ export async function evaluateAdaptation(userId: string): Promise<AdaptEvaluatio
   const downScores = downWindow.map((d) => readinessDaily.get(d));
   const downReady = downScores.every((s) => typeof s === "number");
   if (downReady && downScores.every((s) => (s as number) < READINESS_DOWN_THRESHOLD)) {
+    // Data-completeness guard: if the most recent snapshot is missing >2 of the
+    // 6 core factors, the low score is driven by defaults — skip adaptation.
+    const latest = readinessRows[0];
+    const missingCount = latest ? countMissingCoreFactors(latest.factors) : CORE_FACTOR_LABELS.length;
+    if (missingCount > 2) {
+      console.warn(
+        `[plan-adaptation] readiness data incomplete, adaptation skipped (${missingCount}/${CORE_FACTOR_LABELS.length} core factors missing)`
+      );
+      return {
+        direction: null,
+        reason: "readiness_data_incomplete",
+        detail: `Readiness data incomplete, adaptation skipped (${missingCount} of ${CORE_FACTOR_LABELS.length} core factors missing)`,
+      };
+    }
     return {
       direction: "down",
       reason: "readiness_low_2d",
