@@ -83,6 +83,7 @@ const Auth = () => {
         {HERO_VIDEOS.map((src, index) => (
           <video
             key={src}
+            ref={(node) => { videoRefs.current[index] = node; }}
             src={src}
             autoPlay={index === 0}
             muted
