@@ -379,7 +379,39 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
           .maybeSingle();
         if (activePlan?.content) {
           const today = new Date();
-          const todayStr = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
+          const dateInTz = (offsetDays = 0) => {
+            const d = new Date(today);
+            d.setDate(today.getDate() + offsetDays);
+            const parts = new Intl.DateTimeFormat("en-GB", {
+              timeZone: tz,
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              weekday: "long",
+            }).formatToParts(d);
+            const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+            return { date: `${get("day")}/${get("month")}/${get("year")}`, weekday: get("weekday") };
+          };
+          const todayInfo = dateInTz(0);
+          const tomorrowInfo = dateInTz(1);
+          const planEntries = String(activePlan.content).split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi);
+          const findPlanEntry = (date: string) => planEntries.find((entry) => {
+            const match = entry.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+            if (!match) return false;
+            return `${match[1].padStart(2, "0")}/${match[2].padStart(2, "0")}/${match[3]}` === date;
+          });
+          const summariseEntry = (date: string) => {
+            const entry = findPlanEntry(date);
+            if (!entry) return `${date}: NO SESSION SCHEDULED — rest day / blank diary day.`;
+            const heading = entry.split("\n")[0]?.replace(/[#*_`]/g, "").trim() || date;
+            const title = entry.split("\n").find((line) => /total:|run|walk|interval|easy|long|rest|race/i.test(line) && !/^\s*\|/.test(line))?.replace(/[#*_`]/g, "").trim();
+            return `${date}: ${heading}${title && title !== heading ? ` — ${title}` : ""}`;
+          };
+          const diaryLookup = Array.from({ length: 14 }, (_, i) => {
+            const info = dateInTz(i);
+            return `- ${i === 0 ? "Today" : i === 1 ? "Tomorrow" : `+${i}d`} (${info.weekday} ${info.date}): ${summariseEntry(info.date)}`;
+          }).join("\n");
+          const todayStr = todayInfo.date;
           chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
 - Start date: ${activePlan.start_date || "n/a"}
 - Race date: ${activePlan.race_date || "n/a"}
@@ -389,6 +421,13 @@ Analyze the athlete's readiness and decide whether to adjust today's workout. Be
 
 PLAN CONTENT (markdown):
 ${activePlan.content}
+
+AUTHORITATIVE PLAN DIARY LOOKUP (exact dated entries only; this overrides prior chat messages and weekday assumptions):
+${diaryLookup}
+
+TODAY/TOMORROW STATUS:
+- Today is ${todayInfo.weekday} ${todayInfo.date}: ${summariseEntry(todayInfo.date)}
+- Tomorrow is ${tomorrowInfo.weekday} ${tomorrowInfo.date}: ${summariseEntry(tomorrowInfo.date)}
 
 When the user asks about a future or past session (e.g. "next Friday", "this Wednesday", "16/05/2026"), look it up in the plan content above and answer with the actual scheduled workout. Never claim you don't have access to the plan — it is provided here.`;
         } else {
