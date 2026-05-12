@@ -526,6 +526,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               readiness_score: result.score,
               factors: result.factors,
               current_hour_local: new Date().getHours(),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               missing_data: result.factors
                 .filter(f => f.status === "warning" && f.detail === "Not synced")
                 .map(f => f.label.toLowerCase()),
