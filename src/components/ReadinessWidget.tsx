@@ -187,7 +187,43 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trend, setTrend] = useState<{ day: string; score: number }[]>([]);
+  const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [cacheChecked, setCacheChecked] = useState(false);
 
+  // Check DB cache for readiness snapshot < 60 min old (skipped when user forces refresh)
+  useEffect(() => {
+    if (!user) return;
+    setCacheChecked(false);
+    setCached(null);
+    (async () => {
+      if (refreshNonce === 0) {
+        const { data: snap } = await supabase
+          .from("readiness_snapshots")
+          .select("score, factors, advice, recorded_at")
+          .eq("user_id", user.id)
+          .order("recorded_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (snap) {
+          const recordedAt = new Date((snap as any).recorded_at);
+          const ageMin = (Date.now() - recordedAt.getTime()) / 60000;
+          if (ageMin < 60) {
+            setCached({
+              score: (snap as any).score,
+              factors: ((snap as any).factors as any[]) || [],
+              advice: (snap as any).advice ?? null,
+              recordedAt,
+            });
+            setAiAdvice((snap as any).advice ?? null);
+            setLastUpdated(recordedAt);
+          }
+        }
+      }
+      setCacheChecked(true);
+    })();
+  }, [user, refreshNonce]);
 
   useEffect(() => {
     if (!user) return;
