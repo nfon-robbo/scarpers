@@ -154,6 +154,9 @@ const ReadinessWidget = () => {
   const [loading, setLoading] = useState(true);
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [sparklines, setSparklines] = useState<Record<string, (number | null)[]>>({});
+  const [trend, setTrend] = useState<{ day: string; score: number }[]>([]);
+
 
   useEffect(() => {
     if (!user) return;
