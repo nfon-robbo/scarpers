@@ -644,8 +644,15 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ====== Blog ====== */}
+      {/* ====== Meet the coach ====== */}
       <section className="border-t border-border/40 bg-background">
+        <div className="max-w-6xl mx-auto px-5 pt-20">
+          <CoachClaireCard />
+        </div>
+      </section>
+
+      {/* ====== Blog ====== */}
+      <section className="bg-background">
         <div className="max-w-6xl mx-auto px-5 py-20">
           <BlogPreview
             heading="From the Scarpers blog"
