@@ -169,6 +169,8 @@ Rules:
 - Use the user's name if available
 ${sleepPatternContext}
 ${planContext}
+${yesterdayContext}
+- NEVER describe yesterday's activity as a "run" unless the activity_type above is running/run.
 ${missing_data && missing_data.length > 0 ? `\nCRITICAL: The following data has NOT been synced today: ${missing_data.join(', ')}. Do NOT reference or comment positively on any missing metric.` : ''}`
 
       : `You are a knowledgeable, practical sports science coach. Tone: supportive, clear, no fluff.
