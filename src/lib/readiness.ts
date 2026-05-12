@@ -352,7 +352,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     modifiers.push({
       label: "Today's Effort",
       adj: penalty,
-      detail: `${Math.round(d.todayLoad)} min (intensity-weighted)`,
+      detail: `${Math.floor(d.todayLoad / 60)}:${String(Math.round(d.todayLoad % 60)).padStart(2, "0")} (intensity-weighted)`,
     });
   }
 
