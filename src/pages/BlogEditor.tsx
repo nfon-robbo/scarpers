@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Pencil, Trash2, Eye, Loader2, Sparkles, Printer } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Eye, Loader2, Sparkles } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
 
 interface BlogPost {
