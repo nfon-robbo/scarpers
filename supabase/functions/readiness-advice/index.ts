@@ -156,14 +156,13 @@ serve(async (req) => {
         const recentNights = dates.slice(0, 7).map(d => {
           const bedDt = new Date(byDate[d].earliest);
           const wakeDt = new Date(byDate[d].latest);
-          const fmtTime = (dt: Date) => dt.toISOString().slice(11, 16) + " UTC";
           const durationMs = wakeDt.getTime() - bedDt.getTime();
           const durationH = (durationMs / 3600000).toFixed(1);
-          return `${d}: bed ${fmtTime(bedDt)}, wake ${fmtTime(wakeDt)}, ~${durationH}h`;
+          return `${d}: bed ${fmtLocal(byDate[d].earliest)}, wake ${fmtLocal(byDate[d].latest)}, ~${durationH}h`;
         });
-        
-        sleepPatternContext = `\nRECENT SLEEP DATA (last ${recentNights.length} nights, times in UTC — convert to local using current_hour_local vs current UTC hour to infer offset):\n${recentNights.join("\n")}`;
-        sleepPatternContext += `\nIMPORTANT: Convert all times to the user's local timezone before mentioning them. Use the difference between current_hour_local and the current UTC hour to determine the offset. Never show UTC times to the user.`;
+
+        sleepPatternContext = `\nRECENT SLEEP DATA (last ${recentNights.length} nights, all times are already in the user's LOCAL timezone — ${tz}. Use them as-is, do NOT convert or adjust them):\n${recentNights.join("\n")}`;
+        sleepPatternContext += `\nIMPORTANT: The times above are already local. Never describe them as UTC. Never apply a timezone offset to them.`;
       }
     }
 
