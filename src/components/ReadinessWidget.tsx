@@ -425,6 +425,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           if (!isToday && load == null) return null;
           return Math.round(passive + active);
         }),
+      };
       setSparklines(series);
 
       // Build daily avg snapshot trend
