@@ -22,7 +22,7 @@ function formatSparkValue(label: string, v: number): string {
 function Sparkline({ points, status, label }: { points: SparkPoint[]; status: "good" | "warning" | "poor"; label: string }) {
   const nums = points.filter((p) => typeof p.value === "number" && isFinite(p.value as number)) as { date: string; value: number }[];
   if (nums.length < 2) {
-    return <div className="h-7 w-20 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">no data</div>;
+    return <div className="h-7 w-20 text-[10px] text-slate-500 italic flex items-center justify-center">no data</div>;
   }
   const vals = nums.map((p) => p.value);
   const min = Math.min(...vals);
