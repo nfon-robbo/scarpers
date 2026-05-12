@@ -63,16 +63,39 @@ const AIChatbot = () => {
     setLoading(false);
     setThreadId(id);
     setMessages([]);
+    const { data: thread } = await supabase
+      .from("chat_threads")
+      .select("title")
+      .eq("id", id)
+      .maybeSingle();
     const { data, error } = await supabase
       .from("chat_messages")
-      .select("role, content, created_at")
+      .select("id, role, content, created_at")
       .eq("thread_id", id)
       .order("created_at", { ascending: true });
     if (error) {
       toast({ title: "Couldn't load chat", description: error.message, variant: "destructive" });
       return;
     }
-    setMessages((data || []).map(m => ({ role: m.role as "user" | "assistant", content: m.content })));
+    const loadedMessages = (data || []).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    if (loadedMessages.length === 0) {
+      const recoveredText = thread?.title?.trim();
+      if (recoveredText && recoveredText.toLowerCase() !== "new chat") {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { error: recoverErr } = await supabase.from("chat_messages").insert({
+            thread_id: id,
+            user_id: session.user.id,
+            role: "user",
+            content: recoveredText,
+          });
+          if (recoverErr) console.error("Failed to recover empty chat from title:", recoverErr);
+        }
+        setMessages([{ role: "user", content: recoveredText }]);
+        return;
+      }
+    }
+    setMessages(loadedMessages);
   }, [toast]);
 
   // Listen for "open-chat-thread" events fired from Settings.
