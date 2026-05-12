@@ -24,6 +24,7 @@ import { format, isToday, isAfter, startOfDay } from "date-fns";
 import { dedupeActivities, purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import HeroPlanCard from "@/components/HeroPlanCard";
 import BlogPreview from "@/components/BlogPreview";
+import CoachClaireCard from "@/components/CoachClaireCard";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
 import ReadinessWidget from "@/components/ReadinessWidget";
