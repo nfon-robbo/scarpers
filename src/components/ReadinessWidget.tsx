@@ -404,7 +404,27 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         "Stress": toPoints((d) => mByDate.get(d)?.stress_score ?? null),
         "Yesterday's Load": toPoints((d) => loadByDate.get(d) ?? null),
         "Today's Effort": toPoints((d) => loadByDate.get(d) ?? null),
-      };
+        "Body Battery": toPoints((d) => {
+          const load = loadByDate.get(d);
+          const isToday = d === days[days.length - 1];
+          // Passive drain: today uses current hours awake, past days assume full 16h waking day
+          let hoursAwake = 16;
+          if (isToday) {
+            const now = new Date();
+            const wake = new Date(now);
+            wake.setHours(7, 0, 0, 0);
+            hoursAwake = Math.min(20, Math.max(0, (now.getTime() - wake.getTime()) / 3600000));
+          }
+          let passive = 0;
+          if (hoursAwake <= 4) passive = hoursAwake;
+          else if (hoursAwake <= 8) passive = 4 + (hoursAwake - 4) * 1.5;
+          else if (hoursAwake <= 12) passive = 10 + (hoursAwake - 8) * 2;
+          else if (hoursAwake <= 16) passive = 18 + (hoursAwake - 12) * 2.5;
+          else passive = 28 + (hoursAwake - 16) * 3;
+          const active = load != null ? Math.min(10, load * 0.1) : 0;
+          if (!isToday && load == null) return null;
+          return Math.round(passive + active);
+        }),
       setSparklines(series);
 
       // Build daily avg snapshot trend
