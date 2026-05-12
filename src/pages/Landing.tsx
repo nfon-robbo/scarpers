@@ -352,10 +352,6 @@ const Landing = () => {
 
         <div className="relative z-10 flex-1 flex items-end">
           <div className="px-5 sm:px-10 pb-16 sm:pb-24 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-background/40 backdrop-blur text-[11px] font-medium text-foreground/80 mb-6">
-              <Zap className="w-3 h-3 text-primary" />
-              Adaptive coaching · Garmin & Strava
-            </div>
             <h1
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
