@@ -7,37 +7,62 @@ import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "l
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 
 // ── Inline Sparkline (7-day mini trend) ──
-function Sparkline({ values, status }: { values: (number | null)[]; status: "good" | "warning" | "poor" }) {
-  const clean = values.map((v) => (typeof v === "number" && isFinite(v) ? v : null));
-  const nums = clean.filter((v): v is number => v != null);
-  if (nums.length < 2) {
-    return <div className="h-6 w-16 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">—</div>;
-  }
-  const min = Math.min(...nums);
-  const max = Math.max(...nums);
-  const range = max - min || 1;
-  const w = 64;
-  const h = 24;
-  const stepX = w / (clean.length - 1);
-  const color =
-    status === "good" ? "hsl(142, 60%, 45%)" : status === "warning" ? "hsl(45, 90%, 50%)" : "hsl(0, 72%, 51%)";
+export type SparkPoint = { date: string; value: number | null };
 
-  let lastY: number | null = null;
-  const pts: string[] = [];
-  clean.forEach((v, i) => {
-    if (v == null) return;
+function formatSparkValue(label: string, v: number): string {
+  if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
+  if (label === "Resting HR") return `${Math.round(v)} bpm`;
+  if (label === "HRV") return `${Math.round(v)} ms`;
+  if (label === "Sleep Quality") return `${Math.round(v)}/100`;
+  if (label === "Yesterday's Load" || label === "Today's Effort") return `${Math.round(v)} min`;
+  if (label === "Stress") return `${Math.round(v)}`;
+  return `${Math.round(v)}`;
+}
+
+function Sparkline({ points, status, label }: { points: SparkPoint[]; status: "good" | "warning" | "poor"; label: string }) {
+  const nums = points.filter((p) => typeof p.value === "number" && isFinite(p.value as number)) as { date: string; value: number }[];
+  if (nums.length < 2) {
+    return <div className="h-7 w-20 opacity-30 text-[10px] text-muted-foreground flex items-center justify-center">no data</div>;
+  }
+  const vals = nums.map((p) => p.value);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || Math.max(1, Math.abs(max) * 0.1);
+  const w = 80;
+  const h = 28;
+  const padY = 4;
+  const stepX = points.length > 1 ? w / (points.length - 1) : 0;
+  const color =
+    status === "good" ? "hsl(142, 70%, 50%)" : status === "warning" ? "hsl(45, 95%, 55%)" : "hsl(0, 80%, 60%)";
+
+  const coords: { x: number; y: number; p: SparkPoint }[] = [];
+  points.forEach((p, i) => {
+    if (p.value == null) return;
     const x = i * stepX;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    pts.push(`${pts.length === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
-    lastY = y;
+    const y = h - padY - ((p.value - min) / range) * (h - padY * 2);
+    coords.push({ x, y, p });
   });
+
+  const pathD = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
+  const last = coords[coords.length - 1];
 
   return (
     <svg width={w} height={h} className="shrink-0 overflow-visible">
-      <path d={pts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      {lastY != null && (
-        <circle cx={w} cy={lastY} r={2} fill={color} />
-      )}
+      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {last && <circle cx={last.x} cy={last.y} r={2.5} fill={color} />}
+      {/* hover hit areas with native tooltip */}
+      {coords.map((c, i) => {
+        const d = new Date(c.p.date);
+        const dateLabel = d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+        return (
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r={2} fill={color} opacity={0.7} />
+            <circle cx={c.x} cy={c.y} r={8} fill="transparent" className="cursor-pointer hover:fill-white/5">
+              <title>{`${dateLabel} — ${formatSparkValue(label, c.p.value as number)}`}</title>
+            </circle>
+          </g>
+        );
+      })}
     </svg>
   );
 }
