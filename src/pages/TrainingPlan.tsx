@@ -452,8 +452,8 @@ const TrainingPlanPage = () => {
       await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
     }
 
-    // Also remove the workout from intervals.icu on its original date so it
-    // doesn't show on both days. Silent failure if not connected.
+    // Remove the workout from intervals.icu on its original date, then push
+    // the moved workout to its new date. Silent failure if not connected.
     try {
       await supabase.functions.invoke("intervals-sync", {
         body: { deleteRange: { oldest: fromIso, newest: fromIso } },
@@ -461,8 +461,14 @@ const TrainingPlanPage = () => {
     } catch {
       // ignore — user may not have intervals.icu connected
     }
+    try {
+      await handleSyncToIntervals(true, toIso);
+    } catch {
+      // ignore — sync errors are surfaced inside handleSyncToIntervals
+    }
 
-    toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]}. Tap refresh on the new day to push it to intervals.icu.` });
+    toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.` });
+  };
   };
 
   const persistStartDateShift = async (newStart: Date) => {
