@@ -809,6 +809,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
+      <BodyBattery48hDialog open={batteryDialogOpen} onOpenChange={setBatteryDialogOpen} />
     </div>
   );
 };
