@@ -832,6 +832,9 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* ── Readiness ── */}
+          <ReadinessWidget />
+
 
           {/* ── Quick Actions ── */}
           <div className="grid gap-3 sm:grid-cols-3">
