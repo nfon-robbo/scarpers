@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 import { Sparkles, Activity, BookOpen, ShieldCheck, Cpu, Mail } from "lucide-react";
+import coachClaireImg from "@/assets/coach-claire.png";
 
 const CoachClaire = () => (
   <MarketingPageLayout
