@@ -983,8 +983,8 @@ const TrainingPlanPage = () => {
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const handleSyncToIntervals = async (refresh = false, singleDate?: string) => {
-    const workouts = parseWorkoutsFromPlan(content);
+  const handleSyncToIntervals = async (refresh = false, singleDate?: string, contentOverride?: string) => {
+    const workouts = parseWorkoutsFromPlan(contentOverride ?? content);
     let withSegments = workouts.filter(w => w.segments.length > 0 && w.dateObj);
     if (singleDate) {
       withSegments = withSegments.filter(w => {
