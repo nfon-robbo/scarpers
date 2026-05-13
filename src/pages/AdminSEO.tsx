@@ -409,6 +409,7 @@ const AdminSEO = () => {
                     <TableHead>Difficulty</TableHead>
                     <TableHead>Competition</TableHead>
                     <TableHead>CPC</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -423,6 +424,16 @@ const AdminSEO = () => {
                       </TableCell>
                       <TableCell className="capitalize text-sm text-muted-foreground">{k.competitionLabel}</TableCell>
                       <TableCell>{fmtGBP(k.cpcUsd)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
+                        >
+                          <Sparkles className="h-3 w-3 mr-1" /> Improve
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -577,6 +588,83 @@ const AdminSEO = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Improve: "{suggestionsKeyword}"
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {suggestionsPosition ? `Currently ranking #${suggestionsPosition}` : "Not currently ranking"}
+            </p>
+          </DialogHeader>
+
+          {suggestionsLoading ? (
+            <div className="flex flex-col items-center py-8 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analysing keyword & generating suggestions…</p>
+            </div>
+          ) : suggestions.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No suggestions available.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">{suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""} (highest impact first)</p>
+              {suggestions.map((sug, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">{i + 1}</span>
+                          <span className="font-medium text-sm">{sug.title}</span>
+                          <Badge variant="outline" className={`text-[10px] h-5 ${effortColor(sug.effort)}`}>{sug.effort} effort</Badge>
+                          <Badge variant="outline" className={`text-[10px] h-5 ${impactColor(sug.impact)}`}>{sug.impact} impact</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{sug.description}</p>
+                      </div>
+                      {sug.blogOutline && (
+                        <button
+                          onClick={() => setExpandedSuggestion(expandedSuggestion === i ? null : i)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          {expandedSuggestion === i ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+
+                    {expandedSuggestion === i && sug.blogOutline && (
+                      <div className="mt-2 pl-2 border-l-2 border-primary/20">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Blog outline:</p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5">
+                          {sug.blogOutline.map((point, j) => <li key={j}>• {point}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 mt-2">
+                      {actionedIndices.has(i) ? (
+                        <Button size="sm" className="h-7 text-xs" variant="outline" disabled>✓ Done</Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => applySuggestion(sug, i)}
+                          disabled={applyingIdx === i}
+                        >
+                          {applyingIdx === i ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                          {applyingIdx === i ? "Working…" : "Action this"}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
