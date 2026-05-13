@@ -172,6 +172,18 @@ const AdminPage = () => {
 
       <Card>
         <CardHeader className="pb-3">
+          <CardTitle className="text-base">SEO Dashboard</CardTitle>
+          <CardDescription>Comprehensive Semrush snapshot — keywords, traffic, competitors, opportunities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link to="/admin/seo">Open SEO Dashboard</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base">Blog</CardTitle>
           <CardDescription>Create and manage blog posts</CardDescription>
         </CardHeader>
