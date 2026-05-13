@@ -22,6 +22,7 @@ import Terms from "./pages/Terms";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
 import BlogEditor from "./pages/BlogEditor";
+import AdminSEO from "./pages/AdminSEO";
 import FiveKTrainingPlan from "./pages/FiveKTrainingPlan";
 import TenKTrainingPlan from "./pages/TenKTrainingPlan";
 import AIRunningCoach from "./pages/AIRunningCoach";
@@ -60,6 +61,16 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/seo"
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminSEO />} />
+            </Route>
             <Route path="/5k-training-plan" element={<FiveKTrainingPlan />} />
             <Route path="/10k-training-plan" element={<TenKTrainingPlan />} />
             <Route path="/ai-running-coach" element={<AIRunningCoach />} />
