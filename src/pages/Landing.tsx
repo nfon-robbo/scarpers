@@ -357,11 +357,11 @@ const Landing = () => {
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              Finally, a running plan<br />
-              that adjusts with you.
+              Your AI running coach.<br />
+              Personalised 5K &amp; 10K plans.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white/90 max-w-xl leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Adaptive running plans that adjust around your fitness, recovery, schedule and goals. Built for real runners using Garmin and Strava.
+              Free personalised running plans built by AI around your fitness, injuries, sleep and race goal. Adapts every week using your Garmin and Strava data.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base shadow-lg shadow-primary/30">
