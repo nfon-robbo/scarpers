@@ -607,6 +607,30 @@ export type Database = {
         }
         Relationships: []
       }
+      oauth_state: {
+        Row: {
+          created_at: string
+          expires_at: string
+          nonce: string
+          provider: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          nonce: string
+          provider: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          nonce?: string
+          provider?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           athlete_context: string | null
