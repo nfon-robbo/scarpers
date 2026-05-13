@@ -118,6 +118,10 @@ ${meta}
 
 Existing pages on the site:${SITE_PAGES}
 
+HARD RULES:
+- NEVER suggest editing, rewriting, or optimising the homepage ("/") meta title or meta description. The homepage meta is locked and off-limits.
+- "meta_update" suggestions are only allowed for non-homepage routes (e.g. /5k-training-plan, /10k-training-plan, /ai-running-coach, /coach/claire-rayners, /about, /blog/*).
+
 Suggest 3-5 concrete, actionable SEO improvements to rank higher for "${keyword}". For each:
 1. "type": one of "blog_post", "meta_update", "content_addition", "faq_schema", "internal_link"
 2. "title": short title of the action
@@ -188,6 +192,14 @@ Return ONLY valid JSON: { "suggestions": [...] }`;
     } else {
       try { suggestions = JSON.parse(aiData.choices?.[0]?.message?.content || "{}"); } catch { /* */ }
     }
+
+    // Safety net: strip any meta_update suggestion that targets the homepage
+    const homepageRefs = /(\bhome\s*page\b|\bhomepage\b|\blanding\s*page\b|^\/$|["'`\s]\/["'`\s]|index\.html|root\s+page)/i;
+    suggestions.suggestions = (suggestions.suggestions || []).filter((s: any) => {
+      if (s?.type !== "meta_update") return true;
+      const blob = `${s.title || ""} ${s.description || ""}`;
+      return !homepageRefs.test(blob);
+    });
 
     const impactOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
     suggestions.suggestions?.sort((a: any, b: any) => (impactOrder[a.impact] ?? 3) - (impactOrder[b.impact] ?? 3));
