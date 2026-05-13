@@ -58,12 +58,23 @@ const diffColor = (d: number | null) => {
 };
 
 const AdminSEO = () => {
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [checked, setChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [gsc, setGsc] = useState<GscResponse | null>(null);
   const [gscLoading, setGscLoading] = useState(false);
   const [gscError, setGscError] = useState<string | null>(null);
+
+  // Suggestions dialog
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsKeyword, setSuggestionsKeyword] = useState("");
+  const [suggestionsPosition, setSuggestionsPosition] = useState<number | null>(null);
+  const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
+  const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
+  const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
 
   const loadGsc = async () => {
     setGscLoading(true); setGscError(null);
@@ -80,6 +91,64 @@ const AdminSEO = () => {
   };
 
   useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+
+  const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
+    setSuggestionsKeyword(keyword);
+    setSuggestionsPosition(position);
+    setSuggestions([]);
+    setActionedIndices(new Set());
+    setExpandedSuggestion(null);
+    setSuggestionsOpen(true);
+    setSuggestionsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-suggestions", {
+        body: { keyword, position, volume, difficulty },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setSuggestions(((data as any).suggestions ?? []) as Suggestion[]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to generate suggestions");
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const applySuggestion = async (s: Suggestion, idx: number) => {
+    if (actionedIndices.has(idx)) { toast.info("Already actioned."); return; }
+    setApplyingIdx(idx);
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-suggestions", {
+        body: {
+          keyword: suggestionsKeyword,
+          action: "apply",
+          suggestionTitle: s.title,
+          suggestionDescription: s.description,
+          suggestionType: s.type,
+          blogTitle: s.blogTitle,
+          blogSlug: s.blogSlug,
+          blogOutline: s.blogOutline,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.applied && (data as any)?.post) {
+        setActionedIndices(prev => new Set(prev).add(idx));
+        const post = (data as any).post;
+        toast.success("Draft blog post created", {
+          description: `"${post.slug}" saved as draft.`,
+          action: { label: "Edit", onClick: () => navigate(`/admin/blog/${post.id}`) },
+        });
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to apply suggestion");
+    } finally {
+      setApplyingIdx(null);
+    }
+  };
+
+  const effortColor = (e: string) => e === "low" ? "bg-primary/20 text-primary" : e === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-destructive/20 text-destructive";
+  const impactColor = (i: string) => i === "high" ? "bg-primary/20 text-primary" : i === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground";
+
 
   useEffect(() => {
     if (authLoading) return;
