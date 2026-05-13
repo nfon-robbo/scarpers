@@ -2,7 +2,6 @@
   "domain": "scarpers.co.uk",
   "database": "uk",
   "lastUpdated": "2026-05-13",
-  "source": "Semrush (pulled via Lovable agent)",
   "overview": {
     "organicKeywords": 1,
     "organicTrafficEst": 5,
@@ -12,44 +11,49 @@
   "topKeywords": [
     { "keyword": "scarpers", "position": 6, "volume": 260, "trafficShare": 100, "url": "https://www.scarpers.co.uk/" }
   ],
+  "targetKeywords": [
+    { "keyword": "ai running coach", "volume": 20, "difficulty": 0, "difficultyLabel": "very easy", "competitionLabel": "medium", "cpcUsd": 1.86 },
+    { "keyword": "personalised running plan", "volume": 20, "difficulty": 0, "difficultyLabel": "very easy", "competitionLabel": "medium", "cpcUsd": 1.24 },
+    { "keyword": "best running app uk", "volume": 20, "difficulty": 0, "difficultyLabel": "very easy", "competitionLabel": "low", "cpcUsd": 1.43 },
+    { "keyword": "10k training plan", "volume": 3600, "difficulty": 27, "difficultyLabel": "easy", "competitionLabel": "low", "cpcUsd": 1.44 },
+    { "keyword": "free running plan", "volume": 90, "difficulty": 28, "difficultyLabel": "easy", "competitionLabel": "medium", "cpcUsd": 1.47 },
+    { "keyword": "5k training plan", "volume": 1300, "difficulty": 47, "difficultyLabel": "possible", "competitionLabel": "low", "cpcUsd": 1.02 },
+    { "keyword": "marathon training plan", "volume": 8100, "difficulty": 52, "difficultyLabel": "difficult", "competitionLabel": "high", "cpcUsd": 0.7 },
+    { "keyword": "running coach app", "volume": 90, "difficulty": 54, "difficultyLabel": "difficult", "competitionLabel": "medium", "cpcUsd": 3.42 },
+    { "keyword": "couch to 5k plan", "volume": 12100, "difficulty": 59, "difficultyLabel": "difficult", "competitionLabel": "low", "cpcUsd": 0.62 },
+    { "keyword": "intervals.icu alternative", "volume": null, "difficulty": null, "difficultyLabel": "no data", "competitionLabel": "no data", "cpcUsd": null }
+  ],
   "topPages": [
-    { "url": "https://www.scarpers.co.uk/", "keywordsRanking": 1, "trafficShare": 100, "bestPosition": 6, "topKeyword": "scarpers" }
+    { "url": "https://www.scarpers.co.uk/", "keywordsRanking": 1, "bestPosition": 6, "topKeyword": "scarpers", "trafficShare": 100 }
   ],
   "trend": [
-    { "date": "2026-04-15", "keywords": 1, "traffic": 5, "costUsd": 6 },
+    { "date": "2026-04-15", "keywords": 0, "traffic": 0, "costUsd": 0 },
     { "date": "2026-03-15", "keywords": 0, "traffic": 0, "costUsd": 0 },
     { "date": "2026-02-15", "keywords": 0, "traffic": 0, "costUsd": 0 },
     { "date": "2026-01-15", "keywords": 0, "traffic": 0, "costUsd": 0 },
     { "date": "2025-12-15", "keywords": 0, "traffic": 0, "costUsd": 0 },
     { "date": "2025-11-15", "keywords": 0, "traffic": 0, "costUsd": 0 }
   ],
-  "backlinks": null,
   "competitors": [
-    { "domain": "scarpershoes.com.au", "relevance": 0.07, "commonKeywords": 1, "organicKeywords": 13, "organicTraffic": 1 },
-    { "domain": "scarpertours.com", "relevance": 0.00, "commonKeywords": 1, "organicKeywords": 143, "organicTraffic": 722 },
-    { "domain": "houseoffraser.co.uk", "relevance": 0.00, "commonKeywords": 1, "organicKeywords": 609944, "organicTraffic": 1407245 }
+    { "domain": "scarpershoes.com.au", "relevance": 0.07, "organicKeywords": 13, "organicTraffic": 1 },
+    { "domain": "scarpertours.com", "relevance": 0.00, "organicKeywords": 143, "organicTraffic": 722 },
+    { "domain": "dictionary.com", "relevance": 0.00, "organicKeywords": 1099924, "organicTraffic": 7250178 },
+    { "domain": "wiktionary.org", "relevance": 0.00, "organicKeywords": 1213541, "organicTraffic": 4804269 },
+    { "domain": "thefreedictionary.com", "relevance": 0.00, "organicKeywords": 1212991, "organicTraffic": 658133 }
   ],
-  "targetKeywords": [
-    { "keyword": "ai running coach",          "volume": 20, "cpcUsd": 1.86, "competition": 0.4,  "competitionLabel": "medium", "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "personalised running plan", "volume": 20, "cpcUsd": 1.24, "competition": 0.4,  "competitionLabel": "medium", "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "free 5k training plan",     "volume": 20, "cpcUsd": 1.26, "competition": 0.66, "competitionLabel": "high",   "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "5k training plan app",      "volume": 20, "cpcUsd": 0,    "competition": 0,    "competitionLabel": "low",    "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "running coach app",         "volume": 90, "cpcUsd": 3.42, "competition": 0.45, "competitionLabel": "medium", "difficulty": 54, "difficultyLabel": "difficult" },
-    { "keyword": "adaptive training plan",    "volume": 10, "cpcUsd": 0,    "competition": 0.33, "competitionLabel": "medium", "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "couch to 5k alternative",   "volume": 20, "cpcUsd": 1.45, "competition": 0.23, "competitionLabel": "low",    "difficulty": 0,  "difficultyLabel": "very easy" },
-    { "keyword": "ai marathon coach",         "volume": null, "cpcUsd": null, "competition": null, "competitionLabel": "no data", "difficulty": null, "difficultyLabel": "no data" }
-  ],
+  "backlinks": null,
   "insights": [
-    "Domain is essentially invisible to Google: only 1 ranking keyword ('scarpers' at #6) and ~5 estimated visits/month.",
-    "All quick-win target keywords (ai running coach, personalised running plan, free 5k training plan, 5k training plan app) have difficulty 0/100 — winnable as soon as Google indexes the new landing copy and blog posts.",
-    "'running coach app' is the only difficult target (KDI 54). Skip it for now; revisit after authority builds via the easier wins.",
-    "No backlinks tracked. Link-building is the next compounding step — guest posts on running blogs, Reddit r/running, parkrun forums.",
-    "Competitor list is junk (dictionaries + Italian for 'escape') because the 'scarpers' brand term has no SEO neighbours yet — that changes once topical pages start ranking."
+    "Semrush only sees one ranking term — \"scarpers\" — and even that's at #6. The brand is too new for Semrush's UK crawler to have indexed much. Real Google data (Search Console tab) will show more.",
+    "All 'organic competitors' are unrelated (dictionaries, a tour company, a shoe brand) — they only overlap because they happen to mention the word 'scarpers'. Ignore until we rank for actual running terms.",
+    "Three target keywords are 0/100 difficulty: 'ai running coach', 'personalised running plan', 'best running app uk'. These are genuine open lanes — small volume but easy to win and high commercial intent.",
+    "'10k training plan' (3,600/mo, KDI 27) is the standout opportunity: real demand, easy difficulty, and we already have a dedicated landing page.",
+    "Zero backlinks detected. This is the single biggest blocker — every link from a running blog, parkrun forum, or Reddit thread compounds. Pursuing 5–10 quality backlinks would unlock most of the easy-difficulty targets."
   ],
   "actions": [
-    "Wait 1–2 weeks for Google to recrawl the rewritten H1/meta on /, then check positions.",
-    "Submit sitemap.xml in Google Search Console if not already done.",
-    "Write 2 dedicated blog posts: 'AI running coach explained' and 'Personalised running plan vs Couch to 5k'.",
-    "Add internal links from /5k-training-plan and /ai-running-coach to the 3 existing blog posts."
+    "Get the /10k-training-plan page indexed and start earning backlinks to it — 3,600/mo searches and KDI 27 is the highest-ROI target.",
+    "Write 1 blog post per fortnight targeting one easy keyword each: 'AI running coach', 'personalised running plan', 'best running app UK', 'free running plan'.",
+    "Submit Scarpers to running-app roundup posts and Reddit threads (r/running, r/AdvancedRunning, r/UKrunning) — this is how zero-backlink sites bootstrap authority.",
+    "Use the live Search Console tab as the source of truth for ranking changes — Semrush is weeks behind for new sites.",
+    "Re-check Semrush in 4–6 weeks once Google has crawled more of the site; expect target keywords to start appearing in topKeywords."
   ]
 }
