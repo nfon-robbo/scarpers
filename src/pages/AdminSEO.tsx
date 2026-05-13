@@ -126,8 +126,9 @@ const AdminSEO = () => {
         <Stat label="Paid ads" value={fmtNum(s.overview.adwordsKeywords)} hint="Adwords keywords" />
       </div>
 
-      <Tabs defaultValue="keywords">
+      <Tabs defaultValue="live">
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="live"><Activity className="w-3.5 h-3.5 mr-1.5" /> Live (Search Console)</TabsTrigger>
           <TabsTrigger value="keywords"><Target className="w-3.5 h-3.5 mr-1.5" /> Keywords</TabsTrigger>
           <TabsTrigger value="targets"><Lightbulb className="w-3.5 h-3.5 mr-1.5" /> Target opportunities</TabsTrigger>
           <TabsTrigger value="pages"><Globe className="w-3.5 h-3.5 mr-1.5" /> Top pages</TabsTrigger>
