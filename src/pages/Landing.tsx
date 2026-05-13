@@ -271,7 +271,7 @@ const Landing = () => {
     };
     const desc = setMeta(
       "description",
-      "Adaptive running plans that adjust around your fitness, recovery and goals. Built for real runners using Garmin and Strava. Free personalised 5K, 10K, marathon and ultra training.",
+      "Adaptive AI running plans that adjust around your fitness, recovery and goals. Free personalised 5K, 10K, marathon and ultra training for Garmin and Strava.",
     );
     const kw = setMeta(
       "keywords",
