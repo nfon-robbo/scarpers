@@ -37,10 +37,30 @@ Deno.serve(async (req) => {
         });
       }
 
-      const token = authHeader.replace("Bearer ", "");
+      // Verify caller, then mint an opaque nonce so the JWT never enters the URL.
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: { user }, error: userErr } = await supabase.auth.getUser(
+        authHeader.replace("Bearer ", "")
+      );
+      if (userErr || !user) {
+        return new Response(JSON.stringify({ error: "Not authenticated" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const nonce = crypto.randomUUID();
+      const { error: nonceErr } = await supabase.from("oauth_state").insert({
+        nonce, user_id: user.id, provider: "google_fit",
+      });
+      if (nonceErr) {
+        console.error("oauth_state insert failed:", nonceErr);
+        return new Response(JSON.stringify({ error: "Failed to start OAuth" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-fit-callback`;
       const scope = "https://www.googleapis.com/auth/fitness.sleep.read";
-      const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_FIT_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${token}`;
+      const googleUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_FIT_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent&state=${nonce}`;
 
       return new Response(JSON.stringify({ url: googleUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -90,7 +110,6 @@ Deno.serve(async (req) => {
       }
 
       await supabase.from("google_fit_tokens").delete().eq("user_id", user.id);
-      await supabase.from("sleep_stages").delete().eq("user_id", user.id);
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -102,7 +121,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Google Fit auth error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

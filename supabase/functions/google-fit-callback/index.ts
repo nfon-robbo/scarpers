@@ -49,17 +49,23 @@ Deno.serve(async (req) => {
 
     const tokenData = await tokenRes.json();
 
-    // Verify user from JWT state
+    // Look up the nonce we minted on `authorize` to find the user.
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(state);
+    const { data: nonceRow } = await supabase
+      .from("oauth_state")
+      .select("user_id, expires_at")
+      .eq("nonce", state)
+      .eq("provider", "google_fit")
+      .maybeSingle();
 
-    if (userError || !user) {
-      console.error("Invalid JWT state:", userError);
+    if (!nonceRow || new Date(nonceRow.expires_at).getTime() < Date.now()) {
       return new Response(
-        `<html><body><script>window.close();</script>Authentication failed.</body></html>`,
+        `<html><body><script>window.close();</script>Authentication failed or link expired.</body></html>`,
         { headers: { "Content-Type": "text/html" } }
       );
     }
+    await supabase.from("oauth_state").delete().eq("nonce", state);
+    const user = { id: nonceRow.user_id };
 
     // Calculate expires_at
     const expiresAt = Math.floor(Date.now() / 1000) + (tokenData.expires_in || 3600);
