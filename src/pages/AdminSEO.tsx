@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,8 +7,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import snapshot from "@/data/seo-snapshot.json";
+
+type Suggestion = {
+  type: string;
+  title: string;
+  description: string;
+  effort: string;
+  impact: string;
+  blogTitle?: string;
+  blogSlug?: string;
+  blogOutline?: string[];
+};
 
 type GscRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 type GscResponse = {
@@ -45,12 +58,23 @@ const diffColor = (d: number | null) => {
 };
 
 const AdminSEO = () => {
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [checked, setChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [gsc, setGsc] = useState<GscResponse | null>(null);
   const [gscLoading, setGscLoading] = useState(false);
   const [gscError, setGscError] = useState<string | null>(null);
+
+  // Suggestions dialog
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsKeyword, setSuggestionsKeyword] = useState("");
+  const [suggestionsPosition, setSuggestionsPosition] = useState<number | null>(null);
+  const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
+  const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
+  const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
 
   const loadGsc = async () => {
     setGscLoading(true); setGscError(null);
@@ -67,6 +91,64 @@ const AdminSEO = () => {
   };
 
   useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+
+  const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
+    setSuggestionsKeyword(keyword);
+    setSuggestionsPosition(position);
+    setSuggestions([]);
+    setActionedIndices(new Set());
+    setExpandedSuggestion(null);
+    setSuggestionsOpen(true);
+    setSuggestionsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-suggestions", {
+        body: { keyword, position, volume, difficulty },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setSuggestions(((data as any).suggestions ?? []) as Suggestion[]);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to generate suggestions");
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const applySuggestion = async (s: Suggestion, idx: number) => {
+    if (actionedIndices.has(idx)) { toast.info("Already actioned."); return; }
+    setApplyingIdx(idx);
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-suggestions", {
+        body: {
+          keyword: suggestionsKeyword,
+          action: "apply",
+          suggestionTitle: s.title,
+          suggestionDescription: s.description,
+          suggestionType: s.type,
+          blogTitle: s.blogTitle,
+          blogSlug: s.blogSlug,
+          blogOutline: s.blogOutline,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.applied && (data as any)?.post) {
+        setActionedIndices(prev => new Set(prev).add(idx));
+        const post = (data as any).post;
+        toast.success("Draft blog post created", {
+          description: `"${post.slug}" saved as draft.`,
+          action: { label: "Edit", onClick: () => navigate(`/admin/blog/${post.id}`) },
+        });
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to apply suggestion");
+    } finally {
+      setApplyingIdx(null);
+    }
+  };
+
+  const effortColor = (e: string) => e === "low" ? "bg-primary/20 text-primary" : e === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-destructive/20 text-destructive";
+  const impactColor = (i: string) => i === "high" ? "bg-primary/20 text-primary" : i === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-muted text-muted-foreground";
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -327,6 +409,7 @@ const AdminSEO = () => {
                     <TableHead>Difficulty</TableHead>
                     <TableHead>Competition</TableHead>
                     <TableHead>CPC</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -341,6 +424,16 @@ const AdminSEO = () => {
                       </TableCell>
                       <TableCell className="capitalize text-sm text-muted-foreground">{k.competitionLabel}</TableCell>
                       <TableCell>{fmtGBP(k.cpcUsd)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
+                        >
+                          <Sparkles className="h-3 w-3 mr-1" /> Improve
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -495,6 +588,83 @@ const AdminSEO = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Improve: "{suggestionsKeyword}"
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {suggestionsPosition ? `Currently ranking #${suggestionsPosition}` : "Not currently ranking"}
+            </p>
+          </DialogHeader>
+
+          {suggestionsLoading ? (
+            <div className="flex flex-col items-center py-8 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Analysing keyword & generating suggestions…</p>
+            </div>
+          ) : suggestions.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No suggestions available.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">{suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""} (highest impact first)</p>
+              {suggestions.map((sug, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">{i + 1}</span>
+                          <span className="font-medium text-sm">{sug.title}</span>
+                          <Badge variant="outline" className={`text-[10px] h-5 ${effortColor(sug.effort)}`}>{sug.effort} effort</Badge>
+                          <Badge variant="outline" className={`text-[10px] h-5 ${impactColor(sug.impact)}`}>{sug.impact} impact</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{sug.description}</p>
+                      </div>
+                      {sug.blogOutline && (
+                        <button
+                          onClick={() => setExpandedSuggestion(expandedSuggestion === i ? null : i)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          {expandedSuggestion === i ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+
+                    {expandedSuggestion === i && sug.blogOutline && (
+                      <div className="mt-2 pl-2 border-l-2 border-primary/20">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Blog outline:</p>
+                        <ul className="text-xs text-muted-foreground space-y-0.5">
+                          {sug.blogOutline.map((point, j) => <li key={j}>• {point}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 mt-2">
+                      {actionedIndices.has(i) ? (
+                        <Button size="sm" className="h-7 text-xs" variant="outline" disabled>✓ Done</Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => applySuggestion(sug, i)}
+                          disabled={applyingIdx === i}
+                        >
+                          {applyingIdx === i ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                          {applyingIdx === i ? "Working…" : "Action this"}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
