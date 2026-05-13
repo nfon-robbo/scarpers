@@ -37,11 +37,29 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Pass user's JWT as state so we can identify them on callback
-      const token = authHeader.replace("Bearer ", "");
+      // Verify caller, then mint an opaque nonce so the JWT never enters the URL.
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: { user }, error: userErr } = await supabase.auth.getUser(
+        authHeader.replace("Bearer ", "")
+      );
+      if (userErr || !user) {
+        return new Response(JSON.stringify({ error: "Not authenticated" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const nonce = crypto.randomUUID();
+      const { error: nonceErr } = await supabase.from("oauth_state").insert({
+        nonce, user_id: user.id, provider: "strava",
+      });
+      if (nonceErr) {
+        console.error("oauth_state insert failed:", nonceErr);
+        return new Response(JSON.stringify({ error: "Failed to start OAuth" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const redirectUri = `${SUPABASE_URL}/functions/v1/strava-auth?action=callback`;
       const scope = "read,activity:read_all";
-      const stravaUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${token}`;
+      const stravaUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${nonce}`;
 
       return new Response(JSON.stringify({ url: stravaUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
