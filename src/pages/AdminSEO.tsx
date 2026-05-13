@@ -138,6 +138,145 @@ const AdminSEO = () => {
           <TabsTrigger value="actions"><ListChecks className="w-3.5 h-3.5 mr-1.5" /> Insights & actions</TabsTrigger>
         </TabsList>
 
+        {/* Live Search Console */}
+        <TabsContent value="live" className="space-y-4">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-6 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-sm">
+                <p className="font-medium">Real Google search data — last 28 days</p>
+                <p className="text-muted-foreground text-xs">
+                  {gsc ? `${fmtDate(gsc.range.start)} → ${fmtDate(gsc.range.end)} · refreshed ${new Date(gsc.fetchedAt).toLocaleTimeString("en-GB")}` : "Pulled from Google Search Console via your connected account."}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={loadGsc} disabled={gscLoading}>
+                {gscLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                Refresh
+              </Button>
+            </CardContent>
+          </Card>
+
+          {gscError && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-6 text-sm text-destructive">{gscError}</CardContent>
+            </Card>
+          )}
+
+          {gscLoading && !gsc && (
+            <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          )}
+
+          {gsc && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="Impressions" value={fmtNum(gsc.totals?.impressions ?? 0)} hint="Times we appeared in Google" />
+                <Stat label="Clicks" value={fmtNum(gsc.totals?.clicks ?? 0)} hint="Actual visits from search" />
+                <Stat label="CTR" value={gsc.totals ? fmtPct(gsc.totals.ctr) : "—"} hint="Clicks ÷ impressions" />
+                <Stat label="Avg position" value={gsc.totals ? fmtPos(gsc.totals.position) : "—"} hint="Average rank when shown" />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Top queries</CardTitle>
+                  <CardDescription>What people actually typed into Google to find scarpers.co.uk</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Query</TableHead>
+                        <TableHead>Clicks</TableHead>
+                        <TableHead>Impressions</TableHead>
+                        <TableHead>CTR</TableHead>
+                        <TableHead>Avg position</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gsc.byQuery.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No query data yet — Google needs a few days of impressions before reporting.</TableCell></TableRow>
+                      )}
+                      {gsc.byQuery.map((r) => (
+                        <TableRow key={r.keys?.[0]}>
+                          <TableCell className="font-medium">{r.keys?.[0]}</TableCell>
+                          <TableCell>{fmtNum(r.clicks)}</TableCell>
+                          <TableCell>{fmtNum(r.impressions)}</TableCell>
+                          <TableCell>{fmtPct(r.ctr)}</TableCell>
+                          <TableCell><Badge variant={r.position <= 3 ? "default" : r.position <= 10 ? "secondary" : "outline"}>{fmtPos(r.position)}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Top pages</CardTitle>
+                  <CardDescription>Which pages on your site Google is showing</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Page</TableHead>
+                        <TableHead>Clicks</TableHead>
+                        <TableHead>Impressions</TableHead>
+                        <TableHead>CTR</TableHead>
+                        <TableHead>Avg position</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gsc.byPage.length === 0 && (
+                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No page data yet.</TableCell></TableRow>
+                      )}
+                      {gsc.byPage.map((r) => (
+                        <TableRow key={r.keys?.[0]}>
+                          <TableCell className="font-mono text-xs"><a href={r.keys?.[0]} target="_blank" rel="noopener noreferrer" className="hover:underline">{r.keys?.[0]}</a></TableCell>
+                          <TableCell>{fmtNum(r.clicks)}</TableCell>
+                          <TableCell>{fmtNum(r.impressions)}</TableCell>
+                          <TableCell>{fmtPct(r.ctr)}</TableCell>
+                          <TableCell>{fmtPos(r.position)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {gsc.sitemaps.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Submitted sitemaps</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Path</TableHead>
+                          <TableHead>Last submitted</TableHead>
+                          <TableHead>Last downloaded</TableHead>
+                          <TableHead>URLs</TableHead>
+                          <TableHead>Errors</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gsc.sitemaps.map((sm: any) => (
+                          <TableRow key={sm.path}>
+                            <TableCell className="font-mono text-xs">{sm.path}</TableCell>
+                            <TableCell className="text-xs">{sm.lastSubmitted ? fmtDate(sm.lastSubmitted) : "—"}</TableCell>
+                            <TableCell className="text-xs">{sm.lastDownloaded ? fmtDate(sm.lastDownloaded) : "—"}</TableCell>
+                            <TableCell>{sm.contents?.[0]?.submitted ?? "—"}</TableCell>
+                            <TableCell>{sm.errors ?? 0}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
+
         {/* Current ranking keywords */}
         <TabsContent value="keywords" className="space-y-4">
           <Card>
