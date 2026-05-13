@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Calendar, ArrowLeft, Pencil } from "lucide-react";
+import DOMPurify from "dompurify";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 import BlogInteractions from "@/components/BlogInteractions";
 
@@ -195,7 +196,12 @@ const BlogPost = () => {
           </div>
         )}
 
-        <div className="blog-content mt-8 text-foreground" dangerouslySetInnerHTML={{ __html: renderContent(post.content) }} />
+        <div
+          className="blog-content mt-8 text-foreground"
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(renderContent(post.content), { ADD_ATTR: ["target", "rel"] }),
+          }}
+        />
       </article>
 
       <BlogInteractions postId={post.id} postTitle={post.title} postSlug={post.slug} />
