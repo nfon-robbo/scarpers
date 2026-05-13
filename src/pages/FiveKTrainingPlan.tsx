@@ -25,7 +25,7 @@ const FiveKTrainingPlan = () => {
 
   return (
   <MarketingPageLayout
-    title="Free Personalised 5K Training Plan | Scarpers AI Running Coach"
+    title="Free Personalised 5K Training Plan | Scarpers"
     description="Get a free personalised 5K training plan built by AI around your fitness, injury history and HR zones. Beginner-friendly, Garmin-ready, adapts week by week."
     canonicalPath="/5k-training-plan"
   >
