@@ -6,7 +6,7 @@ import coachClaireImg from "@/assets/coach-claire.png";
 
 const CoachClaire = () => (
   <MarketingPageLayout
-    title="Coach Claire Rayners — Scarpers' Programmable Elite AI Running Coach"
+    title="Coach Claire Rayners — Scarpers' AI Running Coach"
     description="Meet Coach Claire Rayners: the system-built, programmable elite running coach behind every Scarpers plan, day-ahead briefing and post-run review."
     canonicalPath="/coach"
   >
