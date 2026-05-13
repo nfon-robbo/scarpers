@@ -7,8 +7,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks } from "lucide-react";
+import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw } from "lucide-react";
 import snapshot from "@/data/seo-snapshot.json";
+
+type GscRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
+type GscResponse = {
+  site: string;
+  range: { start: string; end: string };
+  totals: GscRow | null;
+  byQuery: GscRow[];
+  byPage: GscRow[];
+  byDate: GscRow[];
+  sitemaps: any[];
+  fetchedAt: string;
+};
+
+const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
+const fmtPos = (n: number) => n.toFixed(1);
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 const fmtNum = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("en-GB"));
@@ -33,6 +48,25 @@ const AdminSEO = () => {
   const { user, loading: authLoading } = useAuth();
   const [checked, setChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [gsc, setGsc] = useState<GscResponse | null>(null);
+  const [gscLoading, setGscLoading] = useState(false);
+  const [gscError, setGscError] = useState<string | null>(null);
+
+  const loadGsc = async () => {
+    setGscLoading(true); setGscError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("search-console");
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setGsc(data as GscResponse);
+    } catch (e: any) {
+      setGscError(e?.message ?? "Failed to load Search Console data");
+    } finally {
+      setGscLoading(false);
+    }
+  };
+
+  useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
 
   useEffect(() => {
     if (authLoading) return;
