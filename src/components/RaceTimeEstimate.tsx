@@ -332,6 +332,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
               <p className="text-xs text-muted-foreground">Estimated pace · <span className="text-foreground font-medium">{fmtPace(estPace)}</span></p>
               <p className="text-base font-bold tracking-tight">{fmtTime(estFinish)}</p>
               <p className={`text-xs ${estFinish <= goalSec + 5 ? "text-green-400" : estFinish <= redToAmber ? "text-amber-400" : "text-red-400"}`}>{deltaText}</p>
+              {hrAdjustSec < 0 && (
+                <p className="text-[10px] text-emerald-400/80">HR efficiency improving · {Math.round(-hrAdjustSec)}s/km gain ({weeksImproving}w)</p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground mt-2 text-center">
