@@ -78,6 +78,42 @@ const isCredibleCompletedActivity = (a: Activity) => {
   const dur = Number(a.duration_seconds || 0);
   return dist >= 500 && dur >= 60;
 };
+const isRunActivity = (a: Activity) => {
+  const type = (a.activity_type || "").toLowerCase();
+  if (/walk|hike|cycle|bike|ride|swim|row|elliptical|strength|yoga|pilates/i.test(type)) return false;
+  return /run|jog|treadmill/i.test(type) || (!type && Number(a.distance_meters || 0) > 0);
+};
+const durationTextToSeconds = (text: string): number => {
+  const t = text.trim();
+  if (!t) return 0;
+  const repeat = t.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|min|mins|minute|minutes|sec|secs|second|seconds|s)\b/i);
+  if (repeat) return parseInt(repeat[1], 10) * durationTextToSeconds(`${repeat[2]} ${repeat[3]}`);
+  const colon = t.match(/\b(\d{1,3}):(\d{2})\b/);
+  if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+  let total = 0;
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|min|mins|minute|minutes|sec|secs|second|seconds|s)\b/gi)) {
+    const value = parseFloat(m[1]);
+    const unit = m[2].toLowerCase();
+    total += unit.startsWith("h") ? value * 3600 : unit.startsWith("s") ? value : value * 60;
+  }
+  return Math.round(total);
+};
+const plannedDurationSeconds = (w: ParsedWorkout): number => {
+  const fromSegments = (w.segments || []).reduce((sum, seg) => sum + durationTextToSeconds(seg.duration || ""), 0);
+  if (fromSegments > 0) return fromSegments;
+  const fallback = `${w.title} ${w.rawText}`.match(/Total:\s*~?\s*(\d+)\s*min/i) || `${w.title} ${w.rawText}`.match(/\(\s*~?\s*(\d+)\s*min\s*(?:total)?\s*\)/i);
+  return fallback ? parseInt(fallback[1], 10) * 60 : 0;
+};
+const activityCompletesSession = (a: Activity, w: ParsedWorkout, planId: string, day: string) => {
+  const sameDay = isoDay(new Date(a.start_time)) === day;
+  if (!sameDay) return false;
+  if (a.training_plan_id === planId) return true;
+  const run = isRunActivity(a);
+  const plannedSec = plannedDurationSeconds(w);
+  const actualSec = Number(a.duration_seconds || 0);
+  const withinDuration = !a.training_plan_id && run && plannedSec > 0 && actualSec > 0 && Math.abs(actualSec - plannedSec) / plannedSec <= 0.5;
+  return withinDuration || (run && isCredibleCompletedActivity(a));
+};
 const paceSecPerKm = (a: Activity): number | null => {
   if (!a.distance_meters || !a.duration_seconds || a.distance_meters < 100) return null;
   return Math.round(a.duration_seconds / (a.distance_meters / 1000));
