@@ -497,7 +497,39 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => ({ recorded_at: s.recorded_at, score: s.score })));
+    });
+  }, [user]);
 
+  // Recompute the 7-day trend whenever raw snapshots or display mode changes
+  useEffect(() => {
+    const today = new Date();
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    }
+    const byDay = new Map<string, { recorded_at: string; score: number }[]>();
+    trendSnapshots.forEach((s) => {
+      const d = s.recorded_at.split("T")[0];
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d)!.push(s);
+    });
+    const trendArr = days.map((d) => {
+      const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+      let pick: { recorded_at: string; score: number } | undefined;
+      if (rows.length) {
+        if (trendMode === "morning") {
+          pick = rows.find((r) => new Date(r.recorded_at).getHours() >= 5) ?? rows[0];
+        } else {
+          pick = rows[rows.length - 1];
+        }
+      }
+      return {
+        day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
+        score: pick ? pick.score : null,
+      };
+    });
+    setTrend(trendArr);
+  }, [trendSnapshots, trendMode]);
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
