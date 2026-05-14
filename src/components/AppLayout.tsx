@@ -15,7 +15,6 @@ import {
   CalendarDays,
   ListChecks,
   Brain,
-  BarChart3,
   Upload,
   Settings,
   Sun,
