@@ -967,12 +967,11 @@ const TrainingPlanPage = () => {
     setTimeout(() => setDayAdjustPhase("metrics"), 1500);
     setTimeout(() => setDayAdjustPhase("analyzing"), 3500);
 
-    const todayStr = format(new Date(), "yyyy-MM-dd");
     let accumulated = "";
     streamAICoach({
       type: "day-adjust",
       token: session.access_token,
-      targetDate: todayStr,
+      targetDate: targetDateStr,
       todayWorkout,
       onDelta: (text) => {
         accumulated += text;
