@@ -74,7 +74,7 @@ const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
           hr: p.heart_rate ?? null,
           speed: displaySpeed ? Math.round(displaySpeed * 10) / 10 : null,
           altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
-          cadence: p.cadence ?? null,
+          cadence: p.cadence != null ? p.cadence * cadenceMult : null,
           power: p.power ?? null,
           temperature: displayTemp != null ? Math.round(displayTemp * 10) / 10 : null,
           vert_osc: p.vertical_oscillation != null ? Math.round(p.vertical_oscillation * 10) / 10 : null,
