@@ -305,18 +305,30 @@ export default function Analytics() {
   const progress = useMemo(() => {
     if (!plan) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const actDays = new Set(activities.map((a) => isoDay(new Date(a.start_time))));
+    const actDays = new Set(
+      activities
+        .filter((a) => a.training_plan_id === plan.id)
+        .map((a) => isoDay(new Date(a.start_time))),
+    );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
+    // Dedupe by date so multiple plan rows on the same day count once.
+    const seenDates = new Set<string>();
     const days = planWorkouts.map((w) => {
       if (!w.dateObj) return null;
-      const isRest = /rest/i.test(w.title);
       const day = isoDay(w.dateObj);
+      if (seenDates.has(day)) return null;
+      seenDates.add(day);
+      const isRest = /rest/i.test(w.title);
       let status: "completed" | "upcoming" | "skipped" | "rest";
-      if (isRest) { status = "rest"; rest++; }
-      else {
+      if (actDays.has(day)) {
+        // Any linked activity on a planned day counts as completion,
+        // even if the planned row was a rest day.
+        status = "completed"; completed++; total++;
+      } else if (isRest) {
+        status = "rest"; rest++;
+      } else {
         total++;
-        if (actDays.has(day)) { status = "completed"; completed++; }
-        else if (w.dateObj < today) { status = "skipped"; skipped++; }
+        if (w.dateObj < today) { status = "skipped"; skipped++; }
         else { status = "upcoming"; upcoming++; }
       }
       return { date: day, dateObj: w.dateObj, title: w.title, status };
