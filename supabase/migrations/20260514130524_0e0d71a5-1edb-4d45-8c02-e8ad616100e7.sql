@@ -1,0 +1,1 @@
+CREATE POLICY "Users can update own readiness snapshots" ON public.readiness_snapshots FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
