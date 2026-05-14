@@ -47,7 +47,8 @@ export async function runAutoSyncOnce(
     };
 
     // Fan out — each call swallows its own errors so one missing
-    // integration never blocks the others.
+    // integration never blocks the others. Strava is intentionally excluded
+    // here (it's covered by manual / scheduled sync paths).
     await Promise.allSettled([
       fetch(`${baseUrl}/functions/v1/intervals-wellness`, {
         method: "POST",
@@ -57,14 +58,6 @@ export async function runAutoSyncOnce(
         method: "POST",
         headers,
         body: JSON.stringify({ days: 7 }),
-      }).catch(() => null),
-      fetch(`${baseUrl}/functions/v1/strava-import`, {
-        method: "POST",
-        headers,
-      }).catch(() => null),
-      fetch(`${baseUrl}/functions/v1/intervals-sync`, {
-        method: "POST",
-        headers,
       }).catch(() => null),
     ]);
 
