@@ -409,9 +409,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   useEffect(() => {
     if (!user) return;
     const today = new Date();
+    // Trend graph starts from this anchor date and grows forward each day.
+    const TREND_ANCHOR = new Date("2026-05-14T00:00:00");
     const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    const dayMs = 86400000;
+    const totalDays = Math.max(1, Math.min(7, Math.floor((today.getTime() - TREND_ANCHOR.getTime()) / dayMs) + 1));
+    for (let i = totalDays - 1; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * dayMs).toISOString().split("T")[0]);
     }
     const startDate = days[0];
 
@@ -520,9 +524,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   // Recompute the 7-day trend whenever raw snapshots or display mode changes
   useEffect(() => {
     const today = new Date();
+    const TREND_ANCHOR = new Date("2026-05-14T00:00:00");
+    const dayMs = 86400000;
+    const totalDays = Math.max(1, Math.min(7, Math.floor((today.getTime() - TREND_ANCHOR.getTime()) / dayMs) + 1));
     const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    for (let i = totalDays - 1; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * dayMs).toISOString().split("T")[0]);
     }
     const byDay = new Map<string, TrendSnapshot[]>();
     trendSnapshots.forEach((s) => {
@@ -797,7 +804,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness Trend</h4>
                     <div className="flex items-center gap-2">
                       <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
                         <button
