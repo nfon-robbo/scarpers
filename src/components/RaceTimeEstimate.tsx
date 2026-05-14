@@ -18,9 +18,11 @@ function classify(title: string): SessionType | null {
   // Exclude only pure rest days or walk-only sessions (not walk/run)
   if (/\brest\b/.test(t)) return null;
   if (/\bwalk\b/.test(t) && !/run|jog/.test(t)) return null;
+  // Walk/run intervals are easy aerobic sessions, not race-pace work
+  if (/walk\/?run|run\/?walk/i.test(title)) return "easy";
   if (/race[\s-]?pace|\bintervals?\b|repeats?|vo2|track|400m|800m|1k repeats/i.test(title)) return "race";
   if (/tempo|threshold|lactate|\blt\b|cruise/i.test(title)) return "tempo";
-  if (/easy|recovery|long\s+run|long\s+slow|steady|aerobic|base|walk\/?run|run\/?walk/i.test(title)) return "easy";
+  if (/easy|recovery|long\s+run|long\s+slow|steady|aerobic|base/i.test(title)) return "easy";
   return "easy";
 }
 
