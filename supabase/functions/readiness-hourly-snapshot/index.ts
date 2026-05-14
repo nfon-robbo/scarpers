@@ -406,11 +406,18 @@ Deno.serve(async (req) => {
         .gte("recorded_at", todayStart.toISOString()).limit(1).maybeSingle();
       if (!existingMorning) {
         const morning = computeReadiness(data, "morning");
-        await supabase.from("readiness_snapshots").insert({
-          user_id: userId, score: morning.score, hour, factors: morning.factors,
-          recorded_at: recordedAt.toISOString(), kind: "morning",
-        });
-        results.push({ user_id: userId, status: "ok", detail: `morning=${morning.score} eod=${eod.score}` });
+        const forbidden = ["Body Battery", "Today's Effort", "Sleep Debt"];
+        const bad = (morning.factors as Array<{ label: string }>).find((f) => forbidden.includes(f.label));
+        if (bad) {
+          console.error(`[hourly] rejected mislabeled morning snapshot for ${userId}: contains "${bad.label}"`, morning.factors);
+          results.push({ user_id: userId, status: "rejected", detail: `morning had EOD modifier "${bad.label}"` });
+        } else {
+          await supabase.from("readiness_snapshots").insert({
+            user_id: userId, score: morning.score, hour, factors: morning.factors,
+            recorded_at: recordedAt.toISOString(), kind: "morning",
+          });
+          results.push({ user_id: userId, status: "ok", detail: `morning=${morning.score} eod=${eod.score}` });
+        }
       } else {
         results.push({ user_id: userId, status: "ok", detail: `eod=${eod.score} (morning exists)` });
       }
