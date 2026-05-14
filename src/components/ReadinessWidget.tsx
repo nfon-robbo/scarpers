@@ -200,7 +200,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
-  const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
+  const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("end");
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
@@ -560,9 +560,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     };
   }, []);
 
-  // Recompute the 7-day trend whenever raw snapshots or display mode changes
+  // Recompute the trend whenever raw snapshots or display mode changes
   useEffect(() => {
     const today = new Date();
+
+    if (trendMode === "today") {
+      // Hourly view for the current calendar day — every snapshot, in order
+      const todayKey = today.toISOString().split("T")[0];
+      const todays = trendSnapshots
+        .filter((s) => s.recorded_at.split("T")[0] === todayKey)
+        .slice()
+        .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+      const trendArr = todays.map((s) => {
+        const d = new Date(s.recorded_at);
+        return {
+          day: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }),
+          score: s.score,
+        };
+      });
+      setTrend(trendArr);
+      return;
+    }
+
     const dayMs = 86400000;
     const totalDays = 7;
     const days: string[] = [];
@@ -908,6 +927,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         >
                           Morning
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrendMode("today")}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
+                            trendMode === "today" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          Today
+                        </button>
                       </div>
                       <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
                     </div>
@@ -915,6 +944,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   {trendMode === "morning" && (
                     <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
                       Morning score is taken after sleep data has synced to ensure accuracy.
+                    </p>
+                  )}
+                  {trendMode === "today" && (
+                    <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
+                      Hourly snapshots taken throughout today.
                     </p>
                   )}
                   <ResponsiveContainer width="100%" height={160}>
