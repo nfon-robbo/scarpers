@@ -711,7 +711,7 @@ export default function Analytics() {
               <div className="flex gap-1 min-w-max pb-1">
                 {progress.days.map((d) => (
                   <div
-                    key={d.date}
+                    key={d.key}
                     title={`${d.date} · ${d.title} · ${d.status}`}
                     className={cn(
                       "h-8 w-3 rounded-sm shrink-0",
