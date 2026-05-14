@@ -1386,7 +1386,7 @@ const TrainingPlanPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleUndo}
+                  onClick={() => handleUndo()}
                   className="gap-2"
                   title={`Undo last change (${undoCount} step${undoCount === 1 ? "" : "s"} available)`}
                 >
