@@ -1236,8 +1236,9 @@ const TrainingPlanPage = () => {
         const descriptiveTitle = deriveWorkoutTitle(w.title, steps, totalMins);
         const baseName = descriptiveTitle
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
-          .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers - — Walk"
-        const correctedName = /^scarpers\s*[-–—]/i.test(baseName) ? baseName : `Scarpers - ${baseName}`;
+          .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "") // strip any existing brand prefix
+          .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers Dash - — Walk"
+        const correctedName = `Scarpers Dash - ${baseName}`;
         return {
           date: dateStr,
           name: correctedName,
