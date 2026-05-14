@@ -80,6 +80,16 @@ const Activities = () => {
       setActivities((prev) =>
         prev.map((a) => a.id === activityId ? { ...a, training_plan_id: newValue } : a)
       );
+      // Notify Training Plan page (and anything else) to refetch completion state
+      try {
+        window.dispatchEvent(new CustomEvent("plan-link-changed", { detail: { activityId, planId: newValue } }));
+      } catch {}
+      toast({
+        title: currentlyAllocated ? "Removed from plan" : "Linked to plan",
+        description: currentlyAllocated
+          ? "This activity no longer counts toward plan completion."
+          : "This activity now counts as a completed plan workout.",
+      });
     }
     setTogglingPlan(null);
   };
