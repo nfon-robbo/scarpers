@@ -97,11 +97,18 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
             const cells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
             if (cells.length >= 3) {
               const getCell = (idx: number, fallback = "") => (idx >= 0 ? (cells[idx] || fallback) : fallback);
+              const segName = getCell(segmentIdx, cells[0] || "");
+              // Strip mobility / stretching / yoga / foam-rolling segments — these
+              // should never appear as workout rows (per user instruction).
+              if (/\b(mobility|static\s*stretch(?:ing)?|stretch(?:ing)?|foam[\s-]*roll(?:ing)?|yoga|pilates)\b/i.test(segName)) {
+                i++;
+                continue;
+              }
               const target = getCell(targetIdx, cells[2] || "");
               const explicitHrZone = getCell(hrIdx, "");
               const derivedHrZone = explicitHrZone || (/\bZ\d|\bLTHR\b|\bbpm\b/i.test(target) ? target : "");
               segments.push({
-                segment: getCell(segmentIdx, cells[0] || ""),
+                segment: segName,
                 duration: getCell(durationIdx, cells[1] || ""),
                 target,
                 hrZone: derivedHrZone,
