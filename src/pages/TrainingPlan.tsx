@@ -1081,7 +1081,7 @@ const TrainingPlanPage = () => {
       return;
     }
 
-    const workoutSection = dayAdjustResult.match(/##\s*📝\s*(?:Recommended Workout|Workout for Today)\s*\n([\s\S]*?)(?=\n##\s|$)/i);
+    const workoutSection = dayAdjustResult.match(/##\s*📝\s*(?:Recommended Workout|Workout for Today)[^\n]*\n([\s\S]*?)(?=\n##\s|$)/i);
     if (!workoutSection) {
       toast({ title: "Could not extract adjusted workout", description: "The AI response format was unexpected. Please try again.", variant: "destructive" });
       return;
