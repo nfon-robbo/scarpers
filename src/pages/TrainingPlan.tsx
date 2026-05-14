@@ -213,18 +213,50 @@ function deriveWorkoutTitle(
   }
 
   const cleanedOriginal = originalTitle
-    .replace(/^scarpers\s*[-–—]\s*/i, "")
+    .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "")
     .replace(/\s*\(Total:[^)]*\)/i, "")
     .trim();
 
-  // Only relabel as "Nx... intervals" when there are ACTUAL repeated reps
-  // or rest steps. A single continuous work block (e.g. plain easy run with
-  // one Main row) should keep its original title — calling a 15-min easy run
-  // "1x15min walk-run intervals" is wrong and misleads the user.
+  // Detect dominant intent from original title
+  const intentFromTitle = /tempo/i.test(cleanedOriginal)
+    ? "tempo"
+    : /threshold/i.test(cleanedOriginal)
+      ? "threshold"
+      : /hill/i.test(cleanedOriginal)
+        ? "hill reps"
+        : /long/i.test(cleanedOriginal)
+          ? "long run"
+          : /recovery/i.test(cleanedOriginal)
+            ? "recovery"
+            : /vo2|v02/i.test(cleanedOriginal)
+              ? "VO2max"
+              : /fartlek/i.test(cleanedOriginal)
+                ? "fartlek"
+                : /progress/i.test(cleanedOriginal)
+                  ? "progression"
+                  : null;
+
   const hasMultipleReps = groups.some((g) => g.reps > 1);
   const hasRest = groups.some((g) => g.restDur > 0);
+
+  // Continuous (no real intervals) — build a descriptive label from steps
   if (groups.length === 0 || (!hasMultipleReps && !hasRest)) {
-    return originalTitle;
+    // Find the dominant (longest non warm-up / cool-down) step
+    const main = [...steps].sort((a, b) => b.duration - a.duration)[0];
+    const intensity = main?.intensity || "Easy";
+    const labelMap: Record<string, string> = {
+      Easy: "easy run",
+      Recovery: "recovery jog",
+      Tempo: "tempo run",
+      Threshold: "threshold run",
+      Long: "long run",
+      Interval: "interval run",
+      Warmup: "easy run",
+      Cooldown: "easy run",
+      Rest: "rest",
+    };
+    const base = intentFromTitle ?? labelMap[intensity] ?? "run";
+    return `${base.charAt(0).toUpperCase()}${base.slice(1)} ${totalMins}min (Total: ${totalMins} min)`;
   }
 
   const descs = groups.map((g) =>
@@ -232,15 +264,11 @@ function deriveWorkoutTitle(
       ? `${g.reps}x${fmt(g.workDur)} run / ${fmt(g.restDur)} walk`
       : `${g.reps}x${fmt(g.workDur)}`,
   );
-  const intent = /tempo/i.test(cleanedOriginal)
-    ? "tempo intervals"
-    : /threshold/i.test(cleanedOriginal)
-      ? "threshold intervals"
-      : /hill/i.test(cleanedOriginal)
-        ? "hill reps"
-        : /long/i.test(cleanedOriginal)
-          ? "long-run intervals"
-          : "walk-run intervals";
+  const intent = intentFromTitle
+    ? `${intentFromTitle} intervals`
+    : hasRest
+      ? "walk-run intervals"
+      : "intervals";
 
   return `${descs.join(" + ")} ${intent} (Total: ${totalMins} min)`;
 }
