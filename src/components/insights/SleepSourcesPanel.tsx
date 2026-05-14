@@ -16,7 +16,7 @@ const fmtH = (secs: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
-const fmtMin = (secs: number) => (secs ? `${Math.round(secs / 60)}m` : "—");
+const fmtMin = fmtH; // HH:MM for Deep/REM/Light/Awake
 
 const sourceLabel = (s: string) => (s === "google_fit" ? "Google Fit" : "Health Connect");
 
