@@ -444,12 +444,18 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                       <CardContent className="p-4">
                         <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Cadence & Power</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
-                          <Stat label="Avg Cadence" value={data.avg_cadence ? `${Math.round(data.avg_cadence)} rpm` : null} icon={Footprints} />
+                          <Stat label="Avg Cadence" value={(() => {
+                            if (!data.avg_cadence) return null;
+                            const isRun = (data.activity_type ?? "").toLowerCase().includes("run");
+                            return isRun
+                              ? `${Math.round(data.avg_cadence * 2)} spm`
+                              : `${Math.round(data.avg_cadence)} rpm`;
+                          })()} icon={Footprints} />
                           <Stat label="Run-only Cadence" value={(() => {
                             const samples = track.filter((p: any) => typeof p.cadence === "number" && p.cadence >= 70);
                             if (samples.length < 5) return null;
                             const avg = samples.reduce((s: number, p: any) => s + p.cadence, 0) / samples.length;
-                            return `${Math.round(avg)} rpm (${Math.round(avg * 2)} spm)`;
+                            return `${Math.round(avg * 2)} spm`;
                           })()} icon={Footprints} />
                           <Stat label="Avg Power" value={data.avg_power ? `${Math.round(data.avg_power)} W` : null} icon={Zap} />
                           <Stat label="Max Power" value={data.max_power ? `${Math.round(data.max_power)} W` : null} icon={Zap} />
@@ -574,6 +580,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                         track={track}
                         avgHR={data.avg_heart_rate}
                         maxHR={data.max_heart_rate}
+                        activityType={data.activity_type}
                       />
                     )}
                   </TabsContent>

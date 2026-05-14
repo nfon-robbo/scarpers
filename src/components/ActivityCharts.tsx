@@ -32,6 +32,7 @@ interface Props {
   track: GpsPoint[];
   avgHR?: number | null;
   maxHR?: number | null;
+  activityType?: string | null;
 }
 
 const tooltipStyle = {
@@ -41,7 +42,10 @@ const tooltipStyle = {
   fontSize: 11,
 };
 
-const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
+const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
+  const isRunning = (activityType ?? "").toLowerCase().includes("run");
+  const cadenceMult = isRunning ? 2 : 1;
+  const cadenceUnit = isRunning ? "spm" : "rpm";
   const { fmt, label, units } = useUnits();
   const KM_TO_MI = 0.621371;
   const M_TO_FT = 3.28084;
@@ -70,7 +74,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
           hr: p.heart_rate ?? null,
           speed: displaySpeed ? Math.round(displaySpeed * 10) / 10 : null,
           altitude: displayAlt != null ? Math.round(displayAlt * 10) / 10 : null,
-          cadence: p.cadence ?? null,
+          cadence: p.cadence != null ? p.cadence * cadenceMult : null,
           power: p.power ?? null,
           temperature: displayTemp != null ? Math.round(displayTemp * 10) / 10 : null,
           vert_osc: p.vertical_oscillation != null ? Math.round(p.vertical_oscillation * 10) / 10 : null,
@@ -156,7 +160,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
     const speedMult = units.speed === "mph" ? KM_TO_MI : 1;
 
     // Cadence & power stats
-    const cadencePoints = track.filter((p) => p.cadence && p.cadence > 0).map((p) => p.cadence!);
+    const cadencePoints = track.filter((p) => p.cadence && p.cadence > 0).map((p) => p.cadence! * cadenceMult);
     const hasCadence = cadencePoints.length > 10;
     const avgCadence = cadencePoints.length ? Math.round(cadencePoints.reduce((a, b) => a + b, 0) / cadencePoints.length) : null;
 
@@ -308,7 +312,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
                 <Gauge className="w-4 h-4 text-chart-4" /> Cadence
               </CardTitle>
               <CardDescription className="text-xs">
-                RPM over time{analysis.avgCadence ? ` · Avg ${analysis.avgCadence} rpm` : ""}
+                {isRunning ? "Steps per minute" : "RPM"} over time{analysis.avgCadence ? ` · Avg ${analysis.avgCadence} ${cadenceUnit}` : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-4">
@@ -319,7 +323,7 @@ const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
                   <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                   <Tooltip contentStyle={tooltipStyle} />
                   {analysis.avgCadence && <ReferenceLine y={analysis.avgCadence} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Avg ${analysis.avgCadence}`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />}
-                  <Area type="monotone" dataKey="cadence" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={1.5} name="Cadence (rpm)" dot={false} />
+                  <Area type="monotone" dataKey="cadence" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={1.5} name={`Cadence (${cadenceUnit})`} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
