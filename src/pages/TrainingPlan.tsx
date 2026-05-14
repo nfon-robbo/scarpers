@@ -408,7 +408,7 @@ const TrainingPlanPage = () => {
   }, [loadSavedPlan]);
 
   const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string } = {}) => {
-    if (!user) return;
+    if (!user) return null;
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
     const undoContent = options.prevContent ?? content;
 
@@ -430,7 +430,7 @@ const TrainingPlanPage = () => {
       else if (options.undoLabel && undoContent && undoContent !== planContent) {
         pushUndoEntry(savedPlanId, undoContent, options.undoLabel);
       }
-      return;
+      return error ? null : savedPlanId;
     }
 
     // Archive old plan instead of deleting, then insert new one (new plan generations)
@@ -458,7 +458,9 @@ const TrainingPlanPage = () => {
       if (options.undoLabel && previousPlanContent && previousPlanContent !== planContent) {
         pushUndoEntry(data.id, previousPlanContent, options.undoLabel);
       }
+      return data.id;
     }
+    return null;
   };
 
   const deletePlan = async () => {
