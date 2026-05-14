@@ -546,12 +546,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           // If none qualify, leave a gap rather than show a pre-sync score
           // that doesn't reflect that morning's actual recovery.
           const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
-          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12));
+          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12)) ?? after5[0] ?? rows[0];
         } else {
           // End of day = last snapshot of the day, but only if sleep had
           // synced by then. Otherwise the score is noise — show a gap.
           const synced = rows.filter((r) => r.sleepSynced);
-          pick = synced[synced.length - 1];
+          pick = synced[synced.length - 1] ?? rows[rows.length - 1];
         }
       }
       return {
