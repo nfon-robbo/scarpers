@@ -160,7 +160,7 @@ export function deriveWorkoutTitleFromSegments(
   if (!cleanedOriginal || /^rest\b/i.test(cleanedOriginal)) return cleanedOriginal;
 
   // Parse each segment into seconds + role + intensity
-  type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string };
+  type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string; restSecs?: number };
   const parsed: Seg[] = [];
   let totalSecs = 0;
   for (const raw of segments) {
@@ -168,23 +168,11 @@ export function deriveWorkoutTitleFromSegments(
     const segName = raw.segment || "";
     const targetText = `${raw.target || ""} ${raw.notes || ""} ${raw.hrZone || ""}`;
 
-    let reps = 1;
-    let perSecs = 0;
-    const repMatch = dur.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
-    if (repMatch) {
-      reps = parseInt(repMatch[1], 10);
-      const v = parseFloat(repMatch[2]);
-      const unit = repMatch[3].toLowerCase();
-      perSecs = unit.startsWith("s") ? v : v * 60;
-    } else {
-      const min = dur.match(/(\d+(?:\.\d+)?)\s*min/i);
-      const sec = dur.match(/(\d+(?:\.\d+)?)\s*(?:sec|s)\b/i);
-      const colon = dur.match(/(\d{1,3}):(\d{2})/);
-      if (min) perSecs = parseFloat(min[1]) * 60;
-      else if (sec) perSecs = parseFloat(sec[1]);
-      else if (colon) perSecs = parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
-    }
-    const segSecs = reps * perSecs;
+    const repeat = parseRepeatDuration(dur);
+    const reps = repeat?.reps ?? 1;
+    const perSecs = repeat?.workSecs ?? parseDurationSeconds(dur);
+    const restSecs = repeat?.restSecs ?? 0;
+    const segSecs = repeat ? reps * (perSecs + restSecs) : reps * perSecs;
     totalSecs += segSecs;
 
     let role: Seg["role"] = "main";
@@ -198,7 +186,7 @@ export function deriveWorkoutTitleFromSegments(
     else if (/Z4|Z5|interval|VO2|v02/i.test(targetText)) intensity = "Interval";
     else if (/long/i.test(segName) || /long/i.test(cleanedOriginal)) intensity = "Long";
     else if (/recovery|Z1\b/i.test(targetText) && role === "main") intensity = "Recovery";
-    parsed.push({ secs: perSecs, role, reps, intensity });
+    parsed.push({ secs: perSecs, role, reps, intensity, restSecs });
   }
 
   const totalMins = Math.max(1, Math.round(totalSecs / 60));
@@ -212,7 +200,7 @@ export function deriveWorkoutTitleFromSegments(
     if (cur.reps > 1) {
       // explicit "Nx" segment — pair with following recovery if any
       const next = parsed[i + 1];
-      const rest = next && next.role === "recovery" ? next.secs : 0;
+      const rest = cur.restSecs || (next && next.role === "recovery" ? next.secs : 0);
       groups.push({ work: cur.secs, rest, reps: cur.reps });
       if (rest) i++;
     }
