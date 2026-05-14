@@ -365,8 +365,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const monthlyLoadAvg = monthlyTotal / 28;
 
       // Determine wake time from sleep stages (latest end_time on most recent date)
-      const todaySleepStages = (sleepStages as any[]).filter((s: any) => s.date === today || s.date === yesterday);
-      const endTimes = todaySleepStages
+      const endTimes = todaysStageRows
         .filter((s: any) => s.end_time)
         .map((s: any) => new Date(s.end_time).getTime())
         .sort((a: number, b: number) => b - a);
@@ -382,11 +381,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setData({
         sleepScore: finalSleepScore,
         sleepHours: sleepDuration ? sleepDuration / 3600 : null,
-        deepPct: hasSleepStages && totalSleep > 0 ? (stages.deep / totalSleep) * 100 : null,
-        remPct: hasSleepStages && totalSleep > 0 ? (stages.rem / totalSleep) * 100 : null,
-        rhr: (latestMetrics as any)?.resting_heart_rate ?? null,
+        deepPct: hasSleepStages && totalSleep > 0 ? (stages.deep / totalSleep) * 100 : metricStageTotal ? ((metricDeepSeconds as number) / metricStageTotal) * 100 : null,
+        remPct: hasSleepStages && totalSleep > 0 ? (stages.rem / totalSleep) * 100 : metricStageTotal ? ((metricRemSeconds as number) / metricStageTotal) * 100 : null,
+        rhr: (todayMetrics as any)?.resting_heart_rate ?? null,
         rhrBaseline,
-        hrv: (latestMetrics as any)?.hrv ?? null,
+        hrv: (todayMetrics as any)?.hrv ?? null,
         hrvBaseline,
         yesterdayLoad: yesterdayLoad > 0 ? yesterdayLoad : null,
         stressScore: (latestMetrics as any)?.stress_score ?? null,
