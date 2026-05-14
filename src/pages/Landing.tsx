@@ -632,7 +632,7 @@ const Landing = () => {
                     {v === true ? (
                       <Check className="w-4 h-4 text-primary inline" />
                     ) : v === false ? (
-                      <X className="w-4 h-4 text-muted-foreground/50 inline" />
+                      <X className="w-4 h-4 text-muted-foreground inline" aria-label="Not included" />
                     ) : (
                       <span className="text-xs text-muted-foreground">{v}</span>
                     )}
