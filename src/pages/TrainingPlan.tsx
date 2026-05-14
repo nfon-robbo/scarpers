@@ -1312,12 +1312,9 @@ const TrainingPlanPage = () => {
       setContent(result.markdown);
       
       // Save to database
-      await savePlan(result.markdown, { undoLabel: "DOCX import", prevContent: previousContent });
+      const planId = await savePlan(result.markdown, { undoLabel: "DOCX import", prevContent: previousContent });
 
-      toast({
-        title: `Imported ${result.workoutCount} workouts!`,
-        description: `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`,
-      });
+      toastPlanChange(`Imported ${result.workoutCount} workouts!`, `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`, previousContent ? planId : null);
     } catch (err) {
       toast({
         title: "Import failed",
@@ -1350,14 +1347,11 @@ const TrainingPlanPage = () => {
       setRaceDate(new Date(result.endDate));
       setLetAIDecide(false);
       setContent(result.markdown);
-      await savePlan(result.markdown, { undoLabel: "FIT import", prevContent: previousContent });
+      const planId = await savePlan(result.markdown, { undoLabel: "FIT import", prevContent: previousContent });
 
-      toast({
-        title: `Imported ${result.workoutCount} workouts!`,
-        description: result.errors.length
-          ? `Some files couldn't be parsed (${result.errors.length}).`
-          : `Plan from ${result.startDate} to ${result.endDate}.`,
-      });
+      toastPlanChange(`Imported ${result.workoutCount} workouts!`, result.errors.length
+        ? `Some files couldn't be parsed (${result.errors.length}).`
+        : `Plan from ${result.startDate} to ${result.endDate}.`, previousContent ? planId : null);
     } catch (err) {
       toast({
         title: "Import failed",
