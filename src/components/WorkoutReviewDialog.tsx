@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { ParsedWorkout } from "@/lib/plan-export";
+import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
 interface Props {
   open: boolean;
