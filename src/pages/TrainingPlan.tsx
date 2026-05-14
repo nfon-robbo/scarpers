@@ -492,14 +492,6 @@ const TrainingPlanPage = () => {
           content: planContent,
         } as any)
         .eq("id", savedPlanId);
-          race_distance: raceDistance,
-          goal_time: goalTime || null,
-          training_days: trainingDays,
-          start_date: toLocalISODate(startDate),
-          race_date: raceDateValue,
-          content: planContent,
-        } as any)
-        .eq("id", savedPlanId);
       if (error) console.error("In-place plan update failed:", error);
       else if (options.undoLabel && undoContent && undoContent !== planContent) {
         pushUndoEntry(savedPlanId, undoContent, options.undoLabel);
