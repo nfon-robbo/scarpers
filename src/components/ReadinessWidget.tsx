@@ -495,23 +495,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       };
       setSparklines(series);
 
-      // Build daily avg snapshot trend
-      const byDay = new Map<string, number[]>();
-      (snaps as any[]).forEach((s) => {
-        const d = s.recorded_at.split("T")[0];
-        if (!byDay.has(d)) byDay.set(d, []);
-        byDay.get(d)!.push(s.score);
-      });
-      const trendArr = days.map((d) => {
-        const vals = byDay.get(d);
-        return {
-          day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
-          score: vals ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
-        };
-      });
-      setTrend(trendArr);
-    });
-  }, [user]);
+      // Store raw snapshots; trend is recomputed in a separate effect when mode changes
+      setTrendSnapshots((snaps as any[]).map((s) => ({ recorded_at: s.recorded_at, score: s.score })));
 
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
