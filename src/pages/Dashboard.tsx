@@ -636,10 +636,11 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* ── Upward adaptation offer (one-tap accept) ── */}
-      {adaptEval?.direction === "up" && user && (
+      {/* ── Plan adaptation offer (opt-in for both directions) ── */}
+      {adaptEval && (adaptEval.direction === "up" || adaptEval.direction === "down") && user && (
         <PlanAdaptationBanner
           userId={user.id}
+          direction={adaptEval.direction}
           detail={adaptEval.detail}
           onDone={() => setAdaptEval(null)}
         />
