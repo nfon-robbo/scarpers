@@ -1073,10 +1073,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
     setDayAdjustDialogOpen(false);
-    toast({
-      title: "Workout updated!",
-      description: "Syncing adjusted workout to Intervals.icu...",
-    });
+    toastPlanChange("Workout updated!", "Syncing adjusted workout to Intervals.icu...", savedPlanId);
 
     // Auto-sync to Intervals.icu after applying adjustment
     setTimeout(() => {
