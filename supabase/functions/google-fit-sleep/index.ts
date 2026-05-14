@@ -247,10 +247,38 @@ Deno.serve(async (req) => {
           source: "google_fit",
         });
         totalStages++;
+        addStage(sleepDate, "sleep", durationSeconds);
       }
     }
 
-    console.log(`Google Fit sleep sync complete: ${totalStages} stages from ${sessions.length} sessions`);
+    // Upsert daily_metrics totals (deep/rem/light/awake minutes + total duration)
+    for (const [date, t] of Object.entries(dailyTotals)) {
+      const totalSecs = t.deep + t.rem + t.light + t.sleep;
+      const { data: existing } = await supabase
+        .from("daily_metrics")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("date", date)
+        .maybeSingle();
+
+      const payload = {
+        user_id: user.id,
+        date,
+        deep_sleep_minutes: Math.round(t.deep / 60),
+        rem_sleep_minutes: Math.round(t.rem / 60),
+        light_sleep_minutes: Math.round((t.light + t.sleep) / 60),
+        awake_during_night_minutes: Math.round(t.awake / 60),
+        sleep_duration_seconds: totalSecs,
+      };
+
+      if (existing) {
+        await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+      } else {
+        await supabase.from("daily_metrics").insert(payload);
+      }
+    }
+
+    console.log(`Google Fit sleep sync complete: ${totalStages} stages from ${sessions.length} sessions, ${Object.keys(dailyTotals).length} daily_metrics rows updated`);
     return new Response(
       JSON.stringify({ synced: totalStages, sessions: sessions.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
