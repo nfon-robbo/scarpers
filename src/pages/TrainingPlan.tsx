@@ -1173,12 +1173,39 @@ const TrainingPlanPage = () => {
         return ds === singleDate;
       });
     } else {
-      // Skip workouts that already have a linked completed activity — no point
-      // pushing them to Intervals/Garmin again.
-      withSegments = withSegments.filter(w => {
+      // Skip workouts on dates that already have a completed activity — no
+      // point pushing them to Intervals/Garmin again. Use linked activities
+      // first, then fall back to any activity logged on that date for this
+      // user (covers cases where the activity hasn't been auto-linked yet).
+      const allDateKeys = new Set<string>(completedDates);
+      try {
+        if (user && withSegments.length > 0) {
+          const sortedDates = withSegments
+            .map((w) => w.dateObj!)
+            .sort((a, b) => a.getTime() - b.getTime());
+          const first = sortedDates[0];
+          const last = sortedDates[sortedDates.length - 1];
+          const fromIso = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-${String(first.getDate()).padStart(2, "0")}T00:00:00.000Z`;
+          // Add 1 day to last so we capture the full final day
+          const lastPlus = new Date(last.getTime() + 24 * 60 * 60 * 1000);
+          const toIso = `${lastPlus.getFullYear()}-${String(lastPlus.getMonth() + 1).padStart(2, "0")}-${String(lastPlus.getDate()).padStart(2, "0")}T00:00:00.000Z`;
+          const { data: acts } = await supabase
+            .from("activities")
+            .select("start_time")
+            .eq("user_id", user.id)
+            .gte("start_time", fromIso)
+            .lt("start_time", toIso);
+          for (const a of acts ?? []) {
+            if (a.start_time) allDateKeys.add(format(new Date(a.start_time), "yyyy-MM-dd"));
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch activity dates for sync filter", e);
+      }
+      withSegments = withSegments.filter((w) => {
         const d = w.dateObj!;
         const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        return !completedDates.has(ds);
+        return !allDateKeys.has(ds);
       });
     }
     if (withSegments.length === 0) {
