@@ -299,7 +299,7 @@ const SleepCalendar = () => {
                     {!hasStages && (
                       <p className="text-xs text-muted-foreground italic">No stage breakdown available — showing total sleep time</p>
                     )}
-                    <p className="text-sm text-muted-foreground">Total: {Math.floor(total / 3600)}h {Math.round((total % 3600) / 60)}m</p>
+                    <p className="text-sm text-muted-foreground">Total: {Math.floor(total / 3600)}:{String(Math.round((total % 3600) / 60)).padStart(2, "0")}</p>
                   </>
                 );
               })()}
