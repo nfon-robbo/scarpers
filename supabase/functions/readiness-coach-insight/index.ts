@@ -22,8 +22,9 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    const { readiness_score, factors } = await req.json();
-    const score = Number(readiness_score);
+    const body = await req.json();
+    const score = Number(body.readiness_score ?? body.score);
+    const factors = body.factors;
     if (!Number.isFinite(score)) throw new Error("readiness_score required");
 
     const factorsText = (factors || [])
