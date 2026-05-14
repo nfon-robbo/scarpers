@@ -1982,9 +1982,17 @@ const TrainingPlanPage = () => {
               <DialogDescription>
                 {dayAdjustMode === "next"
                   ? `Applying coach recommendation to your next session${dayAdjustTargetDate ? ` — ${format(dayAdjustTargetDate, "EEEE d MMMM")}` : ""}`
-                  : "Analyzing your readiness for today's workout"}
+                  : dayAdjustShifted && dayAdjustTargetDate
+                    ? `Analyzing your readiness for ${format(dayAdjustTargetDate, "EEEE d MMMM")}'s workout`
+                    : "Analyzing your readiness for today's workout"}
               </DialogDescription>
             </DialogHeader>
+
+            {dayAdjustMode !== "next" && dayAdjustShifted && (
+              <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground">
+                Today's session is complete — here is what is coming up next.
+              </div>
+            )}
 
             {/* Progress Steps */}
             {dayAdjusting && (
