@@ -312,7 +312,7 @@ const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
                 <Gauge className="w-4 h-4 text-chart-4" /> Cadence
               </CardTitle>
               <CardDescription className="text-xs">
-                RPM over time{analysis.avgCadence ? ` · Avg ${analysis.avgCadence} rpm` : ""}
+                {isRunning ? "Steps per minute" : "RPM"} over time{analysis.avgCadence ? ` · Avg ${analysis.avgCadence} ${cadenceUnit}` : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-4">
@@ -323,7 +323,7 @@ const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
                   <YAxis domain={["auto", "auto"]} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                   <Tooltip contentStyle={tooltipStyle} />
                   {analysis.avgCadence && <ReferenceLine y={analysis.avgCadence} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" label={{ value: `Avg ${analysis.avgCadence}`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />}
-                  <Area type="monotone" dataKey="cadence" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={1.5} name="Cadence (rpm)" dot={false} />
+                  <Area type="monotone" dataKey="cadence" stroke="hsl(var(--chart-4))" fill="hsl(var(--chart-4))" fillOpacity={0.15} strokeWidth={1.5} name={`Cadence (${cadenceUnit})`} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
