@@ -76,6 +76,7 @@ import {
   workoutIntensity,
 } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
+import { AUTO_SYNC_STARTED, AUTO_SYNC_DONE, isAutoSyncDoneThisSession } from "@/lib/auto-sync";
 import BodyBattery48hDialog from "./BodyBattery48hDialog";
 import FactorDetailDialog from "./FactorDetailDialog";
 
@@ -195,6 +196,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [cacheChecked, setCacheChecked] = useState(false);
   const [batteryDialogOpen, setBatteryDialogOpen] = useState(false);
   const [factorDialog, setFactorDialog] = useState<{ label: string; status: "good" | "warning" | "poor"; detail: string } | null>(null);
+  const [autoSyncing, setAutoSyncing] = useState<boolean>(() => {
+    // If user is mid-session and auto-sync hasn't finished yet, assume in
+    // progress so we show the awaiting stamp immediately on mount.
+    return false;
+  });
+
+  // Listen for the global auto-sync lifecycle so we can show "awaiting"
+  // stamps and re-fetch when fresh data lands.
+  useEffect(() => {
+    const onStart = () => setAutoSyncing(true);
+    const onDone = () => {
+      setAutoSyncing(false);
+      // Force fresh recompute now that we (hopefully) have new data.
+      setRefreshNonce((n) => n + 1);
+    };
+    window.addEventListener(AUTO_SYNC_STARTED, onStart);
+    window.addEventListener(AUTO_SYNC_DONE, onDone);
+    return () => {
+      window.removeEventListener(AUTO_SYNC_STARTED, onStart);
+      window.removeEventListener(AUTO_SYNC_DONE, onDone);
+    };
+  }, []);
 
   // Check DB cache for readiness snapshot < 60 min old (skipped when user forces refresh)
   useEffect(() => {
@@ -490,6 +513,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
+
+  // Essentials needed for a real readiness score. While auto-sync is in
+  // flight (or hasn't started yet this session) and any of these are
+  // missing, we suppress the score and show an "awaiting" stamp instead of
+  // a misleading low number driven by missing-data fallbacks.
+  const awaiting = useMemo<string[]>(() => {
+    if (!data) return [];
+    const items: string[] = [];
+    if (data.sleepScore == null && data.deepPct == null) items.push("sleep results");
+    if (data.rhr == null) items.push("resting heart rate");
+    if (data.hrv == null) items.push("HRV");
+    return items;
+  }, [data]);
+
+  // Suppress the score (and snapshot writes) when:
+  //   • auto-sync hasn't completed this session yet, AND
+  //   • we're missing one or more essentials.
+  // Once sync completes, even if data is still missing we surface the score
+  // so the user can see what's actually broken.
+  const autoSyncSettled = !autoSyncing && (user ? isAutoSyncDoneThisSession(user.id) : true);
+  const suppressScore = !autoSyncSettled && awaiting.length > 0;
+
   const displayResult = cached
     ? { score: cached.score, factors: cached.factors as { label: string; status: "good" | "warning" | "poor"; detail: string }[] }
     : (result ?? {
@@ -506,6 +551,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   useEffect(() => {
     if (!result || !user) return;
     if (cached && cached.advice) return;
+    if (suppressScore) return; // don't persist a misleading low score while we're still syncing
     let cancelled = false;
     (async () => {
       setAiLoading(true);
@@ -553,7 +599,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       } as any);
     })();
     return () => { cancelled = true; };
-  }, [result, user, cached]);
+  }, [result, user, cached, suppressScore]);
 
   // Helper: split detail "primary · sub" into two parts
   const splitDetail = (detail: string): { primary: string; sub: string | null } => {
@@ -652,10 +698,25 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + 7-day trend */}
                 <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
-                  <div className="flex items-center justify-center">
-                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                  <div className="relative flex items-center justify-center">
+                    <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
+                      <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                    </div>
+                    {suppressScore && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="rotate-[-8deg] border-2 border-yellow-400/80 rounded-md px-3 py-2 bg-yellow-400/10 backdrop-blur-sm shadow-lg max-w-[180px] text-center">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-yellow-300 flex items-center justify-center gap-1.5">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Awaiting
+                          </div>
+                          <div className="text-[11px] font-semibold text-yellow-100 leading-tight mt-1">
+                            {awaiting.join(" · ")}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {isFallback && (
+                  {isFallback && !suppressScore && (
                     <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Waiting for data
