@@ -230,6 +230,29 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     }
   }
 
+  // ── Cadence improvement → running economy gain ──
+  // Compare each session's cadence to the earliest recorded session's cadence.
+  // 1% improvement above baseline → 1 s/km off the blended pace, capped at 10 s/km total.
+  let cadenceAdjustSec = 0;
+  let cadenceImprovementPct = 0;
+  if (estPace != null) {
+    const withCad = completed
+      .filter(c => c.cadence != null)
+      .sort((a, b) => a.date.getTime() - b.date.getTime()) as { date: Date; cadence: number }[];
+    if (withCad.length >= 2) {
+      const baseline = withCad[0].cadence;
+      // Average % improvement across the most recent up-to-3 sessions vs baseline
+      const recentCad = withCad.slice(-3);
+      const pcts = recentCad.map(c => ((c.cadence - baseline) / baseline) * 100);
+      const avgPct = pcts.reduce((a, n) => a + n, 0) / pcts.length;
+      if (avgPct > 0) {
+        cadenceImprovementPct = avgPct;
+        cadenceAdjustSec = -Math.min(10, avgPct); // 1s/km per 1%, cap at 10
+        estPace = estPace + cadenceAdjustSec;
+      }
+    }
+  }
+
   const estFinish = estPace != null ? estPace * km : null;
 
   // Gauge bounds (relative to goal)
