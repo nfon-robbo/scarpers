@@ -1,4 +1,7 @@
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { autoLinkActivitiesToPlan } from "@/lib/auto-link-activities";
+import { format } from "date-fns";
 
 let running = false;
 
