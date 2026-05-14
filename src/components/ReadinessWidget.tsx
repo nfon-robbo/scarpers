@@ -8,7 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
-type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null };
+type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null; kind: "morning" | "eod" };
 
 function formatSparkValue(label: string, v: number): string {
   if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
@@ -243,6 +243,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           .from("readiness_snapshots")
           .select("score, factors, advice, recorded_at")
           .eq("user_id", user.id)
+          .eq("kind", "eod")
           .order("recorded_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -439,7 +440,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("readiness_snapshots")
-        .select("score, factors, recorded_at")
+        .select("score, factors, recorded_at, kind")
         .eq("user_id", user.id)
         .gte("recorded_at", startDate + "T00:00:00Z")
         .order("recorded_at", { ascending: true })
@@ -515,7 +516,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => {
         const validity = extractSnapshotValidity(s.factors as any[]);
-        return { recorded_at: s.recorded_at, score: s.score, ...validity };
+        return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", ...validity };
       }));
     });
   }, [user]);
@@ -539,19 +540,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
       let pick: TrendSnapshot | undefined;
       if (rows.length) {
-        if (trendMode === "morning") {
-          // Morning = first post-5am snapshot with synced sleep and a plausible
-          // wake-time model. Older noisy snapshots can have sleep data present
-          // but still show 20h awake before midday, which crushes the score.
-          // If none qualify, leave a gap rather than show a pre-sync score
-          // that doesn't reflect that morning's actual recovery.
-          const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
-          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12)) ?? after5[0] ?? rows[0];
-        } else {
-          // End of day = last snapshot of the day, but only if sleep had
-          // synced by then. Otherwise the score is noise — show a gap.
-          const synced = rows.filter((r) => r.sleepSynced);
-          pick = synced[synced.length - 1] ?? rows[rows.length - 1];
+        const wantedKind: "morning" | "eod" = trendMode === "morning" ? "morning" : "eod";
+        const matching = rows.filter((r) => r.kind === wantedKind);
+        if (matching.length) {
+          // Morning = earliest matching; EOD = latest matching
+          pick = wantedKind === "morning" ? matching[0] : matching[matching.length - 1];
         }
       }
       return {
@@ -639,6 +632,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setAiLoading(false);
       const recordedAt = new Date();
       setLastUpdated(recordedAt);
+      // Persist EOD snapshot (the live algorithm includes all daytime modifiers)
       await supabase.from("readiness_snapshots").insert({
         user_id: user.id,
         score: result.score,
@@ -646,7 +640,32 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         factors: result.factors as any,
         advice,
         recorded_at: recordedAt.toISOString(),
+        kind: "eod",
       } as any);
+
+      // Also persist a morning snapshot for today if one isn't already stored
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { data: existingMorning } = await supabase
+        .from("readiness_snapshots")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("kind", "morning")
+        .gte("recorded_at", todayStart.toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (!existingMorning && data) {
+        const morning = computeReadiness(data, "morning");
+        await supabase.from("readiness_snapshots").insert({
+          user_id: user.id,
+          score: morning.score,
+          hour: recordedAt.getHours(),
+          factors: morning.factors as any,
+          advice: null,
+          recorded_at: recordedAt.toISOString(),
+          kind: "morning",
+        } as any);
+      }
     })();
     return () => { cancelled = true; };
   }, [result, user, cached, suppressScore]);

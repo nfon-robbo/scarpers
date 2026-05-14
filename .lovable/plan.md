@@ -1,38 +1,67 @@
 ## Goal
 
-Stop the system silently rewriting the current week when readiness is low. Instead, surface a banner and let the user choose. Also give a one-tap path to revert the 13/05 adaptation that swapped your intervals to easy runs.
+Make morning and end-of-day readiness genuinely different, and have a background job take an hourly snapshot per user so the trend reflects fresh data without the dashboard recomputing on every load.
 
-## Changes
+## 1. Database schema
 
-1. **Dashboard auto-adapt flow (`src/pages/Dashboard.tsx`)**
-   - When `evaluateAdaptation()` returns `direction: "down"`, no longer call the edge function automatically. Instead set `adaptEval` so the banner renders (mirrors how `"up"` already behaves).
-   - Respect a per-day dismissal so the banner doesn't re-appear all day if you ignore it.
+Add a `kind` column to `readiness_snapshots`:
 
-2. **Banner supports both directions (`src/components/PlanAdaptationBanner.tsx`)**
-   - Add a `direction: "up" | "down"` prop.
-   - **Down copy:** title "Ease this week?", body "Readiness has been low for 2 days. We can drop intensity to ~85% and swap intervals for easy runs this week only." Buttons: **Ease this week** / **Keep as planned** / dismiss X.
-   - **Up copy:** unchanged.
-   - On accept: call `plan-auto-adapt` with the chosen mode, push undo entry, toast with "View" + "Undo" actions.
+- `kind text not null default 'eod'` with check `kind in ('morning','eod')`
+- Index on `(user_id, kind, recorded_at desc)` for fast latest lookups
+- Backfill: mark all existing rows as `kind = 'morning'` (the recent recalc used the morning algorithm)
 
-3. **Per-day dismissal helpers (`src/lib/plan-adaptation.ts`)**
-   - Add `isDownwardDismissedToday(userId)` / `dismissDownwardToday(userId)` mirroring the existing upward helpers.
-   - Skip showing the down banner if dismissed today.
+## 2. Two scoring modes
 
-4. **Restore the 13/05 adaptation (one-off, surfaced in Training Plan page)**
-   - On `/training-plan`, if `last_adapted_at` is within the last 7 days **and** there's a matching entry in `plan-undo-history`, show a small inline strip: *"This week was auto-adjusted on DD/MM/YYYY (recovery). Restore original?"* with a Restore button that swaps `content` back to the previous version (uses existing `pushUndoEntry` / undo history).
-   - Strip auto-clears once the user dismisses or restores.
+In `src/lib/readiness.ts`, extend `computeReadiness(d, mode)` where `mode: 'morning' | 'eod'` (default `'eod'` to keep callers working).
 
-5. **Edge function (`supabase/functions/plan-auto-adapt/index.ts`)**
-   - No behavioural change. It still does the surgical edit when invoked. We're just no longer invoking it without consent.
+Morning mode reflects state immediately after sleep sync — overnight recovery only:
 
-6. **Memory update**
-   - Update `mem://features/training-plans/auto-adaptation` to reflect: down adaptation is now **opt-in via banner** (was auto). Up adaptation unchanged.
+- Same Phase 1 core factors (Sleep, Deep, RHR, HRV, Yesterday's Load)
+- Skip all modifiers: Recovery, Sleep Debt, Training Ramp / Freshness, Today's Effort
+- Skip `bodyBatteryDrain` entirely (no hours-awake passive drain, no active drain, no daytime charge)
+- Body Battery factor not added
+- Sleep Debt still allowed (overnight signal) — but Today's Effort/Recovery omitted
+
+End-of-day mode = current behaviour, unchanged.
+
+## 3. Hourly background job
+
+New edge function `readiness-hourly-snapshot` (no JWT verify, service role):
+
+1. List all users with at least one activity, sleep stage, or daily metric in the last 14 days (the "active user" cohort)
+2. For each user:
+   - Trigger the existing per-user sync path used by `auto-sync` (Google Fit + Intervals; Strava already excluded from auto sync per memory) so the latest data lands first
+   - Build the same `ReadinessData` the dashboard builds (rebuild the data assembly server-side using existing tables)
+   - Call `computeReadiness(data, 'morning')` and `computeReadiness(data, 'eod')`
+   - Insert two rows into `readiness_snapshots` with appropriate `kind`, `score`, `factors`, `recorded_at = now()`, `hour = current UTC hour`
+3. Always insert even when no new source data (so trend points stay consistent)
+
+Schedule via `pg_cron` at `0 * * * *` (top of every UTC hour) calling the function with the service role key (uses `supabase--insert` to register because the URL contains the project ref).
+
+The existing daily auto-sync cron stays for now; the hourly job effectively supersedes it but we won't remove it in this change.
+
+## 4. Dashboard reads
+
+`ReadinessWidget`:
+
+- Drop the heuristic that picks "morning" vs "eod" from a single pool
+- Query latest morning snapshot and latest eod snapshot per day for the 7-day window using the new `kind` column
+- Live computation on the dashboard remains for the "now" display only; the trend lines come purely from snapshots
+- Hourly cache on the dashboard is kept
+
+## 5. Backfill historical morning scores
+
+Existing post-14/05 rows are already morning-style — relabel them `kind='morning'`. We won't synthesise a historical end-of-day series; the eod line will start populating from the first hourly cron run forward (an explicit gap before that is honest).
+
+## Technical notes
+
+- Server-side `ReadinessData` assembly mirrors the queries in `ReadinessWidget` lines ~408–520 and the per-user `computeReadiness` inputs from earlier in the file. Extract a small shared helper in `supabase/functions/_shared/readiness-data.ts` so the edge function and the client stay consistent (the client can keep using it via copy, since edge functions can't import from `src/`).
+- The sync trigger reuses the same logic as `auto-sync/index.ts` — call its per-user routine in-process rather than HTTP-invoking it.
+- `kind` index avoids full table scans as snapshots accumulate (24 rows × users × day).
+- Cron registration uses `supabase--insert` because the SQL embeds the project URL and anon key.
 
 ## Out of scope
 
-- Trigger thresholds (`READINESS_DOWN_THRESHOLD = 55`, 2 consecutive days) stay as-is — only the *application* becomes opt-in.
-- The Day-Ahead popup and chatbot rationalisations are unrelated and untouched.
-
-## Notes
-
-- The 13/05 adaptation is already in the database (`last_adaptation_reason: readiness_low_2d`). The Restore strip in step 4 is the recovery path for that specific event; from now on, you'll see the banner first and nothing changes without your tap.
+- Removing the existing daily auto-sync cron
+- Backfilling a historical end-of-day series
+- UI copy changes beyond what the existing morning/eod toggle already shows
