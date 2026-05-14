@@ -617,36 +617,47 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     (async () => {
       setAiLoading(true);
       let advice: string | null = null;
+      let insight = "";
+      let recommendation = "";
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({
-              readiness_score: result.score,
-              factors: result.factors,
-              current_hour_local: new Date().getHours(),
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              missing_data: result.factors
-                .filter(f => f.status === "warning" && f.detail === "Not synced")
-                .map(f => f.label.toLowerCase()),
-            }),
-          }
-        );
-        if (resp.ok) {
-          const d = await resp.json();
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        };
+        const baseBody = {
+          readiness_score: result.score,
+          factors: result.factors,
+          current_hour_local: new Date().getHours(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          missing_data: result.factors
+            .filter(f => f.status === "warning" && f.detail === "Not synced")
+            .map(f => f.label.toLowerCase()),
+        };
+        const [adviceResp, insightResp] = await Promise.all([
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`, {
+            method: "POST", headers, body: JSON.stringify(baseBody),
+          }),
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-coach-insight`, {
+            method: "POST", headers,
+            body: JSON.stringify({ readiness_score: result.score, factors: result.factors }),
+          }),
+        ]);
+        if (adviceResp.ok) {
+          const d = await adviceResp.json();
           advice = d.advice ?? null;
+        }
+        if (insightResp.ok) {
+          const d = await insightResp.json();
+          insight = d.insight || "";
+          recommendation = d.recommendation || "";
         }
       } catch { /* swallow */ }
       if (cancelled) return;
       setAiAdvice(advice ?? "");
+      if (insight || recommendation) setCoachInsight({ insight, recommendation });
       setAiLoading(false);
       const recordedAt = new Date();
       setLastUpdated(recordedAt);
@@ -657,6 +668,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         hour: recordedAt.getHours(),
         factors: result.factors as any,
         advice,
+        insight: insight || null,
+        recommendation: recommendation || null,
         recorded_at: recordedAt.toISOString(),
         kind: "eod",
       } as any);
