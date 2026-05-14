@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles } from "lucide-react";
+import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,8 @@ interface Props {
   activity: any | null;
   workoutDate: Date | null;
   workoutTitle: string;
+  /** Only the latest completed workout can request a fresh elite-coach recommendation. */
+  canRequestCoach?: boolean;
 }
 
 type Difficulty = "Too easy" | "Just right" | "Hard" | "Too hard";
@@ -45,7 +47,7 @@ const ChoiceRow = ({ label, options, value, onChange }: { label: string; options
   </div>
 );
 
-export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity, workoutDate, workoutTitle }: Props) {
+export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity, workoutDate, workoutTitle, canRequestCoach = true }: Props) {
   const navigate = useNavigate();
   const [reviewContent, setReviewContent] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -61,12 +63,16 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachDone, setCoachDone] = useState(false);
 
+  // Track whether we already loaded an existing saved review for this activity
+  const hydratedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!open) return;
     setReviewContent("");
     setReviewLoading(true);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
+    hydratedRef.current = null;
 
     if (!workout || !activity) { setReviewLoading(false); return; }
 
@@ -74,6 +80,34 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setReviewLoading(false); return; }
+
+      // 1. Try to load any saved review (selections + cached AI text)
+      const { data: saved } = await supabase
+        .from("workout_reviews")
+        .select("difficulty, pace, feel, injury, ai_summary, coach_recommendation")
+        .eq("activity_id", activity.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (saved) {
+        hydratedRef.current = activity.id;
+        if (saved.difficulty) setDifficulty(saved.difficulty as Difficulty);
+        if (saved.pace) setPace(saved.pace as Pace);
+        if (saved.feel) setFeel(saved.feel as Feel);
+        if (saved.injury) setInjury(saved.injury as Injury);
+        if (saved.coach_recommendation) {
+          setCoachContent(saved.coach_recommendation);
+          setCoachDone(true);
+        }
+        if (saved.ai_summary) {
+          setReviewContent(saved.ai_summary);
+          setReviewLoading(false);
+          return; // don't regenerate the AI summary if we already have it cached
+        }
+      } else {
+        hydratedRef.current = activity.id;
+      }
 
       const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
       const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
@@ -95,17 +129,49 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
         activitySummary,
         plannedWorkout,
         onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
-        onDone: () => { if (!cancelled) setReviewLoading(false); },
+        onDone: async () => {
+          if (cancelled) return;
+          setReviewLoading(false);
+          // Cache the AI summary so we don't regenerate next time
+          try {
+            await supabase.from("workout_reviews").upsert({
+              user_id: session.user.id,
+              activity_id: activity.id,
+              ai_summary: accumulated,
+            } as any, { onConflict: "activity_id" });
+          } catch (e) { console.error("[review] failed to cache ai_summary", e); }
+        },
         onError: () => { if (!cancelled) { setReviewLoading(false); setReviewContent("Unable to generate review. Please try again."); } },
       });
     })();
     return () => { cancelled = true; };
   }, [open, workout, activity]);
 
+  // Persist check-in selections whenever the user changes one
+  useEffect(() => {
+    if (!open || !activity || hydratedRef.current !== activity.id) return;
+    if (!difficulty && !pace && !feel && !injury) return;
+    const t = setTimeout(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      try {
+        await supabase.from("workout_reviews").upsert({
+          user_id: user.id,
+          activity_id: activity.id,
+          difficulty,
+          pace,
+          feel,
+          injury,
+        } as any, { onConflict: "activity_id" });
+      } catch (e) { console.error("[review] failed to save selections", e); }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [open, activity, difficulty, pace, feel, injury]);
+
   const feedbackComplete = !!(difficulty && pace && feel && injury);
 
   const submitFeedback = async () => {
-    if (!workout || !activity || !feedbackComplete) return;
+    if (!workout || !activity || !feedbackComplete || !canRequestCoach) return;
     setCoachLoading(true);
     setCoachContent("");
     setCoachDone(false);
@@ -131,7 +197,18 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       activitySummary,
       plannedWorkout,
       onDelta: (text) => { accumulated += text; setCoachContent(accumulated); },
-      onDone: () => { setCoachLoading(false); setCoachDone(true); },
+      onDone: async () => {
+        setCoachLoading(false);
+        setCoachDone(true);
+        try {
+          await supabase.from("workout_reviews").upsert({
+            user_id: session.user.id,
+            activity_id: activity.id,
+            difficulty, pace, feel, injury,
+            coach_recommendation: accumulated,
+          } as any, { onConflict: "activity_id" });
+        } catch (e) { console.error("[review] failed to save coach recommendation", e); }
+      },
       onError: () => { setCoachLoading(false); setCoachContent("Unable to generate recommendation. Please try again."); },
     });
   };
@@ -234,12 +311,22 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
             <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={setInjury} />
             <Button
               onClick={submitFeedback}
-              disabled={!feedbackComplete || coachLoading}
+              disabled={!feedbackComplete || coachLoading || !canRequestCoach}
               className="w-full"
               size="sm"
+              title={!canRequestCoach ? "Only your most recent completed workout can request a fresh recommendation" : undefined}
             >
-              {coachLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Asking the coach…</> : <><Sparkles className="w-4 h-4 mr-2" />Get elite coach recommendation</>}
+              {coachLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Asking the coach…</>
+                : !canRequestCoach
+                  ? <><Lock className="w-4 h-4 mr-2" />Available on your latest workout only</>
+                  : <><Sparkles className="w-4 h-4 mr-2" />Get elite coach recommendation</>}
             </Button>
+            {!canRequestCoach && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Your check-in answers are saved automatically.
+              </p>
+            )}
           </div>
         )}
 
@@ -259,7 +346,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
                 <span>Still writing...</span>
               </div>
             )}
-            {coachDone && (
+            {coachDone && canRequestCoach && (
               <div className="flex gap-2 mt-3">
                 <Button
                   size="sm"
