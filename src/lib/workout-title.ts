@@ -138,7 +138,7 @@ export function deriveWorkoutTitleFromSteps(
       ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
       : `${g.reps}x${fmtDur(g.workDur)}`,
   );
-  const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : hasRest ? "walk-run intervals" : "intervals";
+  const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
   return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
 }
 
@@ -215,17 +215,16 @@ export function deriveWorkoutTitleFromSegments(
         ? `${g.reps}x${fmtDur(g.work)} run / ${fmtDur(g.rest)} walk`
         : `${g.reps}x${fmtDur(g.work)}`,
     );
-    const intentLabel = intent && intent !== "recovery"
-      ? `${intent} intervals`
-      : groups.some((g) => g.rest > 0)
-        ? "walk-run intervals"
-        : "intervals";
+    const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
     body = `${descs.join(" + ")} ${intentLabel} ${totalMins}min`;
   } else {
     // Continuous — pick longest main as the dominant
     const main = parsed.filter((p) => p.role === "main").sort((a, b) => b.secs - a.secs)[0];
     const base = intent ?? labelFromIntensity[main?.intensity ?? "Easy"] ?? "run";
-    body = `${capitalize(base)} ${totalMins}min`;
+    const sessionType = base === "easy run" ? "continuous easy run" : base;
+    body = main?.secs && totalSecs > main.secs
+      ? `${fmtDur(main.secs)} ${sessionType} (${totalMins}min total)`
+      : `${capitalize(sessionType)} ${totalMins}min`;
   }
 
   return body;
