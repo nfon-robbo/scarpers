@@ -1876,6 +1876,12 @@ const TrainingPlanPage = () => {
                 </Popover>
               }
             />
+            <RaceTimeEstimate
+              workouts={parseWorkoutsFromPlan(content)}
+              linkedActivities={linkedActivities}
+              raceDistance={raceDistance}
+              goalTime={goalTime}
+            />
             <PlanDayList
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
