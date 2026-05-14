@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { format, differenceInDays, startOfWeek, isToday, isBefore, differenceInWeeks } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { ParsedWorkout } from "@/lib/plan-export";
+import { describeWorkoutLabel } from "@/lib/workout-title";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Calendar, Trophy, CheckCircle2 } from "lucide-react";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
@@ -77,15 +78,8 @@ const DISTANCE_LABELS: Record<string, string> = {
   "marathon": "Marathon",
 };
 
-function workoutDisplayTitle(title: string): string {
-  const cleaned = title
-    .replace(/\s*\(Total:.*?\)/i, "")
-    .replace(/\*\*/g, "")
-    .replace(/^\s*[—–\-]+\s*/, "")
-    .trim();
-  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
-  if (/^scarpers\s*[-–]/i.test(cleaned)) return cleaned;
-  return `Scarpers - ${cleaned}`;
+function workoutDisplayTitle(workout: ParsedWorkout): string {
+  return describeWorkoutLabel(workout.title, workout.segments);
 }
 
 export default function PlanOverview({
@@ -326,7 +320,7 @@ export default function PlanOverview({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold truncate">
-                  {workoutDisplayTitle(todayWorkout.title)}
+                  {workoutDisplayTitle(todayWorkout)}
                 </p>
                 {todayIsCompleted && (
                   <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
@@ -384,7 +378,7 @@ export default function PlanOverview({
         workout={todayWorkout || null}
         activity={todayActivity || null}
         workoutDate={today}
-        workoutTitle={todayWorkout ? workoutDisplayTitle(todayWorkout.title) : "Workout"}
+        workoutTitle={todayWorkout ? workoutDisplayTitle(todayWorkout) : "Workout"}
       />
     </div>
   );
