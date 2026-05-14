@@ -216,8 +216,13 @@ function deriveWorkoutTitle(
     .replace(/\s*\(Total:[^)]*\)/i, "")
     .trim();
 
-  if (groups.length === 0) {
-    // No intervals — keep the original title (Easy run, Long run, Tempo, etc.)
+  // Only relabel as "Nx... intervals" when there are ACTUAL repeated reps
+  // or rest steps. A single continuous work block (e.g. plain easy run with
+  // one Main row) should keep its original title — calling a 15-min easy run
+  // "1x15min walk-run intervals" is wrong and misleads the user.
+  const hasMultipleReps = groups.some((g) => g.reps > 1);
+  const hasRest = groups.some((g) => g.restDur > 0);
+  if (groups.length === 0 || (!hasMultipleReps && !hasRest)) {
     return originalTitle;
   }
 
