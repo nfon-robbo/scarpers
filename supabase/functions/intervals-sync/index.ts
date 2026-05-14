@@ -208,7 +208,10 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
     if (n === "warmup") return "warmup";
     if (n === "cooldown") return "cooldown";
     if (n === "recovery" || n === "rest") return "rest";
-    return "active";
+    // Garmin only recognises warmup/cooldown/interval/recovery/rest/repeat.
+    // "active" is silently dropped on export, leaving the watch with NO steps.
+    // Map every work step (Interval, Active, Steady, etc.) to "interval".
+    return "interval";
   }
 
   function fmtStep(step: WorkoutStep): string {
