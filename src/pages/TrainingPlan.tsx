@@ -523,10 +523,12 @@ const TrainingPlanPage = () => {
       toast({ title: "Could not move workout", description: "Workout header not found.", variant: "destructive" });
       return;
     }
+    const previousContent = content;
     const newContent = newLines.join("\n");
     setContent(newContent);
     if (savedPlanId && user) {
-      await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
+      const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
+      if (!error) pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
     }
 
     // Remove the workout from intervals.icu on its original date, then push
@@ -551,16 +553,18 @@ const TrainingPlanPage = () => {
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
+      const previousContent = content;
       const newContent = shiftPlanDates(content, deltaDays);
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
-        await supabase.from("training_plans")
+        const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
             content: newContent,
           })
           .eq("id", savedPlanId);
+        if (!error && previousContent !== newContent) pushUndoEntry(savedPlanId, previousContent, "start date shift");
       }
       toast({ title: "Start date updated", description: "Workouts shifted to the new start date." });
     } catch (e: any) {
