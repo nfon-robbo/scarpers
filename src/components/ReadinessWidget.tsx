@@ -716,7 +716,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             return (
               <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + 7-day trend */}
-                <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
+                <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   <div className="relative flex items-center justify-center">
                     <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
                       <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
