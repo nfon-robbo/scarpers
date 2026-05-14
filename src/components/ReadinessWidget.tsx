@@ -519,10 +519,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     });
     const trendArr = days.map((d) => {
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      let pick: { recorded_at: string; score: number } | undefined;
+      let pick: { recorded_at: string; score: number; sleepSynced: boolean } | undefined;
       if (rows.length) {
         if (trendMode === "morning") {
-          pick = rows.find((r) => new Date(r.recorded_at).getHours() >= 5) ?? rows[0];
+          const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
+          // Prefer first snapshot after 5am with synced sleep data
+          pick = after5.find((r) => r.sleepSynced);
+          // Fallback: if no valid snapshot before 10am, use earliest snapshot of the day
+          if (!pick) pick = after5[0] ?? rows[0];
         } else {
           pick = rows[rows.length - 1];
         }
