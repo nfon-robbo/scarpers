@@ -41,6 +41,33 @@ const fmtDur = (s: number) => {
   return `${sec}s`;
 };
 
+const parseDurationSeconds = (text: string): number => {
+  const cleaned = text.replace(/[()]/g, " ").trim();
+  const colon = cleaned.match(/(\d{1,3}):(\d{2})/);
+  if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+  const hour = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)s?\b/i);
+  const min = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:m|min|minute)s?\b/i);
+  const sec = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:s|sec|second)s?\b/i);
+  let total = 0;
+  if (hour) total += parseFloat(hour[1]) * 3600;
+  if (min) total += parseFloat(min[1]) * 60;
+  if (sec) total += parseFloat(sec[1]);
+  return Math.round(total);
+};
+
+const parseRepeatDuration = (duration: string): { reps: number; workSecs: number; restSecs: number } | null => {
+  const cleaned = duration.replace(/[()]/g, " ").replace(/×/g, "x");
+  const repeat = cleaned.match(/(\d+)\s*x\s*(.+)$/i);
+  if (!repeat) return null;
+  const reps = parseInt(repeat[1], 10);
+  const body = repeat[2];
+  const [workPart, restPart] = body.split(/\s*\/\s*/);
+  const workSecs = parseDurationSeconds(workPart || "");
+  const restSecs = parseDurationSeconds(restPart || "");
+  if (!reps || !workSecs) return null;
+  return { reps, workSecs, restSecs };
+};
+
 const intentFrom = (text: string): string | null => {
   if (/tempo/i.test(text)) return "tempo";
   if (/threshold|lthr/i.test(text)) return "threshold";
@@ -111,7 +138,7 @@ export function deriveWorkoutTitleFromSteps(
       ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
       : `${g.reps}x${fmtDur(g.workDur)}`,
   );
-  const intentLabel = intent ? `${intent} intervals` : hasRest ? "walk-run intervals" : "intervals";
+  const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : hasRest ? "walk-run intervals" : "intervals";
   return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
 }
 
