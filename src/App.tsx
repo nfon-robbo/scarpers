@@ -13,6 +13,7 @@ import UploadPage from "./pages/Upload";
 import Activities from "./pages/Activities";
 import InsightsPage from "./pages/Insights";
 import TrainingPlanPage from "./pages/TrainingPlan";
+import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
@@ -86,6 +87,7 @@ const App = () => (
               <Route path="/activities" element={<Activities />} />
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/training-plan" element={<TrainingPlanPage />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
