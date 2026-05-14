@@ -585,7 +585,6 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-        <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 h-8 px-2 text-muted-foreground hover:text-foreground">
             <Link to="/training-plan">
               <ArrowLeft className="w-4 h-4 mr-1" />
