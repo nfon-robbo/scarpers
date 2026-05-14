@@ -57,6 +57,29 @@ export async function startStravaBackgroundImport(accessToken: string) {
       description: `${totalImported} new activities imported${totalSkipped > 0 ? `, ${totalSkipped} already existed` : ""}.`,
       duration: 6000,
     });
+
+    // Auto-link any newly synced activities to the active training plan
+    if (totalImported > 0) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const result = await autoLinkActivitiesToPlan(user.id);
+          if (result.matches.length > 0) {
+            const lines = result.matches.slice(0, 5).map((m) => {
+              const day = format(new Date(m.date + "T00:00:00"), "EEE d MMM");
+              return `${day}: ${m.plannedTitle}`;
+            });
+            const more = result.matches.length > 5 ? `\n+${result.matches.length - 5} more` : "";
+            toast.success(
+              `Auto-marked ${result.matches.length} planned session${result.matches.length === 1 ? "" : "s"} complete`,
+              { description: lines.join("\n") + more, duration: 8000 }
+            );
+          }
+        }
+      } catch (linkErr) {
+        console.error("[strava-import] auto-link failed", linkErr);
+      }
+    }
   } catch (e: any) {
     toast.error("Strava import failed", {
       description: e?.message ?? "Unknown error",
