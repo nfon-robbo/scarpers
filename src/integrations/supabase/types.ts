@@ -1045,6 +1045,48 @@ export type Database = {
         }
         Relationships: []
       }
+      workout_reviews: {
+        Row: {
+          activity_id: string
+          ai_summary: string | null
+          coach_recommendation: string | null
+          created_at: string
+          difficulty: string | null
+          feel: string | null
+          id: string
+          injury: string | null
+          pace: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          ai_summary?: string | null
+          coach_recommendation?: string | null
+          created_at?: string
+          difficulty?: string | null
+          feel?: string | null
+          id?: string
+          injury?: string | null
+          pace?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          ai_summary?: string | null
+          coach_recommendation?: string | null
+          created_at?: string
+          difficulty?: string | null
+          feel?: string | null
+          id?: string
+          injury?: string | null
+          pace?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

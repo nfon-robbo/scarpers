@@ -506,6 +506,24 @@ export default function PlanDayList({
   useEffect(() => { setCustomSteps(loadCustomSteps()); }, []);
   useEffect(() => { saveCustomSteps(customSteps); }, [customSteps]);
 
+  // Auto-open the review dialog when an activity has just been auto-linked
+  // to a planned session (fired by the Strava import auto-linker).
+  useEffect(() => {
+    const onAutoLinked = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { date?: string } | undefined;
+      if (!detail?.date) return;
+      // Wait one tick so that fresh linkedActivities/completedDates props arrive
+      setTimeout(() => {
+        const w = workoutMap.get(detail.date!);
+        if (w) setReviewWorkout(w);
+      }, 50);
+    };
+    window.addEventListener("workout-auto-linked", onAutoLinked as EventListener);
+    return () => window.removeEventListener("workout-auto-linked", onAutoLinked as EventListener);
+    // workoutMap recreated each render; the listener captures the latest one via closure on next render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workouts]);
+
   const addCustomStep = (w: ParsedWorkout, step: CustomStep) => {
     const key = workoutKey(w);
     setCustomSteps((prev) => ({ ...prev, [key]: [...(prev[key] || []), step] }));
@@ -947,6 +965,12 @@ export default function PlanDayList({
         activity={reviewWorkout ? linkedActivities[workoutKey(reviewWorkout)] || null : null}
         workoutDate={reviewWorkout?.dateObj || null}
         workoutTitle={reviewWorkout ? shortLabel(reviewWorkout) : "Workout"}
+        canRequestCoach={
+          !!reviewWorkout &&
+          workoutKey(reviewWorkout) === (
+            Array.from(completedDates || new Set<string>()).sort().slice(-1)[0] || ""
+          )
+        }
       />
     </Card>
   );
