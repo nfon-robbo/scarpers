@@ -170,6 +170,75 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   return [{ duration, hrLow: low, hrHigh: high, hrZone, intensity: stepType, pace: workPace }];
 }
 
+/**
+ * Build a descriptive workout title that reflects the actual structure
+ * (e.g. "10x1min run / 1min walk intervals"), so plans synced to
+ * intervals.icu / Garmin don't all show as generic "Easy run" when they
+ * actually contain walk-run intervals or repetitions.
+ */
+function deriveWorkoutTitle(
+  originalTitle: string,
+  steps: { duration: number; intensity: string }[],
+  totalMins: number,
+): string {
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    if (m > 0 && sec > 0) return `${m}m${sec}s`;
+    if (m > 0) return `${m}min`;
+    return `${sec}s`;
+  };
+
+  // Group consecutive Interval (+ optional Recovery) pairs into reps
+  type Group = { workDur: number; restDur: number; reps: number };
+  const groups: Group[] = [];
+  let i = 0;
+  while (i < steps.length) {
+    if (steps[i].intensity === "Interval") {
+      const work = steps[i].duration;
+      const next = steps[i + 1];
+      const hasRest = next && (next.intensity === "Recovery" || next.intensity === "Rest");
+      const rest = hasRest ? next.duration : 0;
+      const last = groups[groups.length - 1];
+      if (last && last.workDur === work && last.restDur === rest) {
+        last.reps += 1;
+      } else {
+        groups.push({ workDur: work, restDur: rest, reps: 1 });
+      }
+      i += hasRest ? 2 : 1;
+    } else {
+      i += 1;
+    }
+  }
+
+  const cleanedOriginal = originalTitle
+    .replace(/^scarpers\s*[-–—]\s*/i, "")
+    .replace(/\s*\(Total:[^)]*\)/i, "")
+    .trim();
+
+  if (groups.length === 0) {
+    // No intervals — keep the original title (Easy run, Long run, Tempo, etc.)
+    return originalTitle;
+  }
+
+  const descs = groups.map((g) =>
+    g.restDur > 0
+      ? `${g.reps}x${fmt(g.workDur)} run / ${fmt(g.restDur)} walk`
+      : `${g.reps}x${fmt(g.workDur)}`,
+  );
+  const intent = /tempo/i.test(cleanedOriginal)
+    ? "tempo intervals"
+    : /threshold/i.test(cleanedOriginal)
+      ? "threshold intervals"
+      : /hill/i.test(cleanedOriginal)
+        ? "hill reps"
+        : /long/i.test(cleanedOriginal)
+          ? "long-run intervals"
+          : "walk-run intervals";
+
+  return `${descs.join(" + ")} ${intent} (Total: ${totalMins} min)`;
+}
+
 const RACE_DISTANCES = [
   { value: "5k", label: "5K" },
   { value: "10k", label: "10K" },
@@ -1053,7 +1122,8 @@ const TrainingPlanPage = () => {
           .join("\n");
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
-        const baseName = w.title
+        const descriptiveTitle = deriveWorkoutTitle(w.title, steps, totalMins);
+        const baseName = descriptiveTitle
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers - — Walk"
         const correctedName = /^scarpers\s*[-–—]/i.test(baseName) ? baseName : `Scarpers - ${baseName}`;
