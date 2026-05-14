@@ -9,12 +9,19 @@ interface Props {
   description: string;
   canonicalPath: string;
   noindex?: boolean;
+  ogType?: "website" | "article";
+  ogImage?: string;
   children: ReactNode;
 }
 
-const MarketingPageLayout = ({ title, description, canonicalPath, noindex, children }: Props) => {
+const SITE = "https://www.scarpers.co.uk";
+const DEFAULT_OG_IMAGE = "https://www.scarpers.co.uk/og-image.png";
+
+const MarketingPageLayout = ({ title, description, canonicalPath, noindex, ogType = "website", ogImage, children }: Props) => {
   useEffect(() => {
     document.title = title;
+    const url = `${SITE}${canonicalPath}`;
+    const image = ogImage || DEFAULT_OG_IMAGE;
 
     const setMeta = (name: string, content: string) => {
       let el = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
@@ -27,8 +34,43 @@ const MarketingPageLayout = ({ title, description, canonicalPath, noindex, child
       return el;
     };
 
+    const setProp = (property: string, content: string) => {
+      let el = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute("property", property);
+        document.head.appendChild(el);
+      }
+      el.content = content;
+      return { el, prev: el.content };
+    };
+
     const desc = setMeta("description", description);
     const robots = noindex ? setMeta("robots", "noindex, follow") : null;
+
+    // Capture previous OG values so we can restore on unmount
+    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]');
+    const ogDesc = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
+    const ogUrl = document.querySelector<HTMLMetaElement>('meta[property="og:url"]');
+    const ogTypeEl = document.querySelector<HTMLMetaElement>('meta[property="og:type"]');
+    const ogImg = document.querySelector<HTMLMetaElement>('meta[property="og:image"]');
+    const twTitle = document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]');
+    const twDesc = document.querySelector<HTMLMetaElement>('meta[name="twitter:description"]');
+    const twImg = document.querySelector<HTMLMetaElement>('meta[name="twitter:image"]');
+    const prev = {
+      ogTitle: ogTitle?.content, ogDesc: ogDesc?.content, ogUrl: ogUrl?.content,
+      ogType: ogTypeEl?.content, ogImg: ogImg?.content,
+      twTitle: twTitle?.content, twDesc: twDesc?.content, twImg: twImg?.content,
+    };
+
+    setProp("og:title", title);
+    setProp("og:description", description);
+    setProp("og:url", url);
+    setProp("og:type", ogType);
+    setProp("og:image", image);
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
+    setMeta("twitter:image", image);
 
     let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     const prevCanonical = canonical?.href ?? null;
@@ -37,13 +79,21 @@ const MarketingPageLayout = ({ title, description, canonicalPath, noindex, child
       canonical.rel = "canonical";
       document.head.appendChild(canonical);
     }
-    canonical.href = `https://www.scarpers.co.uk${canonicalPath}`;
+    canonical.href = url;
 
     return () => {
       if (prevCanonical && canonical) canonical.href = prevCanonical;
       if (robots) robots.remove();
+      if (ogTitle && prev.ogTitle !== undefined) ogTitle.content = prev.ogTitle;
+      if (ogDesc && prev.ogDesc !== undefined) ogDesc.content = prev.ogDesc;
+      if (ogUrl && prev.ogUrl !== undefined) ogUrl.content = prev.ogUrl;
+      if (ogTypeEl && prev.ogType !== undefined) ogTypeEl.content = prev.ogType;
+      if (ogImg && prev.ogImg !== undefined) ogImg.content = prev.ogImg;
+      if (twTitle && prev.twTitle !== undefined) twTitle.content = prev.twTitle;
+      if (twDesc && prev.twDesc !== undefined) twDesc.content = prev.twDesc;
+      if (twImg && prev.twImg !== undefined) twImg.content = prev.twImg;
     };
-  }, [title, description, canonicalPath, noindex]);
+  }, [title, description, canonicalPath, noindex, ogType, ogImage]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
