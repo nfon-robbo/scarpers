@@ -31,15 +31,20 @@ interface PlanDayListProps {
   raceDistance?: string;
 }
 
-function shortLabel(title: string): string {
-  const cleaned = title
-    .replace(/\s*\(Total:.*?\)/i, "")
-    .replace(/\*\*/g, "")
-    .replace(/^\s*[—–\-]+\s*/, "")
-    .trim();
-  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
-  if (/^scarpers\s*[-–]/i.test(cleaned)) return cleaned;
-  return `Scarpers - ${cleaned}`;
+import { describeWorkoutLabel } from "@/lib/workout-title";
+
+function shortLabel(w: ParsedWorkout | string): string {
+  if (typeof w === "string") {
+    const cleaned = w
+      .replace(/\s*\(Total:.*?\)/i, "")
+      .replace(/\*\*/g, "")
+      .replace(/^\s*[—–\-]+\s*/, "")
+      .trim();
+    if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
+    if (/^scarpers(?:\s+dash)?\s*[-–]/i.test(cleaned)) return cleaned;
+    return `Scarpers Dash - ${cleaned}`;
+  }
+  return describeWorkoutLabel(w.title, w.segments);
 }
 
 function extractDistance(w: ParsedWorkout): string | null {
