@@ -190,7 +190,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
-  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number; sleepSynced: boolean }[]>([]);
+  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null }[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -274,7 +274,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("daily_metrics")
-        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
         .eq("user_id", user.id)
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
@@ -287,7 +287,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .order("start_time", { ascending: false })
         .then(({ data }) => data || []),
     ]).then(([sleepStages, allMetrics, allActivities]) => {
-      const stages = groupSleepByDate(sleepStages as any);
+      const todaysStageRows = (sleepStages as any[]).filter((s: any) => s.date === today);
+      const stages = groupSleepByDate(todaysStageRows as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
       const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
@@ -302,11 +303,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const rhrBaseline = rhrVals.length ? rhrVals.reduce((a: number, b: number) => a + b, 0) / rhrVals.length : null;
       const hrvBaseline = hrvVals.length ? hrvVals.reduce((a: number, b: number) => a + b, 0) / hrvVals.length : null;
 
-      const sleepDates = [...new Set((sleepStages as any[]).map((s: any) => s.date))].sort().reverse();
-      const mostRecentSleepDate = sleepDates[0] || null;
-      const isSleepCurrent = mostRecentSleepDate && (mostRecentSleepDate === today || mostRecentSleepDate === yesterday);
-      const finalSleepScore = isSleepCurrent ? (sleepScore ?? (latestMetrics as any)?.sleep_score ?? null) : null;
-      const sleepDuration = isSleepCurrent && hasSleepStages ? totalSleep : isSleepCurrent ? ((latestMetrics as any)?.sleep_duration_seconds ?? null) : null;
+      const metricDeepSeconds = ((todayMetrics as any)?.deep_sleep_minutes ?? null) != null ? Number((todayMetrics as any).deep_sleep_minutes) * 60 : null;
+      const metricRemSeconds = ((todayMetrics as any)?.rem_sleep_minutes ?? null) != null ? Number((todayMetrics as any).rem_sleep_minutes) * 60 : null;
+      const metricLightSeconds = ((todayMetrics as any)?.light_sleep_minutes ?? null) != null ? Number((todayMetrics as any).light_sleep_minutes) * 60 : null;
+      const metricStageTotal = [metricDeepSeconds, metricRemSeconds, metricLightSeconds].every((v) => typeof v === "number" && v > 0)
+        ? (metricDeepSeconds as number) + (metricRemSeconds as number) + (metricLightSeconds as number)
+        : null;
+      const finalSleepScore = sleepScore ?? (todayMetrics as any)?.sleep_score ?? null;
+      const sleepDuration = hasSleepStages ? totalSleep : ((todayMetrics as any)?.sleep_duration_seconds ?? null);
 
       const recentMetrics = allMetrics.filter((m: any) => m.date >= threeDaysAgo && m.date <= today);
       const recentSleepSecs = recentMetrics.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
