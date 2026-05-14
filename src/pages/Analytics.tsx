@@ -78,6 +78,42 @@ const isCredibleCompletedActivity = (a: Activity) => {
   const dur = Number(a.duration_seconds || 0);
   return dist >= 500 && dur >= 60;
 };
+const isRunActivity = (a: Activity) => {
+  const type = (a.activity_type || "").toLowerCase();
+  if (/walk|hike|cycle|bike|ride|swim|row|elliptical|strength|yoga|pilates/i.test(type)) return false;
+  return /run|jog|treadmill/i.test(type) || (!type && Number(a.distance_meters || 0) > 0);
+};
+const durationTextToSeconds = (text: string): number => {
+  const t = text.trim();
+  if (!t) return 0;
+  const repeat = t.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|min|mins|minute|minutes|sec|secs|second|seconds|s)\b/i);
+  if (repeat) return parseInt(repeat[1], 10) * durationTextToSeconds(`${repeat[2]} ${repeat[3]}`);
+  const colon = t.match(/\b(\d{1,3}):(\d{2})\b/);
+  if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+  let total = 0;
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|min|mins|minute|minutes|sec|secs|second|seconds|s)\b/gi)) {
+    const value = parseFloat(m[1]);
+    const unit = m[2].toLowerCase();
+    total += unit.startsWith("h") ? value * 3600 : unit.startsWith("s") ? value : value * 60;
+  }
+  return Math.round(total);
+};
+const plannedDurationSeconds = (w: ParsedWorkout): number => {
+  const fromSegments = (w.segments || []).reduce((sum, seg) => sum + durationTextToSeconds(seg.duration || ""), 0);
+  if (fromSegments > 0) return fromSegments;
+  const fallback = `${w.title} ${w.rawText}`.match(/Total:\s*~?\s*(\d+)\s*min/i) || `${w.title} ${w.rawText}`.match(/\(\s*~?\s*(\d+)\s*min\s*(?:total)?\s*\)/i);
+  return fallback ? parseInt(fallback[1], 10) * 60 : 0;
+};
+const activityCompletesSession = (a: Activity, w: ParsedWorkout, planId: string, day: string) => {
+  if (isoDay(new Date(a.start_time)) !== day) return false;
+  const run = isRunActivity(a);
+  const linkedToPlan = a.training_plan_id === planId;
+  const plannedSec = plannedDurationSeconds(w);
+  const actualSec = Number(a.duration_seconds || 0);
+  const withinDuration = !a.training_plan_id && run && plannedSec > 0 && actualSec > 0 && Math.abs(actualSec - plannedSec) / plannedSec <= 0.5;
+  const credibleRunOnPlannedDate = run && isCredibleCompletedActivity(a);
+  return linkedToPlan || withinDuration || credibleRunOnPlannedDate;
+};
 const paceSecPerKm = (a: Activity): number | null => {
   if (!a.distance_meters || !a.duration_seconds || a.distance_meters < 100) return null;
   return Math.round(a.duration_seconds / (a.distance_meters / 1000));
@@ -315,34 +351,27 @@ export default function Analytics() {
   const progress = useMemo(() => {
     if (!plan) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const actDays = new Set(
-      activities
-        .filter((a) => (a.training_plan_id === plan.id || !a.training_plan_id) && isCredibleCompletedActivity(a))
-        .map((a) => isoDay(new Date(a.start_time))),
+    const credibleActivityDays = new Set(
+      activities.filter(isCredibleCompletedActivity).map((a) => isoDay(new Date(a.start_time))),
     );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
-    // Dedupe by date so multiple plan rows on the same day count once.
-    const seenDates = new Set<string>();
-    const days = planWorkouts.map((w) => {
+    const days = planWorkouts.map((w, index) => {
       if (!w.dateObj) return null;
       const day = isoDay(w.dateObj);
-      if (seenDates.has(day)) return null;
-      seenDates.add(day);
       const isRest = /rest/i.test(w.title);
       let status: "completed" | "upcoming" | "skipped" | "rest";
-      if (actDays.has(day)) {
-        // Any linked activity on a planned day counts as completion,
-        // even if the planned row was a rest day.
+      const hasCompletion = activities.some((a) => activityCompletesSession(a, w, plan.id, day));
+      if (hasCompletion) {
         status = "completed"; completed++; total++;
       } else if (isRest) {
         status = "rest"; rest++;
       } else {
         total++;
-        if (w.dateObj < today) { status = "skipped"; skipped++; }
+        if (w.dateObj < today && !credibleActivityDays.has(day)) { status = "skipped"; skipped++; }
         else { status = "upcoming"; upcoming++; }
       }
-      return { date: day, dateObj: w.dateObj, title: w.title, status };
-    }).filter(Boolean) as { date: string; dateObj: Date; title: string; status: string }[];
+      return { key: `${day}-${index}`, date: day, dateObj: w.dateObj, title: w.title, status };
+    }).filter(Boolean) as { key: string; date: string; dateObj: Date; title: string; status: string }[];
 
     const pct = total ? Math.round((completed / total) * 100) : 0;
     const raceDate = plan.race_date ? new Date(plan.race_date.split("/").reverse().join("-")) : null;
@@ -682,7 +711,7 @@ export default function Analytics() {
               <div className="flex gap-1 min-w-max pb-1">
                 {progress.days.map((d) => (
                   <div
-                    key={d.date}
+                    key={d.key}
                     title={`${d.date} · ${d.title} · ${d.status}`}
                     className={cn(
                       "h-8 w-3 rounded-sm shrink-0",
