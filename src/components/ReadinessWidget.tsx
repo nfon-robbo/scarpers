@@ -238,11 +238,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     if (!user) return;
     setCacheChecked(false);
     setCached(null);
+    setCoachInsight(null);
     (async () => {
       if (refreshNonce === 0) {
         const { data: snap } = await supabase
           .from("readiness_snapshots")
-          .select("score, factors, advice, recorded_at")
+          .select("score, factors, advice, insight, recommendation, recorded_at")
           .eq("user_id", user.id)
           .eq("kind", "eod")
           .order("recorded_at", { ascending: false })
@@ -259,6 +260,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               recordedAt,
             });
             setAiAdvice((snap as any).advice ?? null);
+            const ins = (snap as any).insight as string | null;
+            const rec = (snap as any).recommendation as string | null;
+            if (ins || rec) setCoachInsight({ insight: ins || "", recommendation: rec || "" });
             setLastUpdated(recordedAt);
           }
         }
