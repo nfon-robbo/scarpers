@@ -182,6 +182,7 @@ const WellnessTab = () => {
       )}
 
       <SleepSourcesPanel />
+      <GoogleFitConnect />
       <SleepCalendar />
       <SleepStagesChart />
 
