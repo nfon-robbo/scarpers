@@ -1,6 +1,7 @@
 # Scarpers robots.txt
 User-agent: *
 Allow: /
+Disallow: /auth
 Disallow: /dashboard
 Disallow: /upload
 Disallow: /activities
