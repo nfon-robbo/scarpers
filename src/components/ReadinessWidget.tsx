@@ -716,7 +716,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             return (
               <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + 7-day trend */}
-                <div className="flex flex-col items-stretch shrink-0 md:w-[200px] gap-3">
+                <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   <div className="relative flex items-center justify-center">
                     <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
                       <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
@@ -767,7 +767,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
                 return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-2">
                     <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
                     <div className="flex items-center gap-2">
                       <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
@@ -795,26 +795,26 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={64}>
-                    <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <AreaChart data={trend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
                         <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.4} />
+                          <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.5} />
                           <stop offset="100%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       {/* Colour-coded score zones */}
-                      <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.12} ifOverflow="visible" />
-                      <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.12} ifOverflow="visible" />
-                      <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.12} ifOverflow="visible" />
-                      <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.14} ifOverflow="visible" />
-                      <XAxis dataKey="day" tick={{ fontSize: 9 }} className="fill-muted-foreground" axisLine={false} tickLine={false} interval={0} />
+                      <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.28} ifOverflow="visible" />
+                      <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="visible" />
+                      <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="visible" />
+                      <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="visible" />
+                      <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} interval={0} />
                       <YAxis domain={[0, 100]} hide />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
                       />
-                      <Area type="monotone" dataKey="score" stroke="hsl(180, 80%, 55%)" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2, fill: "hsl(180, 80%, 55%)" }} connectNulls={false} />
+                      <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                   {showDeclineTip && (
