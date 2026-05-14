@@ -524,9 +524,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   // Recompute the 7-day trend whenever raw snapshots or display mode changes
   useEffect(() => {
     const today = new Date();
+    const TREND_ANCHOR = new Date("2026-05-14T00:00:00");
+    const dayMs = 86400000;
+    const totalDays = Math.max(1, Math.min(7, Math.floor((today.getTime() - TREND_ANCHOR.getTime()) / dayMs) + 1));
     const days: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    for (let i = totalDays - 1; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * dayMs).toISOString().split("T")[0]);
     }
     const byDay = new Map<string, TrendSnapshot[]>();
     trendSnapshots.forEach((s) => {
