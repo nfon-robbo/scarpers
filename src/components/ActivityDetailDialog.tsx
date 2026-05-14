@@ -574,6 +574,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                         track={track}
                         avgHR={data.avg_heart_rate}
                         maxHR={data.max_heart_rate}
+                        activityType={data.activity_type}
                       />
                     )}
                   </TabsContent>
