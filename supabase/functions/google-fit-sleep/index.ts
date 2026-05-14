@@ -146,6 +146,13 @@ Deno.serve(async (req) => {
     }
 
     let totalStages = 0;
+    // Aggregate per-date totals so we can also update daily_metrics
+    const dailyTotals: Record<string, { deep: number; rem: number; light: number; awake: number; sleep: number }> = {};
+    const addStage = (date: string, stage: string, secs: number) => {
+      if (!dailyTotals[date]) dailyTotals[date] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
+      const t = dailyTotals[date] as any;
+      if (stage in t) t[stage] += secs;
+    };
 
     for (const session of sessions) {
       const sessionStart = parseInt(session.startTimeMillis);
