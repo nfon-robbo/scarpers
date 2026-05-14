@@ -656,15 +656,21 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .maybeSingle();
       if (!existingMorning && data) {
         const morning = computeReadiness(data, "morning");
-        await supabase.from("readiness_snapshots").insert({
-          user_id: user.id,
-          score: morning.score,
-          hour: recordedAt.getHours(),
-          factors: morning.factors as any,
-          advice: null,
-          recorded_at: recordedAt.toISOString(),
-          kind: "morning",
-        } as any);
+        const forbidden = ["Body Battery", "Today's Effort", "Sleep Debt"];
+        const bad = morning.factors.find((f) => forbidden.includes(f.label));
+        if (bad) {
+          console.error(`[readiness] rejected mislabeled morning snapshot: contains "${bad.label}"`, morning.factors);
+        } else {
+          await supabase.from("readiness_snapshots").insert({
+            user_id: user.id,
+            score: morning.score,
+            hour: recordedAt.getHours(),
+            factors: morning.factors as any,
+            advice: null,
+            recorded_at: recordedAt.toISOString(),
+            kind: "morning",
+          } as any);
+        }
       }
     })();
     return () => { cancelled = true; };
