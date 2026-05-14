@@ -204,6 +204,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
+  const [coachInsight, setCoachInsight] = useState<{ insight: string; recommendation: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [cacheChecked, setCacheChecked] = useState(false);
@@ -237,11 +238,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     if (!user) return;
     setCacheChecked(false);
     setCached(null);
+    setCoachInsight(null);
     (async () => {
       if (refreshNonce === 0) {
         const { data: snap } = await supabase
           .from("readiness_snapshots")
-          .select("score, factors, advice, recorded_at")
+          .select("score, factors, advice, insight, recommendation, recorded_at")
           .eq("user_id", user.id)
           .eq("kind", "eod")
           .order("recorded_at", { ascending: false })
@@ -258,6 +260,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               recordedAt,
             });
             setAiAdvice((snap as any).advice ?? null);
+            const ins = (snap as any).insight as string | null;
+            const rec = (snap as any).recommendation as string | null;
+            if (ins || rec) setCoachInsight({ insight: ins || "", recommendation: rec || "" });
             setLastUpdated(recordedAt);
           }
         }
@@ -612,36 +617,47 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     (async () => {
       setAiLoading(true);
       let advice: string | null = null;
+      let insight = "";
+      let recommendation = "";
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({
-              readiness_score: result.score,
-              factors: result.factors,
-              current_hour_local: new Date().getHours(),
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              missing_data: result.factors
-                .filter(f => f.status === "warning" && f.detail === "Not synced")
-                .map(f => f.label.toLowerCase()),
-            }),
-          }
-        );
-        if (resp.ok) {
-          const d = await resp.json();
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        };
+        const baseBody = {
+          readiness_score: result.score,
+          factors: result.factors,
+          current_hour_local: new Date().getHours(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          missing_data: result.factors
+            .filter(f => f.status === "warning" && f.detail === "Not synced")
+            .map(f => f.label.toLowerCase()),
+        };
+        const [adviceResp, insightResp] = await Promise.all([
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-advice`, {
+            method: "POST", headers, body: JSON.stringify(baseBody),
+          }),
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-coach-insight`, {
+            method: "POST", headers,
+            body: JSON.stringify({ readiness_score: result.score, factors: result.factors }),
+          }),
+        ]);
+        if (adviceResp.ok) {
+          const d = await adviceResp.json();
           advice = d.advice ?? null;
+        }
+        if (insightResp.ok) {
+          const d = await insightResp.json();
+          insight = d.insight || "";
+          recommendation = d.recommendation || "";
         }
       } catch { /* swallow */ }
       if (cancelled) return;
       setAiAdvice(advice ?? "");
+      if (insight || recommendation) setCoachInsight({ insight, recommendation });
       setAiLoading(false);
       const recordedAt = new Date();
       setLastUpdated(recordedAt);
@@ -652,6 +668,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         hour: recordedAt.getHours(),
         factors: result.factors as any,
         advice,
+        insight: insight || null,
+        recommendation: recommendation || null,
         recorded_at: recordedAt.toISOString(),
         kind: "eod",
       } as any);
@@ -975,6 +993,22 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   </div>
                 );
               })}
+              {(coachInsight?.insight || coachInsight?.recommendation) && (
+                <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-1.5">
+                  {coachInsight.insight && (
+                    <p className="text-xs leading-snug text-slate-200">
+                      <span className="font-semibold text-cyan-300">Today's insight: </span>
+                      {coachInsight.insight}
+                    </p>
+                  )}
+                  {coachInsight.recommendation && (
+                    <p className="text-xs leading-snug text-slate-200">
+                      <span className="font-semibold text-cyan-300">Recommendation: </span>
+                      {coachInsight.recommendation}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
             );
