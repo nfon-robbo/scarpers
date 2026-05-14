@@ -181,8 +181,11 @@ function bodyBatteryDrain(d: ReadinessData): {
 
 // ── Main scoring ───────────────────────────────────────────────────────
 
-export function computeReadiness(d: ReadinessData): ReadinessResult {
+export type ReadinessMode = "morning" | "eod";
+
+export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"): ReadinessResult {
   const factors: ReadinessFactor[] = [];
+  const isMorning = mode === "morning";
   let weightedSum = 0;
   const TOTAL_WEIGHT = 1.0;
 
