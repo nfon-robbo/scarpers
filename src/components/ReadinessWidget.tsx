@@ -646,7 +646,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     setData(null);
     setRefreshNonce((n) => n + 1);
   };
-  const hasTrend = trend.filter((t) => t.score > 0).length >= 2;
+  const hasTrend = trend.filter((t) => t.score != null).length >= 2;
 
   return (
     <div className="space-y-4 animate-fade-in">
