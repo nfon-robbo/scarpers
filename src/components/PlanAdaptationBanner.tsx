@@ -1,37 +1,52 @@
 import { useState } from "react";
-import { TrendingUp, X, Loader2 } from "lucide-react";
+import { TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
-import { dismissUpwardToday } from "@/lib/plan-adaptation";
+import { dismissUpwardToday, dismissDownwardToday } from "@/lib/plan-adaptation";
 
 interface Props {
   userId: string;
+  direction: "up" | "down";
   detail?: string;
   onDone: () => void;
 }
 
-export default function PlanAdaptationBanner({ userId, detail, onDone }: Props) {
+export default function PlanAdaptationBanner({ userId, direction, detail, onDone }: Props) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const isDown = direction === "down";
 
   const handleAccept = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("plan-auto-adapt", {
-        body: { mode: "up", reason: "readiness_high_3d_accepted" },
+        body: {
+          mode: direction,
+          reason: isDown ? "readiness_low_2d_accepted" : "readiness_high_3d_accepted",
+        },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.reason || "Adaptation skipped");
       if (data.plan_id && data.prev_content) {
-        pushUndoEntry(data.plan_id, data.prev_content, "auto bump (up)");
+        pushUndoEntry(
+          data.plan_id,
+          data.prev_content,
+          isDown ? "auto recovery adjustment" : "auto bump (up)"
+        );
       }
-      toast.success("Plan bumped — go get it.", {
-        description: "We added a small intensity bump to this week.",
-        action: { label: "View", onClick: () => navigate("/training-plan") },
-      });
+      toast.success(
+        isDown ? "This week eased — get some rest." : "Plan bumped — go get it.",
+        {
+          description: isDown
+            ? "Intervals swapped to easy runs and durations trimmed ~15%."
+            : "We added a small intensity bump to this week.",
+          action: { label: "View", onClick: () => navigate("/training-plan") },
+        }
+      );
       onDone();
     } catch (e) {
       toast.error("Could not adjust plan", {
@@ -43,9 +58,18 @@ export default function PlanAdaptationBanner({ userId, detail, onDone }: Props) 
   };
 
   const handleDismiss = () => {
-    dismissUpwardToday(userId);
+    if (isDown) dismissDownwardToday(userId);
+    else dismissUpwardToday(userId);
     onDone();
   };
+
+  const Icon = isDown ? TrendingDown : TrendingUp;
+  const title = isDown ? "Ease this week?" : "You're trending strong";
+  const body = isDown
+    ? "Recovery has been low for 2 days. We can drop this week's intensity ~15% and swap any intervals for easy runs."
+    : "Recovery and Running IQ have been climbing for 3+ days. Want a small intensity bump this week?";
+  const acceptLabel = isDown ? "Ease this week" : "Bump it";
+  const dismissLabel = isDown ? "Keep as planned" : "Not now";
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-accent/10 to-background p-4 backdrop-blur-md shadow-lg">
@@ -59,13 +83,11 @@ export default function PlanAdaptationBanner({ userId, detail, onDone }: Props) 
 
       <div className="flex items-start gap-3 pr-8">
         <div className="shrink-0 w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-          <TrendingUp className="w-5 h-5 text-primary" />
+          <Icon className="w-5 h-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold tracking-tight">You're trending strong</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Recovery and Running IQ have been climbing for 3+ days. Want a small intensity bump this week?
-          </p>
+          <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-1">{body}</p>
           {detail && (
             <p className="text-[11px] text-muted-foreground/70 mt-1">{detail}</p>
           )}
@@ -78,7 +100,7 @@ export default function PlanAdaptationBanner({ userId, detail, onDone }: Props) 
               className="h-8 rounded-lg"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Bump it
+              {acceptLabel}
             </Button>
             <Button
               size="sm"
@@ -87,7 +109,7 @@ export default function PlanAdaptationBanner({ userId, detail, onDone }: Props) 
               disabled={loading}
               className="h-8 rounded-lg"
             >
-              Not now
+              {dismissLabel}
             </Button>
           </div>
         </div>

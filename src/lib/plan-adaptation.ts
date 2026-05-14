@@ -209,6 +209,7 @@ export function markAdaptCheckRan(userId: string) {
 
 // Dismissal for the upward banner (per day).
 const UP_DISMISS_KEY = (userId: string) => `adaptUpDismissed:${userId}`;
+const DOWN_DISMISS_KEY = (userId: string) => `adaptDownDismissed:${userId}`;
 
 export function isUpwardDismissedToday(userId: string): boolean {
   try {
@@ -223,6 +224,24 @@ export function dismissUpwardToday(userId: string) {
   try {
     const today = new Date().toISOString().slice(0, 10);
     localStorage.setItem(UP_DISMISS_KEY(userId), today);
+  } catch {
+    // ignore
+  }
+}
+
+export function isDownwardDismissedToday(userId: string): boolean {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    return localStorage.getItem(DOWN_DISMISS_KEY(userId)) === today;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissDownwardToday(userId: string) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(DOWN_DISMISS_KEY(userId), today);
   } catch {
     // ignore
   }
