@@ -629,10 +629,10 @@ const TrainingPlanPage = () => {
       startDate: toLocalISODate(newStart),
       raceDate: toLocalISODate(newEnd),
       onDelta: (text) => { accumulated += text; setContent(accumulated); },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
-        savePlan(accumulated, { undoLabel: "end date regeneration", prevContent: content });
-        toast({ title: "Plan regenerated", description: "New plan built for updated end date." });
+        const planId = await savePlan(accumulated, { undoLabel: "end date regeneration", prevContent: content });
+        toastPlanChange("Plan regenerated", "New plan built for updated end date.", content ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Regeneration failed", description: err, variant: "destructive" });
@@ -698,10 +698,10 @@ const TrainingPlanPage = () => {
         accumulated += text;
         setContent(accumulated);
       },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
-        savePlan(accumulated, { undoLabel: "plan generation", prevContent: previousContent });
-        toast({ title: "Plan saved", description: "Your training plan has been saved." });
+        const planId = await savePlan(accumulated, { undoLabel: "plan generation", prevContent: previousContent });
+        toastPlanChange("Plan saved", "Your training plan has been saved.", previousContent ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
@@ -795,12 +795,12 @@ const TrainingPlanPage = () => {
         accumulated += text;
         setContent(accumulated);
       },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
-        toast({ title: "Plan updated", description: "Your adjusted training plan has been saved." });
+        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
+        toastPlanChange("Plan updated", "Your adjusted training plan has been saved.", planId);
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
