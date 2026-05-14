@@ -31,7 +31,8 @@ export default function PlanAdaptationBanner({ userId, direction, detail, onDone
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.reason || "Adaptation skipped");
-      if (data.plan_id && data.prev_content) {
+      const canUndo = data.plan_id && data.prev_content;
+      if (canUndo) {
         pushUndoEntry(
           data.plan_id,
           data.prev_content,
@@ -44,7 +45,15 @@ export default function PlanAdaptationBanner({ userId, direction, detail, onDone
           description: isDown
             ? "Intervals swapped to easy runs and durations trimmed ~15%."
             : "We added a small intensity bump to this week.",
-          action: { label: "View", onClick: () => navigate("/training-plan") },
+          action: {
+            label: canUndo ? "Undo" : "View",
+            onClick: async () => {
+              if (canUndo) {
+                await supabase.from("training_plans").update({ content: data.prev_content }).eq("id", data.plan_id);
+              }
+              navigate("/training-plan");
+            },
+          },
         }
       );
       onDone();
