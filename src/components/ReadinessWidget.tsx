@@ -551,6 +551,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   useEffect(() => {
     if (!result || !user) return;
     if (cached && cached.advice) return;
+    if (suppressScore) return; // don't persist a misleading low score while we're still syncing
     let cancelled = false;
     (async () => {
       setAiLoading(true);
