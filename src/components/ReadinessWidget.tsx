@@ -535,11 +535,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       let pick: TrendSnapshot | undefined;
       if (rows.length) {
         if (trendMode === "morning") {
-          // Morning = first snapshot after 5am whose sleep data had synced.
+          // Morning = first post-5am snapshot with synced sleep and a plausible
+          // wake-time model. Older noisy snapshots can have sleep data present
+          // but still show 20h awake before midday, which crushes the score.
           // If none qualify, leave a gap rather than show a pre-sync score
           // that doesn't reflect that morning's actual recovery.
           const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
-          pick = after5.find((r) => r.sleepSynced);
+          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12));
         } else {
           // End of day = last snapshot of the day, but only if sleep had
           // synced by then. Otherwise the score is noise — show a gap.
