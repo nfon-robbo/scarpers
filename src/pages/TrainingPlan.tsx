@@ -13,7 +13,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp, Undo2 } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp, Undo2, BarChart3, ArrowRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -1565,6 +1565,22 @@ const TrainingPlanPage = () => {
             : "Your personal season strategy and tailored training plan"
           }
         </p>
+        {content && !loading && (
+          <button
+            type="button"
+            onClick={() => navigate("/analytics")}
+            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/40 hover:bg-card/70 hover:border-primary/40 transition-colors px-3 py-2.5 text-left"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <BarChart3 className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm font-medium truncate">View plan analytics</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline truncate">
+                Progress, trends and AI summary
+              </span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
         {content && !loading && (
           <div className="flex flex-wrap gap-2">
             {Object.keys(linkedActivities).length > 0 && (
