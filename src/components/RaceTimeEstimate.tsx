@@ -87,7 +87,34 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     const goalSec = parseGoalSeconds(goalTime);
     if (!km || !goalSec) return null;
 
-    // Gather completed planned sessions with valid pace (exclude rest/walk).
+    // Helpers to extract target pace (sec/km) from a "M:SS/km" string
+    const paceFromTarget = (s: string): number | null => {
+      if (!s) return null;
+      const m = s.match(/(\d{1,2}):(\d{2})\s*\/?\s*km/i);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    // For walk/run interval sessions, prefer the run segment's planned target pace
+    const runIntervalTargetPace = (w: ParsedWorkout): number | null => {
+      if (!/walk\/?run|run\/?walk|run\s*\/\s*walk/i.test(w.title)) return null;
+      // Find a segment whose name/notes mention "run" (and not "walk only")
+      const runSeg = w.segments.find(s => {
+        const label = `${s.segment} ${s.notes || ""}`.toLowerCase();
+        return /\brun\b/.test(label) && !/walk\s+only/.test(label);
+      });
+      if (runSeg) {
+        const p = paceFromTarget(runSeg.target);
+        if (p) return p;
+      }
+      // Fall back: scan raw text for "run ... M:SS/km" near the word run
+      const m = w.rawText.match(/run[^|\n]{0,40}?(\d{1,2}:\d{2})\s*\/?\s*km/i);
+      if (m) {
+        const [mm, ss] = m[1].split(":").map(Number);
+        return mm * 60 + ss;
+      }
+      return null;
+    };
+
     const completed = workouts
       .filter(w => w.dateObj)
       .map(w => {
@@ -99,7 +126,16 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         if (dist < 500 || dur < 60) return null;
         const type = classify(w.title);
         if (!type) return null;
-        const pace = dur / (dist / 1000); // sec per km
+        const isWalkRun = /walk\/?run|run\/?walk/i.test(w.title);
+        let pace: number;
+        if (isWalkRun) {
+          // Use run-only pace from the plan; fall back skipped if unavailable
+          const target = runIntervalTargetPace(w);
+          if (!target) return null;
+          pace = target;
+        } else {
+          pace = dur / (dist / 1000);
+        }
         if (pace < 150 || pace > 900) return null;
         return { date: w.dateObj as Date, type, pace, title: w.title };
       })
