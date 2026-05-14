@@ -62,6 +62,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [coachContent, setCoachContent] = useState("");
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachDone, setCoachDone] = useState(false);
+  const [nextSession, setNextSession] = useState<ParsedWorkout | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
 
   // Track whether we already loaded an existing saved review for this activity
   const hydratedRef = useRef<string | null>(null);
