@@ -32,6 +32,7 @@ interface Props {
   track: GpsPoint[];
   avgHR?: number | null;
   maxHR?: number | null;
+  activityType?: string | null;
 }
 
 const tooltipStyle = {
@@ -41,7 +42,10 @@ const tooltipStyle = {
   fontSize: 11,
 };
 
-const ActivityCharts = ({ track, avgHR, maxHR }: Props) => {
+const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
+  const isRunning = (activityType ?? "").toLowerCase().includes("run");
+  const cadenceMult = isRunning ? 2 : 1;
+  const cadenceUnit = isRunning ? "spm" : "rpm";
   const { fmt, label, units } = useUnits();
   const KM_TO_MI = 0.621371;
   const M_TO_FT = 3.28084;
