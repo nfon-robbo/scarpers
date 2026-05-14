@@ -323,18 +323,18 @@ Also consider:
 - If resting HR is elevated → flag potential illness/overtraining
 - CADENCE is critical for joint health: target 170-180 spm. If the athlete's recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
 
-Your response MUST follow this exact format:
+Your response MUST follow this exact format. Use the literal phrase "the target session" or refer to the target date — do NOT say "today" or "today's" if the target date in the user prompt is not actually today's calendar date.
 
 ## 🌙 Sleep & Recovery Assessment
-Brief summary of last night's sleep quality and what it means for today.
+Brief summary of last night's sleep quality and what it means for the target session.
 
-## 📋 Today's Planned Workout
-Show the original planned workout.
+## 📋 Planned Workout
+Show the original planned workout for the target date.
 
 ## ✅ Decision: [KEEP AS-IS / ADJUSTED]
 State clearly whether you're modifying the workout or not, and why.
 
-## 📝 Workout for Today
+## 📝 Recommended Workout
 If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration/Distance | Target | Notes). Include the workout title with "(Total: Xmin)". When a segment has a distance target, include both distance and estimated duration.
 If kept as-is, restate the original workout.
 
