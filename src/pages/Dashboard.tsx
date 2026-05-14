@@ -33,6 +33,7 @@ import {
   shouldRunAdaptCheck,
   markAdaptCheckRan,
   isUpwardDismissedToday,
+  isDownwardDismissedToday,
   type AdaptEvaluation,
 } from "@/lib/plan-adaptation";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
