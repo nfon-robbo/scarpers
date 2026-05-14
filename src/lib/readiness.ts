@@ -288,7 +288,14 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
   // Normalise to 0-100 with fixed denominator
   let baseScore = weightedSum / TOTAL_WEIGHT;
 
-  // ── Phase 2: Modifiers (additive) ──
+  // ── Phase 2: Modifiers (EOD only) ──
+
+  if (isMorning) {
+    // Morning score = pure overnight recovery snapshot. No daytime drain,
+    // no today's effort, no recovery-clock penalty. Floor at 5.
+    const finalScore = Math.round(Math.max(5, Math.min(100, baseScore)));
+    return { score: finalScore, factors };
+  }
 
   const modifiers: { label: string; adj: number; detail: string }[] = [];
 
