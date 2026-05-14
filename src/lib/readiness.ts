@@ -94,54 +94,107 @@ export function workoutIntensity(act: {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-/** Body-battery drain: passive drain from hours awake + active drain from activities.
- *  Returns a negative modifier (0 to ~-50). */
-function bodyBatteryDrain(d: ReadinessData): { drain: number; hoursAwake: number; passiveDrain: number; activeDrain: number } {
+/** Body-battery drain & daytime charging.
+ *  Passive drain is stress-scaled. When the user is calm (stress < 30) and
+ *  has done <5 intensity-min of activity in the prior 2h, the battery
+ *  charges at 1-3 pts/hr (scaled by HRV vs baseline), capped at 15 pts/day. */
+function bodyBatteryDrain(d: ReadinessData): {
+  drain: number;
+  hoursAwake: number;
+  passiveDrain: number;
+  activeDrain: number;
+  passiveCharge: number;
+} {
   const now = Date.now();
 
   // Determine hours awake
-  let hoursAwake: number;
+  let wakeMs: number;
   if (d.wakeTimeIso) {
-    hoursAwake = Math.max(0, (now - new Date(d.wakeTimeIso).getTime()) / 3600000);
+    wakeMs = new Date(d.wakeTimeIso).getTime();
   } else {
-    // Fallback: assume woke up at 7am local
     const today7am = new Date();
     today7am.setHours(7, 0, 0, 0);
-    hoursAwake = Math.max(0, (now - today7am.getTime()) / 3600000);
+    wakeMs = today7am.getTime();
   }
+  let hoursAwake = Math.max(0, (now - wakeMs) / 3600000);
+  hoursAwake = Math.min(20, hoursAwake); // 20h cap unchanged
 
-  // Cap at 20 hours (after that you're in a bad state anyway)
-  hoursAwake = Math.min(20, hoursAwake);
-
-  // Passive drain: gentle accelerating curve
-  // Target: ~25-30 pts total after 16h awake
-  // 0-4h: ~1pt/hr, 4-8h: ~1.5pts/hr, 8-12h: ~2pts/hr, 12-16h: ~2.5pts/hr, 16+: ~3pts/hr
-  let passiveDrain = 0;
-  if (hoursAwake <= 4) {
-    passiveDrain = hoursAwake * 1;
-  } else if (hoursAwake <= 8) {
-    passiveDrain = 4 + (hoursAwake - 4) * 1.5;
-  } else if (hoursAwake <= 12) {
-    passiveDrain = 10 + (hoursAwake - 8) * 2;
-  } else if (hoursAwake <= 16) {
-    passiveDrain = 18 + (hoursAwake - 12) * 2.5;
+  // ── Stress-scaled passive drain rate per hour ──
+  // stress <=35 → cap at 1.5/h. stress >=55 → ramp toward 3/h. mid-day fatigue still accelerates a touch.
+  const stress = d.stressScore ?? 40;
+  let baseRatePerHour: number;
+  if (stress <= 35) {
+    baseRatePerHour = 1.0; // calm baseline
+  } else if (stress >= 55) {
+    baseRatePerHour = 2.5; // elevated baseline (capped further by curve below)
   } else {
-    passiveDrain = 28 + (hoursAwake - 16) * 3;
+    // 35 → 1.0, 55 → 2.5
+    baseRatePerHour = 1.0 + ((stress - 35) / 20) * 1.5;
   }
 
-  // Active drain: each activity drains based on intensity-weighted load
-  // Reduced to ~0.1 pts per minute since Today's Effort modifier handles the main penalty
+  // Apply gentle accelerating curve over the day, capped by stress-derived ceiling.
+  // Ceiling: 1.5/h on calm days, up to 3/h on high-stress days.
+  const ceiling = stress <= 35 ? 1.5 : stress >= 55 ? 3.0 : 1.5 + ((stress - 35) / 20) * 1.5;
+
+  // Integrate hour-by-hour: rate = min(ceiling, baseRate * (1 + hoursAwake/16))
+  let passiveDrain = 0;
+  for (let h = 0; h < hoursAwake; h++) {
+    const slice = Math.min(1, hoursAwake - h);
+    const rate = Math.min(ceiling, baseRatePerHour * (1 + h / 16));
+    passiveDrain += rate * slice;
+  }
+
+  // ── Active drain (unchanged) ──
   let activeDrain = 0;
   for (const act of d.todayActivities) {
     activeDrain += act.intensityLoad * 0.1;
   }
-  activeDrain = Math.min(10, activeDrain); // reduced cap
+  activeDrain = Math.min(10, activeDrain);
+
+  // ── Daytime charging ──
+  // For each hour-slice since wake, if stress<30 and prior-2h intensity load <5,
+  // charge at 1/2/3 pts based on HRV vs baseline. Cap total at 15 pts.
+  let passiveCharge = 0;
+  if (stress < 30) {
+    let chargeRate = 2; // at baseline
+    if (d.hrv != null && d.hrvBaseline != null && d.hrvBaseline > 0) {
+      if (d.hrv > d.hrvBaseline * 1.05) chargeRate = 3;
+      else if (d.hrv < d.hrvBaseline * 0.95) chargeRate = 1;
+    }
+
+    for (let h = 0; h < hoursAwake && passiveCharge < 15; h++) {
+      const sliceStart = wakeMs + h * 3600000;
+      const sliceEnd = Math.min(now, sliceStart + 3600000);
+      const sliceHours = (sliceEnd - sliceStart) / 3600000;
+      if (sliceHours <= 0) break;
+
+      // Intensity-weighted minutes in the prior 2h window
+      const windowStart = sliceStart - 2 * 3600000;
+      let recentLoad = 0;
+      for (const act of d.todayActivities) {
+        const aStart = new Date(act.startIso).getTime();
+        const aEnd = aStart + (act.durationSec || 0) * 1000;
+        if (aEnd < windowStart || aStart > sliceStart) continue;
+        // Pro-rate intensityLoad by overlap with window
+        const overlap = Math.max(0, Math.min(aEnd, sliceStart) - Math.max(aStart, windowStart));
+        const total = Math.max(1, aEnd - aStart);
+        recentLoad += act.intensityLoad * (overlap / total);
+      }
+
+      if (recentLoad < 5) {
+        passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
+      }
+    }
+  }
+
+  const netDrain = passiveDrain + activeDrain - passiveCharge;
 
   return {
-    drain: -(passiveDrain + activeDrain),
+    drain: -netDrain,
     hoursAwake: Math.round(hoursAwake * 10) / 10,
     passiveDrain: Math.round(passiveDrain),
     activeDrain: Math.round(activeDrain),
+    passiveCharge: Math.round(passiveCharge),
   };
 }
 
@@ -368,11 +421,12 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   // Add body battery drain as a visible factor (Charged & Drained framing)
   if (battery.hoursAwake > 0.5) {
     const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore); // sleep/recovery charge
+    const charged = Math.round(baseScore) + battery.passiveCharge;
+    const chargeNote = battery.passiveCharge > 0 ? ` (+${battery.passiveCharge} rest)` : "";
     factors.push({
       label: "Body Battery",
-      status: drainTotal <= 15 ? "good" : drainTotal <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
+      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
+      detail: `⚡${charged} charged${chargeNote} · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
     });
   }
 
