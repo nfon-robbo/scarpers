@@ -39,6 +39,23 @@ interface ApiStep {
 
 const WALK_PACE = "13:00/km";
 
+/**
+ * Source-of-truth race date is the markdown plan itself.
+ * Scans for a session heading mentioning "RACE DAY" and extracts the DD/MM/YYYY
+ * date in the same line. Returns ISO YYYY-MM-DD or null.
+ */
+function extractRaceDateFromMarkdown(md: string | null | undefined): string | null {
+  if (!md) return null;
+  const lines = md.split("\n");
+  // Prefer lines that look like session headings (### ...) and contain RACE DAY
+  const candidates = lines.filter(l => /race\s*day/i.test(l));
+  for (const line of candidates) {
+    const m = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  return null;
+}
+
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
