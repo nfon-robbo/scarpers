@@ -74,7 +74,10 @@ const SleepStagesChart = () => {
     if (chartData.length === 0) return null;
     const latest = chartData[chartData.length - 1];
     const total = latest.deep + latest.light + latest.rem + latest.awake;
-    const fmtHM = (h: number) => `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
+    const fmtHM = (h: number) => {
+      const totalMin = Math.round(h * 60);
+      return `${Math.floor(totalMin / 60)}:${String(totalMin % 60).padStart(2, "0")}`;
+    };
     return { ...latest, total, fmtTotal: fmtHM(total), fmtDeep: fmtHM(latest.deep), fmtRem: fmtHM(latest.rem), fmtLight: fmtHM(latest.light) };
   }, [chartData]);
 
