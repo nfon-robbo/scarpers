@@ -188,10 +188,10 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (30%) — primary recovery indicator
+  // Sleep Quality (34%) — primary recovery indicator
   if (d.sleepScore == null) {
     // Missing sleep = assume moderate-poor
-    weightedSum += 30 * 0.30;
+    weightedSum += 30 * 0.34;
     factors.push({
       label: "Sleep Quality",
       status: "poor",
@@ -201,7 +201,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
     const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s * 0.55;
-    weightedSum += adjustedSleep * 0.30;
+    weightedSum += adjustedSleep * 0.34;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -252,48 +252,34 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     weightedSum += 15 * 0.12; // missing = bad
   }
 
-  // HRV vs baseline (20%)
+  // HRV vs baseline (23%)
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
     const hrvScore = pct >= 10 ? 90 : pct >= 0 ? 75 : pct >= -10 ? 55 : pct >= -20 ? 35 : 15;
-    weightedSum += hrvScore * 0.20;
+    weightedSum += hrvScore * 0.23;
     factors.push({
       label: "HRV",
       status: pct >= -5 ? "good" : pct >= -15 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 25 * 0.20; // missing HRV = moderate penalty
+    weightedSum += 25 * 0.23; // missing HRV = moderate penalty
     factors.push({ label: "HRV", status: "poor", detail: "No data" });
   }
 
-  // Stress (10%)
-  if (d.stressScore != null) {
-    const v = d.stressScore;
-    const stressScore = v <= 20 ? 85 : v <= 35 ? 65 : v <= 55 ? 45 : v <= 75 ? 25 : 10;
-    weightedSum += stressScore * 0.10;
-    factors.push({
-      label: "Stress",
-      status: v <= 30 ? "good" : v <= 55 ? "warning" : "poor",
-      detail: `${Math.round(v)}/100`,
-    });
-  } else {
-    weightedSum += 20 * 0.10; // missing stress = assume moderate-poor
-  }
-
-  // Yesterday's Load — intensity-weighted (13%)
+  // Yesterday's Load — intensity-weighted (16%)
   if (d.yesterdayLoad != null) {
     const l = d.yesterdayLoad;
     const loadScore = l <= 15 ? 85 : l <= 40 ? 70 : l <= 80 ? 45 : l <= 140 ? 25 : 10;
-    weightedSum += loadScore * 0.13;
+    weightedSum += loadScore * 0.16;
     factors.push({
       label: "Yesterday's Load",
       status: l <= 40 ? "good" : l <= 80 ? "warning" : "poor",
       detail: `${Math.floor(l / 60)}:${String(Math.round(l % 60)).padStart(2, "0")} training`,
     });
   } else {
-    weightedSum += 50 * 0.13; // rest day = decent
+    weightedSum += 50 * 0.16; // rest day = decent
   }
 
   // Normalise to 0-100 with fixed denominator
