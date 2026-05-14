@@ -677,7 +677,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     setData(null);
     setRefreshNonce((n) => n + 1);
   };
-  const hasTrend = trend.filter((t) => t.score != null).length >= 1;
+  const visibleTrend = useMemo(() => {
+    if (trend.some((t) => t.score != null) || suppressScore) return trend;
+    const todayLabel = new Date().toLocaleDateString(undefined, { weekday: "short" });
+    if (!trend.length) return [{ day: todayLabel, score: displayResult.score }];
+    return trend.map((t, i) => (i === trend.length - 1 ? { ...t, score: displayResult.score } : t));
+  }, [trend, suppressScore, displayResult.score]);
+  const hasTrend = visibleTrend.some((t) => t.score != null);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -777,7 +783,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   )}
               {hasTrend && (() => {
                 // Use only valid (non-null) trend points for direction analysis
-                const validPts = trend.filter((t) => t.score != null) as { day: string; score: number }[];
+                const validPts = visibleTrend.filter((t) => t.score != null) as { day: string; score: number }[];
                 const last3 = validPts.slice(-3).map((t) => t.score);
                 let trendLabel: "Recovering" | "Stable" | "Declining" | "At Risk" = "Stable";
                 let trendColor = "text-slate-300";
@@ -835,7 +841,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </p>
                   )}
                   <ResponsiveContainer width="100%" height={160}>
-                    <AreaChart data={trend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
+                    <AreaChart data={visibleTrend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
                         <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.5} />
