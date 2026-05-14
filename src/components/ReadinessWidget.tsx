@@ -196,6 +196,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [cacheChecked, setCacheChecked] = useState(false);
   const [batteryDialogOpen, setBatteryDialogOpen] = useState(false);
   const [factorDialog, setFactorDialog] = useState<{ label: string; status: "good" | "warning" | "poor"; detail: string } | null>(null);
+  const [autoSyncing, setAutoSyncing] = useState<boolean>(() => {
+    // If user is mid-session and auto-sync hasn't finished yet, assume in
+    // progress so we show the awaiting stamp immediately on mount.
+    return false;
+  });
+
+  // Listen for the global auto-sync lifecycle so we can show "awaiting"
+  // stamps and re-fetch when fresh data lands.
+  useEffect(() => {
+    const onStart = () => setAutoSyncing(true);
+    const onDone = () => {
+      setAutoSyncing(false);
+      // Force fresh recompute now that we (hopefully) have new data.
+      setRefreshNonce((n) => n + 1);
+    };
+    window.addEventListener(AUTO_SYNC_STARTED, onStart);
+    window.addEventListener(AUTO_SYNC_DONE, onDone);
+    return () => {
+      window.removeEventListener(AUTO_SYNC_STARTED, onStart);
+      window.removeEventListener(AUTO_SYNC_DONE, onDone);
+    };
+  }, []);
 
   // Check DB cache for readiness snapshot < 60 min old (skipped when user forces refresh)
   useEffect(() => {
