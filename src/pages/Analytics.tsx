@@ -67,7 +67,17 @@ interface Review { activity_id: string; pace: string | null; coach_recommendatio
 // ---------- Helpers ----------
 
 const fmtDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+const isoDay = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+const isCredibleCompletedActivity = (a: Activity) => {
+  const dist = Number(a.distance_meters || 0);
+  const dur = Number(a.duration_seconds || 0);
+  return dist >= 500 && dur >= 60;
+};
 const paceSecPerKm = (a: Activity): number | null => {
   if (!a.distance_meters || !a.duration_seconds || a.distance_meters < 100) return null;
   return Math.round(a.duration_seconds / (a.distance_meters / 1000));
@@ -307,7 +317,7 @@ export default function Analytics() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const actDays = new Set(
       activities
-        .filter((a) => a.training_plan_id === plan.id)
+        .filter((a) => (a.training_plan_id === plan.id || !a.training_plan_id) && isCredibleCompletedActivity(a))
         .map((a) => isoDay(new Date(a.start_time))),
     );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
