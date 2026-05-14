@@ -334,7 +334,8 @@ Replace {TARGET_DATE_FORMATTED} with the target date written in UK long format (
 ## ✅ Decision: [KEEP AS-IS / ADJUSTED]
 State clearly whether you're modifying the workout or not, and why.
 
-## 📝 Recommended Workout
+## 📝 Recommended Workout — {TARGET_DATE_FORMATTED}
+Replace {TARGET_DATE_FORMATTED} with the same UK long-format target date used above.
 If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration/Distance | Target | Notes). Include the workout title with "(Total: Xmin)". When a segment has a distance target, include both distance and estimated duration.
 If kept as-is, restate the original workout.
 
