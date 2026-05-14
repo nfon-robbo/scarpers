@@ -310,7 +310,6 @@ const WellnessTab = () => {
       </Card>
 
       <SleepStagesChart />
-      <GoogleFitConnect />
       <HealthConnectCard />
     </div>
   );
