@@ -803,6 +803,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
                     </div>
                   </div>
+                  {trendMode === "morning" && (
+                    <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
+                      Morning score is taken after sleep data has synced to ensure accuracy.
+                    </p>
+                  )}
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={trend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
