@@ -519,7 +519,20 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", ...validity };
       }));
     });
-  }, [user]);
+  }, [user, refreshNonce]);
+
+  // Auto-reload snapshots when the page becomes visible or regains focus,
+  // so the chart never shows stale scores after a tab switch or data change.
+  useEffect(() => {
+    const reload = () => setRefreshNonce((n) => n + 1);
+    const onVisibility = () => { if (document.visibilityState === "visible") reload(); };
+    window.addEventListener("focus", reload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", reload);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // Recompute the 7-day trend whenever raw snapshots or display mode changes
   useEffect(() => {
