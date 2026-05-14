@@ -247,7 +247,19 @@ Give me your verdict.`;
     }
 
     const data = await response.json();
-    const advice = data.choices?.[0]?.message?.content || "Get off your ass and do something.";
+    let advice = data.choices?.[0]?.message?.content || "Get off your ass and do something.";
+
+    // If deep sleep is below 13%, append a practical tip on how to improve it.
+    const deepFactor = (factors || []).find((f: any) =>
+      typeof f?.label === "string" && f.label.toLowerCase().includes("deep sleep")
+    );
+    const deepPctMatch = typeof deepFactor?.detail === "string"
+      ? deepFactor.detail.match(/(\d+(?:\.\d+)?)\s*%/)
+      : null;
+    const deepPct = deepPctMatch ? parseFloat(deepPctMatch[1]) : null;
+    if (deepPct != null && deepPct < 13) {
+      advice = `${advice.trim()}\n\n**Boosting deep sleep:** It can't be forced, but consistent bed and wake times, avoiding alcohol and heavy meals within 3 hours of bed, and a cool, dark bedroom reliably increase it over time.`;
+    }
 
     return new Response(JSON.stringify({ advice }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
