@@ -540,10 +540,14 @@ const TrainingPlanPage = () => {
     }
     const previousContent = content;
     const newContent = newLines.join("\n");
+    let undoPlanId: string | null = null;
     setContent(newContent);
     if (savedPlanId && user) {
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
-      if (!error) pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
+      if (!error) {
+        pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
+        undoPlanId = savedPlanId;
+      }
     }
 
     // Remove the workout from intervals.icu on its original date, then push
@@ -561,7 +565,7 @@ const TrainingPlanPage = () => {
       // ignore — sync errors are surfaced inside handleSyncToIntervals
     }
 
-    toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.` });
+    toastPlanChange("Workout moved", `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.`, undoPlanId);
   };
 
   const persistStartDateShift = async (newStart: Date) => {
@@ -570,6 +574,7 @@ const TrainingPlanPage = () => {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
       const previousContent = content;
       const newContent = shiftPlanDates(content, deltaDays);
+      let undoPlanId: string | null = null;
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
@@ -579,9 +584,12 @@ const TrainingPlanPage = () => {
             content: newContent,
           })
           .eq("id", savedPlanId);
-        if (!error && previousContent !== newContent) pushUndoEntry(savedPlanId, previousContent, "start date shift");
+        if (!error && previousContent !== newContent) {
+          pushUndoEntry(savedPlanId, previousContent, "start date shift");
+          undoPlanId = savedPlanId;
+        }
       }
-      toast({ title: "Start date updated", description: "Workouts shifted to the new start date." });
+      toastPlanChange("Start date updated", "Workouts shifted to the new start date.", undoPlanId);
     } catch (e: any) {
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
     } finally {
