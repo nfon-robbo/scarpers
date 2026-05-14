@@ -511,7 +511,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
     }
-    const byDay = new Map<string, { recorded_at: string; score: number }[]>();
+    const byDay = new Map<string, { recorded_at: string; score: number; sleepSynced: boolean }[]>();
     trendSnapshots.forEach((s) => {
       const d = s.recorded_at.split("T")[0];
       if (!byDay.has(d)) byDay.set(d, []);
