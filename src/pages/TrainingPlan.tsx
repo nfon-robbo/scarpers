@@ -237,6 +237,9 @@ function deriveWorkoutTitle(
           : "walk-run intervals";
 
   return `${descs.join(" + ")} ${intent} (Total: ${totalMins} min)`;
+}
+
+const RACE_DISTANCES = [
   { value: "5k", label: "5K" },
   { value: "10k", label: "10K" },
   { value: "half-marathon", label: "Half Marathon" },
