@@ -189,7 +189,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
-  const [trend, setTrend] = useState<{ day: string; score: number }[]>([]);
+  const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
+  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number }[]>([]);
+  const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -493,24 +495,41 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       };
       setSparklines(series);
 
-      // Build daily avg snapshot trend
-      const byDay = new Map<string, number[]>();
-      (snaps as any[]).forEach((s) => {
-        const d = s.recorded_at.split("T")[0];
-        if (!byDay.has(d)) byDay.set(d, []);
-        byDay.get(d)!.push(s.score);
-      });
-      const trendArr = days.map((d) => {
-        const vals = byDay.get(d);
-        return {
-          day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
-          score: vals ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0,
-        };
-      });
-      setTrend(trendArr);
+      // Store raw snapshots; trend is recomputed in a separate effect when mode changes
+      setTrendSnapshots((snaps as any[]).map((s) => ({ recorded_at: s.recorded_at, score: s.score })));
     });
   }, [user]);
 
+  // Recompute the 7-day trend whenever raw snapshots or display mode changes
+  useEffect(() => {
+    const today = new Date();
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
+    }
+    const byDay = new Map<string, { recorded_at: string; score: number }[]>();
+    trendSnapshots.forEach((s) => {
+      const d = s.recorded_at.split("T")[0];
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d)!.push(s);
+    });
+    const trendArr = days.map((d) => {
+      const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+      let pick: { recorded_at: string; score: number } | undefined;
+      if (rows.length) {
+        if (trendMode === "morning") {
+          pick = rows.find((r) => new Date(r.recorded_at).getHours() >= 5) ?? rows[0];
+        } else {
+          pick = rows[rows.length - 1];
+        }
+      }
+      return {
+        day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
+        score: pick ? pick.score : null,
+      };
+    });
+    setTrend(trendArr);
+  }, [trendSnapshots, trendMode]);
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
 
@@ -627,7 +646,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     setData(null);
     setRefreshNonce((n) => n + 1);
   };
-  const hasTrend = trend.filter((t) => t.score > 0).length >= 2;
+  const hasTrend = trend.filter((t) => t.score != null).length >= 2;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -723,8 +742,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </p>
                   )}
               {hasTrend && (() => {
-                // Use only valid (non-zero) trend points for direction analysis
-                const validPts = trend.filter((t) => t.score > 0);
+                // Use only valid (non-null) trend points for direction analysis
+                const validPts = trend.filter((t) => t.score != null) as { day: string; score: number }[];
                 const last3 = validPts.slice(-3).map((t) => t.score);
                 let trendLabel: "Recovering" | "Stable" | "Declining" | "At Risk" = "Stable";
                 let trendColor = "text-slate-300";
@@ -748,9 +767,33 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
                 return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
-                    <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setTrendMode("end")}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
+                            trendMode === "end" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          End of day
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrendMode("morning")}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
+                            trendMode === "morning" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          Morning
+                        </button>
+                      </div>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
+                    </div>
                   </div>
                   <ResponsiveContainer width="100%" height={64}>
                     <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
@@ -771,7 +814,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
                       />
-                      <Area type="monotone" dataKey="score" stroke="hsl(180, 80%, 55%)" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2, fill: "hsl(180, 80%, 55%)" }} />
+                      <Area type="monotone" dataKey="score" stroke="hsl(180, 80%, 55%)" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2, fill: "hsl(180, 80%, 55%)" }} connectNulls={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                   {showDeclineTip && (
