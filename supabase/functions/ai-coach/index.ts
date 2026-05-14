@@ -299,7 +299,7 @@ If the user prompt contains a "COACH RECOMMENDATION TO APPLY" block, you are NOT
 - 🚫 NEVER add mobility, stretching, static stretching, foam rolling, yoga, or any non-running auxiliary segment as a row inside a workout's segment table. Workout tables contain ONLY warm-up, run/walk intervals, main running blocks, and cool-down. If recovery work is relevant, mention it in the notes column or in your prose recommendation — NEVER as its own segment row.
 - NEVER change the workout title unless the structural type changed.
 - Preserve every other segment exactly as written, including warm-up, cool-down, paces, BPM, notes.
-- Output the COMPLETE modified workout under "## 📝 Workout for Today" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
+- Output the COMPLETE modified workout under "## 📝 Recommended Workout" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
 
 
 
