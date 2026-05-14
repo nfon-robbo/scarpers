@@ -35,7 +35,6 @@ const Blog = () => {
       title="Scarpers Running Blog — AI Coaching & Training Tips"
       description="Expert running advice, AI coaching insights, training plan guides and race day tips from the team at Scarpers."
       canonicalPath="/blog"
-      noindex={!loading && posts.length === 0}
     >
       <div className="text-center mb-10">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">From the Coach</p>
