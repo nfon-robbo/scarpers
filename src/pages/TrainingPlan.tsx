@@ -25,7 +25,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
-import { popUndoEntry, getUndoCount, peekUndoEntry } from "@/lib/plan-undo-history";
+import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
 
 interface ApiStep {
   duration: number;
@@ -394,9 +394,10 @@ const TrainingPlanPage = () => {
     return () => window.removeEventListener("plan-undo-changed", onPlanChange);
   }, [loadSavedPlan]);
 
-  const savePlan = async (planContent: string, options: { inPlace?: boolean } = {}) => {
+  const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string } = {}) => {
     if (!user) return;
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
+    const undoContent = options.prevContent ?? content;
 
     // In-place edit: update the existing plan row so linked activities (training_plan_id)
     // continue to register as completed. Used by day-adjust, day-ahead, plan-review etc.
@@ -413,10 +414,14 @@ const TrainingPlanPage = () => {
         } as any)
         .eq("id", savedPlanId);
       if (error) console.error("In-place plan update failed:", error);
+      else if (options.undoLabel && undoContent && undoContent !== planContent) {
+        pushUndoEntry(savedPlanId, undoContent, options.undoLabel);
+      }
       return;
     }
 
     // Archive old plan instead of deleting, then insert new one (new plan generations)
+    const previousPlanContent = savedPlanId ? undoContent : "";
     if (savedPlanId) {
       await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
     }
@@ -437,6 +442,9 @@ const TrainingPlanPage = () => {
 
     if (!error && data) {
       setSavedPlanId(data.id);
+      if (options.undoLabel && previousPlanContent && previousPlanContent !== planContent) {
+        pushUndoEntry(data.id, previousPlanContent, options.undoLabel);
+      }
     }
   };
 
