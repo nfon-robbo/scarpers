@@ -514,6 +514,7 @@ const TrainingPlanPage = () => {
         training_days: trainingDays,
         start_date: toLocalISODate(startDate),
         race_date: finalRaceDate,
+        content: planContent,
       } as any)
       .select("id")
       .single();
