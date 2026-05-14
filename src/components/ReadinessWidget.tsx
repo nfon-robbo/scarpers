@@ -190,7 +190,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
-  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number }[]>([]);
+  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number; sleepSynced: boolean }[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -422,7 +422,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("readiness_snapshots")
-        .select("score, recorded_at")
+        .select("score, factors, recorded_at")
         .eq("user_id", user.id)
         .gte("recorded_at", startDate + "T00:00:00Z")
         .order("recorded_at", { ascending: true })
@@ -496,7 +496,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setSparklines(series);
 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
-      setTrendSnapshots((snaps as any[]).map((s) => ({ recorded_at: s.recorded_at, score: s.score })));
+      setTrendSnapshots((snaps as any[]).map((s) => {
+        const sleepFactor = Array.isArray(s.factors) ? s.factors.find((f: any) => f?.label === "Sleep Quality") : null;
+        const sleepSynced = !!sleepFactor && sleepFactor.detail !== "Not synced";
+        return { recorded_at: s.recorded_at, score: s.score, sleepSynced };
+      }));
     });
   }, [user]);
 
@@ -507,7 +511,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
     }
-    const byDay = new Map<string, { recorded_at: string; score: number }[]>();
+    const byDay = new Map<string, { recorded_at: string; score: number; sleepSynced: boolean }[]>();
     trendSnapshots.forEach((s) => {
       const d = s.recorded_at.split("T")[0];
       if (!byDay.has(d)) byDay.set(d, []);
@@ -515,10 +519,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     });
     const trendArr = days.map((d) => {
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      let pick: { recorded_at: string; score: number } | undefined;
+      let pick: { recorded_at: string; score: number; sleepSynced: boolean } | undefined;
       if (rows.length) {
         if (trendMode === "morning") {
-          pick = rows.find((r) => new Date(r.recorded_at).getHours() >= 5) ?? rows[0];
+          const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
+          // Prefer first snapshot after 5am with synced sleep data
+          pick = after5.find((r) => r.sleepSynced);
+          // Fallback: if no valid snapshot before 10am, use earliest snapshot of the day
+          if (!pick) pick = after5[0] ?? rows[0];
         } else {
           pick = rows[rows.length - 1];
         }
@@ -795,6 +803,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
                     </div>
                   </div>
+                  {trendMode === "morning" && (
+                    <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
+                      Morning score is taken after sleep data has synced to ensure accuracy.
+                    </p>
+                  )}
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={trend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
