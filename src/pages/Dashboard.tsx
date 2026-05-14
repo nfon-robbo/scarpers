@@ -389,6 +389,37 @@ const Dashboard = () => {
     return () => { cancelled = true; };
   }, [user, navigate]);
 
+  // ── Auto-sync all integrations once per browser session per user ──
+  // Triggered as soon as we have a logged-in user + session. Silent (no
+  // toast); ReadinessWidget listens for AUTO_SYNC_DONE to refresh once
+  // fresh sleep / wellness data has landed.
+  useEffect(() => {
+    if (!user || !session) return;
+    runAutoSyncOnce(user.id, session).catch((e) =>
+      console.error("Auto-sync on login failed", e)
+    );
+  }, [user, session]);
+
+  // After auto-sync finishes, re-pull metrics + activities so the dashboard
+  // (and the readiness widget) sees the freshly synced data.
+  useEffect(() => {
+    if (!user) return;
+    const onDone = () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 56);
+      supabase.from("activities")
+        .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
+        .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
+        .then(({ data }) => setActivities((data as ActivityRow[]) || []));
+      supabase.from("daily_metrics")
+        .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
+        .eq("user_id", user.id).gte("date", since.toISOString().split("T")[0]).order("date", { ascending: true })
+        .then(({ data }) => setMetrics((data as MetricsRow[]) || []));
+    };
+    window.addEventListener(AUTO_SYNC_DONE, onDone);
+    return () => window.removeEventListener(AUTO_SYNC_DONE, onDone);
+  }, [user]);
+
 
   const stats = useMemo(() => {
     if (activities.length === 0) return null;
