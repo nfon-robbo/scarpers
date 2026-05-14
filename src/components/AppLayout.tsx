@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 const navItems: { to: string; icon: LucideIcon; label: string }[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/training-plan", icon: CalendarDays, label: "Plan" },
-  { to: "/analytics", icon: BarChart3, label: "Analytics" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/insights", icon: Brain, label: "Insights" },
   { to: "/upload", icon: Upload, label: "Import" },
