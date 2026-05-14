@@ -361,10 +361,10 @@ ${metricsToday}
 ${yesterdayContext}
 ${cadenceContext}
 
-TODAY'S PLANNED WORKOUT:
-${today_workout || "No workout found for today."}
+PLANNED WORKOUT FOR ${targetDateStr}:
+${today_workout || "No workout found for the target date."}
 
-Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
 
     } else if (type === "chat") {
       // Fetch the user's active training plan so chat answers reference real scheduled sessions
