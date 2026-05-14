@@ -157,10 +157,15 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const last3 = completed.slice(0, 3);
   const ready = last3.length >= 3;
 
-  const latestOf = (t: SessionType) => completed.find(c => c.type === t)?.pace ?? null;
-  const easyPace = latestOf("easy");
-  const tempoPace = latestOf("tempo");
-  const racePace = latestOf("race");
+  // Average up to the last 3 sessions of each type so a single slow recovery
+  // run doesn't dominate the easy bucket over faster walk/run target paces.
+  const avgOf = (t: SessionType) => {
+    const arr = completed.filter(c => c.type === t).slice(0, 3).map(c => c.pace);
+    return arr.length ? arr.reduce((a, n) => a + n, 0) / arr.length : null;
+  };
+  const easyPace = avgOf("easy");
+  const tempoPace = avgOf("tempo");
+  const racePace = avgOf("race");
 
   // Derived race-pace contributions
   const easyContrib = easyPace; // 100% of easy pace
