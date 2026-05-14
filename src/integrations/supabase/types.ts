@@ -707,6 +707,7 @@ export type Database = {
           factors: Json | null
           hour: number
           id: string
+          kind: string
           recorded_at: string
           score: number
           user_id: string
@@ -717,6 +718,7 @@ export type Database = {
           factors?: Json | null
           hour: number
           id?: string
+          kind?: string
           recorded_at?: string
           score: number
           user_id: string
@@ -727,6 +729,7 @@ export type Database = {
           factors?: Json | null
           hour?: number
           id?: string
+          kind?: string
           recorded_at?: string
           score?: number
           user_id?: string
