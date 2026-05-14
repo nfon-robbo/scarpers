@@ -1566,6 +1566,22 @@ const TrainingPlanPage = () => {
           }
         </p>
         {content && !loading && (
+          <button
+            type="button"
+            onClick={() => navigate("/analytics")}
+            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/40 hover:bg-card/70 hover:border-primary/40 transition-colors px-3 py-2.5 text-left"
+          >
+            <span className="flex items-center gap-2 min-w-0">
+              <BarChart3 className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-sm font-medium truncate">View plan analytics</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline truncate">
+                Progress, trends and AI summary
+              </span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
+        {content && !loading && (
           <div className="flex flex-wrap gap-2">
             {Object.keys(linkedActivities).length > 0 && (
               <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing || dayAdjusting}>
