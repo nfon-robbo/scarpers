@@ -742,8 +742,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </p>
                   )}
               {hasTrend && (() => {
-                // Use only valid (non-zero) trend points for direction analysis
-                const validPts = trend.filter((t) => t.score > 0);
+                // Use only valid (non-null) trend points for direction analysis
+                const validPts = trend.filter((t) => t.score != null) as { day: string; score: number }[];
                 const last3 = validPts.slice(-3).map((t) => t.score);
                 let trendLabel: "Recovering" | "Stable" | "Declining" | "At Risk" = "Stable";
                 let trendColor = "text-slate-300";
@@ -767,9 +767,33 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
                 return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
-                    <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setTrendMode("end")}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
+                            trendMode === "end" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          End of day
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrendMode("morning")}
+                          className={cn(
+                            "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
+                            trendMode === "morning" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          Morning
+                        </button>
+                      </div>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
+                    </div>
                   </div>
                   <ResponsiveContainer width="100%" height={64}>
                     <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
