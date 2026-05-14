@@ -1018,19 +1018,24 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 const score = displayResult.score;
                 if (suppressScore) return null;
 
+                const sleepPts = (sparklines["Sleep Quality"] || []).filter(p => typeof p.value === "number") as { value: number }[];
+                const hrvPts = (sparklines["HRV"] || []).filter(p => typeof p.value === "number") as { value: number }[];
+                const avgSleep = sleepPts.length >= 3 ? sleepPts.reduce((a, p) => a + (p.value as number), 0) / sleepPts.length : null;
+                const todayLoad = data?.todayLoad ?? 0;
+
                 // ── Recovery Countdown ──
                 let recoveryLine: string | null = null;
+                let recoverySecondary: string | null = null;
                 if (score >= 70) {
                   recoveryLine = "You are recovered and ready.";
+                  recoverySecondary = todayLoad > 60
+                    ? "Keep effort moderate today to protect tomorrow's score."
+                    : "A quality session is well within reach today.";
                 } else {
-                  const sleepPts = (sparklines["Sleep Quality"] || []).filter(p => typeof p.value === "number") as { value: number }[];
-                  const avgSleep = sleepPts.length >= 3 ? sleepPts.reduce((a, p) => a + (p.value as number), 0) / sleepPts.length : null;
-                  // Overnight recovery: sleep quality scaled — a perfect night restores ~60 pts
                   const overnightCharge = avgSleep != null ? (avgSleep / 100) * 60 : null;
                   if (overnightCharge != null && overnightCharge > 5) {
                     const gap = 70 - score;
                     const nights = Math.max(1, Math.ceil(gap / overnightCharge));
-                    // Hours until tomorrow's wake (assume bedtime 23:00, 8h sleep → wake 07:00)
                     const now = new Date();
                     const wake = new Date(now);
                     wake.setHours(7, 0, 0, 0);
@@ -1038,51 +1043,69 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     const hoursToWake = (wake.getTime() - now.getTime()) / 3600000;
                     const totalHours = Math.round(hoursToWake + (nights - 1) * 24);
                     recoveryLine = `Estimated recovery to 70+ in approximately ${totalHours} hours.`;
+                    recoverySecondary = nights > 1
+                      ? `Expect about ${nights} solid nights of sleep before you bounce back fully.`
+                      : "Prioritise an early bedtime and you should wake refreshed.";
                   }
                 }
 
                 // ── Tomorrow's Forecast ──
                 let forecastLine: string | null = null;
-                const sleepPts = (sparklines["Sleep Quality"] || []).filter(p => typeof p.value === "number") as { value: number }[];
-                const hrvPts = (sparklines["HRV"] || []).filter(p => typeof p.value === "number") as { value: number }[];
-                const avgSleep = sleepPts.length >= 3 ? sleepPts.reduce((a, p) => a + (p.value as number), 0) / sleepPts.length : null;
+                let forecastSecondary: string | null = null;
                 if (avgSleep != null) {
-                  // Sleep contribution vs neutral 50
                   const sleepDelta = (avgSleep - 50) * 0.4;
-                  // Today's training load impact (drains tomorrow)
-                  const todayLoad = data?.todayLoad ?? 0;
                   const loadDrain = Math.min(20, todayLoad * 0.08);
-                  // HRV trend: latest vs 7-day avg
                   let hrvDelta = 0;
+                  let hrvTrendUp = false;
+                  let hrvTrendDown = false;
                   if (hrvPts.length >= 3) {
                     const avgHrv = hrvPts.reduce((a, p) => a + (p.value as number), 0) / hrvPts.length;
                     const latestHrv = hrvPts[hrvPts.length - 1].value as number;
                     hrvDelta = ((latestHrv - avgHrv) / Math.max(1, avgHrv)) * 30;
+                    hrvTrendUp = latestHrv > avgHrv * 1.05;
+                    hrvTrendDown = latestHrv < avgHrv * 0.95;
                   }
-                  // Sleep debt: recent vs baseline
                   let debtDelta = 0;
                   if (data?.recentSleepAvgHours != null && data?.baselineSleepAvgHours != null) {
                     debtDelta = (data.recentSleepAvgHours - data.baselineSleepAvgHours) * 4;
                   }
                   const projected = Math.max(0, Math.min(100, Math.round(score + sleepDelta - loadDrain + hrvDelta + debtDelta - (score - 50) * 0.3)));
                   const dir = projected > score + 2 ? " trending up" : projected < score - 2 ? " trending down" : " stable";
-                  forecastLine = `Tomorrow's forecast: approximately ${projected}.${dir}`;
+                  forecastLine = `Tomorrow's forecast: approximately ${projected}.${dir}.`;
+                  // Pick the dominant driver
+                  if (loadDrain >= 8) {
+                    forecastSecondary = "Today's training load is the main drag, so refuel and rest well tonight.";
+                  } else if (hrvTrendDown) {
+                    forecastSecondary = "HRV is trending below your average, suggesting recovery is still incomplete.";
+                  } else if (hrvTrendUp && avgSleep >= 65) {
+                    forecastSecondary = "Strong HRV and steady sleep are setting you up for a productive session.";
+                  } else if (avgSleep < 50) {
+                    forecastSecondary = "Sleep quality has been the limiter — an earlier night should lift the score.";
+                  } else {
+                    forecastSecondary = "Maintain your current sleep and recovery habits to hold this trajectory.";
+                  }
                 }
 
                 if (!recoveryLine && !forecastLine) return null;
                 return (
-                  <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-1.5">
+                  <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-2.5">
                     {recoveryLine && (
-                      <p className="text-xs leading-snug text-slate-200">
-                        <span className="font-semibold text-cyan-300">Recovery: </span>
-                        {recoveryLine}
-                      </p>
+                      <div className="text-xs leading-snug text-slate-200 space-y-0.5">
+                        <p>
+                          <span className="font-semibold text-cyan-300">Recovery: </span>
+                          {recoveryLine}
+                        </p>
+                        {recoverySecondary && <p className="text-slate-400">{recoverySecondary}</p>}
+                      </div>
                     )}
                     {forecastLine && (
-                      <p className="text-xs leading-snug text-slate-200">
-                        <span className="font-semibold text-cyan-300">Forecast: </span>
-                        {forecastLine}
-                      </p>
+                      <div className="text-xs leading-snug text-slate-200 space-y-0.5">
+                        <p>
+                          <span className="font-semibold text-cyan-300">Forecast: </span>
+                          {forecastLine}
+                        </p>
+                        {forecastSecondary && <p className="text-slate-400">{forecastSecondary}</p>}
+                      </div>
                     )}
                   </div>
                 );
