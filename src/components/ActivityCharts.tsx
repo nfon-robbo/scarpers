@@ -160,7 +160,7 @@ const ActivityCharts = ({ track, avgHR, maxHR, activityType }: Props) => {
     const speedMult = units.speed === "mph" ? KM_TO_MI : 1;
 
     // Cadence & power stats
-    const cadencePoints = track.filter((p) => p.cadence && p.cadence > 0).map((p) => p.cadence!);
+    const cadencePoints = track.filter((p) => p.cadence && p.cadence > 0).map((p) => p.cadence! * cadenceMult);
     const hasCadence = cadencePoints.length > 10;
     const avgCadence = cadencePoints.length ? Math.round(cadencePoints.reduce((a, b) => a + b, 0) / cadencePoints.length) : null;
 
