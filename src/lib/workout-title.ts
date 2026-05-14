@@ -158,6 +158,8 @@ export function deriveWorkoutTitleFromSegments(
     .trim();
 
   if (!cleanedOriginal || /^rest\b/i.test(cleanedOriginal)) return cleanedOriginal;
+  // Race day: never derive from segments (warm-up strides would mislabel it as intervals)
+  if (/race\s*day|🏁/i.test(cleanedOriginal)) return cleanedOriginal;
 
   // Parse each segment into seconds + role + intensity
   type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string; restSecs?: number };
