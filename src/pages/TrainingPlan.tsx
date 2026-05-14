@@ -403,8 +403,17 @@ const TrainingPlanPage = () => {
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(data.training_days);
         setStartDate(parseLocalISODate(data.start_date));
-        if (data.race_date && data.race_date !== "ai-recommend") {
-          setRaceDate(parseLocalISODate(data.race_date));
+        // Markdown plan is the source of truth for race day. If the stored
+        // race_date disagrees with the RACE DAY heading in content, self-heal.
+        const derived = extractRaceDateFromMarkdown(data.content);
+        const effectiveRace = derived ?? (data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null);
+        if (effectiveRace) {
+          setRaceDate(parseLocalISODate(effectiveRace));
+          if (derived && derived !== data.race_date) {
+            supabase.from("training_plans").update({ race_date: derived } as any).eq("id", data.id).then(({ error }) => {
+              if (error) console.error("race_date self-heal failed:", error);
+            });
+          }
         } else if (data.race_date === "ai-recommend") {
           setLetAIDecide(true);
         }
