@@ -95,9 +95,9 @@ export function workoutIntensity(act: {
 }
 
 /** Body-battery drain & daytime charging.
- *  Passive drain is stress-scaled. When the user is calm (stress < 30) and
- *  has done <5 intensity-min of activity in the prior 2h, the battery
- *  charges at 1-3 pts/hr (scaled by HRV vs baseline), capped at 15 pts/day. */
+ *  Passive drain ramps from 1 to 3 pts/hr based on hours awake only.
+ *  When prior-2h activity load <5, the battery charges at 1-3 pts/hr
+ *  (scaled by HRV vs baseline), capped at 15 pts/day. */
 function bodyBatteryDrain(d: ReadinessData): {
   drain: number;
   hoursAwake: number;
@@ -119,28 +119,12 @@ function bodyBatteryDrain(d: ReadinessData): {
   let hoursAwake = Math.max(0, (now - wakeMs) / 3600000);
   hoursAwake = Math.min(20, hoursAwake); // 20h cap unchanged
 
-  // ── Stress-scaled passive drain rate per hour ──
-  // stress <=35 → cap at 1.5/h. stress >=55 → ramp toward 3/h. mid-day fatigue still accelerates a touch.
-  const stress = d.stressScore ?? 40;
-  let baseRatePerHour: number;
-  if (stress <= 35) {
-    baseRatePerHour = 1.0; // calm baseline
-  } else if (stress >= 55) {
-    baseRatePerHour = 2.5; // elevated baseline (capped further by curve below)
-  } else {
-    // 35 → 1.0, 55 → 2.5
-    baseRatePerHour = 1.0 + ((stress - 35) / 20) * 1.5;
-  }
-
-  // Apply gentle accelerating curve over the day, capped by stress-derived ceiling.
-  // Ceiling: 1.5/h on calm days, up to 3/h on high-stress days.
-  const ceiling = stress <= 35 ? 1.5 : stress >= 55 ? 3.0 : 1.5 + ((stress - 35) / 20) * 1.5;
-
-  // Integrate hour-by-hour: rate = min(ceiling, baseRate * (1 + hoursAwake/16))
+  // ── Passive drain: hours-awake-only ramp from 1 → 3 pts/hr ──
+  // rate = min(3, 1 + hoursAwake/8) integrated hour-by-hour
   let passiveDrain = 0;
   for (let h = 0; h < hoursAwake; h++) {
     const slice = Math.min(1, hoursAwake - h);
-    const rate = Math.min(ceiling, baseRatePerHour * (1 + h / 16));
+    const rate = Math.min(3, 1 + h / 8);
     passiveDrain += rate * slice;
   }
 
@@ -152,38 +136,35 @@ function bodyBatteryDrain(d: ReadinessData): {
   activeDrain = Math.min(10, activeDrain);
 
   // ── Daytime charging ──
-  // For each hour-slice since wake, if stress<30 and prior-2h intensity load <5,
+  // For each hour-slice since wake, if prior-2h intensity load <5,
   // charge at 1/2/3 pts based on HRV vs baseline. Cap total at 15 pts.
   let passiveCharge = 0;
-  if (stress < 30) {
-    let chargeRate = 2; // at baseline
-    if (d.hrv != null && d.hrvBaseline != null && d.hrvBaseline > 0) {
-      if (d.hrv > d.hrvBaseline * 1.05) chargeRate = 3;
-      else if (d.hrv < d.hrvBaseline * 0.95) chargeRate = 1;
+  let chargeRate = 2; // at baseline
+  if (d.hrv != null && d.hrvBaseline != null && d.hrvBaseline > 0) {
+    if (d.hrv > d.hrvBaseline * 1.05) chargeRate = 3;
+    else if (d.hrv < d.hrvBaseline * 0.95) chargeRate = 1;
+  }
+
+  for (let h = 0; h < hoursAwake && passiveCharge < 15; h++) {
+    const sliceStart = wakeMs + h * 3600000;
+    const sliceEnd = Math.min(now, sliceStart + 3600000);
+    const sliceHours = (sliceEnd - sliceStart) / 3600000;
+    if (sliceHours <= 0) break;
+
+    // Intensity-weighted minutes in the prior 2h window
+    const windowStart = sliceStart - 2 * 3600000;
+    let recentLoad = 0;
+    for (const act of d.todayActivities) {
+      const aStart = new Date(act.startIso).getTime();
+      const aEnd = aStart + (act.durationSec || 0) * 1000;
+      if (aEnd < windowStart || aStart > sliceStart) continue;
+      const overlap = Math.max(0, Math.min(aEnd, sliceStart) - Math.max(aStart, windowStart));
+      const total = Math.max(1, aEnd - aStart);
+      recentLoad += act.intensityLoad * (overlap / total);
     }
 
-    for (let h = 0; h < hoursAwake && passiveCharge < 15; h++) {
-      const sliceStart = wakeMs + h * 3600000;
-      const sliceEnd = Math.min(now, sliceStart + 3600000);
-      const sliceHours = (sliceEnd - sliceStart) / 3600000;
-      if (sliceHours <= 0) break;
-
-      // Intensity-weighted minutes in the prior 2h window
-      const windowStart = sliceStart - 2 * 3600000;
-      let recentLoad = 0;
-      for (const act of d.todayActivities) {
-        const aStart = new Date(act.startIso).getTime();
-        const aEnd = aStart + (act.durationSec || 0) * 1000;
-        if (aEnd < windowStart || aStart > sliceStart) continue;
-        // Pro-rate intensityLoad by overlap with window
-        const overlap = Math.max(0, Math.min(aEnd, sliceStart) - Math.max(aStart, windowStart));
-        const total = Math.max(1, aEnd - aStart);
-        recentLoad += act.intensityLoad * (overlap / total);
-      }
-
-      if (recentLoad < 5) {
-        passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
-      }
+    if (recentLoad < 5) {
+      passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
     }
   }
 
@@ -207,10 +188,10 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (30%) — primary recovery indicator
+  // Sleep Quality (34%) — primary recovery indicator
   if (d.sleepScore == null) {
     // Missing sleep = assume moderate-poor
-    weightedSum += 30 * 0.30;
+    weightedSum += 30 * 0.34;
     factors.push({
       label: "Sleep Quality",
       status: "poor",
@@ -220,7 +201,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
     const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s * 0.55;
-    weightedSum += adjustedSleep * 0.30;
+    weightedSum += adjustedSleep * 0.34;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -271,48 +252,34 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     weightedSum += 15 * 0.12; // missing = bad
   }
 
-  // HRV vs baseline (20%)
+  // HRV vs baseline (23%)
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
     const hrvScore = pct >= 10 ? 90 : pct >= 0 ? 75 : pct >= -10 ? 55 : pct >= -20 ? 35 : 15;
-    weightedSum += hrvScore * 0.20;
+    weightedSum += hrvScore * 0.23;
     factors.push({
       label: "HRV",
       status: pct >= -5 ? "good" : pct >= -15 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 25 * 0.20; // missing HRV = moderate penalty
+    weightedSum += 25 * 0.23; // missing HRV = moderate penalty
     factors.push({ label: "HRV", status: "poor", detail: "No data" });
   }
 
-  // Stress (10%)
-  if (d.stressScore != null) {
-    const v = d.stressScore;
-    const stressScore = v <= 20 ? 85 : v <= 35 ? 65 : v <= 55 ? 45 : v <= 75 ? 25 : 10;
-    weightedSum += stressScore * 0.10;
-    factors.push({
-      label: "Stress",
-      status: v <= 30 ? "good" : v <= 55 ? "warning" : "poor",
-      detail: `${Math.round(v)}/100`,
-    });
-  } else {
-    weightedSum += 20 * 0.10; // missing stress = assume moderate-poor
-  }
-
-  // Yesterday's Load — intensity-weighted (13%)
+  // Yesterday's Load — intensity-weighted (16%)
   if (d.yesterdayLoad != null) {
     const l = d.yesterdayLoad;
     const loadScore = l <= 15 ? 85 : l <= 40 ? 70 : l <= 80 ? 45 : l <= 140 ? 25 : 10;
-    weightedSum += loadScore * 0.13;
+    weightedSum += loadScore * 0.16;
     factors.push({
       label: "Yesterday's Load",
       status: l <= 40 ? "good" : l <= 80 ? "warning" : "poor",
       detail: `${Math.floor(l / 60)}:${String(Math.round(l % 60)).padStart(2, "0")} training`,
     });
   } else {
-    weightedSum += 50 * 0.13; // rest day = decent
+    weightedSum += 50 * 0.16; // rest day = decent
   }
 
   // Normalise to 0-100 with fixed denominator
@@ -367,18 +334,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     }
   }
 
-  // 3-day stress trend
-  if (d.stressHistory.length >= 2) {
-    const avg = d.stressHistory.reduce((a, b) => a + b, 0) / d.stressHistory.length;
-    if (avg > 45) {
-      const penalty = -Math.round(Math.min(10, (avg - 45) / 5)); // softened
-      modifiers.push({
-        label: "Stress Trend",
-        adj: penalty,
-        detail: `avg ${Math.round(avg)}/100 (${d.stressHistory.length}d)`,
-      });
-    }
-  }
+
 
   // Training monotony (7d vs 28d)
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
