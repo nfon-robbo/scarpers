@@ -25,7 +25,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, generateIcsCalendar, downloadText
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
-import { popUndoEntry, getUndoCount, peekUndoEntry } from "@/lib/plan-undo-history";
+import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
 
 interface ApiStep {
   duration: number;
@@ -275,16 +275,17 @@ const TrainingPlanPage = () => {
     };
   }, [savedPlanId]);
 
-  const handleUndo = useCallback(async () => {
-    if (!savedPlanId || !user) return;
-    const peek = peekUndoEntry(savedPlanId);
+  const handleUndo = useCallback(async (planIdOverride?: string) => {
+    const targetPlanId = typeof planIdOverride === "string" ? planIdOverride : savedPlanId;
+    if (!targetPlanId || !user) return;
+    const peek = peekUndoEntry(targetPlanId);
     if (!peek) return;
-    const entry = popUndoEntry(savedPlanId);
+    const entry = popUndoEntry(targetPlanId);
     if (!entry) return;
     const { error } = await supabase
       .from("training_plans")
       .update({ content: entry.prevContent })
-      .eq("id", savedPlanId);
+      .eq("id", targetPlanId);
     if (error) {
       toast({ title: "Undo failed", description: error.message, variant: "destructive" });
       return;
@@ -292,6 +293,18 @@ const TrainingPlanPage = () => {
     setContent(entry.prevContent);
     toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
   }, [savedPlanId, user, toast]);
+
+  const toastPlanChange = useCallback((title: string, description: string, planId?: string | null) => {
+    toast({
+      title,
+      description,
+      action: planId ? (
+        <ToastAction altText="Undo plan change" onClick={() => handleUndo(planId)}>
+          Undo
+        </ToastAction>
+      ) : undefined,
+    });
+  }, [handleUndo, toast]);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
@@ -394,9 +407,10 @@ const TrainingPlanPage = () => {
     return () => window.removeEventListener("plan-undo-changed", onPlanChange);
   }, [loadSavedPlan]);
 
-  const savePlan = async (planContent: string, options: { inPlace?: boolean } = {}) => {
-    if (!user) return;
+  const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string } = {}) => {
+    if (!user) return null;
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
+    const undoContent = options.prevContent ?? content;
 
     // In-place edit: update the existing plan row so linked activities (training_plan_id)
     // continue to register as completed. Used by day-adjust, day-ahead, plan-review etc.
@@ -413,10 +427,14 @@ const TrainingPlanPage = () => {
         } as any)
         .eq("id", savedPlanId);
       if (error) console.error("In-place plan update failed:", error);
-      return;
+      else if (options.undoLabel && undoContent && undoContent !== planContent) {
+        pushUndoEntry(savedPlanId, undoContent, options.undoLabel);
+      }
+      return error ? null : savedPlanId;
     }
 
     // Archive old plan instead of deleting, then insert new one (new plan generations)
+    const previousPlanContent = savedPlanId ? undoContent : "";
     if (savedPlanId) {
       await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
     }
@@ -437,7 +455,12 @@ const TrainingPlanPage = () => {
 
     if (!error && data) {
       setSavedPlanId(data.id);
+      if (options.undoLabel && previousPlanContent && previousPlanContent !== planContent) {
+        pushUndoEntry(data.id, previousPlanContent, options.undoLabel);
+      }
+      return data.id;
     }
+    return null;
   };
 
   const deletePlan = async () => {
@@ -515,10 +538,16 @@ const TrainingPlanPage = () => {
       toast({ title: "Could not move workout", description: "Workout header not found.", variant: "destructive" });
       return;
     }
+    const previousContent = content;
     const newContent = newLines.join("\n");
+    let undoPlanId: string | null = null;
     setContent(newContent);
     if (savedPlanId && user) {
-      await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
+      const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
+      if (!error) {
+        pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
+        undoPlanId = savedPlanId;
+      }
     }
 
     // Remove the workout from intervals.icu on its original date, then push
@@ -536,25 +565,31 @@ const TrainingPlanPage = () => {
       // ignore — sync errors are surfaced inside handleSyncToIntervals
     }
 
-    toast({ title: "Workout moved", description: `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.` });
+    toastPlanChange("Workout moved", `Rescheduled to ${toParts[2]}/${toParts[1]}/${toParts[0]} and synced to intervals.icu.`, undoPlanId);
   };
 
   const persistStartDateShift = async (newStart: Date) => {
     setUpdatingDates(true);
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
+      const previousContent = content;
       const newContent = shiftPlanDates(content, deltaDays);
+      let undoPlanId: string | null = null;
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
-        await supabase.from("training_plans")
+        const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
             content: newContent,
           })
           .eq("id", savedPlanId);
+        if (!error && previousContent !== newContent) {
+          pushUndoEntry(savedPlanId, previousContent, "start date shift");
+          undoPlanId = savedPlanId;
+        }
       }
-      toast({ title: "Start date updated", description: "Workouts shifted to the new start date." });
+      toastPlanChange("Start date updated", "Workouts shifted to the new start date.", undoPlanId);
     } catch (e: any) {
       toast({ title: "Update failed", description: e.message, variant: "destructive" });
     } finally {
@@ -594,10 +629,10 @@ const TrainingPlanPage = () => {
       startDate: toLocalISODate(newStart),
       raceDate: toLocalISODate(newEnd),
       onDelta: (text) => { accumulated += text; setContent(accumulated); },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
-        savePlan(accumulated);
-        toast({ title: "Plan regenerated", description: "New plan built for updated end date." });
+        const planId = await savePlan(accumulated, { undoLabel: "end date regeneration", prevContent: content });
+        toastPlanChange("Plan regenerated", "New plan built for updated end date.", content ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Regeneration failed", description: err, variant: "destructive" });
@@ -637,6 +672,7 @@ const TrainingPlanPage = () => {
       toast({ title: "Set a race date", description: "Pick a race date or let the AI recommend one.", variant: "destructive" });
       return;
     }
+    const previousContent = content;
     setLoading(true);
     setContent("");
 
@@ -662,10 +698,10 @@ const TrainingPlanPage = () => {
         accumulated += text;
         setContent(accumulated);
       },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
-        savePlan(accumulated);
-        toast({ title: "Plan saved", description: "Your training plan has been saved." });
+        const planId = await savePlan(accumulated, { undoLabel: "plan generation", prevContent: previousContent });
+        toastPlanChange("Plan saved", "Your training plan has been saved.", previousContent ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
@@ -759,12 +795,12 @@ const TrainingPlanPage = () => {
         accumulated += text;
         setContent(accumulated);
       },
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        savePlan(accumulated, { inPlace: true });
-        toast({ title: "Plan updated", description: "Your adjusted training plan has been saved." });
+        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
+        toastPlanChange("Plan updated", "Your adjusted training plan has been saved.", planId);
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
@@ -1027,15 +1063,17 @@ const TrainingPlanPage = () => {
 
     const updatedContent = content.slice(0, idx) + replacement + content.slice(idx + todayWorkout.rawText.length);
 
+    const previousContent = content;
     setContent(updatedContent);
-    savePlan(updatedContent, { inPlace: true });
+    savePlan(updatedContent, {
+      inPlace: true,
+      undoLabel: `${format(today, "dd/MM/yyyy")} workout adjustment`,
+      prevContent: previousContent,
+    });
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
     setDayAdjustDialogOpen(false);
-    toast({
-      title: "Workout updated!",
-      description: "Syncing adjusted workout to Intervals.icu...",
-    });
+    toastPlanChange("Workout updated!", "Syncing adjusted workout to Intervals.icu...", savedPlanId);
 
     // Auto-sync to Intervals.icu after applying adjustment
     setTimeout(() => {
@@ -1263,6 +1301,7 @@ const TrainingPlanPage = () => {
     setImporting(true);
     try {
       const result = await importDocxPlan(file);
+      const previousContent = content;
       
       // Update state with imported plan metadata
       setRaceDistance(result.raceDistance);
@@ -1273,12 +1312,9 @@ const TrainingPlanPage = () => {
       setContent(result.markdown);
       
       // Save to database
-      await savePlan(result.markdown);
+      const planId = await savePlan(result.markdown, { undoLabel: "DOCX import", prevContent: previousContent });
 
-      toast({
-        title: `Imported ${result.workoutCount} workouts!`,
-        description: `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`,
-      });
+      toastPlanChange(`Imported ${result.workoutCount} workouts!`, `Plan from ${result.startDate} to ${result.endDate}. You can now sync to intervals.icu.`, previousContent ? planId : null);
     } catch (err) {
       toast({
         title: "Import failed",
@@ -1304,20 +1340,18 @@ const TrainingPlanPage = () => {
     setImporting(true);
     try {
       const result = await importFitPlan(valid);
+      const previousContent = content;
       setRaceDistance(result.raceDistance);
       setTrainingDays(result.trainingDays);
       setStartDate(new Date(result.startDate));
       setRaceDate(new Date(result.endDate));
       setLetAIDecide(false);
       setContent(result.markdown);
-      await savePlan(result.markdown);
+      const planId = await savePlan(result.markdown, { undoLabel: "FIT import", prevContent: previousContent });
 
-      toast({
-        title: `Imported ${result.workoutCount} workouts!`,
-        description: result.errors.length
-          ? `Some files couldn't be parsed (${result.errors.length}).`
-          : `Plan from ${result.startDate} to ${result.endDate}.`,
-      });
+      toastPlanChange(`Imported ${result.workoutCount} workouts!`, result.errors.length
+        ? `Some files couldn't be parsed (${result.errors.length}).`
+        : `Plan from ${result.startDate} to ${result.endDate}.`, previousContent ? planId : null);
     } catch (err) {
       toast({
         title: "Import failed",
@@ -1353,7 +1387,7 @@ const TrainingPlanPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleUndo}
+                  onClick={() => handleUndo()}
                   className="gap-2"
                   title={`Undo last change (${undoCount} step${undoCount === 1 ? "" : "s"} available)`}
                 >
