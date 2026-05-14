@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { parseWorkoutsFromPlan, ParsedWorkout } from "@/lib/plan-export";
 import {
   Loader2, RefreshCw, Trophy, Activity as ActivityIcon, Heart, Gauge,
-  Flame, Moon, Brain, Timer, Sparkles, CheckCircle2, AlertTriangle,
+  Flame, Moon, Brain, Timer, Sparkles, CheckCircle2, AlertTriangle, ArrowLeft,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Area, ReferenceDot,
