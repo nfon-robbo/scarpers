@@ -608,7 +608,7 @@ const TrainingPlanPage = () => {
       onDelta: (text) => { accumulated += text; setContent(accumulated); },
       onDone: () => {
         setLoading(false);
-        savePlan(accumulated);
+        savePlan(accumulated, { undoLabel: "end date regeneration", prevContent: content });
         toast({ title: "Plan regenerated", description: "New plan built for updated end date." });
       },
       onError: (err) => {
@@ -775,7 +775,7 @@ const TrainingPlanPage = () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        savePlan(accumulated, { inPlace: true });
+        savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
         toast({ title: "Plan updated", description: "Your adjusted training plan has been saved." });
       },
       onError: (err) => {
@@ -1039,8 +1039,13 @@ const TrainingPlanPage = () => {
 
     const updatedContent = content.slice(0, idx) + replacement + content.slice(idx + todayWorkout.rawText.length);
 
+    const previousContent = content;
     setContent(updatedContent);
-    savePlan(updatedContent, { inPlace: true });
+    savePlan(updatedContent, {
+      inPlace: true,
+      undoLabel: `${format(today, "dd/MM/yyyy")} workout adjustment`,
+      prevContent: previousContent,
+    });
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
     setDayAdjustDialogOpen(false);
