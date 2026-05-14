@@ -370,23 +370,9 @@ const Dashboard = () => {
         markAdaptCheckRan(user.id);
 
         if (evaluation.direction === "down") {
-          // Auto-apply downward adaptation immediately.
-          const { data, error } = await supabase.functions.invoke("plan-auto-adapt", {
-            body: { mode: "down", reason: evaluation.reason },
-          });
-          if (error) throw error;
-          if (data?.ok) {
-            if (data.plan_id && data.prev_content) {
-              pushUndoEntry(data.plan_id, data.prev_content, "auto recovery adjustment");
-            }
-            if (data.new_content) {
-              setPlan((prev) => prev ? { ...prev, content: data.new_content } : prev);
-            }
-            sonnerToast("We've adjusted this week's plan based on your recovery.", {
-              description: "Get some rest and come back stronger.",
-              action: { label: "View", onClick: () => navigate("/training-plan") },
-              duration: 10000,
-            });
+          // Opt-in: surface a banner instead of auto-applying.
+          if (!isDownwardDismissedToday(user.id)) {
+            setAdaptEval(evaluation);
           }
         } else if (evaluation.direction === "up") {
           if (!isUpwardDismissedToday(user.id)) {
