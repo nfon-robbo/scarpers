@@ -731,13 +731,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </div>
                     {suppressScore && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="rotate-[-8deg] border-2 border-yellow-400/80 rounded-md px-3 py-2 bg-yellow-400/10 backdrop-blur-sm shadow-lg max-w-[180px] text-center">
+                        <div className="rotate-[-8deg] border-2 border-yellow-400/80 rounded-md px-3 py-2 bg-yellow-400/10 backdrop-blur-sm shadow-lg max-w-[200px] text-center">
                           <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-yellow-300 flex items-center justify-center gap-1.5">
                             <Loader2 className="h-3 w-3 animate-spin" />
-                            Awaiting
+                            Waiting for data
                           </div>
                           <div className="text-[11px] font-semibold text-yellow-100 leading-tight mt-1">
                             {awaiting.join(" · ")}
+                          </div>
+                          <div className="text-[9px] font-normal text-yellow-200/80 leading-snug mt-1.5 normal-case tracking-normal">
+                            Check back shortly once your watch has synced.
                           </div>
                         </div>
                       </div>
