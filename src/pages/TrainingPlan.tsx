@@ -39,6 +39,23 @@ interface ApiStep {
 
 const WALK_PACE = "13:00/km";
 
+/**
+ * Source-of-truth race date is the markdown plan itself.
+ * Scans for a session heading mentioning "RACE DAY" and extracts the DD/MM/YYYY
+ * date in the same line. Returns ISO YYYY-MM-DD or null.
+ */
+function extractRaceDateFromMarkdown(md: string | null | undefined): string | null {
+  if (!md) return null;
+  const lines = md.split("\n");
+  // Prefer lines that look like session headings (### ...) and contain RACE DAY
+  const candidates = lines.filter(l => /race\s*day/i.test(l));
+  for (const line of candidates) {
+    const m = line.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  return null;
+}
+
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
@@ -386,8 +403,17 @@ const TrainingPlanPage = () => {
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(data.training_days);
         setStartDate(parseLocalISODate(data.start_date));
-        if (data.race_date && data.race_date !== "ai-recommend") {
-          setRaceDate(parseLocalISODate(data.race_date));
+        // Markdown plan is the source of truth for race day. If the stored
+        // race_date disagrees with the RACE DAY heading in content, self-heal.
+        const derived = extractRaceDateFromMarkdown(data.content);
+        const effectiveRace = derived ?? (data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null);
+        if (effectiveRace) {
+          setRaceDate(parseLocalISODate(effectiveRace));
+          if (derived && derived !== data.race_date) {
+            supabase.from("training_plans").update({ race_date: derived } as any).eq("id", data.id).then(({ error }) => {
+              if (error) console.error("race_date self-heal failed:", error);
+            });
+          }
         } else if (data.race_date === "ai-recommend") {
           setLetAIDecide(true);
         }
@@ -454,6 +480,13 @@ const TrainingPlanPage = () => {
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
     const undoContent = options.prevContent ?? content;
 
+    // Reconcile with markdown: the RACE DAY heading in the plan is the source of truth.
+    const derivedRaceDate = extractRaceDateFromMarkdown(planContent);
+    const finalRaceDate = derivedRaceDate ?? raceDateValue;
+    if (derivedRaceDate && derivedRaceDate !== raceDateValue) {
+      try { setRaceDate(parseLocalISODate(derivedRaceDate)); setLetAIDecide(false); } catch {}
+    }
+
     // In-place edit: update the existing plan row so linked activities (training_plan_id)
     // continue to register as completed. Used by day-adjust, day-ahead, plan-review etc.
     if (options.inPlace && savedPlanId) {
@@ -464,7 +497,7 @@ const TrainingPlanPage = () => {
           goal_time: goalTime || null,
           training_days: trainingDays,
           start_date: toLocalISODate(startDate),
-          race_date: raceDateValue,
+          race_date: finalRaceDate,
           content: planContent,
         } as any)
         .eq("id", savedPlanId);
@@ -489,7 +522,7 @@ const TrainingPlanPage = () => {
         goal_time: goalTime || null,
         training_days: trainingDays,
         start_date: toLocalISODate(startDate),
-        race_date: raceDateValue,
+        race_date: finalRaceDate,
         content: planContent,
       } as any)
       .select("id")
