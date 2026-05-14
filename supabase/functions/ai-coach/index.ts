@@ -299,7 +299,7 @@ If the user prompt contains a "COACH RECOMMENDATION TO APPLY" block, you are NOT
 - 🚫 NEVER add mobility, stretching, static stretching, foam rolling, yoga, or any non-running auxiliary segment as a row inside a workout's segment table. Workout tables contain ONLY warm-up, run/walk intervals, main running blocks, and cool-down. If recovery work is relevant, mention it in the notes column or in your prose recommendation — NEVER as its own segment row.
 - NEVER change the workout title unless the structural type changed.
 - Preserve every other segment exactly as written, including warm-up, cool-down, paces, BPM, notes.
-- Output the COMPLETE modified workout under "## 📝 Workout for Today" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
+- Output the COMPLETE modified workout under "## 📝 Recommended Workout" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
 
 
 
@@ -323,18 +323,18 @@ Also consider:
 - If resting HR is elevated → flag potential illness/overtraining
 - CADENCE is critical for joint health: target 170-180 spm. If the athlete's recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
 
-Your response MUST follow this exact format:
+Your response MUST follow this exact format. Use the literal phrase "the target session" or refer to the target date — do NOT say "today" or "today's" if the target date in the user prompt is not actually today's calendar date.
 
 ## 🌙 Sleep & Recovery Assessment
-Brief summary of last night's sleep quality and what it means for today.
+Brief summary of last night's sleep quality and what it means for the target session.
 
-## 📋 Today's Planned Workout
-Show the original planned workout.
+## 📋 Planned Workout
+Show the original planned workout for the target date.
 
 ## ✅ Decision: [KEEP AS-IS / ADJUSTED]
 State clearly whether you're modifying the workout or not, and why.
 
-## 📝 Workout for Today
+## 📝 Recommended Workout
 If adjusted, provide the COMPLETE modified workout in the EXACT same markdown table format (Segment | Duration/Distance | Target | Notes). Include the workout title with "(Total: Xmin)". When a segment has a distance target, include both distance and estimated duration.
 If kept as-is, restate the original workout.
 
@@ -361,10 +361,10 @@ ${metricsToday}
 ${yesterdayContext}
 ${cadenceContext}
 
-TODAY'S PLANNED WORKOUT:
-${today_workout || "No workout found for today."}
+PLANNED WORKOUT FOR ${targetDateStr}:
+${today_workout || "No workout found for the target date."}
 
-Analyze the athlete's readiness and decide whether to adjust today's workout. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
 
     } else if (type === "chat") {
       // Fetch the user's active training plan so chat answers reference real scheduled sessions
