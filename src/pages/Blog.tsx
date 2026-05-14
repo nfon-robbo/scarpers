@@ -32,7 +32,7 @@ const Blog = () => {
 
   return (
     <MarketingPageLayout
-      title="Scarpers Running Blog | AI Coaching, Training & Race Day Tips"
+      title="Scarpers Running Blog — AI Coaching & Training Tips"
       description="Expert running advice, AI coaching insights, training plan guides and race day tips from the team at Scarpers."
       canonicalPath="/blog"
       noindex={!loading && posts.length === 0}
