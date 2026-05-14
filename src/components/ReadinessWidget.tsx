@@ -8,7 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
-type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null };
+type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null; kind: "morning" | "eod" };
 
 function formatSparkValue(label: string, v: number): string {
   if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
