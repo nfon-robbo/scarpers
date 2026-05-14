@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ParsedWorkout } from "@/lib/plan-export";
+import { describeWorkoutLabel } from "@/lib/workout-title";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -57,22 +58,10 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
     return `Week ${diff + 1}`;
   }, [weekStart, planWeeks]);
 
-  // Extract short workout label from title
-  function shortLabel(title: string): string {
-    if (/rest/i.test(title)) return "Rest Day";
-    if (/interval/i.test(title)) return "Intervals";
-    if (/tempo/i.test(title)) return "Tempo";
-    if (/long\s*run/i.test(title)) return "Long Run";
-    if (/easy/i.test(title)) return "Easy Run";
-    if (/recovery/i.test(title)) return "Recovery";
-    if (/fartlek/i.test(title)) return "Fartlek";
-    if (/hill/i.test(title)) return "Hills";
-    if (/race/i.test(title)) return "Race";
-    if (/threshold/i.test(title)) return "Threshold";
-    if (/cadence/i.test(title)) return "Cadence";
-    if (/steady/i.test(title)) return "Steady";
-    if (/aerobic/i.test(title)) return "Aerobic";
-    return title.split(/[(\-–]/)[0].trim().slice(0, 18);
+  // Extract descriptive workout label from the parsed workout, not just the generic title.
+  function shortLabel(workout: ParsedWorkout): string {
+    if (/rest/i.test(workout.title)) return "Rest Day";
+    return describeWorkoutLabel(workout.title, workout.segments);
   }
 
   // Extract music BPM from workout segments notes, with fallback based on HR zone
@@ -219,7 +208,7 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
                     <CheckCircle2 className="w-3 h-3 text-primary absolute top-0.5 right-0.5" />
                   )}
                   <p className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate">
-                    {shortLabel(workout.title)}
+                    {shortLabel(workout)}
                   </p>
                   {(totalDuration(workout) || musicBpm(workout)) && (
                     <p className="text-[8px] sm:text-[9px] opacity-75 mt-0.5 truncate">
@@ -245,7 +234,7 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {selectedWorkout.title}
+                  {shortLabel(selectedWorkout)}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}

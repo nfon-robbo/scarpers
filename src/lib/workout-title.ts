@@ -41,6 +41,33 @@ const fmtDur = (s: number) => {
   return `${sec}s`;
 };
 
+const parseDurationSeconds = (text: string): number => {
+  const cleaned = text.replace(/[()]/g, " ").trim();
+  const colon = cleaned.match(/(\d{1,3}):(\d{2})/);
+  if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+  const hour = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)s?\b/i);
+  const min = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:m|min|minute)s?\b/i);
+  const sec = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:s|sec|second)s?\b/i);
+  let total = 0;
+  if (hour) total += parseFloat(hour[1]) * 3600;
+  if (min) total += parseFloat(min[1]) * 60;
+  if (sec) total += parseFloat(sec[1]);
+  return Math.round(total);
+};
+
+const parseRepeatDuration = (duration: string): { reps: number; workSecs: number; restSecs: number } | null => {
+  const cleaned = duration.replace(/[()]/g, " ").replace(/×/g, "x");
+  const repeat = cleaned.match(/(\d+)\s*x\s*(.+)$/i);
+  if (!repeat) return null;
+  const reps = parseInt(repeat[1], 10);
+  const body = repeat[2];
+  const [workPart, restPart] = body.split(/\s*\/\s*/);
+  const workSecs = parseDurationSeconds(workPart || "");
+  const restSecs = parseDurationSeconds(restPart || "");
+  if (!reps || !workSecs) return null;
+  return { reps, workSecs, restSecs };
+};
+
 const intentFrom = (text: string): string | null => {
   if (/tempo/i.test(text)) return "tempo";
   if (/threshold|lthr/i.test(text)) return "threshold";
@@ -111,7 +138,7 @@ export function deriveWorkoutTitleFromSteps(
       ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
       : `${g.reps}x${fmtDur(g.workDur)}`,
   );
-  const intentLabel = intent ? `${intent} intervals` : hasRest ? "walk-run intervals" : "intervals";
+  const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
   return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
 }
 
@@ -133,7 +160,7 @@ export function deriveWorkoutTitleFromSegments(
   if (!cleanedOriginal || /^rest\b/i.test(cleanedOriginal)) return cleanedOriginal;
 
   // Parse each segment into seconds + role + intensity
-  type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string };
+  type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string; restSecs?: number };
   const parsed: Seg[] = [];
   let totalSecs = 0;
   for (const raw of segments) {
@@ -141,23 +168,11 @@ export function deriveWorkoutTitleFromSegments(
     const segName = raw.segment || "";
     const targetText = `${raw.target || ""} ${raw.notes || ""} ${raw.hrZone || ""}`;
 
-    let reps = 1;
-    let perSecs = 0;
-    const repMatch = dur.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
-    if (repMatch) {
-      reps = parseInt(repMatch[1], 10);
-      const v = parseFloat(repMatch[2]);
-      const unit = repMatch[3].toLowerCase();
-      perSecs = unit.startsWith("s") ? v : v * 60;
-    } else {
-      const min = dur.match(/(\d+(?:\.\d+)?)\s*min/i);
-      const sec = dur.match(/(\d+(?:\.\d+)?)\s*(?:sec|s)\b/i);
-      const colon = dur.match(/(\d{1,3}):(\d{2})/);
-      if (min) perSecs = parseFloat(min[1]) * 60;
-      else if (sec) perSecs = parseFloat(sec[1]);
-      else if (colon) perSecs = parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
-    }
-    const segSecs = reps * perSecs;
+    const repeat = parseRepeatDuration(dur);
+    const reps = repeat?.reps ?? 1;
+    const perSecs = repeat?.workSecs ?? parseDurationSeconds(dur);
+    const restSecs = repeat?.restSecs ?? 0;
+    const segSecs = repeat ? reps * (perSecs + restSecs) : reps * perSecs;
     totalSecs += segSecs;
 
     let role: Seg["role"] = "main";
@@ -171,7 +186,7 @@ export function deriveWorkoutTitleFromSegments(
     else if (/Z4|Z5|interval|VO2|v02/i.test(targetText)) intensity = "Interval";
     else if (/long/i.test(segName) || /long/i.test(cleanedOriginal)) intensity = "Long";
     else if (/recovery|Z1\b/i.test(targetText) && role === "main") intensity = "Recovery";
-    parsed.push({ secs: perSecs, role, reps, intensity });
+    parsed.push({ secs: perSecs, role, reps, intensity, restSecs });
   }
 
   const totalMins = Math.max(1, Math.round(totalSecs / 60));
@@ -185,7 +200,7 @@ export function deriveWorkoutTitleFromSegments(
     if (cur.reps > 1) {
       // explicit "Nx" segment — pair with following recovery if any
       const next = parsed[i + 1];
-      const rest = next && next.role === "recovery" ? next.secs : 0;
+      const rest = cur.restSecs || (next && next.role === "recovery" ? next.secs : 0);
       groups.push({ work: cur.secs, rest, reps: cur.reps });
       if (rest) i++;
     }
@@ -200,17 +215,16 @@ export function deriveWorkoutTitleFromSegments(
         ? `${g.reps}x${fmtDur(g.work)} run / ${fmtDur(g.rest)} walk`
         : `${g.reps}x${fmtDur(g.work)}`,
     );
-    const intentLabel = intent
-      ? `${intent} intervals`
-      : groups.some((g) => g.rest > 0)
-        ? "walk-run intervals"
-        : "intervals";
+    const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
     body = `${descs.join(" + ")} ${intentLabel} ${totalMins}min`;
   } else {
     // Continuous — pick longest main as the dominant
     const main = parsed.filter((p) => p.role === "main").sort((a, b) => b.secs - a.secs)[0];
     const base = intent ?? labelFromIntensity[main?.intensity ?? "Easy"] ?? "run";
-    body = `${capitalize(base)} ${totalMins}min`;
+    const sessionType = base === "easy run" ? "continuous easy run" : base;
+    body = main?.secs && totalSecs > main.secs
+      ? `${fmtDur(main.secs)} ${sessionType} (${totalMins}min total)`
+      : `${capitalize(sessionType)} ${totalMins}min`;
   }
 
   return body;
