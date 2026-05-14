@@ -548,19 +548,19 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const awaiting = useMemo<string[]>(() => {
     if (!data) return [];
     const items: string[] = [];
-    if (data.sleepScore == null && data.deepPct == null) items.push("sleep results");
+    if (data.sleepScore == null) items.push("sleep score");
+    if (data.sleepHours == null) items.push("sleep duration");
+    if (data.deepPct == null) items.push("deep sleep");
     if (data.rhr == null) items.push("resting heart rate");
     if (data.hrv == null) items.push("HRV");
     return items;
   }, [data]);
 
-  // Suppress the score (and snapshot writes) when:
-  //   • auto-sync hasn't completed this session yet, AND
-  //   • we're missing one or more essentials.
-  // Once sync completes, even if data is still missing we surface the score
-  // so the user can see what's actually broken.
-  const autoSyncSettled = !autoSyncing && (user ? isAutoSyncDoneThisSession(user.id) : true);
-  const suppressScore = !autoSyncSettled && awaiting.length > 0;
+  // Suppress the score (and snapshot writes) whenever any of the five
+  // required inputs are missing. We never persist or display a readiness
+  // score derived from default-penalty fallbacks — instead we surface a
+  // "waiting for data" stamp so the user knows what's outstanding.
+  const suppressScore = awaiting.length > 0;
 
   const displayResult = cached
     ? { score: cached.score, factors: cached.factors as { label: string; status: "good" | "warning" | "poor"; detail: string }[] }
