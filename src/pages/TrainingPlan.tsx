@@ -1053,7 +1053,8 @@ const TrainingPlanPage = () => {
           .join("\n");
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
-        const baseName = w.title
+        const descriptiveTitle = deriveWorkoutTitle(w.title, steps, totalMins);
+        const baseName = descriptiveTitle
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers - — Walk"
         const correctedName = /^scarpers\s*[-–—]/i.test(baseName) ? baseName : `Scarpers - ${baseName}`;
