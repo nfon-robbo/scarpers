@@ -540,19 +540,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
       let pick: TrendSnapshot | undefined;
       if (rows.length) {
-        if (trendMode === "morning") {
-          // Morning = first post-5am snapshot with synced sleep and a plausible
-          // wake-time model. Older noisy snapshots can have sleep data present
-          // but still show 20h awake before midday, which crushes the score.
-          // If none qualify, leave a gap rather than show a pre-sync score
-          // that doesn't reflect that morning's actual recovery.
-          const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
-          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12)) ?? after5[0] ?? rows[0];
-        } else {
-          // End of day = last snapshot of the day, but only if sleep had
-          // synced by then. Otherwise the score is noise — show a gap.
-          const synced = rows.filter((r) => r.sleepSynced);
-          pick = synced[synced.length - 1] ?? rows[rows.length - 1];
+        const wantedKind: "morning" | "eod" = trendMode === "morning" ? "morning" : "eod";
+        const matching = rows.filter((r) => r.kind === wantedKind);
+        if (matching.length) {
+          // Morning = earliest matching; EOD = latest matching
+          pick = wantedKind === "morning" ? matching[0] : matching[matching.length - 1];
         }
       }
       return {
