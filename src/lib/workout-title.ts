@@ -215,7 +215,7 @@ export function deriveWorkoutTitleFromSegments(
         ? `${g.reps}x${fmtDur(g.work)} run / ${fmtDur(g.rest)} walk`
         : `${g.reps}x${fmtDur(g.work)}`,
     );
-    const intentLabel = intent
+    const intentLabel = intent && intent !== "recovery"
       ? `${intent} intervals`
       : groups.some((g) => g.rest > 0)
         ? "walk-run intervals"
