@@ -253,9 +253,20 @@ Deno.serve(async (req) => {
     let status = 500;
     let clientError = "Google Fit sleep sync failed";
 
+    // Token invalid is an expected, user-actionable state — return 200 so it
+    // isn't surfaced as a runtime error in the client overlay.
     if (message === "GOOGLE_FIT_USER_TOKEN_INVALID") {
-      status = 401;
-      clientError = "Your Google Fit connection expired or was revoked. Please disconnect and reconnect Google Fit.";
+      console.log("Google Fit sleep skipped: token invalid (user must reconnect)");
+      return new Response(
+        JSON.stringify({
+          synced: 0,
+          sessions: 0,
+          skipped: true,
+          reason: "token_invalid",
+          message: "Your Google Fit connection expired or was revoked. Please disconnect and reconnect Google Fit.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     } else if (message === "GOOGLE_FIT_APP_CREDENTIALS_INVALID") {
       status = 400;
       clientError = "Google Fit app credentials are invalid. Please update backend Google Fit credentials.";
