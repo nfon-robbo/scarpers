@@ -158,9 +158,10 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   if (!data) return null;
   const { km, goalSec, completed } = data;
 
-  // Take last 3 completed sessions; pick latest of each type for blending
-  const last3 = completed.slice(0, 3);
-  const ready = last3.length >= 3;
+  // Require at least 5 completed planned sessions before unlocking the gauge
+  const MIN_SESSIONS = 5;
+  const recent = completed.slice(0, MIN_SESSIONS);
+  const ready = completed.length >= MIN_SESSIONS;
 
   // Average up to the last 3 sessions of each type so a single slow recovery
   // run doesn't dominate the easy bucket over faster walk/run target paces.
@@ -174,7 +175,8 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
 
   // Derived race-pace contributions
   const easyContrib = easyPace; // 100% of easy pace
-  const tempoContrib = tempoPace != null ? tempoPace + 45 : null; // +45s/km → threshold
+  // Tempo is faster than race pace, so add 30 s/km to derive race pace
+  const tempoContrib = tempoPace != null ? tempoPace + 30 : null;
   const raceContrib = racePace; // direct
 
   // Blend with weighting; if a category is missing, redistribute its weight proportionally
