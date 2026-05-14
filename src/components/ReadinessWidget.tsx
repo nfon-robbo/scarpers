@@ -409,11 +409,10 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   useEffect(() => {
     if (!user) return;
     const today = new Date();
-    // Trend graph starts from this anchor date and grows forward each day.
-    const TREND_ANCHOR = new Date("2026-05-14T00:00:00");
+    // Rolling 7-day window
     const days: string[] = [];
     const dayMs = 86400000;
-    const totalDays = Math.max(1, Math.min(7, Math.floor((today.getTime() - TREND_ANCHOR.getTime()) / dayMs) + 1));
+    const totalDays = 7;
     for (let i = totalDays - 1; i >= 0; i--) {
       days.push(new Date(today.getTime() - i * dayMs).toISOString().split("T")[0]);
     }
