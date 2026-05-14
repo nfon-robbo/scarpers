@@ -182,6 +182,7 @@ const WellnessTab = () => {
       )}
 
       <SleepSourcesPanel />
+      <GoogleFitConnect />
       <SleepCalendar />
       <SleepStagesChart />
 
@@ -309,7 +310,6 @@ const WellnessTab = () => {
       </Card>
 
       <SleepStagesChart />
-      <GoogleFitConnect />
       <HealthConnectCard />
     </div>
   );
