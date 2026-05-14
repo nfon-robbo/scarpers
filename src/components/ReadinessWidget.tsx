@@ -516,7 +516,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => {
         const validity = extractSnapshotValidity(s.factors as any[]);
-        return { recorded_at: s.recorded_at, score: s.score, ...validity };
+        return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", ...validity };
       }));
     });
   }, [user]);
