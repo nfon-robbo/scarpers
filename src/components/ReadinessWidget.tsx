@@ -524,7 +524,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         }
       }
       return {
-        day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }).charAt(0),
+        day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }),
         score: pick ? pick.score : null,
       };
     });
