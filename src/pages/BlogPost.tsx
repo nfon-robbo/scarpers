@@ -153,6 +153,8 @@ const BlogPost = () => {
       title={`${post.title} | Scarpers Blog`}
       description={post.excerpt || `${post.title} — Scarpers running blog.`}
       canonicalPath={`/blog/${post.slug}`}
+      ogType="article"
+      ogImage={post.cover_image || undefined}
     >
       <div className="flex items-center justify-between mb-6">
         <Link to="/blog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
