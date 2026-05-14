@@ -262,7 +262,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             setAiAdvice((snap as any).advice ?? null);
             const ins = (snap as any).insight as string | null;
             const rec = (snap as any).recommendation as string | null;
-            if (ins || rec) setCoachInsight({ insight: ins || "", recommendation: rec || "" });
+            if (ins || rec) {
+              setCoachInsight({ insight: ins || "", recommendation: rec || "" });
+            } else {
+              // Backfill: cached snapshot predates insight columns, fetch now
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/readiness-coach-insight`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+                  body: JSON.stringify({ score: (snap as any).score, factors: (snap as any).factors || [] }),
+                });
+                if (resp.ok) {
+                  const d = await resp.json();
+                  const newIns = d.insight || "";
+                  const newRec = d.recommendation || "";
+                  if (newIns || newRec) {
+                    setCoachInsight({ insight: newIns, recommendation: newRec });
+                    await supabase.from("readiness_snapshots").update({ insight: newIns || null, recommendation: newRec || null } as any).eq("user_id", user.id).eq("recorded_at", (snap as any).recorded_at);
+                  }
+                }
+              } catch (e) { console.error("Backfill insight failed", e); }
+            }
             setLastUpdated(recordedAt);
           }
         }
