@@ -408,6 +408,22 @@ Total length: 150 words max. Do not include the original next-session table agai
           </div>
         )}
 
+        {/* Next planned session snapshot — shown alongside coach recommendation */}
+        {coachContent && nextSession && (
+          <div className="mt-3 p-3 rounded-lg border border-border bg-muted/30">
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Originally planned next ({nextSession.date})</p>
+            <p className="text-sm font-semibold mb-1.5">{nextSession.title}</p>
+            <ul className="text-xs space-y-0.5 text-muted-foreground">
+              {(nextSession.segments || []).map((s, i) => (
+                <li key={i}>• {s.segment}: {s.duration} — {s.target} <span className="opacity-70">({s.hrZone})</span></li>
+              ))}
+            </ul>
+            {readinessScore != null && (
+              <p className="text-[11px] text-muted-foreground mt-2">Readiness at recommendation: <span className="font-semibold">{readinessScore}/100</span></p>
+            )}
+          </div>
+        )}
+
         {/* Elite coach recommendation */}
         {coachContent && (
           <div className="mt-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
