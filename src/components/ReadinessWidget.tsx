@@ -599,7 +599,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       } as any);
     })();
     return () => { cancelled = true; };
-  }, [result, user, cached]);
+  }, [result, user, cached, suppressScore]);
 
   // Helper: split detail "primary · sub" into two parts
   const splitDetail = (detail: string): { primary: string; sub: string | null } => {
