@@ -880,39 +880,70 @@ const TrainingPlanPage = () => {
     setPostAnalysisPlanContent(null);
   };
 
-  const extractTodayWorkout = (): string | null => {
-    if (!content) return null;
-    const today = new Date();
-    const workouts = parseWorkoutsFromPlan(content);
-    const todayStr = format(today, "yyyy-MM-dd");
-    const todayWorkout = workouts.find(w => {
-      if (!w.dateObj) return false;
-      return format(w.dateObj, "yyyy-MM-dd") === todayStr;
-    });
-    if (!todayWorkout) return null;
-    // Reconstruct the workout text from title + segments
-    let text = `**${todayWorkout.title}**\n`;
-    if (todayWorkout.segments.length > 0) {
+  // Build markdown text for a parsed workout (used by Day Ahead AI prompt)
+  const workoutToText = (w: ParsedWorkout): string => {
+    let text = `**${w.title}**\n`;
+    if (w.segments.length > 0) {
       text += "| Segment | Duration | Target | HR Zone | Notes |\n";
       text += "|---------|----------|--------|---------|-------|\n";
-      for (const s of todayWorkout.segments) {
+      for (const s of w.segments) {
         text += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
       }
     }
     return text;
   };
 
+  // Returns true if a planned-session counts as completed for `dateKey` (yyyy-MM-dd)
+  // Same matching logic as RaceTimeEstimate: a linked activity exists with
+  // realistic distance + duration on that date.
+  const hasCompletedSession = (dateKey: string): boolean => {
+    const act = linkedActivities[dateKey];
+    if (!act) return false;
+    const dist = Number(act.distance_meters || 0);
+    const dur = Number(act.duration_seconds || 0);
+    return dist >= 500 && dur >= 60;
+  };
+
+  // Pick the workout to assess: today's, unless today is already complete
+  // (or today is a rest day) — then skip forward to the next non-rest session.
+  const pickUpcomingWorkout = (): { workout: ParsedWorkout; dateObj: Date; shifted: boolean } | null => {
+    if (!content) return null;
+    const workouts = parseWorkoutsFromPlan(content)
+      .filter(w => w.dateObj)
+      .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()));
+    const today = new Date();
+    const todayStr = format(today, "yyyy-MM-dd");
+    const todaysWorkout = workouts.find(w => format(w.dateObj!, "yyyy-MM-dd") === todayStr);
+    const isRest = (w: ParsedWorkout) => w.segments.length === 0 || /\brest\b/i.test(w.title);
+
+    // If today has a real (non-rest) planned session AND it isn't completed yet, use it
+    if (todaysWorkout && !isRest(todaysWorkout) && !hasCompletedSession(todayStr)) {
+      return { workout: todaysWorkout, dateObj: todaysWorkout.dateObj!, shifted: false };
+    }
+
+    // Otherwise walk forward to the next non-rest scheduled session
+    const next = workouts.find(w => {
+      const ds = format(w.dateObj!, "yyyy-MM-dd");
+      return ds > todayStr && !isRest(w);
+    });
+    if (!next) return null;
+    return { workout: next, dateObj: next.dateObj!, shifted: true };
+  };
+
   const [dayAdjustIsModified, setDayAdjustIsModified] = useState(false);
   const [dayAdjustDialogOpen, setDayAdjustDialogOpen] = useState(false);
   const [dayAdjustPhase, setDayAdjustPhase] = useState<"sleep" | "metrics" | "analyzing" | "done">("sleep");
+  const [dayAdjustShifted, setDayAdjustShifted] = useState(false);
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
-    const todayWorkout = extractTodayWorkout();
-    if (!todayWorkout) {
-      toast({ title: "No workout today", description: "There's no planned workout for today in your training plan.", variant: "destructive" });
+    const picked = pickUpcomingWorkout();
+    if (!picked) {
+      toast({ title: "No upcoming workout", description: "There's no scheduled session coming up in your plan.", variant: "destructive" });
       return;
     }
+    const todayWorkout = workoutToText(picked.workout);
+    const targetDateStr = format(picked.dateObj, "yyyy-MM-dd");
 
     // Open dialog immediately with progress
     setDayAdjustDialogOpen(true);
@@ -920,8 +951,9 @@ const TrainingPlanPage = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
     setDayAdjustPhase("sleep");
-    setDayAdjustTargetDate(new Date());
+    setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
+    setDayAdjustShifted(picked.shifted);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
