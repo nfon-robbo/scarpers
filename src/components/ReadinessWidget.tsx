@@ -632,6 +632,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setAiLoading(false);
       const recordedAt = new Date();
       setLastUpdated(recordedAt);
+      // Persist EOD snapshot (the live algorithm includes all daytime modifiers)
       await supabase.from("readiness_snapshots").insert({
         user_id: user.id,
         score: result.score,
@@ -639,7 +640,32 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         factors: result.factors as any,
         advice,
         recorded_at: recordedAt.toISOString(),
+        kind: "eod",
       } as any);
+
+      // Also persist a morning snapshot for today if one isn't already stored
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { data: existingMorning } = await supabase
+        .from("readiness_snapshots")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("kind", "morning")
+        .gte("recorded_at", todayStart.toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (!existingMorning && data) {
+        const morning = computeReadiness(data, "morning");
+        await supabase.from("readiness_snapshots").insert({
+          user_id: user.id,
+          score: morning.score,
+          hour: recordedAt.getHours(),
+          factors: morning.factors as any,
+          advice: null,
+          recorded_at: recordedAt.toISOString(),
+          kind: "morning",
+        } as any);
+      }
     })();
     return () => { cancelled = true; };
   }, [result, user, cached, suppressScore]);
