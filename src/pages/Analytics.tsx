@@ -351,8 +351,8 @@ export default function Analytics() {
   const progress = useMemo(() => {
     if (!plan) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const credibleRunDays = new Set(
-      activities.filter((a) => isRunActivity(a) && isCredibleCompletedActivity(a)).map((a) => isoDay(new Date(a.start_time))),
+    const credibleActivityDays = new Set(
+      activities.filter(isCredibleCompletedActivity).map((a) => isoDay(new Date(a.start_time))),
     );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
     const days = planWorkouts.map((w, index) => {
@@ -367,7 +367,7 @@ export default function Analytics() {
         status = "rest"; rest++;
       } else {
         total++;
-        if (w.dateObj < today && !credibleRunDays.has(day)) { status = "skipped"; skipped++; }
+        if (w.dateObj < today && !credibleActivityDays.has(day)) { status = "skipped"; skipped++; }
         else { status = "upcoming"; upcoming++; }
       }
       return { key: `${day}-${index}`, date: day, dateObj: w.dateObj, title: w.title, status };
