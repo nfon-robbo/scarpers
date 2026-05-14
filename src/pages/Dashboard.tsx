@@ -837,23 +837,6 @@ const Dashboard = () => {
             })()}
           </section>
 
-          {/* ── Workouts This Week Summary ── */}
-          <Card className="glass border-border/30">
-            <CardContent className="flex items-center gap-4 py-4 px-5">
-              <span className="text-2xl">🏃</span>
-              <div className="flex-1">
-                <p className="text-sm font-bold">
-                  {weeklyProgress.completed} / {weeklyProgress.planned} workouts this week
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  ↓ {Math.abs(weeklyProgress.delta)} last week
-                </p>
-              </div>
-              <div className="text-sm font-bold px-3 py-1 rounded-full bg-primary/10 text-primary">
-                +{weeklyProgress.delta >= 0 ? weeklyProgress.delta : 0}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* ── Recent Runs + Resting HR ── */}
           <div className="grid grid-cols-5 gap-3">
