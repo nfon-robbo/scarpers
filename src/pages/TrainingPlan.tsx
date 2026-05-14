@@ -275,16 +275,17 @@ const TrainingPlanPage = () => {
     };
   }, [savedPlanId]);
 
-  const handleUndo = useCallback(async () => {
-    if (!savedPlanId || !user) return;
-    const peek = peekUndoEntry(savedPlanId);
+  const handleUndo = useCallback(async (planIdOverride?: string) => {
+    const targetPlanId = typeof planIdOverride === "string" ? planIdOverride : savedPlanId;
+    if (!targetPlanId || !user) return;
+    const peek = peekUndoEntry(targetPlanId);
     if (!peek) return;
-    const entry = popUndoEntry(savedPlanId);
+    const entry = popUndoEntry(targetPlanId);
     if (!entry) return;
     const { error } = await supabase
       .from("training_plans")
       .update({ content: entry.prevContent })
-      .eq("id", savedPlanId);
+      .eq("id", targetPlanId);
     if (error) {
       toast({ title: "Undo failed", description: error.message, variant: "destructive" });
       return;
@@ -292,6 +293,18 @@ const TrainingPlanPage = () => {
     setContent(entry.prevContent);
     toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
   }, [savedPlanId, user, toast]);
+
+  const toastPlanChange = useCallback((title: string, description: string, planId?: string | null) => {
+    toast({
+      title,
+      description,
+      action: planId ? (
+        <ToastAction altText="Undo plan change" onClick={() => handleUndo(planId)}>
+          Undo
+        </ToastAction>
+      ) : undefined,
+    });
+  }, [handleUndo, toast]);
   const [raceDistance, setRaceDistance] = useState<string>("half-marathon");
   const [goalTime, setGoalTime] = useState<string>("");
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
