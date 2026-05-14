@@ -440,7 +440,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("readiness_snapshots")
-        .select("score, factors, recorded_at")
+        .select("score, factors, recorded_at, kind")
         .eq("user_id", user.id)
         .gte("recorded_at", startDate + "T00:00:00Z")
         .order("recorded_at", { ascending: true })
