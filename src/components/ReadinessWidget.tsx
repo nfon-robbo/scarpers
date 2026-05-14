@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
+type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null };
 
 function formatSparkValue(label: string, v: number): string {
   if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
@@ -18,6 +19,16 @@ function formatSparkValue(label: string, v: number): string {
   if (label === "Stress") return `${Math.round(v)}`;
   if (label === "Body Battery") return `${Math.round(v)}% charge`;
   return `${Math.round(v)}`;
+}
+
+function extractSnapshotValidity(factors: any[]): Pick<TrendSnapshot, "sleepSynced" | "awakeHours"> {
+  const sleepFactor = Array.isArray(factors) ? factors.find((f: any) => f?.label === "Sleep Quality") : null;
+  const bodyBattery = Array.isArray(factors) ? factors.find((f: any) => f?.label === "Body Battery") : null;
+  const awakeMatch = String(bodyBattery?.detail ?? "").match(/\(([\d.]+)h awake\)/);
+  return {
+    sleepSynced: !!sleepFactor && sleepFactor.detail !== "Not synced" && !String(sleepFactor.detail ?? "").includes("Waiting for sync"),
+    awakeHours: awakeMatch ? Number(awakeMatch[1]) : null,
+  };
 }
 
 function Sparkline({ points, status, label }: { points: SparkPoint[]; status: "good" | "warning" | "poor"; label: string }) {
