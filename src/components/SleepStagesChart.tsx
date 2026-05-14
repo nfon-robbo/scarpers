@@ -74,7 +74,10 @@ const SleepStagesChart = () => {
     if (chartData.length === 0) return null;
     const latest = chartData[chartData.length - 1];
     const total = latest.deep + latest.light + latest.rem + latest.awake;
-    const fmtHM = (h: number) => `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
+    const fmtHM = (h: number) => {
+      const totalMin = Math.round(h * 60);
+      return `${Math.floor(totalMin / 60)}:${String(totalMin % 60).padStart(2, "0")}`;
+    };
     return { ...latest, total, fmtTotal: fmtHM(total), fmtDeep: fmtHM(latest.deep), fmtRem: fmtHM(latest.rem), fmtLight: fmtHM(latest.light) };
   }, [chartData]);
 
@@ -106,9 +109,8 @@ const SleepStagesChart = () => {
               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: "hsl(var(--foreground))" }}
               formatter={(v: number) => {
-                const h = Math.floor(v);
-                const m = Math.round((v % 1) * 60);
-                return [`${h}h ${m}m`, ""];
+                const totalMin = Math.round(v * 60);
+                return [`${Math.floor(totalMin / 60)}:${String(totalMin % 60).padStart(2, "0")}`, ""];
               }}
             />
             <Legend />

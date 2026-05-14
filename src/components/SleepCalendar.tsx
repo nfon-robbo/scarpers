@@ -281,15 +281,16 @@ const SleepCalendar = () => {
                       {stageItems.map(({ key, label, color }) => {
                         const secs = selected.stages[key];
                         if (secs === 0 && key !== "awake") return null;
-                        const h = Math.floor(secs / 3600);
-                        const m = Math.round((secs % 3600) / 60);
+                        const totalMin = Math.round(secs / 60);
+                        const h = Math.floor(totalMin / 60);
+                        const m = totalMin % 60;
                         const pct = total > 0 ? Math.round((secs / total) * 100) : 0;
                         return (
                           <div key={key} className="flex items-center gap-2 rounded-md border p-2">
                             <div className={`w-3 h-3 rounded-full ${color}`} />
                             <div>
                               <p className="text-sm font-medium">{label}</p>
-                              <p className="text-xs text-muted-foreground">{h}h {m}m ({pct}%)</p>
+                              <p className="text-xs text-muted-foreground">{h}:{String(m).padStart(2, "0")} ({pct}%)</p>
                             </div>
                           </div>
                         );
@@ -298,7 +299,7 @@ const SleepCalendar = () => {
                     {!hasStages && (
                       <p className="text-xs text-muted-foreground italic">No stage breakdown available — showing total sleep time</p>
                     )}
-                    <p className="text-sm text-muted-foreground">Total: {Math.floor(total / 3600)}h {Math.round((total % 3600) / 60)}m</p>
+                    <p className="text-sm text-muted-foreground">Total: {Math.floor(total / 3600)}:{String(Math.round((total % 3600) / 60)).padStart(2, "0")}</p>
                   </>
                 );
               })()}
