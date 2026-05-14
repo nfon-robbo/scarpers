@@ -141,9 +141,14 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const avgHr = Number(act.avg_heart_rate || 0);
         const maxHr = Number(act.max_heart_rate || 0);
         const hrEff = avgHr > 0 && maxHr > 0 ? avgHr / maxHr : null;
-        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff };
+        // Cadence (steps per minute). Try several common fields.
+        const cadRaw = Number(
+          act.avg_cadence ?? act.average_cadence ?? act.avg_running_cadence ?? act.cadence ?? 0
+        );
+        const cadence = cadRaw > 100 && cadRaw < 240 ? cadRaw : null;
+        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff, cadence };
       })
-      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null }[];
+      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null; cadence: number | null }[];
 
     completed.sort((a, b) => b.date.getTime() - a.date.getTime());
 
