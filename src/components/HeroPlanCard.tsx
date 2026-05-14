@@ -3,6 +3,7 @@ import { format, isSameDay, parseISO, isAfter, startOfDay } from "date-fns";
 import heroRunner from "@/assets/hero-runner.jpg";
 import { Cloud, CloudRain, CloudSnow, Sun, CloudSun, CloudFog, Zap, Check, ChevronLeft, ChevronRight, Dumbbell, Clock, Activity } from "lucide-react";
 import type { ParsedWorkout } from "@/lib/plan-export";
+import { describeWorkoutLabel } from "@/lib/workout-title";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
 import { expandWorkoutSteps, expandedToSegments } from "@/lib/plan-step-expand";
@@ -64,18 +65,9 @@ function weatherLabel(code: number): string {
   return "—";
 }
 
-function shortLabel(title: string): string {
-  if (/rest/i.test(title)) return "Rest";
-  if (/interval/i.test(title)) return "Intervals";
-  if (/tempo/i.test(title)) return "Tempo";
-  if (/long\s*run/i.test(title)) return "Long Run";
-  if (/easy/i.test(title)) return "Easy";
-  if (/recovery/i.test(title)) return "Recovery";
-  if (/fartlek/i.test(title)) return "Fartlek";
-  if (/hill/i.test(title)) return "Hills";
-  if (/race/i.test(title)) return "Race";
-  if (/threshold/i.test(title)) return "Threshold";
-  return title.split(/[(\-–]/)[0].trim().slice(0, 10);
+function shortLabel(workout: ParsedWorkout): string {
+  if (/rest/i.test(workout.title)) return "Rest";
+  return describeWorkoutLabel(workout.title, workout.segments);
 }
 
 export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRunDate, workouts = [], completedDates }: HeroPlanCardProps) {
@@ -314,8 +306,8 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
                       </div>
                     ) : hasWorkout ? (
                       <span
-                        aria-label={shortLabel(workout!.title)}
-                        title={shortLabel(workout!.title)}
+                        aria-label={shortLabel(workout!)}
+                        title={shortLabel(workout!)}
                         className="w-4 h-4 rounded-full bg-white/95 text-primary flex items-center justify-center text-[10px] font-extrabold shadow-sm"
                         style={{ fontFamily: "'Bebas Neue', sans-serif" }}
                       >
@@ -358,7 +350,7 @@ export default function HeroPlanCard({ name, raceDistance, planStartDate, nextRu
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {selectedWorkout.title}
+                  {shortLabel(selectedWorkout)}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
