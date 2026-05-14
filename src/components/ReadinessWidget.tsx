@@ -201,7 +201,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
-  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null }[]>([]);
+  const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -512,9 +512,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => {
-        const sleepFactor = Array.isArray(s.factors) ? s.factors.find((f: any) => f?.label === "Sleep Quality") : null;
-        const sleepSynced = !!sleepFactor && sleepFactor.detail !== "Not synced";
-        return { recorded_at: s.recorded_at, score: s.score, sleepSynced };
+        const validity = extractSnapshotValidity(s.factors as any[]);
+        return { recorded_at: s.recorded_at, score: s.score, ...validity };
       }));
     });
   }, [user]);
@@ -526,7 +525,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
     }
-    const byDay = new Map<string, { recorded_at: string; score: number; sleepSynced: boolean }[]>();
+    const byDay = new Map<string, TrendSnapshot[]>();
     trendSnapshots.forEach((s) => {
       const d = s.recorded_at.split("T")[0];
       if (!byDay.has(d)) byDay.set(d, []);
@@ -534,7 +533,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     });
     const trendArr = days.map((d) => {
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      let pick: { recorded_at: string; score: number; sleepSynced: boolean } | undefined;
+      let pick: TrendSnapshot | undefined;
       if (rows.length) {
         if (trendMode === "morning") {
           // Morning = first snapshot after 5am whose sleep data had synced.
