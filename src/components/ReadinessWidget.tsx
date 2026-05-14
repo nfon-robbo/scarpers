@@ -804,7 +804,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness Trend</h4>
                     <div className="flex items-center gap-2">
                       <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
                         <button
