@@ -127,7 +127,7 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-11 rounded-xl bg-white/10 border-white/15 text-white placeholder:text-white/40 focus:border-primary/50 transition-colors"
+                  className="h-11 rounded-xl bg-white/10 border-white/15 text-white placeholder:text-white/70 focus:border-primary/50 transition-colors"
                 />
               </div>
               <div className="space-y-2">
@@ -140,7 +140,7 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="h-11 rounded-xl bg-white/10 border-white/15 text-white placeholder:text-white/40 focus:border-primary/50 transition-colors"
+                  className="h-11 rounded-xl bg-white/10 border-white/15 text-white placeholder:text-white/70 focus:border-primary/50 transition-colors"
                 />
               </div>
               <Button
