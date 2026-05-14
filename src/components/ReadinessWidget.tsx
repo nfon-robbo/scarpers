@@ -993,6 +993,22 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   </div>
                 );
               })}
+              {(coachInsight?.insight || coachInsight?.recommendation) && (
+                <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-1.5">
+                  {coachInsight.insight && (
+                    <p className="text-xs leading-snug text-slate-200">
+                      <span className="font-semibold text-cyan-300">Today's insight: </span>
+                      {coachInsight.insight}
+                    </p>
+                  )}
+                  {coachInsight.recommendation && (
+                    <p className="text-xs leading-snug text-slate-200">
+                      <span className="font-semibold text-cyan-300">Recommendation: </span>
+                      {coachInsight.recommendation}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
             );
