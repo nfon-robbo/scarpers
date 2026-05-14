@@ -305,7 +305,11 @@ export default function Analytics() {
   const progress = useMemo(() => {
     if (!plan) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const actDays = new Set(activities.map((a) => isoDay(new Date(a.start_time))));
+    const actDays = new Set(
+      activities
+        .filter((a) => a.training_plan_id === plan.id)
+        .map((a) => isoDay(new Date(a.start_time))),
+    );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
     const days = planWorkouts.map((w) => {
       if (!w.dateObj) return null;
