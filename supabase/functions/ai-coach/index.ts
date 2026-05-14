@@ -328,8 +328,8 @@ Your response MUST follow this exact format. Use the literal phrase "the target 
 ## 🌙 Sleep & Recovery Assessment
 Brief summary of last night's sleep quality and what it means for the target session.
 
-## 📋 Planned Workout
-Show the original planned workout for the target date.
+## 📋 Planned Workout — {TARGET_DATE_FORMATTED}
+Replace {TARGET_DATE_FORMATTED} with the target date written in UK long format (e.g. "Thursday 15 May 2026") based on the target date provided in the user prompt. Then show the original planned workout for that date.
 
 ## ✅ Decision: [KEEP AS-IS / ADJUSTED]
 State clearly whether you're modifying the workout or not, and why.
