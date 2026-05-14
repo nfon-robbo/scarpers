@@ -351,34 +351,26 @@ export default function Analytics() {
   const progress = useMemo(() => {
     if (!plan) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const actDays = new Set(
-      activities
-        .filter((a) => (a.training_plan_id === plan.id || !a.training_plan_id) && isCredibleCompletedActivity(a))
-        .map((a) => isoDay(new Date(a.start_time))),
+    const credibleRunDays = new Set(
+      activities.filter((a) => isRunActivity(a) && isCredibleCompletedActivity(a)).map((a) => isoDay(new Date(a.start_time))),
     );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
-    // Dedupe by date so multiple plan rows on the same day count once.
-    const seenDates = new Set<string>();
-    const days = planWorkouts.map((w) => {
+    const days = planWorkouts.map((w, index) => {
       if (!w.dateObj) return null;
       const day = isoDay(w.dateObj);
-      if (seenDates.has(day)) return null;
-      seenDates.add(day);
       const isRest = /rest/i.test(w.title);
       let status: "completed" | "upcoming" | "skipped" | "rest";
-      if (actDays.has(day)) {
-        // Any linked activity on a planned day counts as completion,
-        // even if the planned row was a rest day.
+      if (activityCompletesSession(activities.find((a) => activityCompletesSession(a, w, plan.id, day)) as Activity, w, plan.id, day)) {
         status = "completed"; completed++; total++;
       } else if (isRest) {
         status = "rest"; rest++;
       } else {
         total++;
-        if (w.dateObj < today) { status = "skipped"; skipped++; }
+        if (w.dateObj < today && !credibleRunDays.has(day)) { status = "skipped"; skipped++; }
         else { status = "upcoming"; upcoming++; }
       }
-      return { date: day, dateObj: w.dateObj, title: w.title, status };
-    }).filter(Boolean) as { date: string; dateObj: Date; title: string; status: string }[];
+      return { key: `${day}-${index}`, date: day, dateObj: w.dateObj, title: w.title, status };
+    }).filter(Boolean) as { key: string; date: string; dateObj: Date; title: string; status: string }[];
 
     const pct = total ? Math.round((completed / total) * 100) : 0;
     const raceDate = plan.race_date ? new Date(plan.race_date.split("/").reverse().join("-")) : null;
