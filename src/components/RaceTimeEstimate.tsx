@@ -137,9 +137,13 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
           pace = dur / (dist / 1000);
         }
         if (pace < 150 || pace > 900) return null;
-        return { date: w.dateObj as Date, type, pace, title: w.title };
+        // HR efficiency: avg / max heart rate (lower = fitter at same pace)
+        const avgHr = Number(act.avg_heart_rate || 0);
+        const maxHr = Number(act.max_heart_rate || 0);
+        const hrEff = avgHr > 0 && maxHr > 0 ? avgHr / maxHr : null;
+        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff };
       })
-      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string }[];
+      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null }[];
 
     completed.sort((a, b) => b.date.getTime() - a.date.getTime());
 
