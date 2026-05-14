@@ -360,7 +360,8 @@ export default function Analytics() {
       const day = isoDay(w.dateObj);
       const isRest = /rest/i.test(w.title);
       let status: "completed" | "upcoming" | "skipped" | "rest";
-      if (activityCompletesSession(activities.find((a) => activityCompletesSession(a, w, plan.id, day)) as Activity, w, plan.id, day)) {
+      const hasCompletion = activities.some((a) => activityCompletesSession(a, w, plan.id, day));
+      if (hasCompletion) {
         status = "completed"; completed++; total++;
       } else if (isRest) {
         status = "rest"; rest++;
