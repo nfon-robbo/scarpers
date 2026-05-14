@@ -370,10 +370,13 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
               {hrAdjustSec < 0 && (
                 <p className="text-[10px] text-emerald-400/80">HR efficiency improving · {Math.round(-hrAdjustSec)}s/km gain ({weeksImproving}w)</p>
               )}
+              {cadenceAdjustSec < 0 && (
+                <p className="text-[10px] text-emerald-400/80">Cadence improving · {Math.round(-cadenceAdjustSec)}s/km gain ({cadenceImprovementPct.toFixed(1)}%)</p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              {last3.length} / 3 planned sessions completed
+              {Math.min(completed.length, MIN_SESSIONS)} / {MIN_SESSIONS} planned sessions completed
             </p>
           )}
         </div>
