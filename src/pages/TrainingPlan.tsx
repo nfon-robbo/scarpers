@@ -649,6 +649,7 @@ const TrainingPlanPage = () => {
       toast({ title: "Set a race date", description: "Pick a race date or let the AI recommend one.", variant: "destructive" });
       return;
     }
+    const previousContent = content;
     setLoading(true);
     setContent("");
 
@@ -676,7 +677,7 @@ const TrainingPlanPage = () => {
       },
       onDone: () => {
         setLoading(false);
-        savePlan(accumulated);
+        savePlan(accumulated, { undoLabel: "plan generation", prevContent: previousContent });
         toast({ title: "Plan saved", description: "Your training plan has been saved." });
       },
       onError: (err) => {
@@ -1280,6 +1281,7 @@ const TrainingPlanPage = () => {
     setImporting(true);
     try {
       const result = await importDocxPlan(file);
+      const previousContent = content;
       
       // Update state with imported plan metadata
       setRaceDistance(result.raceDistance);
@@ -1290,7 +1292,7 @@ const TrainingPlanPage = () => {
       setContent(result.markdown);
       
       // Save to database
-      await savePlan(result.markdown);
+      await savePlan(result.markdown, { undoLabel: "DOCX import", prevContent: previousContent });
 
       toast({
         title: `Imported ${result.workoutCount} workouts!`,
@@ -1321,13 +1323,14 @@ const TrainingPlanPage = () => {
     setImporting(true);
     try {
       const result = await importFitPlan(valid);
+      const previousContent = content;
       setRaceDistance(result.raceDistance);
       setTrainingDays(result.trainingDays);
       setStartDate(new Date(result.startDate));
       setRaceDate(new Date(result.endDate));
       setLetAIDecide(false);
       setContent(result.markdown);
-      await savePlan(result.markdown);
+      await savePlan(result.markdown, { undoLabel: "FIT import", prevContent: previousContent });
 
       toast({
         title: `Imported ${result.workoutCount} workouts!`,
