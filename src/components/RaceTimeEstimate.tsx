@@ -141,9 +141,14 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const avgHr = Number(act.avg_heart_rate || 0);
         const maxHr = Number(act.max_heart_rate || 0);
         const hrEff = avgHr > 0 && maxHr > 0 ? avgHr / maxHr : null;
-        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff };
+        // Cadence (steps per minute). Try several common fields.
+        const cadRaw = Number(
+          act.avg_cadence ?? act.average_cadence ?? act.avg_running_cadence ?? act.cadence ?? 0
+        );
+        const cadence = cadRaw > 100 && cadRaw < 240 ? cadRaw : null;
+        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff, cadence };
       })
-      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null }[];
+      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null; cadence: number | null }[];
 
     completed.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -153,9 +158,10 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   if (!data) return null;
   const { km, goalSec, completed } = data;
 
-  // Take last 3 completed sessions; pick latest of each type for blending
-  const last3 = completed.slice(0, 3);
-  const ready = last3.length >= 3;
+  // Require at least 5 completed planned sessions before unlocking the gauge
+  const MIN_SESSIONS = 5;
+  const recent = completed.slice(0, MIN_SESSIONS);
+  const ready = completed.length >= MIN_SESSIONS;
 
   // Average up to the last 3 sessions of each type so a single slow recovery
   // run doesn't dominate the easy bucket over faster walk/run target paces.
@@ -169,7 +175,8 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
 
   // Derived race-pace contributions
   const easyContrib = easyPace; // 100% of easy pace
-  const tempoContrib = tempoPace != null ? tempoPace + 45 : null; // +45s/km → threshold
+  // Tempo is faster than race pace, so add 30 s/km to derive race pace
+  const tempoContrib = tempoPace != null ? tempoPace + 30 : null;
   const raceContrib = racePace; // direct
 
   // Blend with weighting; if a category is missing, redistribute its weight proportionally
@@ -220,6 +227,29 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       const perWeek = Math.max(2, Math.min(5, 2 + lastDrop * 60));
       hrAdjustSec = -weeksImproving * perWeek;
       estPace = estPace + hrAdjustSec;
+    }
+  }
+
+  // ── Cadence improvement → running economy gain ──
+  // Compare each session's cadence to the earliest recorded session's cadence.
+  // 1% improvement above baseline → 1 s/km off the blended pace, capped at 10 s/km total.
+  let cadenceAdjustSec = 0;
+  let cadenceImprovementPct = 0;
+  if (estPace != null) {
+    const withCad = completed
+      .filter(c => c.cadence != null)
+      .sort((a, b) => a.date.getTime() - b.date.getTime()) as { date: Date; cadence: number }[];
+    if (withCad.length >= 2) {
+      const baseline = withCad[0].cadence;
+      // Average % improvement across the most recent up-to-3 sessions vs baseline
+      const recentCad = withCad.slice(-3);
+      const pcts = recentCad.map(c => ((c.cadence - baseline) / baseline) * 100);
+      const avgPct = pcts.reduce((a, n) => a + n, 0) / pcts.length;
+      if (avgPct > 0) {
+        cadenceImprovementPct = avgPct;
+        cadenceAdjustSec = -Math.min(10, avgPct); // 1s/km per 1%, cap at 10
+        estPace = estPace + cadenceAdjustSec;
+      }
     }
   }
 
@@ -340,10 +370,13 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
               {hrAdjustSec < 0 && (
                 <p className="text-[10px] text-emerald-400/80">HR efficiency improving · {Math.round(-hrAdjustSec)}s/km gain ({weeksImproving}w)</p>
               )}
+              {cadenceAdjustSec < 0 && (
+                <p className="text-[10px] text-emerald-400/80">Cadence improving · {Math.round(-cadenceAdjustSec)}s/km gain ({cadenceImprovementPct.toFixed(1)}%)</p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              {last3.length} / 3 planned sessions completed
+              {Math.min(completed.length, MIN_SESSIONS)} / {MIN_SESSIONS} planned sessions completed
             </p>
           )}
         </div>
