@@ -421,11 +421,12 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
   // Add body battery drain as a visible factor (Charged & Drained framing)
   if (battery.hoursAwake > 0.5) {
     const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore); // sleep/recovery charge
+    const charged = Math.round(baseScore) + battery.passiveCharge;
+    const chargeNote = battery.passiveCharge > 0 ? ` (+${battery.passiveCharge} rest)` : "";
     factors.push({
       label: "Body Battery",
-      status: drainTotal <= 15 ? "good" : drainTotal <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
+      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
+      detail: `⚡${charged} charged${chargeNote} · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
     });
   }
 
