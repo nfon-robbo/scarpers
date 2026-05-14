@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceArea } from "recharts";
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
@@ -722,9 +722,36 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Waiting for data
                     </p>
                   )}
-              {hasTrend && (
+              {hasTrend && (() => {
+                // Use only valid (non-zero) trend points for direction analysis
+                const validPts = trend.filter((t) => t.score > 0);
+                const last3 = validPts.slice(-3).map((t) => t.score);
+                let trendLabel: "Recovering" | "Stable" | "Declining" | "At Risk" = "Stable";
+                let trendColor = "text-slate-300";
+                if (last3.length >= 3) {
+                  const [a, b, c] = last3;
+                  const delta = c - a;
+                  const strictlyDown = a > b && b > c;
+                  if (strictlyDown && c < 40) { trendLabel = "At Risk"; trendColor = "text-red-400"; }
+                  else if (strictlyDown) { trendLabel = "Declining"; trendColor = "text-amber-400"; }
+                  else if (delta >= 5 && c >= b) { trendLabel = "Recovering"; trendColor = "text-emerald-400"; }
+                  else { trendLabel = "Stable"; trendColor = "text-slate-300"; }
+                }
+
+                // Count consecutive declining days from the end
+                let declineStreak = 0;
+                for (let i = validPts.length - 1; i > 0; i--) {
+                  if (validPts[i].score < validPts[i - 1].score) declineStreak++;
+                  else break;
+                }
+                const showDeclineTip = declineStreak >= 3;
+
+                return (
                 <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
-                  <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-1">7 Day Trend</h4>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">7 Day Trend</h4>
+                    <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
+                  </div>
                   <ResponsiveContainer width="100%" height={64}>
                     <AreaChart data={trend} margin={{ top: 4, right: 2, bottom: 0, left: 2 }}>
                       <defs>
@@ -733,6 +760,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                           <stop offset="100%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
+                      {/* Colour-coded score zones */}
+                      <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.12} ifOverflow="visible" />
+                      <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.12} ifOverflow="visible" />
+                      <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.12} ifOverflow="visible" />
+                      <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.14} ifOverflow="visible" />
                       <XAxis dataKey="day" tick={{ fontSize: 9 }} className="fill-muted-foreground" axisLine={false} tickLine={false} interval={0} />
                       <YAxis domain={[0, 100]} hide />
                       <Tooltip
@@ -742,8 +774,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 80%, 55%)" fill="url(#readinessTrendGrad)" strokeWidth={2} dot={{ r: 2, fill: "hsl(180, 80%, 55%)" }} />
                     </AreaChart>
                   </ResponsiveContainer>
+                  {showDeclineTip && (
+                    <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
+                      Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
+                    </p>
+                  )}
                 </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Right column: metrics list */}
