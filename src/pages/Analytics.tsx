@@ -105,14 +105,14 @@ const plannedDurationSeconds = (w: ParsedWorkout): number => {
   return fallback ? parseInt(fallback[1], 10) * 60 : 0;
 };
 const activityCompletesSession = (a: Activity, w: ParsedWorkout, planId: string, day: string) => {
-  const sameDay = isoDay(new Date(a.start_time)) === day;
-  if (!sameDay) return false;
-  if (a.training_plan_id === planId) return true;
+  if (isoDay(new Date(a.start_time)) !== day) return false;
   const run = isRunActivity(a);
+  const linkedToPlan = a.training_plan_id === planId;
   const plannedSec = plannedDurationSeconds(w);
   const actualSec = Number(a.duration_seconds || 0);
   const withinDuration = !a.training_plan_id && run && plannedSec > 0 && actualSec > 0 && Math.abs(actualSec - plannedSec) / plannedSec <= 0.5;
-  return withinDuration || (run && isCredibleCompletedActivity(a));
+  const credibleRunOnPlannedDate = run && isCredibleCompletedActivity(a);
+  return linkedToPlan || withinDuration || credibleRunOnPlannedDate;
 };
 const paceSecPerKm = (a: Activity): number | null => {
   if (!a.distance_meters || !a.duration_seconds || a.distance_meters < 100) return null;
