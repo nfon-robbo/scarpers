@@ -211,6 +211,15 @@ export async function autoLinkActivitiesToPlan(userId: string): Promise<AutoLink
     console.info("[auto-link] matched", matches);
     try {
       window.dispatchEvent(new Event("plan-link-changed"));
+      // Open the workout review for the most recent matched session so the
+      // athlete can update their check-in. Latest by date.
+      const latest = matches.slice().sort((a, b) => a.date.localeCompare(b.date)).pop();
+      if (latest) {
+        // Slight delay so plan + linkedActivities have refreshed first
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("workout-auto-linked", { detail: { date: latest.date, activityId: latest.activityId } }));
+        }, 600);
+      }
     } catch {
       /* non-browser env */
     }
