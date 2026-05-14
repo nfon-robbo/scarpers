@@ -74,6 +74,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     setReviewLoading(true);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
+    setNextSession(null); setReadinessScore(null);
     hydratedRef.current = null;
 
     if (!workout || !activity) { setReviewLoading(false); return; }
