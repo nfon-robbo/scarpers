@@ -243,6 +243,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           .from("readiness_snapshots")
           .select("score, factors, advice, recorded_at")
           .eq("user_id", user.id)
+          .eq("kind", "eod")
           .order("recorded_at", { ascending: false })
           .limit(1)
           .maybeSingle();
