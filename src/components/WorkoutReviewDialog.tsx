@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { ParsedWorkout } from "@/lib/plan-export";
+import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
 interface Props {
   open: boolean;
@@ -62,6 +62,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [coachContent, setCoachContent] = useState("");
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachDone, setCoachDone] = useState(false);
+  const [nextSession, setNextSession] = useState<ParsedWorkout | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
 
   // Track whether we already loaded an existing saved review for this activity
   const hydratedRef = useRef<string | null>(null);
@@ -72,6 +74,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     setReviewLoading(true);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
+    setNextSession(null); setReadinessScore(null);
     hydratedRef.current = null;
 
     if (!workout || !activity) { setReviewLoading(false); return; }
@@ -178,7 +181,46 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setCoachLoading(false); return; }
+    const userId = session.user.id;
 
+    // --- 1. Fetch active plan + parse + locate the NEXT planned session after this one ---
+    let nextWk: ParsedWorkout | null = null;
+    try {
+      const { data: plan } = await supabase
+        .from("training_plans")
+        .select("content")
+        .eq("user_id", userId)
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (plan?.content) {
+        const all = parseWorkoutsFromPlan(plan.content);
+        const completedDate = workoutDate ?? (workout.dateObj ?? null);
+        const isRest = (w: ParsedWorkout) =>
+          (w.segments?.length ?? 0) === 0 || /\brest\b/i.test(w.title);
+        nextWk = all.find(w =>
+          w.dateObj && completedDate && w.dateObj.getTime() > completedDate.getTime() && !isRest(w)
+        ) ?? null;
+      }
+    } catch (e) { console.error("[review] failed to load next planned session", e); }
+    setNextSession(nextWk);
+
+    // --- 2. Latest readiness score ---
+    let readiness: number | null = null;
+    try {
+      const { data: snap } = await supabase
+        .from("readiness_snapshots")
+        .select("score")
+        .eq("user_id", userId)
+        .order("recorded_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (snap?.score != null) readiness = snap.score;
+    } catch (e) { console.error("[review] failed to load readiness", e); }
+    setReadinessScore(readiness);
+
+    // --- 3. Build the prompt ---
     const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
     const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
     const avgHr = activity.avg_heart_rate || "N/A";
@@ -188,7 +230,35 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     for (const s of workout.segments || []) {
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
-    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n\nAs an elite running coach, based on this completed workout and the athlete's feedback, give a concise recommendation (max 120 words) for what their NEXT workout should look like. Include: intended intensity, approximate distance/duration, key target (pace zone or HR zone description, no specific BPM zones), and one cue to focus on. If injuries are flagged as Sore or Painful, prioritise recovery. End with one short sentence inviting them to adjust their next planned workout if they'd like.`;
+    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+    plannedWorkout += `\n## Current Readiness Score\n${readiness != null ? `${readiness}/100` : "Unknown"}\n`;
+
+    if (nextWk) {
+      plannedWorkout += `\n## NEXT Planned Session (${nextWk.date})\nTitle: ${nextWk.title}\n`;
+      for (const s of nextWk.segments || []) {
+        plannedWorkout += `- ${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
+      }
+    } else {
+      plannedWorkout += `\n## NEXT Planned Session\n(No upcoming planned session found in the active plan.)\n`;
+    }
+
+    plannedWorkout += `
+
+You are an elite running coach. The athlete has just completed the session above. You must judge the **next planned session** against their check-in answers and current readiness, then return EXACTLY ONE of three recommendations:
+
+**ENDORSE** — Use when check-in answers and readiness (>=55) indicate they are recovering well. Confirm the next planned session as appropriate and explain in 2 short sentences why it is right for where they are in the plan.
+
+**MODIFY** — Use when check-in answers suggest mild fatigue OR readiness is between 40 and 55. Keep the next session but suggest specific, concrete modifications (e.g. reduce duration by 15%, drop target pace by 15-20 sec/km, convert intervals to easy running). Be precise about the change.
+
+**SWAP** — Use when check-in answers flag significant fatigue, "Sore"/"Painful" injuries, "Exhausted" feel, OR readiness < 40. Recommend swapping the next planned session entirely for an easy recovery run or rest day, and explain the reason clearly.
+
+Format your response as markdown:
+- Start with a heading: "### Verdict: Endorse" or "### Verdict: Modify" or "### Verdict: Swap"
+- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers and readiness score
+- A bullet list titled "**Coach's recommended next session:**" with: intended intensity, approximate distance/duration, key target (pace/HR description, no specific BPM zones), and one cue to focus on
+- End with: "Tap 'Yes, adjust my plan' below to apply this change, or 'Keep as planned' to stick with the original."
+
+Total length: 150 words max. Do not include the original next-session table again — it is shown to the user separately.`;
 
     let accumulated = "";
     streamAICoach({
@@ -200,12 +270,20 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       onDone: async () => {
         setCoachLoading(false);
         setCoachDone(true);
+        // Embed the snapshot of the next planned session at the top of the saved
+        // recommendation so it is always visible when re-opened later.
+        const nextBlock = nextWk
+          ? `> **Next planned session — ${nextWk.date}: ${nextWk.title}**\n` +
+            (nextWk.segments || []).map(s => `> - ${s.segment}: ${s.duration} — ${s.target} (${s.hrZone})`).join("\n") +
+            `\n> Readiness at time of recommendation: ${readiness != null ? `${readiness}/100` : "n/a"}\n\n`
+          : "";
+        const toSave = nextBlock + accumulated;
         try {
           await supabase.from("workout_reviews").upsert({
-            user_id: session.user.id,
+            user_id: userId,
             activity_id: activity.id,
             difficulty, pace, feel, injury,
-            coach_recommendation: accumulated,
+            coach_recommendation: toSave,
           } as any, { onConflict: "activity_id" });
         } catch (e) { console.error("[review] failed to save coach recommendation", e); }
       },
@@ -326,6 +404,22 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
               <p className="text-[11px] text-muted-foreground text-center">
                 Your check-in answers are saved automatically.
               </p>
+            )}
+          </div>
+        )}
+
+        {/* Next planned session snapshot — shown alongside coach recommendation */}
+        {coachContent && nextSession && (
+          <div className="mt-3 p-3 rounded-lg border border-border bg-muted/30">
+            <p className="text-xs font-semibold text-muted-foreground mb-1.5">Originally planned next ({nextSession.date})</p>
+            <p className="text-sm font-semibold mb-1.5">{nextSession.title}</p>
+            <ul className="text-xs space-y-0.5 text-muted-foreground">
+              {(nextSession.segments || []).map((s, i) => (
+                <li key={i}>• {s.segment}: {s.duration} — {s.target} <span className="opacity-70">({s.hrZone})</span></li>
+              ))}
+            </ul>
+            {readinessScore != null && (
+              <p className="text-[11px] text-muted-foreground mt-2">Readiness at recommendation: <span className="font-semibold">{readinessScore}/100</span></p>
             )}
           </div>
         )}
