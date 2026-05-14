@@ -471,12 +471,27 @@ const TrainingPlanPage = () => {
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
     const undoContent = options.prevContent ?? content;
 
+    // Reconcile with markdown: the RACE DAY heading in the plan is the source of truth.
+    const derivedRaceDate = extractRaceDateFromMarkdown(planContent);
+    const finalRaceDate = derivedRaceDate ?? raceDateValue;
+    if (derivedRaceDate && derivedRaceDate !== raceDateValue) {
+      try { setRaceDate(parseLocalISODate(derivedRaceDate)); setLetAIDecide(false); } catch {}
+    }
+
     // In-place edit: update the existing plan row so linked activities (training_plan_id)
     // continue to register as completed. Used by day-adjust, day-ahead, plan-review etc.
     if (options.inPlace && savedPlanId) {
       const { error } = await supabase
         .from("training_plans")
         .update({
+          race_distance: raceDistance,
+          goal_time: goalTime || null,
+          training_days: trainingDays,
+          start_date: toLocalISODate(startDate),
+          race_date: finalRaceDate,
+          content: planContent,
+        } as any)
+        .eq("id", savedPlanId);
           race_distance: raceDistance,
           goal_time: goalTime || null,
           training_days: trainingDays,
