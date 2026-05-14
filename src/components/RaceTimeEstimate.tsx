@@ -137,9 +137,13 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
           pace = dur / (dist / 1000);
         }
         if (pace < 150 || pace > 900) return null;
-        return { date: w.dateObj as Date, type, pace, title: w.title };
+        // HR efficiency: avg / max heart rate (lower = fitter at same pace)
+        const avgHr = Number(act.avg_heart_rate || 0);
+        const maxHr = Number(act.max_heart_rate || 0);
+        const hrEff = avgHr > 0 && maxHr > 0 ? avgHr / maxHr : null;
+        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff };
       })
-      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string }[];
+      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null }[];
 
     completed.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -174,6 +178,46 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     const totalW = parts.reduce((a, p) => a + p.weight, 0);
     estPace = parts.reduce((a, p) => a + p.pace * (p.weight / totalW), 0);
   }
+
+  // ── HR efficiency trend → pace improvement ──
+  // Group HR-efficient sessions by ISO week, average eff per week, count
+  // consecutive weeks of week-over-week improvement (lower eff at similar effort).
+  let hrAdjustSec = 0;
+  let weeksImproving = 0;
+  if (estPace != null) {
+    const withHr = completed.filter(c => c.hrEff != null) as { date: Date; hrEff: number }[];
+    const weekKey = (d: Date) => {
+      const t = new Date(d);
+      t.setHours(0, 0, 0, 0);
+      const day = (t.getDay() + 6) % 7; // Mon=0
+      t.setDate(t.getDate() - day);
+      return t.toISOString().slice(0, 10);
+    };
+    const weekly = new Map<string, number[]>();
+    for (const c of withHr) {
+      const k = weekKey(c.date);
+      if (!weekly.has(k)) weekly.set(k, []);
+      weekly.get(k)!.push(c.hrEff);
+    }
+    const weekAvgs = [...weekly.entries()]
+      .map(([k, arr]) => ({ k, avg: arr.reduce((a, n) => a + n, 0) / arr.length }))
+      .sort((a, b) => a.k.localeCompare(b.k)); // oldest → newest
+    // Count trailing weeks where avg dropped vs prior week
+    for (let i = weekAvgs.length - 1; i > 0; i--) {
+      if (weekAvgs[i].avg < weekAvgs[i - 1].avg - 0.005) weeksImproving++;
+      else break;
+    }
+    if (weeksImproving > 0) {
+      // Improvement size scales with magnitude of latest drop (2-5 s/km/week)
+      const lastDrop = weekAvgs.length >= 2
+        ? Math.max(0, weekAvgs[weekAvgs.length - 2].avg - weekAvgs[weekAvgs.length - 1].avg)
+        : 0;
+      const perWeek = Math.max(2, Math.min(5, 2 + lastDrop * 60));
+      hrAdjustSec = -weeksImproving * perWeek;
+      estPace = estPace + hrAdjustSec;
+    }
+  }
+
   const estFinish = estPace != null ? estPace * km : null;
 
   // Gauge bounds (relative to goal)
@@ -288,6 +332,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
               <p className="text-xs text-muted-foreground">Estimated pace · <span className="text-foreground font-medium">{fmtPace(estPace)}</span></p>
               <p className="text-base font-bold tracking-tight">{fmtTime(estFinish)}</p>
               <p className={`text-xs ${estFinish <= goalSec + 5 ? "text-green-400" : estFinish <= redToAmber ? "text-amber-400" : "text-red-400"}`}>{deltaText}</p>
+              {hrAdjustSec < 0 && (
+                <p className="text-[10px] text-emerald-400/80">HR efficiency improving · {Math.round(-hrAdjustSec)}s/km gain ({weeksImproving}w)</p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground mt-2 text-center">
