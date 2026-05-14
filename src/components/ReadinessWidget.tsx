@@ -496,7 +496,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setSparklines(series);
 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
-      setTrendSnapshots((snaps as any[]).map((s) => ({ recorded_at: s.recorded_at, score: s.score })));
+      setTrendSnapshots((snaps as any[]).map((s) => {
+        const sleepFactor = Array.isArray(s.factors) ? s.factors.find((f: any) => f?.label === "Sleep Quality") : null;
+        const sleepSynced = !!sleepFactor && sleepFactor.detail !== "Not synced";
+        return { recorded_at: s.recorded_at, score: s.score, sleepSynced };
+      }));
     });
   }, [user]);
 
