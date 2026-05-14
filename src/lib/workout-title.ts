@@ -1,0 +1,236 @@
+/**
+ * Build a descriptive workout title that reflects the actual structure
+ * (e.g. "10x1min run / 1min walk intervals" or "Easy run 30min"),
+ * so plans don't all show generically as "Easy Run".
+ *
+ * Used both by the in-app plan list (segment-only input) and by the
+ * Intervals.icu sync flow (fully expanded steps).
+ */
+
+const BRAND_PREFIX = "Scarpers Dash";
+
+type IntensityName =
+  | "Easy"
+  | "Recovery"
+  | "Tempo"
+  | "Threshold"
+  | "Long"
+  | "Interval"
+  | "Warmup"
+  | "Cooldown"
+  | "Rest";
+
+interface Step {
+  duration: number; // seconds
+  intensity: string;
+}
+
+interface SegmentLike {
+  segment?: string;
+  duration?: string;
+  target?: string;
+  hrZone?: string;
+  notes?: string;
+}
+
+const fmtDur = (s: number) => {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m > 0 && sec > 0) return `${m}m${sec}s`;
+  if (m > 0) return `${m}min`;
+  return `${sec}s`;
+};
+
+const intentFrom = (text: string): string | null => {
+  if (/tempo/i.test(text)) return "tempo";
+  if (/threshold|lthr/i.test(text)) return "threshold";
+  if (/hill/i.test(text)) return "hill reps";
+  if (/long/i.test(text)) return "long run";
+  if (/recovery/i.test(text)) return "recovery";
+  if (/vo2|v02/i.test(text)) return "VO2max";
+  if (/fartlek/i.test(text)) return "fartlek";
+  if (/progress/i.test(text)) return "progression";
+  if (/race\s*pace/i.test(text)) return "race pace";
+  return null;
+};
+
+const labelFromIntensity: Record<string, string> = {
+  Easy: "easy run",
+  Recovery: "recovery jog",
+  Tempo: "tempo run",
+  Threshold: "threshold run",
+  Long: "long run",
+  Interval: "interval run",
+  Warmup: "easy run",
+  Cooldown: "easy run",
+  Rest: "rest",
+};
+
+/**
+ * Derive title from fully expanded steps (used by sync).
+ */
+export function deriveWorkoutTitleFromSteps(
+  originalTitle: string,
+  steps: Step[],
+  totalMins: number,
+): string {
+  type Group = { workDur: number; restDur: number; reps: number };
+  const groups: Group[] = [];
+  let i = 0;
+  while (i < steps.length) {
+    if (steps[i].intensity === "Interval") {
+      const work = steps[i].duration;
+      const next = steps[i + 1];
+      const hasRest = next && (next.intensity === "Recovery" || next.intensity === "Rest");
+      const rest = hasRest ? next.duration : 0;
+      const last = groups[groups.length - 1];
+      if (last && last.workDur === work && last.restDur === rest) last.reps += 1;
+      else groups.push({ workDur: work, restDur: rest, reps: 1 });
+      i += hasRest ? 2 : 1;
+    } else i += 1;
+  }
+
+  const cleanedOriginal = originalTitle
+    .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "")
+    .replace(/\s*\(Total:[^)]*\)/i, "")
+    .trim();
+
+  const intent = intentFrom(cleanedOriginal);
+  const hasMultipleReps = groups.some((g) => g.reps > 1);
+  const hasRest = groups.some((g) => g.restDur > 0);
+
+  if (groups.length === 0 || (!hasMultipleReps && !hasRest)) {
+    const main = [...steps].sort((a, b) => b.duration - a.duration)[0];
+    const intensity = main?.intensity || "Easy";
+    const base = intent ?? labelFromIntensity[intensity] ?? "run";
+    return `${capitalize(base)} ${totalMins}min (Total: ${totalMins} min)`;
+  }
+
+  const descs = groups.map((g) =>
+    g.restDur > 0
+      ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
+      : `${g.reps}x${fmtDur(g.workDur)}`,
+  );
+  const intentLabel = intent ? `${intent} intervals` : hasRest ? "walk-run intervals" : "intervals";
+  return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
+}
+
+/**
+ * Derive a descriptive title from raw markdown segments (used in the UI list,
+ * where we don't want to fully expand every workout just to label it).
+ */
+export function deriveWorkoutTitleFromSegments(
+  originalTitle: string,
+  segments: SegmentLike[],
+): string {
+  const cleanedOriginal = originalTitle
+    .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "")
+    .replace(/\s*\(Total:[^)]*\)/i, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*[—–\-]+\s*/, "")
+    .trim();
+
+  if (!cleanedOriginal || /^rest\b/i.test(cleanedOriginal)) return cleanedOriginal;
+
+  // Parse each segment into seconds + role + intensity
+  type Seg = { secs: number; role: "warmup" | "cooldown" | "main" | "recovery"; reps: number; intensity: string };
+  const parsed: Seg[] = [];
+  let totalSecs = 0;
+  for (const raw of segments) {
+    const dur = raw.duration || "";
+    const segName = raw.segment || "";
+    const targetText = `${raw.target || ""} ${raw.notes || ""} ${raw.hrZone || ""}`;
+
+    let reps = 1;
+    let perSecs = 0;
+    const repMatch = dur.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
+    if (repMatch) {
+      reps = parseInt(repMatch[1], 10);
+      const v = parseFloat(repMatch[2]);
+      const unit = repMatch[3].toLowerCase();
+      perSecs = unit.startsWith("s") ? v : v * 60;
+    } else {
+      const min = dur.match(/(\d+(?:\.\d+)?)\s*min/i);
+      const sec = dur.match(/(\d+(?:\.\d+)?)\s*(?:sec|s)\b/i);
+      const colon = dur.match(/(\d{1,3}):(\d{2})/);
+      if (min) perSecs = parseFloat(min[1]) * 60;
+      else if (sec) perSecs = parseFloat(sec[1]);
+      else if (colon) perSecs = parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+    }
+    const segSecs = reps * perSecs;
+    totalSecs += segSecs;
+
+    let role: Seg["role"] = "main";
+    if (/warm/i.test(segName)) role = "warmup";
+    else if (/cool/i.test(segName)) role = "cooldown";
+    else if (/recover|rest|walk\s*break/i.test(segName)) role = "recovery";
+
+    let intensity = "Easy";
+    if (/tempo/i.test(targetText) || /tempo/i.test(segName)) intensity = "Tempo";
+    else if (/threshold|lthr/i.test(targetText)) intensity = "Threshold";
+    else if (/Z4|Z5|interval|VO2|v02/i.test(targetText)) intensity = "Interval";
+    else if (/long/i.test(segName) || /long/i.test(cleanedOriginal)) intensity = "Long";
+    else if (/recovery|Z1\b/i.test(targetText) && role === "main") intensity = "Recovery";
+    parsed.push({ secs: perSecs, role, reps, intensity });
+  }
+
+  const totalMins = Math.max(1, Math.round(totalSecs / 60));
+
+  // Build "Nx work / rest" groups from main/recovery sequences with reps>1 or rest
+  type Group = { work: number; rest: number; reps: number };
+  const groups: Group[] = [];
+  for (let i = 0; i < parsed.length; i++) {
+    const cur = parsed[i];
+    if (cur.role !== "main") continue;
+    if (cur.reps > 1) {
+      // explicit "Nx" segment — pair with following recovery if any
+      const next = parsed[i + 1];
+      const rest = next && next.role === "recovery" ? next.secs : 0;
+      groups.push({ work: cur.secs, rest, reps: cur.reps });
+      if (rest) i++;
+    }
+  }
+
+  const intent = intentFrom(cleanedOriginal) ?? intentFrom(parsed.map((p) => p.intensity).join(" "));
+
+  let body: string;
+  if (groups.length > 0 && (groups.some((g) => g.reps > 1) || groups.some((g) => g.rest > 0))) {
+    const descs = groups.map((g) =>
+      g.rest > 0
+        ? `${g.reps}x${fmtDur(g.work)} run / ${fmtDur(g.rest)} walk`
+        : `${g.reps}x${fmtDur(g.work)}`,
+    );
+    const intentLabel = intent
+      ? `${intent} intervals`
+      : groups.some((g) => g.rest > 0)
+        ? "walk-run intervals"
+        : "intervals";
+    body = `${descs.join(" + ")} ${intentLabel} ${totalMins}min`;
+  } else {
+    // Continuous — pick longest main as the dominant
+    const main = parsed.filter((p) => p.role === "main").sort((a, b) => b.secs - a.secs)[0];
+    const base = intent ?? labelFromIntensity[main?.intensity ?? "Easy"] ?? "run";
+    body = `${capitalize(base)} ${totalMins}min`;
+  }
+
+  return body;
+}
+
+/**
+ * Render the in-app plan-list label, prefixed with the brand name.
+ */
+export function describeWorkoutLabel(originalTitle: string, segments: SegmentLike[]): string {
+  const cleaned = (originalTitle || "")
+    .replace(/\s*\(Total:[^)]*\)/i, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*[—–\-]+\s*/, "")
+    .trim();
+  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
+  const desc = deriveWorkoutTitleFromSegments(originalTitle, segments || []);
+  if (!desc) return `${BRAND_PREFIX} - ${cleaned}`;
+  return `${BRAND_PREFIX} - ${desc}`;
+}
+
+function capitalize(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}

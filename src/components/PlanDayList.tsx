@@ -31,15 +31,20 @@ interface PlanDayListProps {
   raceDistance?: string;
 }
 
-function shortLabel(title: string): string {
-  const cleaned = title
-    .replace(/\s*\(Total:.*?\)/i, "")
-    .replace(/\*\*/g, "")
-    .replace(/^\s*[—–\-]+\s*/, "")
-    .trim();
-  if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
-  if (/^scarpers\s*[-–]/i.test(cleaned)) return cleaned;
-  return `Scarpers - ${cleaned}`;
+import { describeWorkoutLabel } from "@/lib/workout-title";
+
+function shortLabel(w: ParsedWorkout | string): string {
+  if (typeof w === "string") {
+    const cleaned = w
+      .replace(/\s*\(Total:.*?\)/i, "")
+      .replace(/\*\*/g, "")
+      .replace(/^\s*[—–\-]+\s*/, "")
+      .trim();
+    if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
+    if (/^scarpers(?:\s+dash)?\s*[-–]/i.test(cleaned)) return cleaned;
+    return `Scarpers Dash - ${cleaned}`;
+  }
+  return describeWorkoutLabel(w.title, w.segments);
 }
 
 function extractDistance(w: ParsedWorkout): string | null {
@@ -657,7 +662,7 @@ export default function PlanDayList({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold truncate">{shortLabel(workout.title)}</p>
+                              <p className="text-sm font-semibold truncate">{shortLabel(workout)}</p>
                               <span className="text-[10px] font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full shrink-0">
                                 Completed ✓
                               </span>
@@ -723,7 +728,7 @@ export default function PlanDayList({
                           </span>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold break-words">{shortLabel(workout.title)}</p>
+                          <p className="text-sm font-semibold break-words">{shortLabel(workout)}</p>
                           {(() => {
                             const customs = customSteps[workoutKey(workout)] || [];
                             const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
@@ -793,7 +798,7 @@ export default function PlanDayList({
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {shortLabel(selectedWorkout.title)}
+                  {shortLabel(selectedWorkout)}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
@@ -941,7 +946,7 @@ export default function PlanDayList({
         workout={reviewWorkout}
         activity={reviewWorkout ? linkedActivities[workoutKey(reviewWorkout)] || null : null}
         workoutDate={reviewWorkout?.dateObj || null}
-        workoutTitle={reviewWorkout ? shortLabel(reviewWorkout.title) : "Workout"}
+        workoutTitle={reviewWorkout ? shortLabel(reviewWorkout) : "Workout"}
       />
     </Card>
   );
