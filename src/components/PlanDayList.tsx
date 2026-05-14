@@ -947,6 +947,12 @@ export default function PlanDayList({
         activity={reviewWorkout ? linkedActivities[workoutKey(reviewWorkout)] || null : null}
         workoutDate={reviewWorkout?.dateObj || null}
         workoutTitle={reviewWorkout ? shortLabel(reviewWorkout) : "Workout"}
+        canRequestCoach={
+          !!reviewWorkout &&
+          workoutKey(reviewWorkout) === (
+            Array.from(completedDates || new Set<string>()).sort().slice(-1)[0] || ""
+          )
+        }
       />
     </Card>
   );
