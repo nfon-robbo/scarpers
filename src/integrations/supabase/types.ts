@@ -188,6 +188,33 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_summaries: {
+        Row: {
+          created_at: string
+          generated_at: string
+          id: string
+          plan_id: string | null
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          generated_at?: string
+          id?: string
+          plan_id?: string | null
+          summary: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          generated_at?: string
+          id?: string
+          plan_id?: string | null
+          summary?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           ai_provider: string
