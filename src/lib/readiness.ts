@@ -334,18 +334,7 @@ export function computeReadiness(d: ReadinessData): ReadinessResult {
     }
   }
 
-  // 3-day stress trend
-  if (d.stressHistory.length >= 2) {
-    const avg = d.stressHistory.reduce((a, b) => a + b, 0) / d.stressHistory.length;
-    if (avg > 45) {
-      const penalty = -Math.round(Math.min(10, (avg - 45) / 5)); // softened
-      modifiers.push({
-        label: "Stress Trend",
-        adj: penalty,
-        detail: `avg ${Math.round(avg)}/100 (${d.stressHistory.length}d)`,
-      });
-    }
-  }
+
 
   // Training monotony (7d vs 28d)
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
