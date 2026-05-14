@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
+type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null };
 
 function formatSparkValue(label: string, v: number): string {
   if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
@@ -18,6 +19,16 @@ function formatSparkValue(label: string, v: number): string {
   if (label === "Stress") return `${Math.round(v)}`;
   if (label === "Body Battery") return `${Math.round(v)}% charge`;
   return `${Math.round(v)}`;
+}
+
+function extractSnapshotValidity(factors: any[]): Pick<TrendSnapshot, "sleepSynced" | "awakeHours"> {
+  const sleepFactor = Array.isArray(factors) ? factors.find((f: any) => f?.label === "Sleep Quality") : null;
+  const bodyBattery = Array.isArray(factors) ? factors.find((f: any) => f?.label === "Body Battery") : null;
+  const awakeMatch = String(bodyBattery?.detail ?? "").match(/\(([\d.]+)h awake\)/);
+  return {
+    sleepSynced: !!sleepFactor && sleepFactor.detail !== "Not synced" && !String(sleepFactor.detail ?? "").includes("Waiting for sync"),
+    awakeHours: awakeMatch ? Number(awakeMatch[1]) : null,
+  };
 }
 
 function Sparkline({ points, status, label }: { points: SparkPoint[]; status: "good" | "warning" | "poor"; label: string }) {
@@ -190,7 +201,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning">("end");
-  const [trendSnapshots, setTrendSnapshots] = useState<{ recorded_at: string; score: number; sleepSynced: boolean }[]>([]);
+  const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -274,7 +285,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("daily_metrics")
-        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
         .eq("user_id", user.id)
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
@@ -287,7 +298,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .order("start_time", { ascending: false })
         .then(({ data }) => data || []),
     ]).then(([sleepStages, allMetrics, allActivities]) => {
-      const stages = groupSleepByDate(sleepStages as any);
+      const todaysStageRows = (sleepStages as any[]).filter((s: any) => s.date === today);
+      const stages = groupSleepByDate(todaysStageRows as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
       const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
@@ -302,11 +314,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const rhrBaseline = rhrVals.length ? rhrVals.reduce((a: number, b: number) => a + b, 0) / rhrVals.length : null;
       const hrvBaseline = hrvVals.length ? hrvVals.reduce((a: number, b: number) => a + b, 0) / hrvVals.length : null;
 
-      const sleepDates = [...new Set((sleepStages as any[]).map((s: any) => s.date))].sort().reverse();
-      const mostRecentSleepDate = sleepDates[0] || null;
-      const isSleepCurrent = mostRecentSleepDate && (mostRecentSleepDate === today || mostRecentSleepDate === yesterday);
-      const finalSleepScore = isSleepCurrent ? (sleepScore ?? (latestMetrics as any)?.sleep_score ?? null) : null;
-      const sleepDuration = isSleepCurrent && hasSleepStages ? totalSleep : isSleepCurrent ? ((latestMetrics as any)?.sleep_duration_seconds ?? null) : null;
+      const metricDeepSeconds = ((todayMetrics as any)?.deep_sleep_minutes ?? null) != null ? Number((todayMetrics as any).deep_sleep_minutes) * 60 : null;
+      const metricRemSeconds = ((todayMetrics as any)?.rem_sleep_minutes ?? null) != null ? Number((todayMetrics as any).rem_sleep_minutes) * 60 : null;
+      const metricLightSeconds = ((todayMetrics as any)?.light_sleep_minutes ?? null) != null ? Number((todayMetrics as any).light_sleep_minutes) * 60 : null;
+      const metricStageTotal = [metricDeepSeconds, metricRemSeconds, metricLightSeconds].every((v) => typeof v === "number" && v > 0)
+        ? (metricDeepSeconds as number) + (metricRemSeconds as number) + (metricLightSeconds as number)
+        : null;
+      const finalSleepScore = sleepScore ?? (todayMetrics as any)?.sleep_score ?? null;
+      const sleepDuration = hasSleepStages ? totalSleep : ((todayMetrics as any)?.sleep_duration_seconds ?? null);
 
       const recentMetrics = allMetrics.filter((m: any) => m.date >= threeDaysAgo && m.date <= today);
       const recentSleepSecs = recentMetrics.filter((m: any) => m.sleep_duration_seconds).map((m: any) => m.sleep_duration_seconds);
@@ -350,8 +365,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const monthlyLoadAvg = monthlyTotal / 28;
 
       // Determine wake time from sleep stages (latest end_time on most recent date)
-      const todaySleepStages = (sleepStages as any[]).filter((s: any) => s.date === today || s.date === yesterday);
-      const endTimes = todaySleepStages
+      const endTimes = todaysStageRows
         .filter((s: any) => s.end_time)
         .map((s: any) => new Date(s.end_time).getTime())
         .sort((a: number, b: number) => b - a);
@@ -367,11 +381,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       setData({
         sleepScore: finalSleepScore,
         sleepHours: sleepDuration ? sleepDuration / 3600 : null,
-        deepPct: hasSleepStages && totalSleep > 0 ? (stages.deep / totalSleep) * 100 : null,
-        remPct: hasSleepStages && totalSleep > 0 ? (stages.rem / totalSleep) * 100 : null,
-        rhr: (latestMetrics as any)?.resting_heart_rate ?? null,
+        deepPct: hasSleepStages && totalSleep > 0 ? (stages.deep / totalSleep) * 100 : metricStageTotal ? ((metricDeepSeconds as number) / metricStageTotal) * 100 : null,
+        remPct: hasSleepStages && totalSleep > 0 ? (stages.rem / totalSleep) * 100 : metricStageTotal ? ((metricRemSeconds as number) / metricStageTotal) * 100 : null,
+        rhr: (todayMetrics as any)?.resting_heart_rate ?? null,
         rhrBaseline,
-        hrv: (latestMetrics as any)?.hrv ?? null,
+        hrv: (todayMetrics as any)?.hrv ?? null,
         hrvBaseline,
         yesterdayLoad: yesterdayLoad > 0 ? yesterdayLoad : null,
         stressScore: (latestMetrics as any)?.stress_score ?? null,
@@ -497,9 +511,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => {
-        const sleepFactor = Array.isArray(s.factors) ? s.factors.find((f: any) => f?.label === "Sleep Quality") : null;
-        const sleepSynced = !!sleepFactor && sleepFactor.detail !== "Not synced";
-        return { recorded_at: s.recorded_at, score: s.score, sleepSynced };
+        const validity = extractSnapshotValidity(s.factors as any[]);
+        return { recorded_at: s.recorded_at, score: s.score, ...validity };
       }));
     });
   }, [user]);
@@ -511,7 +524,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     for (let i = 6; i >= 0; i--) {
       days.push(new Date(today.getTime() - i * 86400000).toISOString().split("T")[0]);
     }
-    const byDay = new Map<string, { recorded_at: string; score: number; sleepSynced: boolean }[]>();
+    const byDay = new Map<string, TrendSnapshot[]>();
     trendSnapshots.forEach((s) => {
       const d = s.recorded_at.split("T")[0];
       if (!byDay.has(d)) byDay.set(d, []);
@@ -519,14 +532,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     });
     const trendArr = days.map((d) => {
       const rows = (byDay.get(d) || []).slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      let pick: { recorded_at: string; score: number; sleepSynced: boolean } | undefined;
+      let pick: TrendSnapshot | undefined;
       if (rows.length) {
         if (trendMode === "morning") {
-          // Morning = first snapshot after 5am whose sleep data had synced.
+          // Morning = first post-5am snapshot with synced sleep and a plausible
+          // wake-time model. Older noisy snapshots can have sleep data present
+          // but still show 20h awake before midday, which crushes the score.
           // If none qualify, leave a gap rather than show a pre-sync score
           // that doesn't reflect that morning's actual recovery.
           const after5 = rows.filter((r) => new Date(r.recorded_at).getHours() >= 5);
-          pick = after5.find((r) => r.sleepSynced);
+          pick = after5.find((r) => r.sleepSynced && (r.awakeHours == null || r.awakeHours < 12));
         } else {
           // End of day = last snapshot of the day, but only if sleep had
           // synced by then. Otherwise the score is noise — show a gap.
