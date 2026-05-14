@@ -227,6 +227,7 @@ Deno.serve(async (req) => {
 
             sessionStages++;
             totalStages++;
+            addStage(sleepDate, normalizedStage, durationSeconds);
           }
         }
       }
