@@ -76,6 +76,7 @@ import {
   workoutIntensity,
 } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
+import { AUTO_SYNC_STARTED, AUTO_SYNC_DONE, isAutoSyncDoneThisSession } from "@/lib/auto-sync";
 import BodyBattery48hDialog from "./BodyBattery48hDialog";
 import FactorDetailDialog from "./FactorDetailDialog";
 
