@@ -204,6 +204,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
+  const [coachInsight, setCoachInsight] = useState<{ insight: string; recommendation: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [cacheChecked, setCacheChecked] = useState(false);
