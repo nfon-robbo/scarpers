@@ -37,6 +37,7 @@ import {
   type AdaptEvaluation,
 } from "@/lib/plan-adaptation";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
+import { runAutoSyncOnce, AUTO_SYNC_DONE } from "@/lib/auto-sync";
 import { toast as sonnerToast } from "sonner";
 
 
