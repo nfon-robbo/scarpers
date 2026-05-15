@@ -421,6 +421,57 @@ Deno.serve(async (req) => {
       } else {
         results.push({ user_id: userId, status: "ok", detail: `eod=${eod.score} (morning exists)` });
       }
+
+      // ── Backfill: fill hourly snapshots between wake-up and the first
+      // existing snapshot of the day, capped at 6 hours. Use a copy of the
+      // data with no today-load / today-activities so body battery and
+      // today's effort don't drag the score down for hours that hadn't
+      // happened yet.
+      try {
+        if (data.wakeTimeIso) {
+          const { data: todays } = await supabase
+            .from("readiness_snapshots")
+            .select("recorded_at, is_backfilled")
+            .eq("user_id", userId)
+            .eq("kind", "eod")
+            .gte("recorded_at", todayStart.toISOString())
+            .order("recorded_at", { ascending: true });
+          const realTodays = (todays || []).filter((r: any) => !r.is_backfilled);
+          if (realTodays.length > 0) {
+            const firstMs = new Date(realTodays[0].recorded_at).getTime();
+            const wakeMs = new Date(data.wakeTimeIso).getTime();
+            const earliest = Math.max(wakeMs, firstMs - 6 * 3600000);
+            // Round up to next top-of-hour
+            const startMs = Math.ceil(earliest / 3600000) * 3600000;
+            const existingHours = new Set(
+              (todays || []).map((r: any) => Math.floor(new Date(r.recorded_at).getTime() / 3600000)),
+            );
+            const backfillData: ReadinessData = {
+              ...data,
+              todayLoad: null,
+              todayActivities: [],
+            };
+            let inserted = 0;
+            for (let t = startMs; t < firstMs - 60000 && t <= Date.now(); t += 3600000) {
+              const hourBucket = Math.floor(t / 3600000);
+              if (existingHours.has(hourBucket)) continue;
+              const r = computeReadiness(backfillData, "eod");
+              const recIso = new Date(t).toISOString();
+              await supabase.from("readiness_snapshots").insert({
+                user_id: userId, score: r.score, hour: new Date(t).getUTCHours(),
+                factors: r.factors, recorded_at: recIso, kind: "eod", is_backfilled: true,
+              });
+              existingHours.add(hourBucket);
+              inserted++;
+            }
+            if (inserted > 0) {
+              results.push({ user_id: userId, status: "backfilled", detail: `${inserted} estimated hour(s)` });
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`backfill error for ${userId}:`, e);
+      }
     } catch (e) {
       console.error(`hourly snapshot error for ${userId}:`, e);
       results.push({ user_id: userId, status: "error", detail: (e as Error).message });

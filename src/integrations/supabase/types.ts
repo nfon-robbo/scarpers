@@ -804,6 +804,7 @@ export type Database = {
           hour: number
           id: string
           insight: string | null
+          is_backfilled: boolean
           kind: string
           recommendation: string | null
           recorded_at: string
@@ -817,6 +818,7 @@ export type Database = {
           hour: number
           id?: string
           insight?: string | null
+          is_backfilled?: boolean
           kind?: string
           recommendation?: string | null
           recorded_at?: string
@@ -830,6 +832,7 @@ export type Database = {
           hour?: number
           id?: string
           insight?: string | null
+          is_backfilled?: boolean
           kind?: string
           recommendation?: string | null
           recorded_at?: string

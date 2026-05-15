@@ -8,7 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
-type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null; kind: "morning" | "eod" };
+type TrendSnapshot = { recorded_at: string; score: number; sleepSynced: boolean; awakeHours: number | null; kind: "morning" | "eod"; isBackfilled?: boolean };
 
 function formatSparkValue(label: string, v: number): string {
   if (label === "Deep Sleep") return `${v.toFixed(1)}%`;
@@ -467,7 +467,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("readiness_snapshots")
-        .select("score, factors, recorded_at, kind")
+        .select("score, factors, recorded_at, kind, is_backfilled")
         .eq("user_id", user.id)
         .gte("recorded_at", startDate + "T00:00:00Z")
         .order("recorded_at", { ascending: true })
@@ -562,7 +562,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       // Store raw snapshots; trend is recomputed in a separate effect when mode changes
       setTrendSnapshots((snaps as any[]).map((s) => {
         const validity = extractSnapshotValidity(s.factors as any[]);
-        return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", ...validity };
+        return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", isBackfilled: !!s.is_backfilled, ...validity };
       }));
     });
   }, [user, refreshNonce]);
@@ -604,6 +604,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           hour: hourFloat,
           score: s.score,
           sleepSynced: s.sleepSynced,
+          isBackfilled: s.isBackfilled,
         } as any;
       });
       setTrend(trendArr);
@@ -1095,7 +1096,23 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               stroke={z.color}
                               fill="url(#readinessTodayGrad)"
                               strokeWidth={2.5}
-                              dot={{ r: 5, fill: z.color, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                              dot={(props: any) => {
+                                const { cx, cy, payload, index } = props;
+                                const bf = !!payload?.isBackfilled;
+                                return (
+                                  <circle
+                                    key={index}
+                                    cx={cx}
+                                    cy={cy}
+                                    r={bf ? 4 : 5}
+                                    fill={z.color}
+                                    fillOpacity={bf ? 0.35 : 1}
+                                    stroke="hsl(var(--background))"
+                                    strokeWidth={2}
+                                    strokeOpacity={bf ? 0.5 : 1}
+                                  />
+                                );
+                              }}
                               activeDot={{ r: 7 }}
                               isAnimationActive={false}
                             />
@@ -1104,6 +1121,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <p className="mt-2 text-[10px] text-muted-foreground/80">
                           {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} today · last at {last.day}
                         </p>
+                        {todayPts.some((p: any) => p.isBackfilled) && (
+                          <p className="mt-1 text-[9px] italic text-muted-foreground/70">
+                            Early morning scores estimated from sleep data.
+                          </p>
+                        )}
                       </>
                     );
                   })() : (
