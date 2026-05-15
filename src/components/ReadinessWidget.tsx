@@ -603,7 +603,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           day: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
           hour: hourFloat,
           score: s.score,
-        };
+          sleepSynced: s.sleepSynced,
+        } as any;
       });
       setTrend(trendArr);
       return;
