@@ -578,8 +578,10 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
       const trendArr = todays.map((s) => {
         const d = new Date(s.recorded_at);
+        const hourFloat = d.getHours() + d.getMinutes() / 60;
         return {
-          day: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }),
+          day: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+          hour: hourFloat,
           score: s.score,
         };
       });
