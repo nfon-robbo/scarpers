@@ -86,7 +86,7 @@ const BlogEditor = () => {
   const openNew = () => {
     setIsNew(true); setEditing(null);
     setTitle(""); setSlug(""); setExcerpt(""); setContent(""); setCoverImage("");
-    setPublished(false); setGeneratedImages([]); setImagePrompt("");
+    setPublished(false); setGeneratedImages([]); setImagePrompt(""); setScheduledFor("");
   };
 
   const openEdit = (post: BlogPost) => {
@@ -94,6 +94,9 @@ const BlogEditor = () => {
     setTitle(post.title); setSlug(post.slug); setExcerpt(post.excerpt || "");
     setContent(post.content); setCoverImage(post.cover_image || "");
     setPublished(post.published); setGeneratedImages([]); setImagePrompt("");
+    // Pre-fill schedule input if the post is scheduled for the future
+    const futurePub = post.published_at && new Date(post.published_at).getTime() > Date.now();
+    setScheduledFor(futurePub ? isoToLocalInput(post.published_at) : "");
   };
 
   const closeEditor = () => { setEditing(null); setIsNew(false); };
@@ -101,6 +104,20 @@ const BlogEditor = () => {
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) { toast.error("Title and content are required"); return; }
     const finalSlug = slug.trim() || slugify(title);
+
+    // Resolve schedule -> published_at
+    let resolvedPublished = published;
+    let resolvedPublishedAt: string | null = null;
+    if (scheduledFor) {
+      const d = new Date(scheduledFor);
+      if (isNaN(d.getTime())) { toast.error("Invalid scheduled date/time"); return; }
+      // Scheduling implies the post should go live automatically — flag as published with a future date
+      resolvedPublished = true;
+      resolvedPublishedAt = d.toISOString();
+    } else if (published) {
+      resolvedPublishedAt = editing?.published_at || new Date().toISOString();
+    }
+
     setSaving(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
