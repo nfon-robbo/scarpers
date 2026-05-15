@@ -27,6 +27,7 @@ import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normal
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
 import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
+import { enforceAndLog } from "@/lib/plan-validation";
 
 interface ApiStep {
   duration: number;
