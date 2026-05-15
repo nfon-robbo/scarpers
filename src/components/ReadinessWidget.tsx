@@ -976,7 +976,21 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="visible" />
                       <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="visible" />
                       <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="visible" />
-                      <XAxis dataKey="day" tick={{ fontSize: 10 }} className="fill-muted-foreground" axisLine={false} tickLine={false} interval={0} />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fontSize: 10 }}
+                        className="fill-muted-foreground"
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        tickFormatter={(v: string) => {
+                          if (trendMode !== "today") return v;
+                          const m = /^(\d{1,2}):/.exec(v);
+                          if (!m) return "";
+                          const h = parseInt(m[1], 10);
+                          return h % 4 === 0 ? `${String(h).padStart(2, "0")}:00` : "";
+                        }}
+                      />
                       <YAxis domain={[0, 100]} hide />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
