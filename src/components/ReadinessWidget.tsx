@@ -565,10 +565,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     const today = new Date();
 
     if (trendMode === "today") {
-      // Hourly view for the current calendar day — every snapshot, in order
-      const todayKey = today.toISOString().split("T")[0];
+      // Hourly view for the current calendar day — every snapshot, in order.
+      // Match snapshots by LOCAL calendar date so timezone offsets don't hide today's data.
+      const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       const todays = trendSnapshots
-        .filter((s) => s.recorded_at.split("T")[0] === todayKey)
+        .filter((s) => {
+          const d = new Date(s.recorded_at);
+          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          return local === localToday;
+        })
         .slice()
         .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
       const trendArr = todays.map((s) => {
@@ -951,6 +956,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Hourly snapshots taken throughout today.
                     </p>
                   )}
+                  {trendMode === "today" && visibleTrend.length < 2 ? (
+                    <div className="h-[160px] flex items-center justify-center text-center px-4">
+                      <p className="text-[11px] text-muted-foreground/80 leading-snug">
+                        Not enough hourly snapshots yet today. Your readiness is captured each hour — check back later to see today's trend.
+                      </p>
+                    </div>
+                  ) : (
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={visibleTrend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
@@ -973,6 +985,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} />
                     </AreaChart>
                   </ResponsiveContainer>
+                  )}
                   {showDeclineTip && (
                     <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
                       Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
