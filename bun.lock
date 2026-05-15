@@ -39,6 +39,10 @@
         "@tiptap/extension-highlight": "^3.23.1",
         "@tiptap/extension-image": "^3.23.1",
         "@tiptap/extension-link": "^3.23.1",
+        "@tiptap/extension-table": "^3.23.4",
+        "@tiptap/extension-table-cell": "^3.23.4",
+        "@tiptap/extension-table-header": "^3.23.4",
+        "@tiptap/extension-table-row": "^3.23.4",
         "@tiptap/extension-text-align": "^3.23.1",
         "@tiptap/extension-underline": "^3.23.1",
         "@tiptap/react": "^3.23.1",
@@ -459,6 +463,14 @@
     "@tiptap/extension-paragraph": ["@tiptap/extension-paragraph@3.23.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-paragraph/-/extension-paragraph-3.23.1.tgz", { "peerDependencies": { "@tiptap/core": "3.23.1" } }, "sha512-GC7b6yAjASl1q9sNkPmukZmVYMfxx03EEhpMMrLYJY9GBz82Ald927yYQsOqf2aKA/Rjo/aZMYCGtjXkGk6aBA=="],
 
     "@tiptap/extension-strike": ["@tiptap/extension-strike@3.23.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-strike/-/extension-strike-3.23.1.tgz", { "peerDependencies": { "@tiptap/core": "3.23.1" } }, "sha512-+R5LG0ZW9SDZc4weA79uq6uUduVsCEph9tRcoQCRA82IVIiPYSTxTLew9odalmk/Mc7vdZvOK5jjtO5jUVw/rg=="],
+
+    "@tiptap/extension-table": ["@tiptap/extension-table@3.23.4", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-table/-/extension-table-3.23.4.tgz", { "peerDependencies": { "@tiptap/core": "3.23.4", "@tiptap/pm": "3.23.4" } }, "sha512-TRh6JMTRYXCWpwavGt3aAHH2f51ZzkhurfW3XvrURG3It8MvfuuY1xB1xba1ss5c0QLWlrKx6GVaSXrUCdFLlg=="],
+
+    "@tiptap/extension-table-cell": ["@tiptap/extension-table-cell@3.23.4", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-table-cell/-/extension-table-cell-3.23.4.tgz", { "peerDependencies": { "@tiptap/extension-table": "3.23.4" } }, "sha512-GmLLF9w7ExXhieshDnwC2U4kE8EM3TliDnHYX7uXOnSptWqASku6hOFw0f1AT5MDJog9NPzRo+adGVRHS9kjTQ=="],
+
+    "@tiptap/extension-table-header": ["@tiptap/extension-table-header@3.23.4", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-table-header/-/extension-table-header-3.23.4.tgz", { "peerDependencies": { "@tiptap/extension-table": "3.23.4" } }, "sha512-5IXIHjpCpuZ06SmOoVsnK4VoOhd/G6yLiDtP3Azcf+KUI5539ryWE9I9EAqgalV2HcJMMYX9MQpl5WReHRGETw=="],
+
+    "@tiptap/extension-table-row": ["@tiptap/extension-table-row@3.23.4", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-table-row/-/extension-table-row-3.23.4.tgz", { "peerDependencies": { "@tiptap/extension-table": "3.23.4" } }, "sha512-kqQt0I4cm2E+NNLpZ5rtox53Vgzyy19ZczvJ66Ao6BZkXXKqYXSRJc4q0jGNPX8hHhvHBpHmffcz5hdT/1XtNQ=="],
 
     "@tiptap/extension-text": ["@tiptap/extension-text@3.23.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@tiptap/extension-text/-/extension-text-3.23.1.tgz", { "peerDependencies": { "@tiptap/core": "3.23.1" } }, "sha512-k1Ki9bBV6mLz1mFP+Laqh1YHJ2MY0P8XzaMqpkgMndEBIJQ3XcpWQc5bfAlRnYcOI9ZXDbAgQ8CwgArxHmQWCQ=="],
 
