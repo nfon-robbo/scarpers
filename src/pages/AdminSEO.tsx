@@ -28,7 +28,7 @@ type Suggestion = {
 type GscRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 type GscResponse = {
   site: string;
-  range: { start: string; end: string };
+  range: { start: string; end: string; days?: number };
   totals: GscRow | null;
   byQuery: GscRow[];
   byPage: GscRow[];
