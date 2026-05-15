@@ -203,7 +203,7 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
   } else {
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
-    const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s * 0.55;
+    const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s >= 50 ? s * 0.65 : s * 0.55;
     weightedSum += adjustedSleep * 0.34;
     const sl = scoreLabel(s);
     factors.push({
