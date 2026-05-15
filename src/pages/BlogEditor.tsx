@@ -128,19 +128,21 @@ const BlogEditor = () => {
       excerpt: excerpt.trim() || null,
       content: content.trim(),
       cover_image: coverImage.trim() || null,
-      published,
-      published_at: published ? (editing?.published_at || new Date().toISOString()) : null,
+      published: resolvedPublished,
+      published_at: resolvedPublishedAt,
       updated_at: new Date().toISOString(),
     };
+
+    const isScheduled = !!scheduledFor && resolvedPublishedAt && new Date(resolvedPublishedAt).getTime() > Date.now();
 
     if (isNew) {
       const { error } = await supabase.from("blog_posts").insert({ ...payload, author_id: session.user.id });
       if (error) { toast.error(error.message); setSaving(false); return; }
-      toast.success("Post created");
+      toast.success(isScheduled ? `Scheduled for ${new Date(resolvedPublishedAt!).toLocaleString("en-GB")}` : "Post created");
     } else if (editing) {
       const { error } = await supabase.from("blog_posts").update(payload).eq("id", editing.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
-      toast.success("Post updated");
+      toast.success(isScheduled ? `Scheduled for ${new Date(resolvedPublishedAt!).toLocaleString("en-GB")}` : "Post updated");
     }
     setSaving(false);
     closeEditor();
