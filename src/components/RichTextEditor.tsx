@@ -110,11 +110,22 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         tableHtml += "</tbody></table>";
 
         event.preventDefault();
-        // @ts-expect-error - editor instance exposed via view
-        view.editorInstance?.chain().focus().insertContent(tableHtml).run();
+        const { state, dispatch } = view;
+        const { schema } = state;
+        const node = (schema.nodes.doc as any).type
+          ? null
+          : null;
+        // Use ProseMirror DOMParser to convert HTML into a slice
+        const tmp = document.createElement("div");
+        tmp.innerHTML = tableHtml;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { DOMParser } = require("@tiptap/pm/model");
+        const slice = DOMParser.fromSchema(schema).parseSlice(tmp);
+        dispatch(state.tr.replaceSelection(slice).scrollIntoView());
         return true;
       },
     },
+  });
 
   if (!editor) return null;
 
