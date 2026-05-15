@@ -205,6 +205,8 @@ const AdminSEO = () => {
 
   useEffect(() => { if (isAdmin) loadGsc(gscDays); /* eslint-disable-line */ }, [isAdmin, gscDays]);
   useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) checkGa4(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin && ga4Connected) loadGa4(ga4Days); /* eslint-disable-line */ }, [isAdmin, ga4Connected, ga4Days]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
     setSuggestionsKeyword(keyword);
