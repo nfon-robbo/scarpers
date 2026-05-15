@@ -71,6 +71,60 @@ const AdminSEO = () => {
   type GscSortKey = "query" | "clicks" | "impressions" | "ctr" | "position";
   const [gscSort, setGscSort] = useState<{ key: GscSortKey; dir: "asc" | "desc" }>({ key: "impressions", dir: "desc" });
 
+  // GA4
+  type Ga4Data = {
+    range: { days: number };
+    totals: { activeUsers: number; newUsers: number; sessions: number; pageViews: number; avgSessionDuration: number; engagementRate: number };
+    pages: { path: string; pageViews: number; users: number; engagementRate: number }[];
+    sources: { source: string; medium: string; sessions: number; users: number }[];
+    countries: { country: string; users: number }[];
+    fetchedAt: string;
+  };
+  const [ga4Connected, setGa4Connected] = useState<boolean | null>(null);
+  const [ga4Data, setGa4Data] = useState<Ga4Data | null>(null);
+  const [ga4Loading, setGa4Loading] = useState(false);
+  const [ga4Error, setGa4Error] = useState<string | null>(null);
+  const [ga4Days, setGa4Days] = useState<7 | 28 | 90>(28);
+
+  const checkGa4 = async () => {
+    const { data } = await supabase.functions.invoke("ga4-data", { body: { action: "status" } });
+    setGa4Connected(!!(data as any)?.connected);
+  };
+  const loadGa4 = async (days: 7 | 28 | 90 = ga4Days) => {
+    setGa4Loading(true); setGa4Error(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ga4-data", { body: { action: "report", days } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setGa4Data(data as Ga4Data);
+    } catch (e: any) {
+      setGa4Error(e?.message ?? "Failed to load GA4 data");
+    } finally { setGa4Loading(false); }
+  };
+  const connectGa4 = async () => {
+    const { data, error } = await supabase.functions.invoke("ga4-oauth-start", { body: {} });
+    if (error || !(data as any)?.url) { toast.error("Failed to start GA4 connection"); return; }
+    const popup = window.open((data as any).url, "ga4-oauth", "width=520,height=640");
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.data === "ga4-connected") {
+        window.removeEventListener("message", onMsg);
+        toast.success("Google Analytics connected");
+        setGa4Connected(true);
+        loadGa4(ga4Days);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    // Fallback: if popup closes, re-check status
+    const timer = setInterval(() => {
+      if (popup?.closed) { clearInterval(timer); checkGa4().then(() => ga4Connected && loadGa4(ga4Days)); }
+    }, 1000);
+  };
+  const disconnectGa4 = async () => {
+    await supabase.functions.invoke("ga4-data", { body: { action: "disconnect" } });
+    setGa4Connected(false); setGa4Data(null);
+    toast.success("Disconnected");
+  };
+
   // Suggestions dialog
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -151,6 +205,8 @@ const AdminSEO = () => {
 
   useEffect(() => { if (isAdmin) loadGsc(gscDays); /* eslint-disable-line */ }, [isAdmin, gscDays]);
   useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) checkGa4(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin && ga4Connected) loadGa4(ga4Days); /* eslint-disable-line */ }, [isAdmin, ga4Connected, ga4Days]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
     setSuggestionsKeyword(keyword);
@@ -271,6 +327,7 @@ const AdminSEO = () => {
       <Tabs defaultValue="live">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="live"><Activity className="w-3.5 h-3.5 mr-1.5" /> Live (Search Console)</TabsTrigger>
+          <TabsTrigger value="ga4"><TrendingUp className="w-3.5 h-3.5 mr-1.5" /> Live (GA4)</TabsTrigger>
           <TabsTrigger value="keywords"><Target className="w-3.5 h-3.5 mr-1.5" /> Keywords</TabsTrigger>
           <TabsTrigger value="targets"><Lightbulb className="w-3.5 h-3.5 mr-1.5" /> Target opportunities</TabsTrigger>
           <TabsTrigger value="pages"><Globe className="w-3.5 h-3.5 mr-1.5" /> Top pages</TabsTrigger>
@@ -537,7 +594,143 @@ const AdminSEO = () => {
           })()}
         </TabsContent>
 
-        {/* Current ranking keywords */}
+        {/* GA4 */}
+        <TabsContent value="ga4" className="space-y-4">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="pt-6 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-sm">
+                <p className="font-medium">Google Analytics (GA4) — last {ga4Days} days</p>
+                <p className="text-muted-foreground text-xs">
+                  {ga4Connected === null
+                    ? "Checking connection…"
+                    : ga4Connected
+                      ? (ga4Data ? `Refreshed ${new Date(ga4Data.fetchedAt).toLocaleTimeString("en-GB")}` : "Connected. Loading data…")
+                      : "Not connected. Sign in with a Google account that has access to your GA4 property."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {ga4Connected && (
+                  <>
+                    <Select value={String(ga4Days)} onValueChange={(v) => setGa4Days(Number(v) as 7 | 28 | 90)}>
+                      <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">Last 7 days</SelectItem>
+                        <SelectItem value="28">Last 28 days</SelectItem>
+                        <SelectItem value="90">Last 90 days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="outline" onClick={() => loadGa4(ga4Days)} disabled={ga4Loading}>
+                      {ga4Loading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                      Refresh
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={disconnectGa4}>Disconnect</Button>
+                  </>
+                )}
+                {ga4Connected === false && (
+                  <Button size="sm" onClick={connectGa4}>Connect Google Analytics</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {ga4Error && (
+            <Card className="border-destructive/40 bg-destructive/5">
+              <CardContent className="pt-6 text-sm text-destructive">{ga4Error}</CardContent>
+            </Card>
+          )}
+
+          {ga4Loading && !ga4Data && (
+            <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+          )}
+
+          {ga4Connected && ga4Data && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="Active users" value={fmtNum(ga4Data.totals.activeUsers)} hint="Unique visitors" />
+                <Stat label="New users" value={fmtNum(ga4Data.totals.newUsers)} hint="First-time visitors" />
+                <Stat label="Sessions" value={fmtNum(ga4Data.totals.sessions)} hint="Total visits" />
+                <Stat label="Page views" value={fmtNum(ga4Data.totals.pageViews)} hint="Total pages viewed" />
+                <Stat label="Avg session" value={`${Math.round(ga4Data.totals.avgSessionDuration)}s`} hint="Time per visit" />
+                <Stat label="Engagement rate" value={fmtPct(ga4Data.totals.engagementRate)} hint="Engaged sessions ÷ total" />
+              </div>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Top pages</CardTitle></CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Page</TableHead>
+                        <TableHead className="text-right">Views</TableHead>
+                        <TableHead className="text-right">Users</TableHead>
+                        <TableHead className="text-right">Engagement</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ga4Data.pages.map((p) => (
+                        <TableRow key={p.path}>
+                          <TableCell className="font-mono text-xs">{p.path}</TableCell>
+                          <TableCell className="text-right">{fmtNum(p.pageViews)}</TableCell>
+                          <TableCell className="text-right">{fmtNum(p.users)}</TableCell>
+                          <TableCell className="text-right">{fmtPct(p.engagementRate)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Traffic sources</CardTitle></CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Source / Medium</TableHead>
+                          <TableHead className="text-right">Sessions</TableHead>
+                          <TableHead className="text-right">Users</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ga4Data.sources.map((s, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{s.source} / {s.medium}</TableCell>
+                            <TableCell className="text-right">{fmtNum(s.sessions)}</TableCell>
+                            <TableCell className="text-right">{fmtNum(s.users)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Top countries</CardTitle></CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Country</TableHead>
+                          <TableHead className="text-right">Users</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ga4Data.countries.map((c) => (
+                          <TableRow key={c.country}>
+                            <TableCell>{c.country}</TableCell>
+                            <TableCell className="text-right">{fmtNum(c.users)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+
         <TabsContent value="keywords" className="space-y-4">
           <Card>
             <CardHeader>

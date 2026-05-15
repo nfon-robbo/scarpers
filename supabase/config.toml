@@ -9,6 +9,8 @@ project_id = "datdwxsugeobqigtopnz"
     verify_jwt = false
   [functions.google-fit-auth]
     verify_jwt = false
+  [functions.ga4-oauth-callback]
+    verify_jwt = false
   [functions.google-fit-callback]
     verify_jwt = false
   [functions.google-fit-sleep]
