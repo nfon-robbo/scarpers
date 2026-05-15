@@ -533,7 +533,8 @@ const AdminSEO = () => {
                 </Card>
               )}
             </>
-          )}
+          );
+          })()}
         </TabsContent>
 
         {/* Current ranking keywords */}
