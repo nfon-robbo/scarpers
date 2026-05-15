@@ -44,6 +44,17 @@ const BlogEditor = () => {
   const [coverImage, setCoverImage] = useState("");
   const [imagePrompt, setImagePrompt] = useState("");
   const [published, setPublished] = useState(false);
+  // Local datetime-input string ("YYYY-MM-DDTHH:mm"); empty = publish immediately when toggled on
+  const [scheduledFor, setScheduledFor] = useState("");
+
+  // Convert ISO -> value for <input type="datetime-local"> in user's local TZ
+  const isoToLocalInput = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   useEffect(() => { checkAdminAndLoad(); }, []);
 
