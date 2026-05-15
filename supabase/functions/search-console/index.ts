@@ -32,9 +32,23 @@ Deno.serve(async (req) => {
       .eq('role', 'admin')
     if (!roles || roles.length === 0) return json({ error: 'Forbidden' }, 403)
 
+    // Parse optional date range (in days). Allowed: 7, 28, 90. Default 28.
+    let days = 28
+    try {
+      if (req.method === 'POST') {
+        const body = await req.json().catch(() => ({}))
+        const d = Number(body?.days)
+        if ([7, 28, 90].includes(d)) days = d
+      } else {
+        const url = new URL(req.url)
+        const d = Number(url.searchParams.get('days'))
+        if ([7, 28, 90].includes(d)) days = d
+      }
+    } catch { /* ignore */ }
+
     const today = new Date()
     const end = today.toISOString().slice(0, 10)
-    const startD = new Date(today.getTime() - 28 * 86400000).toISOString().slice(0, 10)
+    const startD = new Date(today.getTime() - days * 86400000).toISOString().slice(0, 10)
 
     const headers = {
       'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -63,7 +77,7 @@ Deno.serve(async (req) => {
 
     return json({
       site: SITE,
-      range: { start: startD, end },
+      range: { start: startD, end, days },
       totals: totals[0] ?? null,
       byQuery,
       byPage,

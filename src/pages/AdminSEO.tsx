@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Clock, History } from "lucide-react";
+import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Clock, History, ArrowUpDown, AlertTriangle, Zap } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import snapshot from "@/data/seo-snapshot.json";
 
@@ -27,7 +28,7 @@ type Suggestion = {
 type GscRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 type GscResponse = {
   site: string;
-  range: { start: string; end: string };
+  range: { start: string; end: string; days?: number };
   totals: GscRow | null;
   byQuery: GscRow[];
   byPage: GscRow[];
@@ -66,6 +67,9 @@ const AdminSEO = () => {
   const [gsc, setGsc] = useState<GscResponse | null>(null);
   const [gscLoading, setGscLoading] = useState(false);
   const [gscError, setGscError] = useState<string | null>(null);
+  const [gscDays, setGscDays] = useState<7 | 28 | 90>(28);
+  type GscSortKey = "query" | "clicks" | "impressions" | "ctr" | "position";
+  const [gscSort, setGscSort] = useState<{ key: GscSortKey; dir: "asc" | "desc" }>({ key: "impressions", dir: "desc" });
 
   // Suggestions dialog
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -131,10 +135,10 @@ const AdminSEO = () => {
   };
 
 
-  const loadGsc = async () => {
+  const loadGsc = async (days: 7 | 28 | 90 = gscDays) => {
     setGscLoading(true); setGscError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("search-console");
+      const { data, error } = await supabase.functions.invoke("search-console", { body: { days } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setGsc(data as GscResponse);
@@ -145,7 +149,7 @@ const AdminSEO = () => {
     }
   };
 
-  useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) loadGsc(gscDays); /* eslint-disable-line */ }, [isAdmin, gscDays]);
   useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
@@ -281,21 +285,36 @@ const AdminSEO = () => {
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="pt-6 flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm">
-                <p className="font-medium">Real Google search data — last 28 days</p>
+                <p className="font-medium">Real Google search data — last {gscDays} days</p>
                 <p className="text-muted-foreground text-xs">
                   {gsc ? `${fmtDate(gsc.range.start)} → ${fmtDate(gsc.range.end)} · refreshed ${new Date(gsc.fetchedAt).toLocaleTimeString("en-GB")}` : "Pulled from Google Search Console via your connected account."}
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={loadGsc} disabled={gscLoading}>
-                {gscLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                <Select value={String(gscDays)} onValueChange={(v) => setGscDays(Number(v) as 7 | 28 | 90)}>
+                  <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="28">Last 28 days</SelectItem>
+                    <SelectItem value="90">Last 3 months</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => loadGsc(gscDays)} disabled={gscLoading}>
+                  {gscLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                  Refresh
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           {gscError && (
             <Card className="border-destructive/40 bg-destructive/5">
-              <CardContent className="pt-6 text-sm text-destructive">{gscError}</CardContent>
+              <CardContent className="pt-6 text-sm text-destructive space-y-2">
+                <p>{gscError}</p>
+                <p className="text-xs text-muted-foreground">
+                  If you haven't connected Google Search Console yet, go to <strong>Connectors → Google Search Console</strong> and authorise access to scarpers.co.uk. Once connected, this page automatically refreshes daily.
+                </p>
+              </CardContent>
             </Card>
           )}
 
@@ -303,7 +322,34 @@ const AdminSEO = () => {
             <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           )}
 
-          {gsc && (
+          {gsc && (() => {
+            const queries = gsc.byQuery ?? [];
+            const sortRows = (rows: GscRow[]) => {
+              const dir = gscSort.dir === "asc" ? 1 : -1;
+              return [...rows].sort((a, b) => {
+                if (gscSort.key === "query") return ((a.keys?.[0] ?? "").localeCompare(b.keys?.[0] ?? "")) * dir;
+                return ((a as any)[gscSort.key] - (b as any)[gscSort.key]) * dir;
+              });
+            };
+            const toggleSort = (key: GscSortKey) =>
+              setGscSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "query" ? "asc" : "desc" });
+            const SortHead = ({ k, label, className }: { k: GscSortKey; label: string; className?: string }) => (
+              <TableHead className={className}>
+                <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground">
+                  {label}
+                  <ArrowUpDown className={`h-3 w-3 ${gscSort.key === k ? "text-primary" : "opacity-40"}`} />
+                </button>
+              </TableHead>
+            );
+            const sortedQueries = sortRows(queries).slice(0, 20);
+            const quickWins = queries.filter((r) => r.position >= 8 && r.position <= 20).sort((a, b) => b.impressions - a.impressions);
+            const lowCtr = queries.filter((r) => r.impressions > 100 && r.ctr < 0.02).sort((a, b) => b.impressions - a.impressions);
+            const quickWinAction = (r: GscRow) => {
+              if (r.position > 15) return "Add internal links + expand on-page content";
+              if (r.ctr < 0.03) return "Rewrite page title & meta description for clicks";
+              return "Strengthen H1 + add FAQ section to push to page 1";
+            };
+          return (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Stat label="Impressions" value={fmtNum(gsc.totals?.impressions ?? 0)} hint="Times we appeared in Google" />
@@ -312,10 +358,11 @@ const AdminSEO = () => {
                 <Stat label="Avg position" value={gsc.totals ? fmtPos(gsc.totals.position) : "—"} hint="Average rank when shown" />
               </div>
 
-              <Card>
+              {/* Quick Win Keywords (position 8-20) */}
+              <Card className="border-amber-500/40 bg-amber-500/5">
                 <CardHeader>
-                  <CardTitle className="text-base">Top queries</CardTitle>
-                  <CardDescription>What people actually typed into Google to find scarpers.co.uk</CardDescription>
+                  <CardTitle className="text-base flex items-center gap-2"><Zap className="w-4 h-4 text-amber-600" /> Quick win keywords</CardTitle>
+                  <CardDescription>Queries ranking in positions 8–20 — closest to page one. Biggest ROI for small improvements.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -326,13 +373,87 @@ const AdminSEO = () => {
                         <TableHead>Impressions</TableHead>
                         <TableHead>CTR</TableHead>
                         <TableHead>Avg position</TableHead>
+                        <TableHead>Suggested action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {gsc.byQuery.length === 0 && (
+                      {quickWins.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-sm text-muted-foreground">No quick-win queries in this date range yet.</TableCell></TableRow>
+                      )}
+                      {quickWins.map((r) => (
+                        <TableRow key={`qw-${r.keys?.[0]}`}>
+                          <TableCell className="font-medium">{r.keys?.[0]}</TableCell>
+                          <TableCell>{fmtNum(r.clicks)}</TableCell>
+                          <TableCell>{fmtNum(r.impressions)}</TableCell>
+                          <TableCell>{fmtPct(r.ctr)}</TableCell>
+                          <TableCell><Badge className="bg-amber-500/20 text-amber-700 border-amber-500/40">{fmtPos(r.position)}</Badge></TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{quickWinAction(r)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* High Impression / Low CTR */}
+              <Card className="border-destructive/40 bg-destructive/5">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" /> High impressions, low clicks</CardTitle>
+                  <CardDescription>&gt;100 impressions but CTR below 2%. Google shows the site but users skip it — fix the page title and meta description.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Query</TableHead>
+                        <TableHead>Clicks</TableHead>
+                        <TableHead>Impressions</TableHead>
+                        <TableHead>CTR</TableHead>
+                        <TableHead>Avg position</TableHead>
+                        <TableHead>Suggested action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lowCtr.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="text-sm text-muted-foreground">No queries match — every high-impression query is already getting clicks.</TableCell></TableRow>
+                      )}
+                      {lowCtr.map((r) => (
+                        <TableRow key={`lc-${r.keys?.[0]}`}>
+                          <TableCell className="font-medium">{r.keys?.[0]}</TableCell>
+                          <TableCell>{fmtNum(r.clicks)}</TableCell>
+                          <TableCell>{fmtNum(r.impressions)}</TableCell>
+                          <TableCell><Badge variant="destructive">{fmtPct(r.ctr)}</Badge></TableCell>
+                          <TableCell>{fmtPos(r.position)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">Rewrite the meta title &amp; description on the ranking page</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Top queries (sortable) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Top queries</CardTitle>
+                  <CardDescription>Top 20 search queries by impressions — click any column header to sort.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <SortHead k="query" label="Query" />
+                        <SortHead k="clicks" label="Clicks" />
+                        <SortHead k="impressions" label="Impressions" />
+                        <SortHead k="ctr" label="CTR" />
+                        <SortHead k="position" label="Avg position" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedQueries.length === 0 && (
                         <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No query data yet — Google needs a few days of impressions before reporting.</TableCell></TableRow>
                       )}
-                      {gsc.byQuery.map((r) => (
+                      {sortedQueries.map((r) => (
                         <TableRow key={r.keys?.[0]}>
                           <TableCell className="font-medium">{r.keys?.[0]}</TableCell>
                           <TableCell>{fmtNum(r.clicks)}</TableCell>
@@ -412,7 +533,8 @@ const AdminSEO = () => {
                 </Card>
               )}
             </>
-          )}
+          );
+          })()}
         </TabsContent>
 
         {/* Current ranking keywords */}
