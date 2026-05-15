@@ -956,6 +956,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Hourly snapshots taken throughout today.
                     </p>
                   )}
+                  {trendMode === "today" && visibleTrend.length < 2 ? (
+                    <div className="h-[160px] flex items-center justify-center text-center px-4">
+                      <p className="text-[11px] text-muted-foreground/80 leading-snug">
+                        Not enough hourly snapshots yet today. Your readiness is captured each hour — check back later to see today's trend.
+                      </p>
+                    </div>
+                  ) : (
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={visibleTrend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
                       <defs>
@@ -978,6 +985,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} />
                     </AreaChart>
                   </ResponsiveContainer>
+                  )}
                   {showDeclineTip && (
                     <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
                       Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
