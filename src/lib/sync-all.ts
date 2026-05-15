@@ -16,12 +16,11 @@ function shouldRun(key: string) {
   return true;
 }
 
-async function syncStrava(accessToken: string, apikey: string, baseUrl: string, userId: string) {
+async function syncStrava(accessToken: string, apikey: string, baseUrl: string) {
   if (!shouldRun("strava")) return;
-  // Only sync the last 7 days, page 1 — keeps it fast on nav.
   const after = Math.floor((Date.now() - 7 * 86400_000) / 1000);
   try {
-    const res = await fetch(`${baseUrl}/functions/v1/strava-import`, {
+    await fetch(`${baseUrl}/functions/v1/strava-import`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -30,11 +29,6 @@ async function syncStrava(accessToken: string, apikey: string, baseUrl: string, 
       },
       body: JSON.stringify({ page: 1, per_page: 30, after }),
     });
-    if (!res.ok) return;
-    const result = await res.json().catch(() => ({}));
-    if (result?.imported > 0) {
-      try { await autoLinkActivitiesToPlan(userId); } catch { /* ignore */ }
-    }
   } catch {
     // silent
   }
