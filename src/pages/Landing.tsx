@@ -323,7 +323,7 @@ const Landing = () => {
 
     return () => {
       ld.remove();
-      org.remove();
+      
       desc.el.content = desc.prev;
       kw.el.content = kw.prev;
     };
