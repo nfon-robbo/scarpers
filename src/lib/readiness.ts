@@ -169,9 +169,11 @@ function bodyBatteryDrain(d: ReadinessData): {
   }
 
   const netDrain = passiveDrain + activeDrain - passiveCharge;
+  // Cap maximum net drain at 25 points so a hard day cannot single-handedly crush the score
+  const cappedDrain = Math.min(25, netDrain);
 
   return {
-    drain: -netDrain,
+    drain: -cappedDrain,
     hoursAwake: Math.round(hoursAwake * 10) / 10,
     passiveDrain: Math.round(passiveDrain),
     activeDrain: Math.round(activeDrain),
@@ -203,7 +205,7 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
   } else {
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
-    const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s * 0.55;
+    const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s >= 50 ? s * 0.65 : s * 0.55;
     weightedSum += adjustedSleep * 0.34;
     const sl = scoreLabel(s);
     factors.push({
@@ -267,8 +269,8 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 25 * 0.23; // missing HRV = moderate penalty
-    factors.push({ label: "HRV", status: "poor", detail: "No data" });
+    weightedSum += 40 * 0.23; // missing HRV = mild penalty (data-timing, not recovery)
+    factors.push({ label: "HRV", status: "warning", detail: "Not synced" });
   }
 
   // Yesterday's Load — intensity-weighted (16%)
