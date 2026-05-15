@@ -93,8 +93,40 @@ function WatchMockup({
 
 const FAQS = [
   {
+    q: "What is Scarpers?",
+    a: "Scarpers is an adaptive AI running coach that writes personalised training plans for 5K, 10K, half marathon, marathon and ultra distances — built around your real fitness, sleep, readiness and goal race.",
+  },
+  {
+    q: "Is Scarpers free?",
+    a: "Yes. Personalised plans, adaptive adjustments, daily readiness, post-run reviews and Garmin/Strava sync are all free — no credit card, no paywall.",
+  },
+  {
+    q: "How does the AI generate my plan?",
+    a: "Scarpers reads your last 8 weeks of activities, 30 nights of sleep, heart rate zones, injury history and goal race, then writes a week-by-week plan with intensity, target HR and cadence cues. Every session is generated for you, not pulled from a template.",
+  },
+  {
+    q: "Can I use Scarpers if I have an injury?",
+    a: "Yes. Onboarding captures current and recent injuries, and the AI shapes every session around them — no high-impact work against an active flag, conservative load progression, and easy days kept genuinely easy. Always check with a physio for anything serious.",
+  },
+  {
     q: "Does Scarpers work with Garmin watches?",
     a: "Yes. Import .FIT files from any Garmin watch, and export your structured Scarpers workouts to Intervals.icu so they sync straight to your Garmin — warm-ups, intervals, recoveries and target heart rate zones, step-by-step on your wrist.",
+  },
+  {
+    q: "What running distances does Scarpers support?",
+    a: "5K, 10K, half marathon, marathon and ultra (50K, 50 mile and 100K). Block lengths scale with the distance, from 6-week 5K plans to 20-week marathon and 24-week ultra plans.",
+  },
+  {
+    q: "Is Scarpers suitable for complete beginners?",
+    a: "Absolutely. New runners get a gentle run-walk progression that scales week by week. Easy paces stay easy, intensity is introduced slowly, and the plan respects how your body actually responds.",
+  },
+  {
+    q: "How is Scarpers different from Couch to 5K?",
+    a: "Couch to 5K is a fixed 9-week schedule that's identical for everyone. Scarpers writes a beginner plan tailored to your starting fitness, sleep and recovery — and adapts week by week instead of marching through a static template.",
+  },
+  {
+    q: "Is AI coaching safe?",
+    a: "Used responsibly, yes. Scarpers respects your injury history, caps weekly load increases and auto-deloads when readiness drops. It's a complement to — not a replacement for — qualified medical or physio advice. Stop and seek advice if a session causes sharp pain or symptoms that don't settle.",
   },
   {
     q: "How does Strava integration work?",
@@ -107,10 +139,6 @@ const FAQS = [
   {
     q: "Can Scarpers build a personalised marathon training plan?",
     a: "Yes. Marathon blocks run 16–20 weeks with a proper aerobic base, race-pace long runs, threshold work and a real taper. The plan adapts each week to your training load, readiness and life schedule.",
-  },
-  {
-    q: "Is Scarpers suitable for beginner runners?",
-    a: "Absolutely. New runners get a gentle run-walk progression that scales week by week. Easy paces stay easy, intensity is introduced slowly, and the plan respects how your body actually responds.",
   },
   {
     q: "What happens if I miss runs?",
