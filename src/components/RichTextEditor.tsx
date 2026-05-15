@@ -20,7 +20,9 @@ import {
   Quote, Minus, Code,
   Table as TableIcon, Rows3, Columns3, Trash2,
   ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine,
+  ListTree,
 } from "lucide-react";
+import { slugifyHeading } from "@/lib/heading-slug";
 
 interface RichTextEditorProps {
   content: string;
