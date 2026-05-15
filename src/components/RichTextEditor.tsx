@@ -205,11 +205,11 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
     setTocPopoverOpen(false);
     try {
       const buildPrompt = (h: string) =>
-        `A warm, photorealistic editorial image illustrating this blog section heading: "${h}". ` +
+        `A warm, photorealistic editorial image whose subject matter is conceptually about: ${h}. ` +
         `Show either a single everyday person or a small relaxed group of everyday people in a calm, natural setting — a park, a quiet trail, woodland, forest, mountains, or a peaceful path. ` +
         `The people should look like ordinary people of any body type (including average or larger builds) just trying to get fitter — NOT professional athletes, NOT on a running track, NOT in a stadium, NOT in a competitive race environment, NOT wearing pro race kit. Relaxed posture, soft natural light, calming mood. ` +
-        `Alternatively, if the heading is conceptual, render a clean informational illustration that visually explains the benefits or comparison the heading is about. ` +
-        `No text, no words, no logos in the image.`;
+        `Alternatively, if the topic is conceptual, render a clean informational illustration that visually explains the benefits or comparison — using only icons, shapes and imagery. ` +
+        `ABSOLUTELY NO TEXT of any kind in the image: do not render the topic words, no titles, no headings, no captions, no labels, no signage, no watermarks, no letters, no numbers, no words, no typography anywhere. Pure imagery only.`;
 
       const results = await Promise.all(
         headingsToUse.map((h) =>
