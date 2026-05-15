@@ -162,22 +162,29 @@ export async function autoLinkActivitiesToPlan(userId: string): Promise<AutoLink
     if (!candidates || candidates.length === 0) continue;
     const kind = plannedKind(w);
     const plannedSec = plannedDurationSeconds(w);
-    if (!plannedSec) continue;
 
     checked++;
 
-    // Pick best candidate of matching kind, closest duration, within 20%
+    // Prefer a kind-matching candidate within 20% of planned duration.
+    // Fall back to any kind-matching activity on the same day so a run done
+    // longer/shorter than planned still counts as "completed".
     let best: { a: any; diff: number } | null = null;
+    let fallback: { a: any; diff: number } | null = null;
     for (const a of candidates) {
       const aKind = activityKind(a.activity_type);
       if (aKind !== kind) continue;
       const aSec = Number(a.duration_seconds) || 0;
       if (aSec <= 0) continue;
-      const diff = Math.abs(aSec - plannedSec) / plannedSec;
-      if (diff > 0.2) continue;
-      if (!best || diff < best.diff) best = { a, diff };
+      const diff = plannedSec > 0 ? Math.abs(aSec - plannedSec) / plannedSec : 0;
+      if (plannedSec > 0 && diff <= 0.2) {
+        if (!best || diff < best.diff) best = { a, diff };
+      } else {
+        if (!fallback || diff < fallback.diff) fallback = { a, diff };
+      }
     }
-    if (!best) continue;
+    const chosen = best || fallback;
+    if (!chosen) continue;
+    best = chosen;
 
     const { error } = await supabase
       .from("activities")
