@@ -144,6 +144,15 @@ ${plan.content}`;
     newContent = newContent.replace(/^```(?:markdown)?\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     if (newContent.length < 50) throw new Error("AI returned empty/short content");
 
+    // Guardrail: enforce 5-min minimum on Warm-up / Cool-down rows.
+    const validated = enforceWarmupCooldownMinimums(newContent);
+    newContent = validated.content;
+    for (const c of validated.corrections) {
+      console.warn(
+        `[plan-auto-adapt] bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
+      );
+    }
+
     // Persist
     const { error: updErr } = await supabase
       .from("training_plans")
