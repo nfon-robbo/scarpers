@@ -455,7 +455,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("sleep_stages")
-        .select("date, stage, duration_seconds")
+        .select("date, stage, duration_seconds, end_time")
         .eq("user_id", user.id)
         .gte("date", startDate)
         .then(({ data }) => data || []),
