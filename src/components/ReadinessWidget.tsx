@@ -202,6 +202,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("end");
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
+  const [wakeHour, setWakeHour] = useState<number | null>(null);
   const [trend, setTrend] = useState<{ day: string; score: number | null; hour?: number }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [coachInsight, setCoachInsight] = useState<{ insight: string; recommendation: string } | null>(null);
@@ -454,7 +455,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("sleep_stages")
-        .select("date, stage, duration_seconds")
+        .select("date, stage, duration_seconds, end_time")
         .eq("user_id", user.id)
         .gte("date", startDate)
         .then(({ data }) => data || []),
@@ -487,6 +488,25 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         if (stage === "deep" || stage === "light" || stage === "rem") cur.total += dur;
         stagesByDate.set(s.date, cur);
       });
+
+      // Determine wake-up time: latest sleep_stages.end_time that falls on today (local)
+      const now = new Date();
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      let latestWakeTs: number | null = null;
+      (stages as any[]).forEach((s) => {
+        if (!s.end_time) return;
+        const d = new Date(s.end_time);
+        const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (local !== todayLocal) return;
+        const ts = d.getTime();
+        if (latestWakeTs == null || ts > latestWakeTs) latestWakeTs = ts;
+      });
+      if (latestWakeTs != null) {
+        const w = new Date(latestWakeTs);
+        setWakeHour(w.getHours() + w.getMinutes() / 60);
+      } else {
+        setWakeHour(null);
+      }
 
       // Daily load
       const loadByDate = new Map<string, number>();
@@ -583,7 +603,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           day: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
           hour: hourFloat,
           score: s.score,
-        };
+          sleepSynced: s.sleepSynced,
+        } as any;
       });
       setTrend(trendArr);
       return;
@@ -997,12 +1018,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         </div>
                       );
                     }
-                    // dynamic x domain: 30 min before first, 30 min after last (or now)
+                    // Wake-up time: prefer sleep_stages end_time, fall back to first sleep-synced
+                    // snapshot of the day, then 06:00.
                     const now = new Date();
                     const nowHour = now.getHours() + now.getMinutes() / 60;
-                    // Start the chart at the first snapshot of the day (typically wake-up time)
-                    const xMin = Math.max(0, first.hour);
-                    const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
+                    const fallbackSynced = todayPts.find((p: any) => p.sleepSynced)?.hour;
+                    const effectiveWake = wakeHour ?? fallbackSynced ?? 6;
+                    const wakeLabel = `${String(Math.floor(effectiveWake)).padStart(2, "0")}:${String(Math.round((effectiveWake - Math.floor(effectiveWake)) * 60)).padStart(2, "0")}`;
+                    const xMin = Math.max(0, Math.min(effectiveWake, first.hour));
+                    const xMax = Math.min(23, Math.max(last.hour, nowHour));
                     const scores = todayPts.map((p: any) => p.score);
                     const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
                     const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
@@ -1057,6 +1081,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               strokeDasharray="3 3"
                               strokeOpacity={0.7}
                               label={{ value: String(Math.round(last.score)), position: "right", fill: z.color, fontSize: 11, fontWeight: 700 }}
+                            />
+                            <ReferenceLine
+                              x={effectiveWake}
+                              stroke="hsl(var(--muted-foreground))"
+                              strokeDasharray="2 3"
+                              strokeOpacity={0.6}
+                              label={{ value: `↑ ${wakeLabel}`, position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 600 }}
                             />
                             <Area
                               type="monotone"
