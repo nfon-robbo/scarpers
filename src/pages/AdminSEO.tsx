@@ -327,6 +327,7 @@ const AdminSEO = () => {
       <Tabs defaultValue="live">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="live"><Activity className="w-3.5 h-3.5 mr-1.5" /> Live (Search Console)</TabsTrigger>
+          <TabsTrigger value="ga4"><TrendingUp className="w-3.5 h-3.5 mr-1.5" /> Live (GA4)</TabsTrigger>
           <TabsTrigger value="keywords"><Target className="w-3.5 h-3.5 mr-1.5" /> Keywords</TabsTrigger>
           <TabsTrigger value="targets"><Lightbulb className="w-3.5 h-3.5 mr-1.5" /> Target opportunities</TabsTrigger>
           <TabsTrigger value="pages"><Globe className="w-3.5 h-3.5 mr-1.5" /> Top pages</TabsTrigger>
