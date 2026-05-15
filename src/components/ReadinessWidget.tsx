@@ -1027,7 +1027,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     const effectiveWake = wakeHour ?? fallbackSynced ?? 6;
                     const wakeLabel = `${String(Math.floor(effectiveWake)).padStart(2, "0")}:${String(Math.round((effectiveWake - Math.floor(effectiveWake)) * 60)).padStart(2, "0")}`;
                     const xMin = Math.max(0, Math.min(effectiveWake, first.hour));
-                    const xMax = Math.min(23, Math.max(last.hour, nowHour));
+                    const xMax = Math.min(23.99, Math.max(last.hour, nowHour));
+                    // Evenly-spaced ticks anchored at xMin so the axis visibly extends back to wake-up time
+                    const xTicks: number[] = (() => {
+                      const span = xMax - xMin;
+                      if (span <= 0) return [xMin];
+                      const target = 5;
+                      const step = span / (target - 1);
+                      return Array.from({ length: target }, (_, i) => xMin + step * i);
+                    })();
                     const scores = todayPts.map((p: any) => p.score);
                     const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
                     const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
@@ -1057,6 +1065,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               dataKey="hour"
                               type="number"
                               domain={[xMin, xMax]}
+                              ticks={xTicks}
+                              allowDataOverflow
                               tick={{ fontSize: 10 }}
                               className="fill-muted-foreground"
                               axisLine={false}
