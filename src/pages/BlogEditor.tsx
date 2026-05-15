@@ -431,8 +431,13 @@ const BlogEditor = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{post.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {post.published ? <span className="text-primary font-medium">Published</span> : <span className="text-amber-600">Draft</span>}
-                  {" · "}
+                  {(() => {
+                    const future = post.published && post.published_at && new Date(post.published_at).getTime() > Date.now();
+                    if (future) return <span className="text-blue-500 font-medium">Scheduled · {new Date(post.published_at!).toLocaleString("en-GB")}</span>;
+                    if (post.published) return <span className="text-primary font-medium">Published</span>;
+                    return <span className="text-amber-600">Draft</span>;
+                  })()}
+                  {" · created "}
                   {new Date(post.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               </div>
