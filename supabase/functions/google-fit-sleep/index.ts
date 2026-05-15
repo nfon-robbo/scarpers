@@ -206,13 +206,7 @@ Deno.serve(async (req) => {
 
       const datasetData = await datasetRes.json();
 
-      // Delete old data for this date before inserting
-      await supabase
-        .from("sleep_stages")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("date", sleepDate)
-        .eq("source", "google_fit");
+      // (rows for this date were already deleted up-front, before the loop)
 
       const buckets = datasetData.bucket || [];
       let sessionStages = 0;
