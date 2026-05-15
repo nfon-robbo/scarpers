@@ -44,6 +44,17 @@ const BlogEditor = () => {
   const [coverImage, setCoverImage] = useState("");
   const [imagePrompt, setImagePrompt] = useState("");
   const [published, setPublished] = useState(false);
+  // Local datetime-input string ("YYYY-MM-DDTHH:mm"); empty = publish immediately when toggled on
+  const [scheduledFor, setScheduledFor] = useState("");
+
+  // Convert ISO -> value for <input type="datetime-local"> in user's local TZ
+  const isoToLocalInput = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   useEffect(() => { checkAdminAndLoad(); }, []);
 
@@ -75,7 +86,7 @@ const BlogEditor = () => {
   const openNew = () => {
     setIsNew(true); setEditing(null);
     setTitle(""); setSlug(""); setExcerpt(""); setContent(""); setCoverImage("");
-    setPublished(false); setGeneratedImages([]); setImagePrompt("");
+    setPublished(false); setGeneratedImages([]); setImagePrompt(""); setScheduledFor("");
   };
 
   const openEdit = (post: BlogPost) => {
@@ -83,6 +94,9 @@ const BlogEditor = () => {
     setTitle(post.title); setSlug(post.slug); setExcerpt(post.excerpt || "");
     setContent(post.content); setCoverImage(post.cover_image || "");
     setPublished(post.published); setGeneratedImages([]); setImagePrompt("");
+    // Pre-fill schedule input if the post is scheduled for the future
+    const futurePub = post.published_at && new Date(post.published_at).getTime() > Date.now();
+    setScheduledFor(futurePub ? isoToLocalInput(post.published_at) : "");
   };
 
   const closeEditor = () => { setEditing(null); setIsNew(false); };
@@ -90,6 +104,20 @@ const BlogEditor = () => {
   const handleSave = async () => {
     if (!title.trim() || !content.trim()) { toast.error("Title and content are required"); return; }
     const finalSlug = slug.trim() || slugify(title);
+
+    // Resolve schedule -> published_at
+    let resolvedPublished = published;
+    let resolvedPublishedAt: string | null = null;
+    if (scheduledFor) {
+      const d = new Date(scheduledFor);
+      if (isNaN(d.getTime())) { toast.error("Invalid scheduled date/time"); return; }
+      // Scheduling implies the post should go live automatically — flag as published with a future date
+      resolvedPublished = true;
+      resolvedPublishedAt = d.toISOString();
+    } else if (published) {
+      resolvedPublishedAt = editing?.published_at || new Date().toISOString();
+    }
+
     setSaving(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -100,19 +128,21 @@ const BlogEditor = () => {
       excerpt: excerpt.trim() || null,
       content: content.trim(),
       cover_image: coverImage.trim() || null,
-      published,
-      published_at: published ? (editing?.published_at || new Date().toISOString()) : null,
+      published: resolvedPublished,
+      published_at: resolvedPublishedAt,
       updated_at: new Date().toISOString(),
     };
+
+    const isScheduled = !!scheduledFor && resolvedPublishedAt && new Date(resolvedPublishedAt).getTime() > Date.now();
 
     if (isNew) {
       const { error } = await supabase.from("blog_posts").insert({ ...payload, author_id: session.user.id });
       if (error) { toast.error(error.message); setSaving(false); return; }
-      toast.success("Post created");
+      toast.success(isScheduled ? `Scheduled for ${new Date(resolvedPublishedAt!).toLocaleString("en-GB")}` : "Post created");
     } else if (editing) {
       const { error } = await supabase.from("blog_posts").update(payload).eq("id", editing.id);
       if (error) { toast.error(error.message); setSaving(false); return; }
-      toast.success("Post updated");
+      toast.success(isScheduled ? `Scheduled for ${new Date(resolvedPublishedAt!).toLocaleString("en-GB")}` : "Post updated");
     }
     setSaving(false);
     closeEditor();
@@ -319,9 +349,53 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Switch checked={published} onCheckedChange={setPublished} />
-            <Label>Published</Label>
+          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={published}
+                onCheckedChange={(v) => { setPublished(v); if (v) setScheduledFor(""); }}
+                disabled={!!scheduledFor}
+              />
+              <Label>Publish immediately</Label>
+            </div>
+
+            <div>
+              <Label className="text-xs">Or schedule for a later date &amp; time</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  min={isoToLocalInput(new Date().toISOString())}
+                  onChange={(e) => {
+                    setScheduledFor(e.target.value);
+                    if (e.target.value) setPublished(false);
+                  }}
+                  className="max-w-xs"
+                />
+                {scheduledFor && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setScheduledFor("")}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {scheduledFor && (() => {
+                const d = new Date(scheduledFor);
+                const valid = !isNaN(d.getTime());
+                const future = valid && d.getTime() > Date.now();
+                return (
+                  <p className={`text-xs mt-1 ${future ? "text-primary" : "text-amber-600"}`}>
+                    {!valid
+                      ? "Invalid date/time"
+                      : future
+                        ? `Will go live on ${d.toLocaleString("en-GB")}`
+                        : "Scheduled time is in the past — post will publish immediately on save"}
+                  </p>
+                );
+              })()}
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Times use your device's timezone. The post auto-publishes at this moment.
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -357,8 +431,13 @@ const BlogEditor = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{post.title}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {post.published ? <span className="text-primary font-medium">Published</span> : <span className="text-amber-600">Draft</span>}
-                  {" · "}
+                  {(() => {
+                    const future = post.published && post.published_at && new Date(post.published_at).getTime() > Date.now();
+                    if (future) return <span className="text-blue-500 font-medium">Scheduled · {new Date(post.published_at!).toLocaleString("en-GB")}</span>;
+                    if (post.published) return <span className="text-primary font-medium">Published</span>;
+                    return <span className="text-amber-600">Draft</span>;
+                  })()}
+                  {" · created "}
                   {new Date(post.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               </div>
