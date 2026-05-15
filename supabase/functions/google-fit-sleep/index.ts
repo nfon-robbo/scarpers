@@ -16,6 +16,17 @@ const SLEEP_STAGE_MAP: Record<number, string> = {
   6: "rem",
 };
 
+function makeTrace(debug: boolean) {
+  const traceId = `google-fit-sleep-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+  const entries: Array<{ stage: string; data: unknown; timestamp: string }> = [];
+  const log = (stage: string, data: unknown = {}) => {
+    const entry = { stage, data, timestamp: new Date().toISOString() };
+    if (debug) entries.push(entry);
+    console.log(`[${traceId}] ${stage}: ${JSON.stringify(data)}`);
+  };
+  return { traceId, entries, log };
+}
+
 async function refreshAccessToken(
   supabase: any,
   userId: string,
@@ -69,10 +80,15 @@ Deno.serve(async (req) => {
   }
 
   let daysBack = 7; // default
+  let debug = false;
   try {
     const body = await req.clone().json();
     if (body?.days) daysBack = Math.min(body.days, 30);
+    debug = body?.debug === true;
   } catch { /* no body, use default */ }
+
+  const trace = makeTrace(debug);
+  trace.log("request.received", { daysBack, debug, method: req.method });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -80,7 +96,8 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Not authenticated" }), {
+      trace.log("auth.missing_header", {});
+      return new Response(JSON.stringify({ error: "Not authenticated", traceId: trace.traceId }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -89,21 +106,30 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
+      trace.log("auth.invalid_token", { error: userError?.message });
+      return new Response(JSON.stringify({ error: "Invalid token", traceId: trace.traceId }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    trace.log("auth.user_loaded", { userId: user.id });
 
     // Get tokens
-    const { data: tokenRow } = await supabase
+    const { data: tokenRow, error: tokenError } = await supabase
       .from("google_fit_tokens")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
 
+    trace.log("tokens.lookup", {
+      found: !!tokenRow,
+      error: tokenError?.message,
+      expiresAt: tokenRow?.expires_at,
+      now,
+    });
+
     if (!tokenRow) {
-      return new Response(JSON.stringify({ error: "Google Fit not connected" }), {
+      return new Response(JSON.stringify({ error: "Google Fit not connected", traceId: trace.traceId }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -113,15 +139,26 @@ Deno.serve(async (req) => {
     let accessToken = tokenRow.access_token;
     const now = Math.floor(Date.now() / 1000);
     if (tokenRow.expires_at < now + 60) {
+      trace.log("tokens.refresh.started", { expiresAt: tokenRow.expires_at, now });
       accessToken = await refreshAccessToken(supabase, user.id, tokenRow.refresh_token);
+      trace.log("tokens.refresh.completed", {});
+    } else {
+      trace.log("tokens.refresh.skipped", { expiresAt: tokenRow.expires_at, now });
     }
 
     // Fetch sleep sessions
     const endTimeMillis = Date.now();
     const startTimeMillis = endTimeMillis - daysBack * 24 * 60 * 60 * 1000;
 
+    const sessionsUrl = `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startTimeMillis).toISOString()}&endTime=${new Date(endTimeMillis).toISOString()}&activityType=72`;
+    trace.log("google.sessions.request", {
+      url: sessionsUrl,
+      startTime: new Date(startTimeMillis).toISOString(),
+      endTime: new Date(endTimeMillis).toISOString(),
+      activityType: 72,
+    });
     const sessionsRes = await fetch(
-      `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startTimeMillis).toISOString()}&endTime=${new Date(endTimeMillis).toISOString()}&activityType=72`,
+      sessionsUrl,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
@@ -129,8 +166,8 @@ Deno.serve(async (req) => {
 
     if (!sessionsRes.ok) {
       const err = await sessionsRes.text();
-      console.error("Google Fit sessions error:", err);
-      return new Response(JSON.stringify({ error: "Failed to fetch sleep sessions" }), {
+      trace.log("google.sessions.error", { status: sessionsRes.status, statusText: sessionsRes.statusText, body: err });
+      return new Response(JSON.stringify({ error: "Failed to fetch sleep sessions", traceId: trace.traceId, trace: debug ? trace.entries : undefined }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -138,11 +175,30 @@ Deno.serve(async (req) => {
 
     const sessionsData = await sessionsRes.json();
     const sessions = sessionsData.session || [];
-    console.log(`Google Fit: found ${sessions.length} sleep sessions in last ${daysBack} days`);
+    trace.log("google.sessions.response.raw", sessionsData);
+    trace.log("google.sessions.parsed", {
+      sessionsFound: sessions.length,
+      daysBack,
+      sessions: sessions.map((session: any) => ({
+        id: session.id,
+        name: session.name,
+        description: session.description,
+        application: session.application,
+        activityType: session.activityType,
+        startTimeMillis: session.startTimeMillis,
+        endTimeMillis: session.endTimeMillis,
+        startIso: session.startTimeMillis ? new Date(parseInt(session.startTimeMillis)).toISOString() : null,
+        endIso: session.endTimeMillis ? new Date(parseInt(session.endTimeMillis)).toISOString() : null,
+      })),
+      deletedSessionsFound: sessionsData.deletedSession?.length || 0,
+      responseKeys: Object.keys(sessionsData),
+    });
     if (sessions.length === 0) {
-      console.log(`Google Fit API query: startTime=${new Date(startTimeMillis).toISOString()}, endTime=${new Date(endTimeMillis).toISOString()}, activityType=72`);
-      console.log(`Google Fit raw response keys:`, Object.keys(sessionsData));
-      if (sessionsData.deletedSession) console.log(`Google Fit: ${sessionsData.deletedSession.length} deleted sessions found`);
+      trace.log("google.sessions.empty", {
+        query: { startTime: new Date(startTimeMillis).toISOString(), endTime: new Date(endTimeMillis).toISOString(), activityType: 72 },
+        responseKeys: Object.keys(sessionsData),
+        deletedSessionsFound: sessionsData.deletedSession?.length || 0,
+      });
     }
 
     let totalStages = 0;
