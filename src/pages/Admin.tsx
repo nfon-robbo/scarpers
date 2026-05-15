@@ -272,7 +272,7 @@ const AdminPage = () => {
                   </div>
                 ) : <p className="text-sm text-muted-foreground">No active plans yet.</p>}
               </div>
-              <UserDeletionPanel />
+              
             </CardContent>
           </Card>
         </TabsContent>
