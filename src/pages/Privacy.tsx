@@ -144,7 +144,7 @@ const Privacy = () => {
           <br />
           Email: <a className="text-primary underline" href="mailto:hello@scarpers.co.uk">hello@scarpers.co.uk</a>
           <br />
-          Website: <a className="text-primary underline" href="https://scarpers.co.uk">scarpers.co.uk</a>
+          Website: <a className="text-primary underline" href="https://www.scarpers.co.uk/">www.scarpers.co.uk</a>
         </p>
       </section>
     </div>
