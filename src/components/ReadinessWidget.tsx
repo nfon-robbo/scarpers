@@ -604,6 +604,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           hour: hourFloat,
           score: s.score,
           sleepSynced: s.sleepSynced,
+          isBackfilled: s.isBackfilled,
         } as any;
       });
       setTrend(trendArr);
