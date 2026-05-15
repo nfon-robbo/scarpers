@@ -146,6 +146,7 @@ const AdminSEO = () => {
   };
 
   useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
     setSuggestionsKeyword(keyword);
