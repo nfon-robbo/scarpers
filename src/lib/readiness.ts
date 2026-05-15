@@ -169,9 +169,11 @@ function bodyBatteryDrain(d: ReadinessData): {
   }
 
   const netDrain = passiveDrain + activeDrain - passiveCharge;
+  // Cap maximum net drain at 25 points so a hard day cannot single-handedly crush the score
+  const cappedDrain = Math.min(25, netDrain);
 
   return {
-    drain: -netDrain,
+    drain: -cappedDrain,
     hoursAwake: Math.round(hoursAwake * 10) / 10,
     passiveDrain: Math.round(passiveDrain),
     activeDrain: Math.round(activeDrain),
