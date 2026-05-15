@@ -1069,7 +1069,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                             />
                             <YAxis domain={[yMin, yMax]} type="number" hide />
                             <Tooltip
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
                               labelFormatter={(_l: any, payload: any) => {
                                 const d = payload?.[0]?.payload?.day;
                                 return d ? `Time: ${d}` : "";
