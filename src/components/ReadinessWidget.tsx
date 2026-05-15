@@ -958,13 +958,115 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Hourly snapshots taken throughout today.
                     </p>
                   )}
-                  {trendMode === "today" && visibleTrend.length < 1 ? (
-                    <div className="h-[160px] flex items-center justify-center text-center px-4">
-                      <p className="text-[11px] font-semibold lowercase text-muted-foreground/80 leading-snug">
-                        still waiting for data
-                      </p>
-                    </div>
-                  ) : (
+                  {trendMode === "today" ? (() => {
+                    const todayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+                    const zoneFor = (s: number) => {
+                      if (s < 30) return { color: "hsl(0, 75%, 55%)", label: "Low", text: "text-red-400" };
+                      if (s < 55) return { color: "hsl(38, 95%, 55%)", label: "Fair", text: "text-amber-400" };
+                      if (s < 80) return { color: "hsl(142, 70%, 50%)", label: "Good", text: "text-emerald-400" };
+                      return { color: "hsl(210, 95%, 62%)", label: "Peak", text: "text-sky-400" };
+                    };
+                    if (todayPts.length === 0) {
+                      return (
+                        <div className="h-[160px] flex items-center justify-center text-center px-4">
+                          <p className="text-[11px] font-semibold lowercase text-muted-foreground/80 leading-snug">
+                            still waiting for data
+                          </p>
+                        </div>
+                      );
+                    }
+                    const first = todayPts[0];
+                    const last = todayPts[todayPts.length - 1];
+                    const z = zoneFor(last.score);
+                    const delta = last.score - first.score;
+                    const ArrowIcon = delta > 0 ? "▲" : delta < 0 ? "▼" : "■";
+                    const arrowClass = delta > 0 ? "text-emerald-400" : delta < 0 ? "text-red-400" : "text-muted-foreground";
+                    if (todayPts.length < 3) {
+                      return (
+                        <div className="rounded-xl border border-border/40 bg-card/30 px-4 py-5 text-center">
+                          <div className="text-3xl font-bold text-foreground leading-none">{Math.round(last.score)}</div>
+                          <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
+                          <p className="mt-3 text-[11px] text-muted-foreground leading-snug">
+                            Score recorded at {last.day} — check back later as more data builds throughout the day.
+                          </p>
+                        </div>
+                      );
+                    }
+                    // dynamic x domain: 30 min before first, 30 min after last (or now)
+                    const now = new Date();
+                    const nowHour = now.getHours() + now.getMinutes() / 60;
+                    const xMin = Math.max(0, first.hour - 0.5);
+                    const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
+                    return (
+                      <>
+                        <div className="flex items-end justify-between mb-2 px-1">
+                          <div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-4xl font-bold text-foreground leading-none">{Math.round(last.score)}</span>
+                              <span className={cn("text-sm font-semibold", arrowClass)}>
+                                {ArrowIcon} {delta > 0 ? "+" : ""}{Math.round(delta)}
+                              </span>
+                            </div>
+                            <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={160}>
+                          <AreaChart data={todayPts} margin={{ top: 8, right: 40, bottom: 0, left: 4 }}>
+                            <defs>
+                              <linearGradient id="readinessTodayGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={z.color} stopOpacity={0.4} />
+                                <stop offset="100%" stopColor={z.color} stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.25} vertical={false} />
+                            <XAxis
+                              dataKey="hour"
+                              type="number"
+                              domain={[xMin, xMax]}
+                              tick={{ fontSize: 10 }}
+                              className="fill-muted-foreground"
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={(v: any) => {
+                                const h = Math.floor(Number(v));
+                                const m = Math.round((Number(v) - h) * 60);
+                                return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+                              }}
+                            />
+                            <YAxis domain={[0, 100]} type="number" hide />
+                            <Tooltip
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+                              labelFormatter={(_l: any, payload: any) => {
+                                const d = payload?.[0]?.payload?.day;
+                                return d ? `Time: ${d}` : "";
+                              }}
+                              formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
+                            />
+                            <ReferenceLine
+                              y={last.score}
+                              stroke={z.color}
+                              strokeDasharray="3 3"
+                              strokeOpacity={0.7}
+                              label={{ value: String(Math.round(last.score)), position: "right", fill: z.color, fontSize: 11, fontWeight: 700 }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="score"
+                              stroke={z.color}
+                              fill="url(#readinessTodayGrad)"
+                              strokeWidth={2.5}
+                              dot={{ r: 5, fill: z.color, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                              activeDot={{ r: 7 }}
+                              isAnimationActive={false}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                        <p className="mt-2 text-[10px] text-muted-foreground/80">
+                          {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} today · last at {last.day}
+                        </p>
+                      </>
+                    );
+                  })() : (
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={visibleTrend} margin={{ top: 6, right: 8, bottom: 0, left: 4 }}>
                       <defs>
@@ -973,54 +1075,28 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                           <stop offset="100%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      {/* Colour-coded score zones */}
                       <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.28} ifOverflow="hidden" />
                       <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="hidden" />
                       <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="hidden" />
                       <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="hidden" />
                       <XAxis
-                        dataKey={trendMode === "today" ? "hour" : "day"}
-                        type={trendMode === "today" ? "number" : "category"}
-                        domain={trendMode === "today" ? [0, 24] : undefined}
-                        ticks={trendMode === "today" ? [0, 4, 8, 12, 16, 20, 24] : undefined}
-                        allowDataOverflow={trendMode === "today"}
+                        dataKey="day"
                         tick={{ fontSize: 10 }}
                         className="fill-muted-foreground"
                         axisLine={false}
                         tickLine={false}
                         interval={0}
-                        tickFormatter={(v: any) => {
-                          if (trendMode !== "today") return String(v);
-                          return `${String(Math.round(Number(v))).padStart(2, "0")}:00`;
-                        }}
                       />
                       <YAxis domain={[0, 100]} type="number" allowDataOverflow={false} hide />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
-                        labelFormatter={(label: any, payload: any) => {
-                          if (trendMode === "today") {
-                            const d = payload?.[0]?.payload?.day;
-                            return d ? `Time: ${d}` : "";
-                          }
-                          return String(label);
-                        }}
                         formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
                       />
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                   )}
-                  {trendMode === "today" && visibleTrend.length > 0 && (() => {
-                    const last = [...visibleTrend].reverse().find((t: any) => t.score != null) as any;
-                    const count = visibleTrend.filter((t: any) => t.score != null).length;
-                    return (
-                      <p className="mt-2 text-[10px] text-muted-foreground/80">
-                        {count} snapshot{count === 1 ? "" : "s"} today
-                        {last?.day ? ` · last at ${last.day}` : ""}
-                      </p>
-                    );
-                  })()}
                   {showDeclineTip && (
                     <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
                       Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
