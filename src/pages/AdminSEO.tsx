@@ -475,8 +475,8 @@ const AdminSEO = () => {
                     const due = isReviewDue(latest);
                     const expanded = expandedHistoryRow === k.keyword;
                     return (
-                      <>
-                        <TableRow key={k.keyword}>
+                      <React.Fragment key={k.keyword}>
+                        <TableRow>
                           <TableCell className="font-medium align-top">{k.keyword}</TableCell>
                           <TableCell className="align-top">{fmtNum(k.volume)}</TableCell>
                           <TableCell className="align-top">
