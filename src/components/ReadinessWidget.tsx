@@ -958,7 +958,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Hourly snapshots taken throughout today.
                     </p>
                   )}
-                  {trendMode === "today" && visibleTrend.length < 2 ? (
+                  {trendMode === "today" && visibleTrend.length < 1 ? (
                     <div className="h-[160px] flex items-center justify-center text-center px-4">
                       <p className="text-[11px] font-semibold lowercase text-muted-foreground/80 leading-snug">
                         still waiting for data
@@ -966,7 +966,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </div>
                   ) : (
                   <ResponsiveContainer width="100%" height={160}>
-                    <AreaChart data={visibleTrend} margin={{ top: 6, right: 4, bottom: 0, left: 4 }}>
+                    <AreaChart data={visibleTrend} margin={{ top: 6, right: 8, bottom: 0, left: 4 }}>
                       <defs>
                         <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.5} />
@@ -974,34 +974,53 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         </linearGradient>
                       </defs>
                       {/* Colour-coded score zones */}
-                      <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.28} ifOverflow="visible" />
-                      <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="visible" />
-                      <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="visible" />
-                      <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="visible" />
+                      <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.28} ifOverflow="hidden" />
+                      <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="hidden" />
+                      <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="hidden" />
+                      <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="hidden" />
                       <XAxis
                         dataKey={trendMode === "today" ? "hour" : "day"}
                         type={trendMode === "today" ? "number" : "category"}
                         domain={trendMode === "today" ? [0, 24] : undefined}
                         ticks={trendMode === "today" ? [0, 4, 8, 12, 16, 20, 24] : undefined}
+                        allowDataOverflow={trendMode === "today"}
                         tick={{ fontSize: 10 }}
                         className="fill-muted-foreground"
                         axisLine={false}
                         tickLine={false}
-                        interval={trendMode === "today" ? 0 : 0}
+                        interval={0}
                         tickFormatter={(v: any) => {
                           if (trendMode !== "today") return String(v);
-                          return `${String(v).padStart(2, "0")}:00`;
+                          return `${String(Math.round(Number(v))).padStart(2, "0")}:00`;
                         }}
                       />
-                      <YAxis domain={[0, 100]} hide />
+                      <YAxis domain={[0, 100]} type="number" allowDataOverflow={false} hide />
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
+                        labelFormatter={(label: any, payload: any) => {
+                          if (trendMode === "today") {
+                            const d = payload?.[0]?.payload?.day;
+                            return d ? `Time: ${d}` : "";
+                          }
+                          return String(label);
+                        }}
+                        formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
                       />
-                      <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} />
+                      <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                   )}
+                  {trendMode === "today" && visibleTrend.length > 0 && (() => {
+                    const last = [...visibleTrend].reverse().find((t: any) => t.score != null) as any;
+                    const count = visibleTrend.filter((t: any) => t.score != null).length;
+                    return (
+                      <p className="mt-2 text-[10px] text-muted-foreground/80">
+                        {count} snapshot{count === 1 ? "" : "s"} today
+                        {last?.day ? ` · last at ${last.day}` : ""}
+                      </p>
+                    );
+                  })()}
                   {showDeclineTip && (
                     <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
                       Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
