@@ -440,9 +440,9 @@ Deno.serve(async (req) => {
           if (realTodays.length > 0) {
             const firstMs = new Date(realTodays[0].recorded_at).getTime();
             const wakeMs = new Date(data.wakeTimeIso).getTime();
-            const earliest = Math.max(wakeMs, firstMs - 6 * 3600000);
+            // Backfill the full gap from wake-up to the first real snapshot.
             // Round up to next top-of-hour
-            const startMs = Math.ceil(earliest / 3600000) * 3600000;
+            const startMs = Math.ceil(wakeMs / 3600000) * 3600000;
             const existingHours = new Set(
               (todays || []).map((r: any) => Math.floor(new Date(r.recorded_at).getTime() / 3600000)),
             );

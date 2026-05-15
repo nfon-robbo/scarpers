@@ -772,6 +772,49 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           } as any);
         }
       }
+
+      // Backfill hourly snapshots between wake-up and the first real snapshot today.
+      // Use a copy of `data` with no today-load/today-activities so the body battery
+      // and today's effort don't drag past hours down for events that hadn't happened.
+      try {
+        if (data?.wakeTimeIso) {
+          const { data: todays } = await supabase
+            .from("readiness_snapshots")
+            .select("recorded_at, is_backfilled")
+            .eq("user_id", user.id)
+            .eq("kind", "eod")
+            .gte("recorded_at", todayStart.toISOString())
+            .order("recorded_at", { ascending: true });
+          const realTodays = (todays || []).filter((r: any) => !(r as any).is_backfilled);
+          if (realTodays.length > 0) {
+            const firstMs = new Date(realTodays[0].recorded_at).getTime();
+            const wakeMs = new Date(data.wakeTimeIso).getTime();
+            const startMs = Math.ceil(wakeMs / 3600000) * 3600000;
+            const existingHours = new Set(
+              (todays || []).map((r: any) => Math.floor(new Date(r.recorded_at).getTime() / 3600000))
+            );
+            const backfillData = { ...data, todayLoad: null, todayActivities: [] };
+            for (let t = startMs; t < firstMs - 60000 && t <= Date.now(); t += 3600000) {
+              const hourBucket = Math.floor(t / 3600000);
+              if (existingHours.has(hourBucket)) continue;
+              const r = computeReadiness(backfillData as any, "eod");
+              const recIso = new Date(t).toISOString();
+              await supabase.from("readiness_snapshots").insert({
+                user_id: user.id,
+                score: r.score,
+                hour: new Date(t).getHours(),
+                factors: r.factors as any,
+                recorded_at: recIso,
+                kind: "eod",
+                is_backfilled: true,
+              } as any);
+              existingHours.add(hourBucket);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[readiness] backfill failed:", e);
+      }
     })();
     return () => { cancelled = true; };
   }, [result, user, cached, suppressScore]);
