@@ -34,6 +34,7 @@ const BlogPreview = ({
         .from("blog_posts")
         .select("id, title, slug, excerpt, cover_image, published_at")
         .eq("published", true)
+        .lte("published_at", new Date().toISOString())
         .order("published_at", { ascending: false })
         .limit(limit);
       setPosts((data as BlogPost[]) || []);
