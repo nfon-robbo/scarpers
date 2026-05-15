@@ -1017,12 +1017,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         </div>
                       );
                     }
-                    // dynamic x domain: 30 min before first, 30 min after last (or now)
+                    // Wake-up time: prefer sleep_stages end_time, fall back to first sleep-synced
+                    // snapshot of the day, then 06:00.
                     const now = new Date();
                     const nowHour = now.getHours() + now.getMinutes() / 60;
-                    // Start the chart at the first snapshot of the day (typically wake-up time)
-                    const xMin = Math.max(0, first.hour);
-                    const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
+                    const fallbackSynced = todayPts.find((p: any) => p.sleepSynced)?.hour;
+                    const effectiveWake = wakeHour ?? fallbackSynced ?? 6;
+                    const wakeLabel = `${String(Math.floor(effectiveWake)).padStart(2, "0")}:${String(Math.round((effectiveWake - Math.floor(effectiveWake)) * 60)).padStart(2, "0")}`;
+                    const xMin = Math.max(0, Math.min(effectiveWake, first.hour));
+                    const xMax = Math.min(23, Math.max(last.hour, nowHour));
                     const scores = todayPts.map((p: any) => p.score);
                     const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
                     const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
