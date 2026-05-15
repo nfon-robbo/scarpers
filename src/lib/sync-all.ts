@@ -83,11 +83,20 @@ export async function runAllSyncs(): Promise<void> {
     ]);
 
     const tasks: Promise<void>[] = [];
-    if (stravaTok.data) tasks.push(syncStrava(accessToken, apikey, baseUrl, userId));
+    if (stravaTok.data) tasks.push(syncStrava(accessToken, apikey, baseUrl));
     if (gfitTok.data) tasks.push(syncGoogleFit(accessToken, apikey, baseUrl));
     if (intervalsCreds.data) tasks.push(syncIntervals(accessToken, apikey, baseUrl));
 
     await Promise.allSettled(tasks);
+
+    // Always link any unlinked activities to the active plan so the workout
+    // of the day appears as completed everywhere (Plan, Dashboard, etc.).
+    try {
+      const result = await autoLinkActivitiesToPlan(userId);
+      if (result.matches.length > 0) {
+        window.dispatchEvent(new CustomEvent("plan-link-changed"));
+      }
+    } catch { /* silent */ }
   })();
 
   try {
