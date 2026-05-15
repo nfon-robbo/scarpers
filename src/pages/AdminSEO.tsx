@@ -135,10 +135,10 @@ const AdminSEO = () => {
   };
 
 
-  const loadGsc = async () => {
+  const loadGsc = async (days: 7 | 28 | 90 = gscDays) => {
     setGscLoading(true); setGscError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("search-console");
+      const { data, error } = await supabase.functions.invoke("search-console", { body: { days } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       setGsc(data as GscResponse);
@@ -149,7 +149,7 @@ const AdminSEO = () => {
     }
   };
 
-  useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) loadGsc(gscDays); /* eslint-disable-line */ }, [isAdmin, gscDays]);
   useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
