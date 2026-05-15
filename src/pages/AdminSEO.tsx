@@ -71,6 +71,60 @@ const AdminSEO = () => {
   type GscSortKey = "query" | "clicks" | "impressions" | "ctr" | "position";
   const [gscSort, setGscSort] = useState<{ key: GscSortKey; dir: "asc" | "desc" }>({ key: "impressions", dir: "desc" });
 
+  // GA4
+  type Ga4Data = {
+    range: { days: number };
+    totals: { activeUsers: number; newUsers: number; sessions: number; pageViews: number; avgSessionDuration: number; engagementRate: number };
+    pages: { path: string; pageViews: number; users: number; engagementRate: number }[];
+    sources: { source: string; medium: string; sessions: number; users: number }[];
+    countries: { country: string; users: number }[];
+    fetchedAt: string;
+  };
+  const [ga4Connected, setGa4Connected] = useState<boolean | null>(null);
+  const [ga4Data, setGa4Data] = useState<Ga4Data | null>(null);
+  const [ga4Loading, setGa4Loading] = useState(false);
+  const [ga4Error, setGa4Error] = useState<string | null>(null);
+  const [ga4Days, setGa4Days] = useState<7 | 28 | 90>(28);
+
+  const checkGa4 = async () => {
+    const { data } = await supabase.functions.invoke("ga4-data", { body: { action: "status" } });
+    setGa4Connected(!!(data as any)?.connected);
+  };
+  const loadGa4 = async (days: 7 | 28 | 90 = ga4Days) => {
+    setGa4Loading(true); setGa4Error(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ga4-data", { body: { action: "report", days } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setGa4Data(data as Ga4Data);
+    } catch (e: any) {
+      setGa4Error(e?.message ?? "Failed to load GA4 data");
+    } finally { setGa4Loading(false); }
+  };
+  const connectGa4 = async () => {
+    const { data, error } = await supabase.functions.invoke("ga4-oauth-start", { body: {} });
+    if (error || !(data as any)?.url) { toast.error("Failed to start GA4 connection"); return; }
+    const popup = window.open((data as any).url, "ga4-oauth", "width=520,height=640");
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.data === "ga4-connected") {
+        window.removeEventListener("message", onMsg);
+        toast.success("Google Analytics connected");
+        setGa4Connected(true);
+        loadGa4(ga4Days);
+      }
+    };
+    window.addEventListener("message", onMsg);
+    // Fallback: if popup closes, re-check status
+    const timer = setInterval(() => {
+      if (popup?.closed) { clearInterval(timer); checkGa4().then(() => ga4Connected && loadGa4(ga4Days)); }
+    }, 1000);
+  };
+  const disconnectGa4 = async () => {
+    await supabase.functions.invoke("ga4-data", { body: { action: "disconnect" } });
+    setGa4Connected(false); setGa4Data(null);
+    toast.success("Disconnected");
+  };
+
   // Suggestions dialog
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
