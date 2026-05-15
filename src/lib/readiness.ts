@@ -267,8 +267,8 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 25 * 0.23; // missing HRV = moderate penalty
-    factors.push({ label: "HRV", status: "poor", detail: "No data" });
+    weightedSum += 40 * 0.23; // missing HRV = mild penalty (data-timing, not recovery)
+    factors.push({ label: "HRV", status: "warning", detail: "Not synced" });
   }
 
   // Yesterday's Load — intensity-weighted (16%)
