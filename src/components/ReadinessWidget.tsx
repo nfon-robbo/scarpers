@@ -979,18 +979,18 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="visible" />
                       <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="visible" />
                       <XAxis
-                        dataKey="day"
+                        dataKey={trendMode === "today" ? "hour" : "day"}
+                        type={trendMode === "today" ? "number" : "category"}
+                        domain={trendMode === "today" ? [0, 24] : undefined}
+                        ticks={trendMode === "today" ? [0, 4, 8, 12, 16, 20, 24] : undefined}
                         tick={{ fontSize: 10 }}
                         className="fill-muted-foreground"
                         axisLine={false}
                         tickLine={false}
-                        interval={0}
-                        tickFormatter={(v: string) => {
-                          if (trendMode !== "today") return v;
-                          const m = /^(\d{1,2}):/.exec(v);
-                          if (!m) return "";
-                          const h = parseInt(m[1], 10);
-                          return h % 4 === 0 ? `${String(h).padStart(2, "0")}:00` : "";
+                        interval={trendMode === "today" ? 0 : 0}
+                        tickFormatter={(v: any) => {
+                          if (trendMode !== "today") return String(v);
+                          return `${String(v).padStart(2, "0")}:00`;
                         }}
                       />
                       <YAxis domain={[0, 100]} hide />
