@@ -200,6 +200,7 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <div className="w-px bg-border mx-1" />
         <MenuButton active={editor.isActive("link")} onClick={addLink} title="Add link"><LinkIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={addImage} title="Add image"><ImageIcon className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={insertTableOfContents} title="Insert table of contents"><ListTree className="h-4 w-4" /></MenuButton>
         <div className="w-px bg-border mx-1" />
         <MenuButton active={false} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table"><TableIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().addRowBefore().run()} title="Add row above"><ArrowUpFromLine className="h-4 w-4" /></MenuButton>
