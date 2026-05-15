@@ -333,8 +333,8 @@ Deno.serve(async (req) => {
       // from the session itself so we at least capture total sleep time
       if (sessionStages === 0) {
         const durationSeconds = Math.round((sessionEnd - sessionStart) / 1000);
-        console.log(`No stage data for session ${session.id}, creating fallback entry (${durationSeconds}s)`);
-        await supabase.from("sleep_stages").insert({
+        trace.log("session.fallback_sleep_entry.started", { sessionId: session.id, durationSeconds, skippedPoints });
+        const fallbackPayload = {
           user_id: user.id,
           date: sleepDate,
           stage: "sleep",
@@ -342,10 +342,17 @@ Deno.serve(async (req) => {
           start_time: new Date(sessionStart).toISOString(),
           end_time: new Date(sessionEnd).toISOString(),
           source: "google_fit",
+        };
+        const { error: fallbackInsertError } = await supabase.from("sleep_stages").insert(fallbackPayload);
+        trace.log("database.sleep_stages.insert.session_fallback", {
+          sessionId: session.id,
+          payload: fallbackPayload,
+          error: fallbackInsertError?.message || null,
         });
         totalStages++;
         addStage(sleepDate, "sleep", durationSeconds);
       }
+      trace.log("session.processing.completed", { sessionId: session.id, date: sleepDate, insertedStages: sessionStages, skippedPoints });
     }
 
     // ---------- Fallback: query sleep.segment data directly ----------
@@ -363,7 +370,8 @@ Deno.serve(async (req) => {
       if (segRes.ok) {
         const segData = await segRes.json();
         const points: any[] = segData.point || [];
-        console.log(`Google Fit: raw sleep.segment points fetched: ${points.length}`);
+        trace.log("google.raw_segments.response.raw", segData);
+        trace.log("google.raw_segments.parsed", { pointsFetched: points.length });
 
         const pointsByDate = new Map<string, any[]>();
         for (const p of points) {
@@ -374,27 +382,38 @@ Deno.serve(async (req) => {
         }
 
         const newDates = Array.from(pointsByDate.keys()).filter((d) => !nightDates.has(d));
-        console.log(`Google Fit fallback: ${newDates.length} new night(s) from raw segments: ${newDates.join(", ")}`);
+        trace.log("google.raw_segments.dates", {
+          allDates: Array.from(pointsByDate.keys()),
+          sessionDatesAlreadyCovered: Array.from(nightDates),
+          newDates,
+        });
 
         if (newDates.length > 0) {
-          await supabase
+          const { error: fallbackDeleteError } = await supabase
             .from("sleep_stages")
             .delete()
             .eq("user_id", user.id)
             .eq("source", "google_fit")
             .in("date", newDates);
+          trace.log("database.sleep_stages.delete.raw_segments.completed", { dates: newDates, error: fallbackDeleteError?.message || null });
 
           for (const date of newDates) {
             for (const p of pointsByDate.get(date)!) {
               const startNanos = parseInt(p.startTimeNanos);
               const endNanos = parseInt(p.endTimeNanos);
               const stageType = p.value?.[0]?.intVal;
-              if (stageType == null) continue;
+              if (stageType == null) {
+                trace.log("raw_segment.point.skipped", { date, reason: "missing_stage_type", point: p });
+                continue;
+              }
               const stageName = SLEEP_STAGE_MAP[stageType];
-              if (!stageName || stageName === "out_of_bed") continue;
+              if (!stageName || stageName === "out_of_bed") {
+                trace.log("raw_segment.point.skipped", { date, reason: "unsupported_or_out_of_bed", stageType, stageName, point: p });
+                continue;
+              }
 
               const durationSeconds = Math.round((endNanos - startNanos) / 1e9);
-              await supabase.from("sleep_stages").insert({
+              const rawInsertPayload = {
                 user_id: user.id,
                 date,
                 stage: stageName,
@@ -402,18 +421,22 @@ Deno.serve(async (req) => {
                 start_time: new Date(startNanos / 1e6).toISOString(),
                 end_time: new Date(endNanos / 1e6).toISOString(),
                 source: "google_fit",
-              });
+              };
+              const { error: rawInsertError } = await supabase.from("sleep_stages").insert(rawInsertPayload);
+              trace.log("database.sleep_stages.insert.raw_segment", { date, payload: rawInsertPayload, error: rawInsertError?.message || null });
               totalStages++;
               addStage(date, stageName, durationSeconds);
             }
           }
+        } else {
+          trace.log("google.raw_segments.no_new_dates", { reason: "all raw segment dates already covered by sessions or no points returned" });
         }
       } else {
         const errTxt = await segRes.text();
-        console.log(`Google Fit sleep.segment fallback failed: ${segRes.status} ${errTxt}`);
+        trace.log("google.raw_segments.error", { status: segRes.status, statusText: segRes.statusText, body: errTxt });
       }
     } catch (e) {
-      console.log(`Google Fit sleep.segment fallback exception: ${e instanceof Error ? e.message : String(e)}`);
+      trace.log("google.raw_segments.exception", { error: e instanceof Error ? e.message : String(e) });
     }
 
     // Upsert daily_metrics totals (deep/rem/light/awake minutes + total duration)
