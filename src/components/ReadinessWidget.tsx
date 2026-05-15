@@ -882,7 +882,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       Waiting for data
                     </p>
                   )}
-              {hasTrend && (() => {
+              {(hasTrend || trendMode === "today") && (() => {
                 // Use only valid (non-null) trend points for direction analysis
                 const validPts = visibleTrend.filter((t) => t.score != null) as { day: string; score: number }[];
                 const last3 = validPts.slice(-3).map((t) => t.score);
@@ -958,8 +958,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   )}
                   {trendMode === "today" && visibleTrend.length < 2 ? (
                     <div className="h-[160px] flex items-center justify-center text-center px-4">
-                      <p className="text-[11px] text-muted-foreground/80 leading-snug">
-                        Not enough hourly snapshots yet today. Your readiness is captured each hour — check back later to see today's trend.
+                      <p className="text-[11px] font-semibold lowercase text-muted-foreground/80 leading-snug">
+                        still waiting for data
                       </p>
                     </div>
                   ) : (
