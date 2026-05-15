@@ -263,6 +263,74 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---------- Fallback: query sleep.segment data directly ----------
+    // The Sessions API (activityType=72) only returns sleep that was explicitly
+    // logged as a "session". Many watches & Health Connect push raw sleep
+    // segments without a session wrapper, so they're invisible above. Pull the
+    // raw segments for the whole window and ingest any nights we haven't
+    // already covered via sessions.
+    try {
+      const segRes = await fetch(
+        `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.sleep.segment:com.google.android.gms:merged/datasets/${startTimeMillis * 1_000_000}-${endTimeMillis * 1_000_000}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (segRes.ok) {
+        const segData = await segRes.json();
+        const points: any[] = segData.point || [];
+        console.log(`Google Fit: raw sleep.segment points fetched: ${points.length}`);
+
+        const pointsByDate = new Map<string, any[]>();
+        for (const p of points) {
+          const endNanos = parseInt(p.endTimeNanos);
+          const date = new Date(endNanos / 1e6).toISOString().split("T")[0];
+          if (!pointsByDate.has(date)) pointsByDate.set(date, []);
+          pointsByDate.get(date)!.push(p);
+        }
+
+        const newDates = Array.from(pointsByDate.keys()).filter((d) => !nightDates.has(d));
+        console.log(`Google Fit fallback: ${newDates.length} new night(s) from raw segments: ${newDates.join(", ")}`);
+
+        if (newDates.length > 0) {
+          await supabase
+            .from("sleep_stages")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("source", "google_fit")
+            .in("date", newDates);
+
+          for (const date of newDates) {
+            for (const p of pointsByDate.get(date)!) {
+              const startNanos = parseInt(p.startTimeNanos);
+              const endNanos = parseInt(p.endTimeNanos);
+              const stageType = p.value?.[0]?.intVal;
+              if (stageType == null) continue;
+              const stageName = SLEEP_STAGE_MAP[stageType];
+              if (!stageName || stageName === "out_of_bed") continue;
+
+              const durationSeconds = Math.round((endNanos - startNanos) / 1e9);
+              await supabase.from("sleep_stages").insert({
+                user_id: user.id,
+                date,
+                stage: stageName,
+                duration_seconds: durationSeconds,
+                start_time: new Date(startNanos / 1e6).toISOString(),
+                end_time: new Date(endNanos / 1e6).toISOString(),
+                source: "google_fit",
+              });
+              totalStages++;
+              addStage(date, stageName, durationSeconds);
+            }
+          }
+        }
+      } else {
+        const errTxt = await segRes.text();
+        console.log(`Google Fit sleep.segment fallback failed: ${segRes.status} ${errTxt}`);
+      }
+    } catch (e) {
+      console.log(`Google Fit sleep.segment fallback exception: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     // Upsert daily_metrics totals (deep/rem/light/awake minutes + total duration)
     for (const [date, t] of Object.entries(dailyTotals)) {
       const totalSecs = t.deep + t.rem + t.light + t.sleep;
