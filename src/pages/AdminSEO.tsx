@@ -469,29 +469,86 @@ const AdminSEO = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {s.targetKeywords.map((k) => (
-                    <TableRow key={k.keyword}>
-                      <TableCell className="font-medium">{k.keyword}</TableCell>
-                      <TableCell>{fmtNum(k.volume)}</TableCell>
-                      <TableCell>
-                        <Badge variant={diffColor(k.difficulty) as any}>
-                          {k.difficulty == null ? "—" : `${k.difficulty}/100`} · {k.difficultyLabel}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="capitalize text-sm text-muted-foreground">{k.competitionLabel}</TableCell>
-                      <TableCell>{fmtGBP(k.cpcUsd)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
-                        >
-                          <Sparkles className="h-3 w-3 mr-1" /> Improve
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {s.targetKeywords.map((k) => {
+                    const latest = latestActionByKeyword(k.keyword);
+                    const history = historyForKeyword(k.keyword);
+                    const due = isReviewDue(latest);
+                    const expanded = expandedHistoryRow === k.keyword;
+                    return (
+                      <>
+                        <TableRow key={k.keyword}>
+                          <TableCell className="font-medium align-top">{k.keyword}</TableCell>
+                          <TableCell className="align-top">{fmtNum(k.volume)}</TableCell>
+                          <TableCell className="align-top">
+                            <Badge variant={diffColor(k.difficulty) as any}>
+                              {k.difficulty == null ? "—" : `${k.difficulty}/100`} · {k.difficultyLabel}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="capitalize text-sm text-muted-foreground align-top">{k.competitionLabel}</TableCell>
+                          <TableCell className="align-top">{fmtGBP(k.cpcUsd)}</TableCell>
+                          <TableCell className="text-right align-top">
+                            {!latest ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => openActionDialog(k.keyword)}
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" /> Improve
+                              </Button>
+                            ) : (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => openActionDialog(k.keyword)}
+                                  className="inline-flex items-center"
+                                  title="View history & log new action"
+                                >
+                                  {due ? (
+                                    <Badge className="bg-amber-500/20 text-amber-700 border-amber-500/40 hover:bg-amber-500/30 cursor-pointer">
+                                      <Clock className="h-3 w-3 mr-1" /> Review due
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-emerald-500/20 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/30 cursor-pointer">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" /> Actioned
+                                    </Badge>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => setExpandedHistoryRow(expanded ? null : k.keyword)}
+                                  className="text-[11px] text-muted-foreground hover:text-foreground max-w-[220px] truncate text-right"
+                                  title={latest.action_taken}
+                                >
+                                  {fmtUkDate(latest.actioned_at)} · {latest.action_taken}
+                                </button>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Review due {fmtUkDate(latest.next_review_at)}
+                                </span>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {expanded && history.length > 0 && (
+                          <TableRow key={`${k.keyword}-hist`}>
+                            <TableCell colSpan={6} className="bg-muted/30">
+                              <div className="text-xs space-y-1.5">
+                                <p className="font-medium flex items-center gap-1"><History className="h-3 w-3" /> Action history</p>
+                                {history.map((h) => (
+                                  <div key={h.id} className="flex gap-2 pl-4 border-l-2 border-primary/20">
+                                    <span className="text-muted-foreground shrink-0">{fmtUkDate(h.actioned_at)}</span>
+                                    <span className="flex-1">
+                                      <span className="font-medium">{h.action_taken}</span>
+                                      {h.notes && <span className="text-muted-foreground"> — {h.notes}</span>}
+                                      {h.actioned_by_email && <span className="text-muted-foreground"> · {h.actioned_by_email}</span>}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
