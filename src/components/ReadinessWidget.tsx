@@ -1002,6 +1002,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     const nowHour = now.getHours() + now.getMinutes() / 60;
                     const xMin = Math.max(0, first.hour - 0.5);
                     const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
+                    const scores = todayPts.map((p: any) => p.score);
+                    const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
+                    const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
                     return (
                       <>
                         <div className="flex items-end justify-between mb-2 px-1">
