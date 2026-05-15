@@ -1000,7 +1000,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     // dynamic x domain: 30 min before first, 30 min after last (or now)
                     const now = new Date();
                     const nowHour = now.getHours() + now.getMinutes() / 60;
-                    const xMin = Math.max(0, first.hour - 0.5);
+                    // Start the chart at the first snapshot of the day (typically wake-up time)
+                    const xMin = Math.max(0, first.hour);
                     const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
                     const scores = todayPts.map((p: any) => p.score);
                     const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
