@@ -272,7 +272,7 @@ const AdminPage = () => {
                   </div>
                 ) : <p className="text-sm text-muted-foreground">No active plans yet.</p>}
               </div>
-              <UserDeletionPanel />
+              
             </CardContent>
           </Card>
         </TabsContent>
@@ -616,81 +616,4 @@ const AdminPage = () => {
     </div>
   );
 };
-
-// TEMPORARY — user deletion panel. Remove this component (and the
-// admin-users edge function) once cleanup is complete.
-function UserDeletionPanel() {
-  const { toast } = useToast();
-  const [users, setUsers] = useState<{ id: string; email: string; created_at: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [filter, setFilter] = useState("");
-
-  const load = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.functions.invoke("admin-users", { method: "GET" });
-    setLoading(false);
-    if (error || (data as any)?.error) {
-      toast({ title: "Failed to load users", description: error?.message || (data as any)?.error, variant: "destructive" });
-      return;
-    }
-    setUsers((data as any).users || []);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const handleDelete = async (id: string, email: string) => {
-    if (!confirm(`Permanently delete ${email}? This wipes all their data and cannot be undone.`)) return;
-    setDeletingId(id);
-    const { data, error } = await supabase.functions.invoke("admin-users", { body: { userId: id } });
-    setDeletingId(null);
-    if (error || (data as any)?.error) {
-      toast({ title: "Delete failed", description: error?.message || (data as any)?.error, variant: "destructive" });
-      return;
-    }
-    toast({ title: "User deleted", description: email });
-    setUsers((u) => u.filter((x) => x.id !== id));
-  };
-
-  const filtered = users.filter((u) => u.email.toLowerCase().includes(filter.toLowerCase()));
-
-  return (
-    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h3 className="text-sm font-semibold">Registered users (temporary)</h3>
-          <p className="text-xs text-muted-foreground">Permanently delete users by email. This panel is temporary.</p>
-        </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Refresh"}
-        </Button>
-      </div>
-      <Input placeholder="Filter by email…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      <div className="max-h-96 overflow-y-auto rounded-lg border border-border/50 divide-y divide-border/50">
-        {loading && users.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">No users.</div>
-        ) : filtered.map((u) => (
-          <div key={u.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{u.email || <span className="text-muted-foreground italic">(no email)</span>}</p>
-              <p className="text-xs text-muted-foreground">Joined {new Date(u.created_at).toLocaleDateString("en-GB")}</p>
-            </div>
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={deletingId === u.id}
-              onClick={() => handleDelete(u.id, u.email)}
-            >
-              {deletingId === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Delete"}
-            </Button>
-          </div>
-        ))}
-      </div>
-      <p className="text-[10px] text-muted-foreground">{filtered.length} of {users.length} shown</p>
-    </div>
-  );
-}
-
 export default AdminPage;
