@@ -959,7 +959,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </p>
                   )}
                   {trendMode === "today" ? (() => {
-                    const todayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+                    const allTodayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+                    // Dedupe: if two snapshots are within 5 min (~0.0833h), keep the more recent one.
+                    const todayPts = allTodayPts.filter((p: any, i: number) => {
+                      const next = allTodayPts[i + 1];
+                      return !next || (next.hour - p.hour) > (5 / 60);
+                    });
                     const zoneFor = (s: number) => {
                       if (s < 30) return { color: "hsl(0, 75%, 55%)", label: "Low", text: "text-red-400" };
                       if (s < 55) return { color: "hsl(38, 95%, 55%)", label: "Fair", text: "text-amber-400" };
@@ -997,6 +1002,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     const nowHour = now.getHours() + now.getMinutes() / 60;
                     const xMin = Math.max(0, first.hour - 0.5);
                     const xMax = Math.min(24, Math.max(last.hour, nowHour) + 0.5);
+                    const scores = todayPts.map((p: any) => p.score);
+                    const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
+                    const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
                     return (
                       <>
                         <div className="flex items-end justify-between mb-2 px-1">
@@ -1033,7 +1041,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                                 return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
                               }}
                             />
-                            <YAxis domain={[0, 100]} type="number" hide />
+                            <YAxis domain={[yMin, yMax]} type="number" hide />
                             <Tooltip
                               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                               labelFormatter={(_l: any, payload: any) => {
