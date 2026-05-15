@@ -116,6 +116,16 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <div className="w-px bg-border mx-1" />
         <MenuButton active={editor.isActive("link")} onClick={addLink} title="Add link"><LinkIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={addImage} title="Add image"><ImageIcon className="h-4 w-4" /></MenuButton>
+        <div className="w-px bg-border mx-1" />
+        <MenuButton active={false} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table"><TableIcon className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().addRowBefore().run()} title="Add row above"><ArrowUpFromLine className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().addRowAfter().run()} title="Add row below"><ArrowDownFromLine className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().addColumnBefore().run()} title="Add column left"><ArrowLeftFromLine className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add column right"><ArrowRightFromLine className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().deleteRow().run()} title="Delete row"><Rows3 className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().deleteColumn().run()} title="Delete column"><Columns3 className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().toggleHeaderRow().run()} title="Toggle header row"><Heading1 className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().deleteTable().run()} title="Delete table"><Trash2 className="h-4 w-4" /></MenuButton>
         <div className="flex-1" />
         <MenuButton active={false} onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo2 className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo2 className="h-4 w-4" /></MenuButton>
