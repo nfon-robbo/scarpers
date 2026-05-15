@@ -959,7 +959,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </p>
                   )}
                   {trendMode === "today" ? (() => {
-                    const todayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+                    const allTodayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+                    // Dedupe: if two snapshots are within 5 min (~0.0833h), keep the more recent one.
+                    const todayPts = allTodayPts.filter((p: any, i: number) => {
+                      const next = allTodayPts[i + 1];
+                      return !next || (next.hour - p.hour) > (5 / 60);
+                    });
                     const zoneFor = (s: number) => {
                       if (s < 30) return { color: "hsl(0, 75%, 55%)", label: "Low", text: "text-red-400" };
                       if (s < 55) return { color: "hsl(38, 95%, 55%)", label: "Fair", text: "text-amber-400" };
