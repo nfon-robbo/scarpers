@@ -265,10 +265,7 @@ const Dashboard = () => {
         .select("id, activity_type, start_time, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, avg_speed, avg_power, calories, training_effect, source_file")
         .eq("user_id", user.id).gte("start_time", since.toISOString()).order("start_time", { ascending: true })
         .then(({ data }) => setActivities((data as ActivityRow[]) || []));
-      supabase.from("daily_metrics")
-        .select("date, sleep_score, sleep_duration_seconds, steps, resting_heart_rate, hrv")
-        .eq("user_id", user.id).gte("date", since.toISOString().split("T")[0]).order("date", { ascending: true })
-        .then(({ data }) => setMetrics((data as MetricsRow[]) || []));
+      reloadMetricsWithStages(user.id, since);
     }
 
     setSyncing(false);
