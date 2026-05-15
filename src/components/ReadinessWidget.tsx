@@ -565,10 +565,15 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     const today = new Date();
 
     if (trendMode === "today") {
-      // Hourly view for the current calendar day — every snapshot, in order
-      const todayKey = today.toISOString().split("T")[0];
+      // Hourly view for the current calendar day — every snapshot, in order.
+      // Match snapshots by LOCAL calendar date so timezone offsets don't hide today's data.
+      const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       const todays = trendSnapshots
-        .filter((s) => s.recorded_at.split("T")[0] === todayKey)
+        .filter((s) => {
+          const d = new Date(s.recorded_at);
+          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          return local === localToday;
+        })
         .slice()
         .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
       const trendArr = todays.map((s) => {
