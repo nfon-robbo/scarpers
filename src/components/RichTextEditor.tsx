@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
@@ -73,6 +74,51 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
     ],
     content,
     onUpdate: handleUpdate,
+    editorProps: {
+      handlePaste: (view, event) => {
+        const cd = event.clipboardData;
+        if (!cd) return false;
+        const html = cd.getData("text/html");
+        // Let the default paste handler deal with HTML (TipTap parses <table> natively)
+        if (html && /<table[\s>]/i.test(html)) return false;
+
+        const text = cd.getData("text/plain");
+        if (!text || !text.includes("\t")) return false;
+
+        // Parse TSV: rows separated by newlines, cells by tabs.
+        const lines = text.replace(/\r\n?/g, "\n").split("\n").filter((l) => l.length > 0);
+        if (lines.length < 1) return false;
+        const rows = lines.map((l) => l.split("\t"));
+        const cols = Math.max(...rows.map((r) => r.length));
+        if (cols < 2) return false; // needs at least 2 columns to be a table
+
+        // Pad rows to equal column count
+        const normalized = rows.map((r) => {
+          const out = r.slice();
+          while (out.length < cols) out.push("");
+          return out;
+        });
+
+        const escape = (s: string) =>
+          s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        const [header, ...body] = normalized;
+        let tableHtml = "<table><tbody>";
+        tableHtml += "<tr>" + header.map((c) => `<th><p>${escape(c)}</p></th>`).join("") + "</tr>";
+        for (const row of body) {
+          tableHtml += "<tr>" + row.map((c) => `<td><p>${escape(c)}</p></td>`).join("") + "</tr>";
+        }
+        tableHtml += "</tbody></table>";
+
+        event.preventDefault();
+        const { state, dispatch } = view;
+        const tmp = document.createElement("div");
+        tmp.innerHTML = tableHtml;
+        const slice = PMDOMParser.fromSchema(state.schema).parseSlice(tmp);
+        dispatch(state.tr.replaceSelection(slice).scrollIntoView());
+        return true;
+      },
+    },
   });
 
   if (!editor) return null;
