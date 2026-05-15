@@ -154,10 +154,28 @@ Deno.serve(async (req) => {
       if (stage in t) t[stage] += secs;
     };
 
+    // Pre-compute the set of "sleep night" dates and wipe existing google_fit rows
+    // for those dates ONCE up front. Doing the delete per-session (as before) caused
+    // duplicate rows whenever two sessions mapped to the same date — the second
+    // session's delete would wipe the first session's freshly-inserted rows... or
+    // (in practice) leave stale rows from earlier syncs untouched, producing dupes.
+    const nightDates = new Set<string>();
+    for (const session of sessions) {
+      nightDates.add(new Date(parseInt(session.endTimeMillis)).toISOString().split("T")[0]);
+    }
+    if (nightDates.size > 0) {
+      await supabase
+        .from("sleep_stages")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("source", "google_fit")
+        .in("date", Array.from(nightDates));
+    }
+
     for (const session of sessions) {
       const sessionStart = parseInt(session.startTimeMillis);
       const sessionEnd = parseInt(session.endTimeMillis);
-      
+
       // Determine the date (use the end time's date as the "sleep night" date)
       const sleepDate = new Date(sessionEnd).toISOString().split("T")[0];
       console.log(`Processing session: ${session.id}, date: ${sleepDate}, start: ${new Date(sessionStart).toISOString()}, end: ${new Date(sessionEnd).toISOString()}`);
@@ -188,13 +206,7 @@ Deno.serve(async (req) => {
 
       const datasetData = await datasetRes.json();
 
-      // Delete old data for this date before inserting
-      await supabase
-        .from("sleep_stages")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("date", sleepDate)
-        .eq("source", "google_fit");
+      // (rows for this date were already deleted up-front, before the loop)
 
       const buckets = datasetData.bucket || [];
       let sessionStages = 0;
