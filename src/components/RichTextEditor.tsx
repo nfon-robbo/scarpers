@@ -5,6 +5,10 @@ import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Highlight from "@tiptap/extension-highlight";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
 import { Button } from "@/components/ui/button";
 import React, { useCallback } from "react";
 import {
@@ -13,6 +17,8 @@ import {
   List, ListOrdered, Heading1, Heading2, Heading3,
   Link as LinkIcon, ImageIcon, Highlighter, Undo2, Redo2,
   Quote, Minus, Code,
+  Table as TableIcon, Rows3, Columns3, Trash2,
+  ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine,
 } from "lucide-react";
 
 interface RichTextEditorProps {
