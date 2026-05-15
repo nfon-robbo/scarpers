@@ -177,9 +177,65 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
     editor.chain().focus().insertContent(html).run();
   };
 
+  // Collect TOC headings (H1/H2/H3) from the current doc.
+  const collectHeadings = (): string[] => {
+    const headings: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "heading") {
+        const text = node.textContent.trim();
+        if (text) headings.push(text);
+      }
+    });
+    return headings;
+  };
+
+  const [generatingTocImages, setGeneratingTocImages] = useState(false);
+
+  // Generate two AI images based on TOC headings — one running-themed, one
+  // concept-themed (good vs bad / comparison) — and insert them into the doc.
+  const generateTocImages = async () => {
+    const headings = collectHeadings();
+    if (headings.length === 0) {
+      toast.error("Add some headings first so we know what to illustrate.");
+      return;
+    }
+    setGeneratingTocImages(true);
+    try {
+      const topic = headings.slice(0, 6).join(" • ");
+      const prompts = [
+        `A photorealistic editorial photograph of runners in motion that visually represents these blog topics: ${topic}. Cinematic lighting, magazine quality.`,
+        `A clean editorial illustration comparing the upsides and downsides of the subject in these blog headings: ${topic}. Two-panel split-style composition, modern, minimal.`,
+      ];
+      const results = await Promise.all(
+        prompts.map((customPrompt) =>
+          supabase.functions.invoke("generate-blog-cover", { body: { customPrompt } })
+        )
+      );
+      let inserted = 0;
+      for (const r of results) {
+        if (r.error || r.data?.error) {
+          console.error("TOC image error", r.error || r.data?.error);
+          continue;
+        }
+        const url = r.data?.url;
+        if (url) {
+          editor.chain().focus().setImage({ src: url }).run();
+          editor.chain().focus().insertContent("<p></p>").run();
+          inserted++;
+        }
+      }
+      if (inserted === 0) toast.error("Could not generate images. Try again.");
+      else toast.success(`Inserted ${inserted} AI image${inserted > 1 ? "s" : ""}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to generate images");
+    } finally {
+      setGeneratingTocImages(false);
+    }
+  };
+
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card">
-      <div className="flex flex-wrap gap-0.5 p-2 border-b border-border bg-muted/30">
+    <div className="border border-border rounded-xl bg-card">
+      <div className="sticky top-0 z-30 flex flex-wrap gap-0.5 p-2 border-b border-border bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/70 rounded-t-xl">
         <MenuButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold className="h-4 w-4" /></MenuButton>
         <MenuButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic className="h-4 w-4" /></MenuButton>
         <MenuButton active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><UnderlineIcon className="h-4 w-4" /></MenuButton>
@@ -196,6 +252,8 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <div className="w-px bg-border mx-1" />
         <MenuButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List className="h-4 w-4" /></MenuButton>
         <MenuButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().sinkListItem("listItem").run()} title="Indent (in list)"><IndentIncrease className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={() => editor.chain().focus().liftListItem("listItem").run()} title="Outdent (in list)"><IndentDecrease className="h-4 w-4" /></MenuButton>
         <MenuButton active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote"><Quote className="h-4 w-4" /></MenuButton>
         <MenuButton active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block"><Code className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal rule"><Minus className="h-4 w-4" /></MenuButton>
@@ -203,6 +261,18 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <MenuButton active={editor.isActive("link")} onClick={addLink} title="Add link"><LinkIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={addImage} title="Add image"><ImageIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={insertTableOfContents} title="Insert table of contents"><ListTree className="h-4 w-4" /></MenuButton>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 px-2"
+          onClick={(e) => { e.preventDefault(); generateTocImages(); }}
+          disabled={generatingTocImages}
+          title="Generate 2 AI images from your headings"
+        >
+          {generatingTocImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          <span className="text-xs">AI images</span>
+        </Button>
         <div className="w-px bg-border mx-1" />
         <MenuButton active={false} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table"><TableIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().addRowBefore().run()} title="Add row above"><ArrowUpFromLine className="h-4 w-4" /></MenuButton>
