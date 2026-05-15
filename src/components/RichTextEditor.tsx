@@ -204,15 +204,22 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
     setGeneratingTocImages(true);
     setTocPopoverOpen(false);
     try {
-      const prompts = headingsToUse.map(
-        (h) =>
-          `A high-quality editorial image that best illustrates this blog section heading: "${h}". It can be a photorealistic shot of a real person (e.g. a runner), a clear visual comparison of the concepts, or an imaginative conceptual illustration — whichever best represents the heading. Cinematic lighting, magazine quality, no text or words in the image.`
-      );
+      const buildPrompt = (h: string) =>
+        `A warm, photorealistic editorial image illustrating this blog section heading: "${h}". ` +
+        `Show either a single everyday person or a small relaxed group of everyday people in a calm, natural setting — a park, a quiet trail, woodland, forest, mountains, or a peaceful path. ` +
+        `The people should look like ordinary people of any body type (including average or larger builds) just trying to get fitter — NOT professional athletes, NOT on a running track, NOT in a stadium, NOT in a competitive race environment, NOT wearing pro race kit. Relaxed posture, soft natural light, calming mood. ` +
+        `Alternatively, if the heading is conceptual, render a clean informational illustration that visually explains the benefits or comparison the heading is about. ` +
+        `No text, no words, no logos in the image.`;
+
       const results = await Promise.all(
-        prompts.map((customPrompt) =>
-          supabase.functions.invoke("generate-blog-cover", { body: { customPrompt } })
+        headingsToUse.map((h) =>
+          supabase.functions
+            .invoke("generate-blog-cover", { body: { customPrompt: buildPrompt(h) } })
+            .then((r) => ({ heading: h, ...r }))
         )
       );
+
+      // Locate each heading in the doc and insert the image directly underneath it.
       let inserted = 0;
       for (const r of results) {
         if (r.error || r.data?.error) {
@@ -220,11 +227,32 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
           continue;
         }
         const url = r.data?.url;
-        if (url) {
+        if (!url) continue;
+
+        let insertPos: number | null = null;
+        editor.state.doc.descendants((node, pos) => {
+          if (insertPos !== null) return false;
+          if (node.type.name === "heading" && node.textContent.trim() === r.heading) {
+            insertPos = pos + node.nodeSize;
+            return false;
+          }
+          return true;
+        });
+
+        if (insertPos !== null) {
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(insertPos, [
+              { type: "image", attrs: { src: url } },
+              { type: "paragraph" },
+            ])
+            .run();
+        } else {
           editor.chain().focus().setImage({ src: url }).run();
           editor.chain().focus().insertContent("<p></p>").run();
-          inserted++;
         }
+        inserted++;
       }
       if (inserted === 0) toast.error("Could not generate images. Try again.");
       else toast.success(`Inserted ${inserted} AI image${inserted > 1 ? "s" : ""}`);
