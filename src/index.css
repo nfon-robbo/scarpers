@@ -236,6 +236,25 @@
 .blog-content pre { background: hsl(var(--muted)); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
 .blog-content strong { color: hsl(var(--foreground)); font-weight: 600; }
 .blog-content hr { border-color: hsl(var(--border)); margin: 2rem 0; }
+.blog-content h1, .blog-content h2, .blog-content h3 { scroll-margin-top: 5rem; }
+.blog-content ul[data-toc="true"],
+.rich-text-editor .ProseMirror ul[data-toc="true"] {
+  list-style: none;
+  padding: 1rem 1.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.4);
+  margin: 1.5rem 0;
+}
+.blog-content ul[data-toc="true"] li,
+.rich-text-editor .ProseMirror ul[data-toc="true"] li {
+  margin: 0.25rem 0;
+}
+.blog-content ul[data-toc="true"] a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+}
+.blog-content ul[data-toc="true"] a:hover { text-decoration: underline; }
 .rich-text-editor .ProseMirror h1 { font-size: 1.875rem; font-weight: 700; }
 .rich-text-editor .ProseMirror h2 { font-size: 1.5rem; font-weight: 700; }
 .rich-text-editor .ProseMirror h3 { font-size: 1.25rem; font-weight: 700; }

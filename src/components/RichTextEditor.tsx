@@ -20,7 +20,9 @@ import {
   Quote, Minus, Code,
   Table as TableIcon, Rows3, Columns3, Trash2,
   ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine,
+  ListTree,
 } from "lucide-react";
+import { slugifyHeading } from "@/lib/heading-slug";
 
 interface RichTextEditorProps {
   content: string;
@@ -137,6 +139,42 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
     }
   };
 
+  // Build a Table of Contents from the current document's headings (H1/H2/H3).
+  // Each entry links to "#<slug>" which the blog renderer matches by adding
+  // matching `id` attributes to headings on render.
+  const insertTableOfContents = () => {
+    type H = { level: number; text: string };
+    const headings: H[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "heading") {
+        const text = node.textContent.trim();
+        if (text) headings.push({ level: node.attrs.level ?? 2, text });
+      }
+    });
+    if (headings.length === 0) {
+      window.alert("Add some headings first, then click Insert TOC again.");
+      return;
+    }
+    const usedSlugs = new Map<string, number>();
+    const escape = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const items = headings
+      .map((h) => {
+        let slug = slugifyHeading(h.text);
+        const n = (usedSlugs.get(slug) ?? 0) + 1;
+        usedSlugs.set(slug, n);
+        if (n > 1) slug = `${slug}-${n}`;
+        const indent = h.level >= 3 ? ' style="margin-left:1.25rem"' : "";
+        return `<li${indent}><a href="#${slug}">${escape(h.text)}</a></li>`;
+      })
+      .join("");
+    const html =
+      `<h2>Table of Contents</h2>` +
+      `<ul data-toc="true">${items}</ul>` +
+      `<p></p>`;
+    editor.chain().focus().insertContent(html).run();
+  };
+
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card">
       <div className="flex flex-wrap gap-0.5 p-2 border-b border-border bg-muted/30">
@@ -162,6 +200,7 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <div className="w-px bg-border mx-1" />
         <MenuButton active={editor.isActive("link")} onClick={addLink} title="Add link"><LinkIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={addImage} title="Add image"><ImageIcon className="h-4 w-4" /></MenuButton>
+        <MenuButton active={false} onClick={insertTableOfContents} title="Insert table of contents"><ListTree className="h-4 w-4" /></MenuButton>
         <div className="w-px bg-border mx-1" />
         <MenuButton active={false} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table"><TableIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().addRowBefore().run()} title="Add row above"><ArrowUpFromLine className="h-4 w-4" /></MenuButton>
