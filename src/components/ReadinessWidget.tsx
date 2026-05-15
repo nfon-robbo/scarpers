@@ -202,7 +202,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
   const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("end");
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
-  const [trend, setTrend] = useState<{ day: string; score: number | null }[]>([]);
+  const [trend, setTrend] = useState<{ day: string; score: number | null; hour?: number }[]>([]);
   const [cached, setCached] = useState<{ score: number; factors: any[]; advice: string | null; recordedAt: Date } | null>(null);
   const [coachInsight, setCoachInsight] = useState<{ insight: string; recommendation: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
