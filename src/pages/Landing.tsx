@@ -319,23 +319,11 @@ const Landing = () => {
     });
     document.head.appendChild(ld);
 
-    const org = document.createElement("script");
-    org.type = "application/ld+json";
-    org.text = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      name: "Scarpers",
-      applicationCategory: "HealthApplication",
-      operatingSystem: "Web, iOS, Android",
-      description:
-        "Adaptive AI running coach with personalised plans for 5K, 10K, half marathon, marathon and ultra. Garmin and Strava integration.",
-      url: "https://www.scarpers.co.uk/",
-    });
-    document.head.appendChild(org);
+    // SoftwareApplication JSON-LD lives in index.html — do not duplicate here.
 
     return () => {
       ld.remove();
-      org.remove();
+      
       desc.el.content = desc.prev;
       kw.el.content = kw.prev;
     };
