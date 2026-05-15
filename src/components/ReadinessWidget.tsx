@@ -1066,6 +1066,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               type="number"
                               domain={[xMin, xMax]}
                               ticks={xTicks}
+                              interval={0}
                               allowDataOverflow
                               tick={{ fontSize: 10 }}
                               className="fill-muted-foreground"
