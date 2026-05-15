@@ -599,6 +599,49 @@ const Dashboard = () => {
 
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  // Auto-open the workout review when the user has completed today's run and
+  // hasn't reviewed it yet. Only prompts once per activity per browser session.
+  useEffect(() => {
+    if (!todaysActivity || !user) return;
+    const shownKey = `workoutReviewShown:${todaysActivity.id}`;
+    if (sessionStorage.getItem(shownKey) === "1") return;
+
+    let cancelled = false;
+    (async () => {
+      const { data: existingReview } = await supabase
+        .from("workout_reviews")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("activity_id", todaysActivity.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (existingReview) {
+        sessionStorage.setItem(shownKey, "1");
+        return;
+      }
+      sessionStorage.setItem(shownKey, "1");
+      // Tiny delay so the dashboard renders before the dialog appears.
+      setTimeout(() => setReviewOpen(true), 400);
+    })();
+
+    return () => { cancelled = true; };
+  }, [todaysActivity, user]);
+
+  // Also open the review when an activity is auto-linked while the user is
+  // on the dashboard (e.g. fresh Strava sync just completed).
+  useEffect(() => {
+    const onAutoLinked = () => {
+      if (todaysActivity) {
+        const shownKey = `workoutReviewShown:${todaysActivity.id}`;
+        if (sessionStorage.getItem(shownKey) === "1") return;
+        sessionStorage.setItem(shownKey, "1");
+        setReviewOpen(true);
+      }
+    };
+    window.addEventListener("workout-auto-linked", onAutoLinked);
+    return () => window.removeEventListener("workout-auto-linked", onAutoLinked);
+  }, [todaysActivity]);
+
   // Latest resting HR
   const latestRHR = useMemo(() => {
     const withRHR = metrics.filter((m) => m.resting_heart_rate);
