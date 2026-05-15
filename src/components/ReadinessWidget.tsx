@@ -489,6 +489,25 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         stagesByDate.set(s.date, cur);
       });
 
+      // Determine wake-up time: latest sleep_stages.end_time that falls on today (local)
+      const now = new Date();
+      const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      let latestWakeTs: number | null = null;
+      (stages as any[]).forEach((s) => {
+        if (!s.end_time) return;
+        const d = new Date(s.end_time);
+        const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        if (local !== todayLocal) return;
+        const ts = d.getTime();
+        if (latestWakeTs == null || ts > latestWakeTs) latestWakeTs = ts;
+      });
+      if (latestWakeTs != null) {
+        const w = new Date(latestWakeTs);
+        setWakeHour(w.getHours() + w.getMinutes() / 60);
+      } else {
+        setWakeHour(null);
+      }
+
       // Daily load
       const loadByDate = new Map<string, number>();
       (acts as any[]).forEach((a) => {
