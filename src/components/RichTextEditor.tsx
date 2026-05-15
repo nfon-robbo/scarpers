@@ -11,7 +11,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Button } from "@/components/ui/button";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
@@ -20,9 +20,11 @@ import {
   Quote, Minus, Code,
   Table as TableIcon, Rows3, Columns3, Trash2,
   ArrowUpFromLine, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine,
-  ListTree,
+  ListTree, IndentIncrease, IndentDecrease, Sparkles, Loader2,
 } from "lucide-react";
 import { slugifyHeading } from "@/lib/heading-slug";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface RichTextEditorProps {
   content: string;
