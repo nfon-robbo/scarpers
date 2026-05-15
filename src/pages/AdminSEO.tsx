@@ -67,6 +67,9 @@ const AdminSEO = () => {
   const [gsc, setGsc] = useState<GscResponse | null>(null);
   const [gscLoading, setGscLoading] = useState(false);
   const [gscError, setGscError] = useState<string | null>(null);
+  const [gscDays, setGscDays] = useState<7 | 28 | 90>(28);
+  type GscSortKey = "query" | "clicks" | "impressions" | "ctr" | "position";
+  const [gscSort, setGscSort] = useState<{ key: GscSortKey; dir: "asc" | "desc" }>({ key: "impressions", dir: "desc" });
 
   // Suggestions dialog
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
