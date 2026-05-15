@@ -192,22 +192,22 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
   };
 
   const [generatingTocImages, setGeneratingTocImages] = useState(false);
+  const [tocPopoverOpen, setTocPopoverOpen] = useState(false);
+  const [selectedHeadings, setSelectedHeadings] = useState<string[]>([]);
 
-  // Generate two AI images based on TOC headings — one running-themed, one
-  // concept-themed (good vs bad / comparison) — and insert them into the doc.
-  const generateTocImages = async () => {
-    const headings = collectHeadings();
-    if (headings.length === 0) {
-      toast.error("Add some headings first so we know what to illustrate.");
+  // Generate one AI image per selected TOC heading.
+  const generateTocImages = async (headingsToUse: string[]) => {
+    if (headingsToUse.length === 0) {
+      toast.error("Select at least one heading first.");
       return;
     }
     setGeneratingTocImages(true);
+    setTocPopoverOpen(false);
     try {
-      const topic = headings.slice(0, 6).join(" • ");
-      const prompts = [
-        `A photorealistic editorial photograph of runners in motion that visually represents these blog topics: ${topic}. Cinematic lighting, magazine quality.`,
-        `A clean editorial illustration comparing the upsides and downsides of the subject in these blog headings: ${topic}. Two-panel split-style composition, modern, minimal.`,
-      ];
+      const prompts = headingsToUse.map(
+        (h) =>
+          `A high-quality editorial image that best illustrates this blog section heading: "${h}". It can be a photorealistic shot of a real person (e.g. a runner), a clear visual comparison of the concepts, or an imaginative conceptual illustration — whichever best represents the heading. Cinematic lighting, magazine quality, no text or words in the image.`
+      );
       const results = await Promise.all(
         prompts.map((customPrompt) =>
           supabase.functions.invoke("generate-blog-cover", { body: { customPrompt } })
@@ -228,12 +228,15 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
       }
       if (inserted === 0) toast.error("Could not generate images. Try again.");
       else toast.success(`Inserted ${inserted} AI image${inserted > 1 ? "s" : ""}`);
+      setSelectedHeadings([]);
     } catch (e: any) {
       toast.error(e?.message || "Failed to generate images");
     } finally {
       setGeneratingTocImages(false);
     }
   };
+
+  const availableHeadings = collectHeadings();
 
   return (
     <div className="border border-border rounded-xl bg-card">
