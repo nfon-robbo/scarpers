@@ -220,7 +220,8 @@ const AIChatbot = () => {
 
           const idx = plan.content!.indexOf(target.rawText!);
           if (idx === -1) { finishWith("⚠️ Couldn't locate the workout in your plan."); return; }
-          const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
+          const updatedRaw = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
+          const updated = enforceAndLog(updatedRaw, "day-ahead in-place edit").content;
 
           pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
