@@ -1096,7 +1096,23 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               stroke={z.color}
                               fill="url(#readinessTodayGrad)"
                               strokeWidth={2.5}
-                              dot={{ r: 5, fill: z.color, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                              dot={(props: any) => {
+                                const { cx, cy, payload, index } = props;
+                                const bf = !!payload?.isBackfilled;
+                                return (
+                                  <circle
+                                    key={index}
+                                    cx={cx}
+                                    cy={cy}
+                                    r={bf ? 4 : 5}
+                                    fill={z.color}
+                                    fillOpacity={bf ? 0.35 : 1}
+                                    stroke="hsl(var(--background))"
+                                    strokeWidth={2}
+                                    strokeOpacity={bf ? 0.5 : 1}
+                                  />
+                                );
+                              }}
                               activeDot={{ r: 7 }}
                               isAnimationActive={false}
                             />
@@ -1105,6 +1121,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <p className="mt-2 text-[10px] text-muted-foreground/80">
                           {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} today · last at {last.day}
                         </p>
+                        {todayPts.some((p: any) => p.isBackfilled) && (
+                          <p className="mt-1 text-[9px] italic text-muted-foreground/70">
+                            Early morning scores estimated from sleep data.
+                          </p>
+                        )}
                       </>
                     );
                   })() : (
