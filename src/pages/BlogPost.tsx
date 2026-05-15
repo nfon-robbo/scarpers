@@ -219,8 +219,23 @@ const BlogPost = () => {
 
         <div
           className="blog-content mt-8 text-foreground"
+          onClick={(e) => {
+            // Intercept TOC anchor links so they smooth-scroll within the page
+            // instead of triggering a full navigation.
+            const target = e.target as HTMLElement;
+            const a = target.closest("a") as HTMLAnchorElement | null;
+            if (!a) return;
+            const href = a.getAttribute("href") || "";
+            if (!href.startsWith("#")) return;
+            const id = href.slice(1);
+            const el = document.getElementById(id);
+            if (!el) return;
+            e.preventDefault();
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            history.replaceState(null, "", `#${id}`);
+          }}
           dangerouslySetInnerHTML={{
-            __html: DOMPurify.sanitize(renderContent(post.content), { ADD_ATTR: ["target", "rel"] }),
+            __html: DOMPurify.sanitize(addHeadingIds(renderContent(post.content)), { ADD_ATTR: ["target", "rel", "id"] }),
           }}
         />
       </article>
