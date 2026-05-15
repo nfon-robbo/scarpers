@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     return json({
       site: SITE,
-      range: { start: startD, end },
+      range: { start: startD, end, days },
       totals: totals[0] ?? null,
       byQuery,
       byPage,
