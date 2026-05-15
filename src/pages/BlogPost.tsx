@@ -5,6 +5,25 @@ import { Loader2, Calendar, ArrowLeft, Pencil } from "lucide-react";
 import DOMPurify from "dompurify";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 import BlogInteractions from "@/components/BlogInteractions";
+import { slugifyHeading } from "@/lib/heading-slug";
+
+// Add deterministic `id` attributes to <h1>/<h2>/<h3> in rendered HTML so
+// that Table-of-Contents anchor links (#slug) inside the same article scroll
+// to the matching section.
+function addHeadingIds(html: string): string {
+  const used = new Map<string, number>();
+  return html.replace(/<(h[1-3])([^>]*)>([\s\S]*?)<\/\1>/gi, (_m, tag, attrs, inner) => {
+    // Skip if an id is already present
+    if (/\sid=/i.test(attrs)) return `<${tag}${attrs}>${inner}</${tag}>`;
+    const text = inner.replace(/<[^>]+>/g, "").trim();
+    if (!text) return `<${tag}${attrs}>${inner}</${tag}>`;
+    let slug = slugifyHeading(text);
+    const n = (used.get(slug) ?? 0) + 1;
+    used.set(slug, n);
+    if (n > 1) slug = `${slug}-${n}`;
+    return `<${tag}${attrs} id="${slug}">${inner}</${tag}>`;
+  });
+}
 
 interface Post {
   id: string;
