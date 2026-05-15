@@ -249,6 +249,7 @@ const AIChatbot = () => {
       onDelta: (t) => { revised += t; },
       onDone: async () => {
         if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
+        const validatedRevised = enforceAndLog(revised, "full plan rewrite").content;
         await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
         const newPlan = {
           user_id: session.user.id,
@@ -256,7 +257,7 @@ const AIChatbot = () => {
           goal_time: plan.goal_time,
           training_days: plan.training_days,
           start_date: plan.start_date,
-          content: revised,
+          content: validatedRevised,
         };
         const { data: inserted } = await supabase.from("training_plans").insert(newPlan).select("id").maybeSingle();
         if (inserted?.id) {
