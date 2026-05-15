@@ -634,6 +634,42 @@ export type Database = {
         }
         Relationships: []
       }
+      keyword_actions: {
+        Row: {
+          action_taken: string
+          actioned_at: string
+          actioned_by: string
+          actioned_by_email: string | null
+          created_at: string
+          id: string
+          keyword: string
+          next_review_at: string
+          notes: string | null
+        }
+        Insert: {
+          action_taken: string
+          actioned_at?: string
+          actioned_by: string
+          actioned_by_email?: string | null
+          created_at?: string
+          id?: string
+          keyword: string
+          next_review_at?: string
+          notes?: string | null
+        }
+        Update: {
+          action_taken?: string
+          actioned_at?: string
+          actioned_by?: string
+          actioned_by_email?: string | null
+          created_at?: string
+          id?: string
+          keyword?: string
+          next_review_at?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
       oauth_state: {
         Row: {
           created_at: string

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Navigate, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Search, ArrowLeft, ExternalLink, TrendingUp, Target, Globe, Link2, Lightbulb, ListChecks, Activity, RefreshCw, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Clock, History } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import snapshot from "@/data/seo-snapshot.json";
 
 type Suggestion = {
@@ -76,6 +77,60 @@ const AdminSEO = () => {
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
 
+  // Keyword action tracking
+  type KeywordAction = { id: string; keyword: string; action_taken: string; notes: string | null; actioned_by: string; actioned_by_email: string | null; actioned_at: string; next_review_at: string };
+  const [keywordActions, setKeywordActions] = useState<KeywordAction[]>([]);
+  const [actionDialogKeyword, setActionDialogKeyword] = useState<string | null>(null);
+  const [actionInput, setActionInput] = useState("");
+  const [actionNotes, setActionNotes] = useState("");
+  const [savingAction, setSavingAction] = useState(false);
+  const [expandedHistoryRow, setExpandedHistoryRow] = useState<string | null>(null);
+
+  const loadKeywordActions = async () => {
+    const { data, error } = await supabase
+      .from("keyword_actions" as any)
+      .select("*")
+      .order("actioned_at", { ascending: false });
+    if (!error && data) setKeywordActions(data as any);
+  };
+
+  const latestActionByKeyword = (kw: string) =>
+    keywordActions.find((a) => a.keyword.toLowerCase() === kw.toLowerCase());
+  const historyForKeyword = (kw: string) =>
+    keywordActions.filter((a) => a.keyword.toLowerCase() === kw.toLowerCase());
+  const isReviewDue = (a: KeywordAction | undefined) =>
+    !!a && new Date(a.next_review_at).getTime() <= Date.now();
+  const fmtUkDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB");
+
+  const openActionDialog = (kw: string) => {
+    setActionDialogKeyword(kw);
+    setActionInput("");
+    setActionNotes("");
+  };
+
+  const submitAction = async (kw: string, actionText: string, notes: string | null) => {
+    if (!user) return;
+    setSavingAction(true);
+    try {
+      const { error } = await supabase.from("keyword_actions" as any).insert({
+        keyword: kw,
+        action_taken: actionText,
+        notes,
+        actioned_by: user.id,
+        actioned_by_email: user.email ?? null,
+      });
+      if (error) throw error;
+      toast.success("Action recorded");
+      setActionDialogKeyword(null);
+      await loadKeywordActions();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save action");
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
+
   const loadGsc = async () => {
     setGscLoading(true); setGscError(null);
     try {
@@ -91,6 +146,7 @@ const AdminSEO = () => {
   };
 
   useEffect(() => { if (isAdmin) loadGsc(); }, [isAdmin]);
+  useEffect(() => { if (isAdmin) loadKeywordActions(); }, [isAdmin]);
 
   const openSuggestions = async (keyword: string, position: number | null, volume?: number | null, difficulty?: number | null) => {
     setSuggestionsKeyword(keyword);
@@ -413,29 +469,86 @@ const AdminSEO = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {s.targetKeywords.map((k) => (
-                    <TableRow key={k.keyword}>
-                      <TableCell className="font-medium">{k.keyword}</TableCell>
-                      <TableCell>{fmtNum(k.volume)}</TableCell>
-                      <TableCell>
-                        <Badge variant={diffColor(k.difficulty) as any}>
-                          {k.difficulty == null ? "—" : `${k.difficulty}/100`} · {k.difficultyLabel}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="capitalize text-sm text-muted-foreground">{k.competitionLabel}</TableCell>
-                      <TableCell>{fmtGBP(k.cpcUsd)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
-                        >
-                          <Sparkles className="h-3 w-3 mr-1" /> Improve
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {s.targetKeywords.map((k) => {
+                    const latest = latestActionByKeyword(k.keyword);
+                    const history = historyForKeyword(k.keyword);
+                    const due = isReviewDue(latest);
+                    const expanded = expandedHistoryRow === k.keyword;
+                    return (
+                      <Fragment key={k.keyword}>
+                        <TableRow>
+                          <TableCell className="font-medium align-top">{k.keyword}</TableCell>
+                          <TableCell className="align-top">{fmtNum(k.volume)}</TableCell>
+                          <TableCell className="align-top">
+                            <Badge variant={diffColor(k.difficulty) as any}>
+                              {k.difficulty == null ? "—" : `${k.difficulty}/100`} · {k.difficultyLabel}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="capitalize text-sm text-muted-foreground align-top">{k.competitionLabel}</TableCell>
+                          <TableCell className="align-top">{fmtGBP(k.cpcUsd)}</TableCell>
+                          <TableCell className="text-right align-top">
+                            {!latest ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => openActionDialog(k.keyword)}
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" /> Improve
+                              </Button>
+                            ) : (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => openActionDialog(k.keyword)}
+                                  className="inline-flex items-center"
+                                  title="View history & log new action"
+                                >
+                                  {due ? (
+                                    <Badge className="bg-amber-500/20 text-amber-700 border-amber-500/40 hover:bg-amber-500/30 cursor-pointer">
+                                      <Clock className="h-3 w-3 mr-1" /> Review due
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-emerald-500/20 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/30 cursor-pointer">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" /> Actioned
+                                    </Badge>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => setExpandedHistoryRow(expanded ? null : k.keyword)}
+                                  className="text-[11px] text-muted-foreground hover:text-foreground max-w-[220px] truncate text-right"
+                                  title={latest.action_taken}
+                                >
+                                  {fmtUkDate(latest.actioned_at)} · {latest.action_taken}
+                                </button>
+                                <span className="text-[10px] text-muted-foreground">
+                                  Review due {fmtUkDate(latest.next_review_at)}
+                                </span>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                        {expanded && history.length > 0 && (
+                          <TableRow key={`${k.keyword}-hist`}>
+                            <TableCell colSpan={6} className="bg-muted/30">
+                              <div className="text-xs space-y-1.5">
+                                <p className="font-medium flex items-center gap-1"><History className="h-3 w-3" /> Action history</p>
+                                {history.map((h) => (
+                                  <div key={h.id} className="flex gap-2 pl-4 border-l-2 border-primary/20">
+                                    <span className="text-muted-foreground shrink-0">{fmtUkDate(h.actioned_at)}</span>
+                                    <span className="flex-1">
+                                      <span className="font-medium">{h.action_taken}</span>
+                                      {h.notes && <span className="text-muted-foreground"> — {h.notes}</span>}
+                                      {h.actioned_by_email && <span className="text-muted-foreground"> · {h.actioned_by_email}</span>}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -663,6 +776,82 @@ const AdminSEO = () => {
               ))}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!actionDialogKeyword} onOpenChange={(o) => !o && setActionDialogKeyword(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              {actionDialogKeyword}
+            </DialogTitle>
+          </DialogHeader>
+
+          {actionDialogKeyword && (() => {
+            const history = historyForKeyword(actionDialogKeyword);
+            const latest = latestActionByKeyword(actionDialogKeyword);
+            const due = isReviewDue(latest);
+            return (
+              <div className="space-y-4">
+                {history.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <History className="h-3 w-3" /> Action history ({history.length})
+                    </p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-md border bg-muted/30 p-2">
+                      {history.map((h) => (
+                        <div key={h.id} className="text-xs border-l-2 border-primary/30 pl-2">
+                          <div className="font-medium">{fmtUkDate(h.actioned_at)} — {h.action_taken}</div>
+                          {h.notes && <div className="text-muted-foreground">{h.notes}</div>}
+                          {h.actioned_by_email && <div className="text-[10px] text-muted-foreground">by {h.actioned_by_email}</div>}
+                          <div className="text-[10px] text-muted-foreground">Review due {fmtUkDate(h.next_review_at)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">What action was taken?</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="e.g. added blog post, updated meta description"
+                    value={actionInput}
+                    onChange={(e) => setActionInput(e.target.value)}
+                    autoFocus
+                  />
+                  <Textarea
+                    placeholder="Optional notes / details"
+                    value={actionNotes}
+                    onChange={(e) => setActionNotes(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {due && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={savingAction}
+                      onClick={() => submitAction(actionDialogKeyword, "No action needed", "Reset review by 30 days")}
+                    >
+                      No action needed · reset 30d
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={savingAction || !actionInput.trim()}
+                    onClick={() => submitAction(actionDialogKeyword, actionInput.trim(), actionNotes.trim() || null)}
+                  >
+                    {savingAction ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    Save action
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
