@@ -25,6 +25,8 @@ import {
 import { slugifyHeading } from "@/lib/heading-slug";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface RichTextEditorProps {
   content: string;
@@ -190,22 +192,22 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
   };
 
   const [generatingTocImages, setGeneratingTocImages] = useState(false);
+  const [tocPopoverOpen, setTocPopoverOpen] = useState(false);
+  const [selectedHeadings, setSelectedHeadings] = useState<string[]>([]);
 
-  // Generate two AI images based on TOC headings — one running-themed, one
-  // concept-themed (good vs bad / comparison) — and insert them into the doc.
-  const generateTocImages = async () => {
-    const headings = collectHeadings();
-    if (headings.length === 0) {
-      toast.error("Add some headings first so we know what to illustrate.");
+  // Generate one AI image per selected TOC heading.
+  const generateTocImages = async (headingsToUse: string[]) => {
+    if (headingsToUse.length === 0) {
+      toast.error("Select at least one heading first.");
       return;
     }
     setGeneratingTocImages(true);
+    setTocPopoverOpen(false);
     try {
-      const topic = headings.slice(0, 6).join(" • ");
-      const prompts = [
-        `A photorealistic editorial photograph of runners in motion that visually represents these blog topics: ${topic}. Cinematic lighting, magazine quality.`,
-        `A clean editorial illustration comparing the upsides and downsides of the subject in these blog headings: ${topic}. Two-panel split-style composition, modern, minimal.`,
-      ];
+      const prompts = headingsToUse.map(
+        (h) =>
+          `A high-quality editorial image that best illustrates this blog section heading: "${h}". It can be a photorealistic shot of a real person (e.g. a runner), a clear visual comparison of the concepts, or an imaginative conceptual illustration — whichever best represents the heading. Cinematic lighting, magazine quality, no text or words in the image.`
+      );
       const results = await Promise.all(
         prompts.map((customPrompt) =>
           supabase.functions.invoke("generate-blog-cover", { body: { customPrompt } })
@@ -226,12 +228,15 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
       }
       if (inserted === 0) toast.error("Could not generate images. Try again.");
       else toast.success(`Inserted ${inserted} AI image${inserted > 1 ? "s" : ""}`);
+      setSelectedHeadings([]);
     } catch (e: any) {
       toast.error(e?.message || "Failed to generate images");
     } finally {
       setGeneratingTocImages(false);
     }
   };
+
+  const availableHeadings = collectHeadings();
 
   return (
     <div className="border border-border rounded-xl bg-card">
@@ -261,18 +266,66 @@ const RichTextEditor = ({ content, onChange }: RichTextEditorProps) => {
         <MenuButton active={editor.isActive("link")} onClick={addLink} title="Add link"><LinkIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={addImage} title="Add image"><ImageIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={insertTableOfContents} title="Insert table of contents"><ListTree className="h-4 w-4" /></MenuButton>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 px-2"
-          onClick={(e) => { e.preventDefault(); generateTocImages(); }}
-          disabled={generatingTocImages}
-          title="Generate 2 AI images from your headings"
-        >
-          {generatingTocImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          <span className="text-xs">AI images</span>
-        </Button>
+        <Popover open={tocPopoverOpen} onOpenChange={(o) => {
+          setTocPopoverOpen(o);
+          if (o) setSelectedHeadings([]);
+        }}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2"
+              disabled={generatingTocImages}
+              title="Generate AI images from selected headings"
+            >
+              {generatingTocImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              <span className="text-xs">AI images</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 p-3">
+            <div className="text-sm font-medium mb-2">Pick headings to illustrate</div>
+            {availableHeadings.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Add some headings to your post first.</p>
+            ) : (
+              <>
+                <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                  {availableHeadings.map((h, i) => {
+                    const id = `toc-img-${i}`;
+                    const checked = selectedHeadings.includes(h);
+                    return (
+                      <label key={id} htmlFor={id} className="flex items-start gap-2 cursor-pointer rounded-md p-1.5 hover:bg-muted">
+                        <Checkbox
+                          id={id}
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            setSelectedHeadings((prev) =>
+                              v ? [...prev, h] : prev.filter((x) => x !== h)
+                            );
+                          }}
+                        />
+                        <span className="text-xs leading-snug">{h}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-border">
+                  <span className="text-xs text-muted-foreground">{selectedHeadings.length} selected</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8"
+                    disabled={selectedHeadings.length === 0 || generatingTocImages}
+                    onClick={(e) => { e.preventDefault(); generateTocImages(selectedHeadings); }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    Generate
+                  </Button>
+                </div>
+              </>
+            )}
+          </PopoverContent>
+        </Popover>
         <div className="w-px bg-border mx-1" />
         <MenuButton active={false} onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert table"><TableIcon className="h-4 w-4" /></MenuButton>
         <MenuButton active={false} onClick={() => editor.chain().focus().addRowBefore().run()} title="Add row above"><ArrowUpFromLine className="h-4 w-4" /></MenuButton>
