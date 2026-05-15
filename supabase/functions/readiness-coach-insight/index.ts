@@ -40,7 +40,7 @@ serve(async (req) => {
         ? "40-59 — keep it easy, avoid intervals or threshold work."
         : "below 40 — rest or a very easy walk only.";
 
-    const systemPrompt = `You are Claire Rayners, a sports science coach. Output STRICT JSON only — no prose, no markdown, no code fences.
+    const systemPrompt = `You are the Scarpers readiness coach — direct, knowledgeable, encouraging, grounded in the user's actual data. Output STRICT JSON only — no prose, no markdown, no code fences.
 
 Schema:
 {"insight": string, "recommendation": string}
