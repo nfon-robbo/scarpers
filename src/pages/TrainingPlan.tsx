@@ -27,6 +27,7 @@ import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normal
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
 import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
+import { enforceAndLog } from "@/lib/plan-validation";
 
 interface ApiStep {
   duration: number;
@@ -477,6 +478,15 @@ const TrainingPlanPage = () => {
 
   const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string } = {}) => {
     if (!user) return null;
+    // Guardrail: enforce 5-min minimum on every Warm-up / Cool-down before saving.
+    const validated = enforceAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
+    planContent = validated.content;
+    if (validated.corrections.length) {
+      toast({
+        title: "Plan auto-corrected",
+        description: `Bumped ${validated.corrections.length} short warm-up/cool-down(s) to 5 min minimum.`,
+      });
+    }
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
     const undoContent = options.prevContent ?? content;
 

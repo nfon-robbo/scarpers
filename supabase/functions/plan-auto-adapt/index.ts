@@ -9,6 +9,50 @@ const corsHeaders = {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+// ── Guardrail: enforce 5-min min Warm-up / Cool-down on every running day. ──
+interface PlanCorrection {
+  day: string;
+  segment: "Warm-up" | "Cool-down";
+  from: number;
+  to: number;
+}
+function enforceWarmupCooldownMinimums(markdown: string): { content: string; corrections: PlanCorrection[] } {
+  if (!markdown) return { content: markdown, corrections: [] };
+  const MIN = 5;
+  const lines = markdown.split("\n");
+  const corrections: PlanCorrection[] = [];
+  let dayHeadingIdx = -1;
+  let dayLabel = "";
+  let dayDelta = 0;
+  const flush = () => {
+    if (dayHeadingIdx >= 0 && dayDelta !== 0) {
+      lines[dayHeadingIdx] = lines[dayHeadingIdx].replace(/\(Total:\s*(\d+)\s*min\)/i, (_m, n) =>
+        `(Total: ${parseInt(n, 10) + dayDelta}min)`
+      );
+    }
+    dayDelta = 0;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const h = line.match(/^###\s+\*\*([^*]+)\*\*/);
+    if (h) { flush(); dayHeadingIdx = i; dayLabel = h[1].trim(); continue; }
+    const seg = line.match(/^\|\s*(Warm-up|Cool-down)\s*\|\s*([^|]+)\|/i);
+    if (!seg) continue;
+    const segment = (seg[1].toLowerCase().startsWith("warm") ? "Warm-up" : "Cool-down") as "Warm-up" | "Cool-down";
+    const cell = seg[2];
+    const num = cell.match(/(\d+)\s*min/i);
+    if (!num) continue;
+    const cur = parseInt(num[1], 10);
+    if (cur >= MIN) continue;
+    const newCell = cell.replace(/(\d+)(\s*min)/i, `${MIN}$2`);
+    lines[i] = line.replace(cell, newCell);
+    dayDelta += MIN - cur;
+    corrections.push({ day: dayLabel, segment, from: cur, to: MIN });
+  }
+  flush();
+  return { content: lines.join("\n"), corrections };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -143,6 +187,15 @@ ${plan.content}`;
     // Strip accidental code fences
     newContent = newContent.replace(/^```(?:markdown)?\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     if (newContent.length < 50) throw new Error("AI returned empty/short content");
+
+    // Guardrail: enforce 5-min minimum on Warm-up / Cool-down rows.
+    const validated = enforceWarmupCooldownMinimums(newContent);
+    newContent = validated.content;
+    for (const c of validated.corrections) {
+      console.warn(
+        `[plan-auto-adapt] bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
+      );
+    }
 
     // Persist
     const { error: updErr } = await supabase

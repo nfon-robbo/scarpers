@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
+import { enforceAndLog } from "@/lib/plan-validation";
 
 interface Message {
   role: "user" | "assistant";
@@ -219,7 +220,8 @@ const AIChatbot = () => {
 
           const idx = plan.content!.indexOf(target.rawText!);
           if (idx === -1) { finishWith("⚠️ Couldn't locate the workout in your plan."); return; }
-          const updated = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
+          const updatedRaw = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
+          const updated = enforceAndLog(updatedRaw, "day-ahead in-place edit").content;
 
           pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
@@ -247,6 +249,7 @@ const AIChatbot = () => {
       onDelta: (t) => { revised += t; },
       onDone: async () => {
         if (!revised.trim()) { finishWith("⚠️ Couldn't apply the change — please try again."); return; }
+        const validatedRevised = enforceAndLog(revised, "full plan rewrite").content;
         await supabase.from("training_plans").update({ archived: true }).eq("id", plan.id);
         const newPlan = {
           user_id: session.user.id,
@@ -254,7 +257,7 @@ const AIChatbot = () => {
           goal_time: plan.goal_time,
           training_days: plan.training_days,
           start_date: plan.start_date,
-          content: revised,
+          content: validatedRevised,
         };
         const { data: inserted } = await supabase.from("training_plans").insert(newPlan).select("id").maybeSingle();
         if (inserted?.id) {
