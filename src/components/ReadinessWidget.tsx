@@ -1041,7 +1041,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                                 return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
                               }}
                             />
-                            <YAxis domain={[0, 100]} type="number" hide />
+                            <YAxis domain={[yMin, yMax]} type="number" hide />
                             <Tooltip
                               contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                               labelFormatter={(_l: any, payload: any) => {
