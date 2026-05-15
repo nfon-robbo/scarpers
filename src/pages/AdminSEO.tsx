@@ -77,6 +77,60 @@ const AdminSEO = () => {
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
 
+  // Keyword action tracking
+  type KeywordAction = { id: string; keyword: string; action_taken: string; notes: string | null; actioned_by: string; actioned_by_email: string | null; actioned_at: string; next_review_at: string };
+  const [keywordActions, setKeywordActions] = useState<KeywordAction[]>([]);
+  const [actionDialogKeyword, setActionDialogKeyword] = useState<string | null>(null);
+  const [actionInput, setActionInput] = useState("");
+  const [actionNotes, setActionNotes] = useState("");
+  const [savingAction, setSavingAction] = useState(false);
+  const [expandedHistoryRow, setExpandedHistoryRow] = useState<string | null>(null);
+
+  const loadKeywordActions = async () => {
+    const { data, error } = await supabase
+      .from("keyword_actions" as any)
+      .select("*")
+      .order("actioned_at", { ascending: false });
+    if (!error && data) setKeywordActions(data as any);
+  };
+
+  const latestActionByKeyword = (kw: string) =>
+    keywordActions.find((a) => a.keyword.toLowerCase() === kw.toLowerCase());
+  const historyForKeyword = (kw: string) =>
+    keywordActions.filter((a) => a.keyword.toLowerCase() === kw.toLowerCase());
+  const isReviewDue = (a: KeywordAction | undefined) =>
+    !!a && new Date(a.next_review_at).getTime() <= Date.now();
+  const fmtUkDate = (iso: string) => new Date(iso).toLocaleDateString("en-GB");
+
+  const openActionDialog = (kw: string) => {
+    setActionDialogKeyword(kw);
+    setActionInput("");
+    setActionNotes("");
+  };
+
+  const submitAction = async (kw: string, actionText: string, notes: string | null) => {
+    if (!user) return;
+    setSavingAction(true);
+    try {
+      const { error } = await supabase.from("keyword_actions" as any).insert({
+        keyword: kw,
+        action_taken: actionText,
+        notes,
+        actioned_by: user.id,
+        actioned_by_email: user.email ?? null,
+      });
+      if (error) throw error;
+      toast.success("Action recorded");
+      setActionDialogKeyword(null);
+      await loadKeywordActions();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save action");
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
+
   const loadGsc = async () => {
     setGscLoading(true); setGscError(null);
     try {
