@@ -488,16 +488,37 @@ const AdminSEO = () => {
                           <TableCell className="align-top">{fmtGBP(k.cpcUsd)}</TableCell>
                           <TableCell className="text-right align-top">
                             {!latest ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => openActionDialog(k.keyword)}
-                              >
-                                <Sparkles className="h-3 w-3 mr-1" /> Improve
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
+                                >
+                                  <Sparkles className="h-3 w-3 mr-1" /> Improve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  onClick={() => openActionDialog(k.keyword)}
+                                  title="Log an action taken on this keyword"
+                                >
+                                  Log
+                                </Button>
+                              </div>
                             ) : (
                               <div className="flex flex-col items-end gap-1">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => openSuggestions(k.keyword, null, k.volume, k.difficulty)}
+                                  >
+                                    <Sparkles className="h-3 w-3 mr-1" /> Improve
+                                  </Button>
+                                </div>
                                 <button
                                   onClick={() => openActionDialog(k.keyword)}
                                   className="inline-flex items-center"
