@@ -460,15 +460,22 @@ Deno.serve(async (req) => {
       };
 
       if (existing) {
-        await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+        const { error: updateError } = await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+        trace.log("database.daily_metrics.update", { date, payload, existingId: existing.id, error: updateError?.message || null });
       } else {
-        await supabase.from("daily_metrics").insert(payload);
+        const { error: dailyInsertError } = await supabase.from("daily_metrics").insert(payload);
+        trace.log("database.daily_metrics.insert", { date, payload, error: dailyInsertError?.message || null });
       }
     }
 
-    console.log(`Google Fit sleep sync complete: ${totalStages} stages from ${sessions.length} sessions, ${Object.keys(dailyTotals).length} daily_metrics rows updated`);
+    trace.log("sync.completed", {
+      totalStages,
+      sessions: sessions.length,
+      dailyMetricsRowsUpdated: Object.keys(dailyTotals).length,
+      dailyTotals,
+    });
     return new Response(
-      JSON.stringify({ synced: totalStages, sessions: sessions.length }),
+      JSON.stringify({ synced: totalStages, sessions: sessions.length, traceId: trace.traceId, trace: debug ? trace.entries : undefined }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
@@ -480,7 +487,7 @@ Deno.serve(async (req) => {
     // Token invalid is an expected, user-actionable state — return 200 so it
     // isn't surfaced as a runtime error in the client overlay.
     if (message === "GOOGLE_FIT_USER_TOKEN_INVALID") {
-      console.log("Google Fit sleep skipped: token invalid (user must reconnect)");
+      trace.log("sync.skipped.token_invalid", { message });
       return new Response(
         JSON.stringify({
           synced: 0,
@@ -488,6 +495,8 @@ Deno.serve(async (req) => {
           skipped: true,
           reason: "token_invalid",
           message: "Your Google Fit connection expired or was revoked. Please disconnect and reconnect Google Fit.",
+          traceId: trace.traceId,
+          trace: debug ? trace.entries : undefined,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -499,8 +508,8 @@ Deno.serve(async (req) => {
       clientError = "Unable to refresh Google Fit token right now. Please reconnect and try again.";
     }
 
-    console.error("Google Fit sleep error:", message);
-    return new Response(JSON.stringify({ error: clientError, code: message }), {
+    trace.log("sync.error", { message, clientError, status });
+    return new Response(JSON.stringify({ error: clientError, code: message, traceId: trace.traceId, trace: debug ? trace.entries : undefined }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
