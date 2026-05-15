@@ -778,6 +778,82 @@ const AdminSEO = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!actionDialogKeyword} onOpenChange={(o) => !o && setActionDialogKeyword(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              {actionDialogKeyword}
+            </DialogTitle>
+          </DialogHeader>
+
+          {actionDialogKeyword && (() => {
+            const history = historyForKeyword(actionDialogKeyword);
+            const latest = latestActionByKeyword(actionDialogKeyword);
+            const due = isReviewDue(latest);
+            return (
+              <div className="space-y-4">
+                {history.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <History className="h-3 w-3" /> Action history ({history.length})
+                    </p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-md border bg-muted/30 p-2">
+                      {history.map((h) => (
+                        <div key={h.id} className="text-xs border-l-2 border-primary/30 pl-2">
+                          <div className="font-medium">{fmtUkDate(h.actioned_at)} — {h.action_taken}</div>
+                          {h.notes && <div className="text-muted-foreground">{h.notes}</div>}
+                          {h.actioned_by_email && <div className="text-[10px] text-muted-foreground">by {h.actioned_by_email}</div>}
+                          <div className="text-[10px] text-muted-foreground">Review due {fmtUkDate(h.next_review_at)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">What action was taken?</label>
+                  <input
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="e.g. added blog post, updated meta description"
+                    value={actionInput}
+                    onChange={(e) => setActionInput(e.target.value)}
+                    autoFocus
+                  />
+                  <Textarea
+                    placeholder="Optional notes / details"
+                    value={actionNotes}
+                    onChange={(e) => setActionNotes(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {due && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={savingAction}
+                      onClick={() => submitAction(actionDialogKeyword, "No action needed", "Reset review by 30 days")}
+                    >
+                      No action needed · reset 30d
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={savingAction || !actionInput.trim()}
+                    onClick={() => submitAction(actionDialogKeyword, actionInput.trim(), actionNotes.trim() || null)}
+                  >
+                    {savingAction ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    Save action
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
