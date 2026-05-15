@@ -115,6 +115,7 @@ Deno.serve(async (req) => {
     trace.log("auth.user_loaded", { userId: user.id });
 
     // Get tokens
+    const now = Math.floor(Date.now() / 1000);
     const { data: tokenRow, error: tokenError } = await supabase
       .from("google_fit_tokens")
       .select("*")
@@ -137,7 +138,6 @@ Deno.serve(async (req) => {
 
     // Refresh if expired
     let accessToken = tokenRow.access_token;
-    const now = Math.floor(Date.now() / 1000);
     if (tokenRow.expires_at < now + 60) {
       trace.log("tokens.refresh.started", { expiresAt: tokenRow.expires_at, now });
       accessToken = await refreshAccessToken(supabase, user.id, tokenRow.refresh_token);
@@ -219,13 +219,18 @@ Deno.serve(async (req) => {
     for (const session of sessions) {
       nightDates.add(new Date(parseInt(session.endTimeMillis)).toISOString().split("T")[0]);
     }
+    trace.log("database.sleep_stages.delete.sessions.planned", { dates: Array.from(nightDates), count: nightDates.size });
     if (nightDates.size > 0) {
-      await supabase
+      const { error: deleteError } = await supabase
         .from("sleep_stages")
         .delete()
         .eq("user_id", user.id)
         .eq("source", "google_fit")
         .in("date", Array.from(nightDates));
+      trace.log("database.sleep_stages.delete.sessions.completed", {
+        dates: Array.from(nightDates),
+        error: deleteError?.message || null,
+      });
     }
 
     for (const session of sessions) {
@@ -234,7 +239,13 @@ Deno.serve(async (req) => {
 
       // Determine the date (use the end time's date as the "sleep night" date)
       const sleepDate = new Date(sessionEnd).toISOString().split("T")[0];
-      console.log(`Processing session: ${session.id}, date: ${sleepDate}, start: ${new Date(sessionStart).toISOString()}, end: ${new Date(sessionEnd).toISOString()}`);
+      trace.log("session.processing.started", {
+        id: session.id,
+        date: sleepDate,
+        start: new Date(sessionStart).toISOString(),
+        end: new Date(sessionEnd).toISOString(),
+        rawSession: session,
+      });
 
       // Fetch sleep segment data for this session
       const datasetRes = await fetch(
@@ -256,16 +267,19 @@ Deno.serve(async (req) => {
       );
 
       if (!datasetRes.ok) {
-        console.error("Failed to fetch sleep segments for session", session.id);
+        const errTxt = await datasetRes.text();
+        trace.log("google.session_segments.error", { sessionId: session.id, status: datasetRes.status, statusText: datasetRes.statusText, body: errTxt });
         continue;
       }
 
       const datasetData = await datasetRes.json();
+      trace.log("google.session_segments.response.raw", { sessionId: session.id, response: datasetData });
 
       // (rows for this date were already deleted up-front, before the loop)
 
       const buckets = datasetData.bucket || [];
       let sessionStages = 0;
+      let skippedPoints = 0;
 
       for (const bucket of buckets) {
         for (const dataset of bucket.dataset || []) {
@@ -274,16 +288,24 @@ Deno.serve(async (req) => {
             const endNanos = parseInt(point.endTimeNanos);
             const stageType = point.value?.[0]?.intVal;
 
-            if (stageType == null) continue;
+            if (stageType == null) {
+              skippedPoints++;
+              trace.log("session.point.skipped", { sessionId: session.id, reason: "missing_stage_type", point });
+              continue;
+            }
 
             const stageName = SLEEP_STAGE_MAP[stageType];
-            if (!stageName || stageName === "out_of_bed") continue;
+            if (!stageName || stageName === "out_of_bed") {
+              skippedPoints++;
+              trace.log("session.point.skipped", { sessionId: session.id, reason: "unsupported_or_out_of_bed", stageType, stageName, point });
+              continue;
+            }
 
             // Keep "sleep" as-is (generic sleep without stage breakdown)
             const normalizedStage = stageName;
             const durationSeconds = Math.round((endNanos - startNanos) / 1e9);
 
-            await supabase.from("sleep_stages").insert({
+            const insertPayload = {
               user_id: user.id,
               date: sleepDate,
               stage: normalizedStage,
@@ -291,6 +313,13 @@ Deno.serve(async (req) => {
               start_time: new Date(startNanos / 1e6).toISOString(),
               end_time: new Date(endNanos / 1e6).toISOString(),
               source: "google_fit",
+            };
+
+            const { error: insertError } = await supabase.from("sleep_stages").insert(insertPayload);
+            trace.log("database.sleep_stages.insert.session_point", {
+              sessionId: session.id,
+              payload: insertPayload,
+              error: insertError?.message || null,
             });
 
             sessionStages++;
