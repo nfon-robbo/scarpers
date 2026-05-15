@@ -1082,6 +1082,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                               strokeOpacity={0.7}
                               label={{ value: String(Math.round(last.score)), position: "right", fill: z.color, fontSize: 11, fontWeight: 700 }}
                             />
+                            <ReferenceLine
+                              x={effectiveWake}
+                              stroke="hsl(var(--muted-foreground))"
+                              strokeDasharray="2 3"
+                              strokeOpacity={0.6}
+                              label={{ value: `↑ ${wakeLabel}`, position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 600 }}
+                            />
                             <Area
                               type="monotone"
                               dataKey="score"
