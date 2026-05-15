@@ -349,9 +349,53 @@ const BlogEditor = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Switch checked={published} onCheckedChange={setPublished} />
-            <Label>Published</Label>
+          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={published}
+                onCheckedChange={(v) => { setPublished(v); if (v) setScheduledFor(""); }}
+                disabled={!!scheduledFor}
+              />
+              <Label>Publish immediately</Label>
+            </div>
+
+            <div>
+              <Label className="text-xs">Or schedule for a later date &amp; time</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  min={isoToLocalInput(new Date().toISOString())}
+                  onChange={(e) => {
+                    setScheduledFor(e.target.value);
+                    if (e.target.value) setPublished(false);
+                  }}
+                  className="max-w-xs"
+                />
+                {scheduledFor && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setScheduledFor("")}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {scheduledFor && (() => {
+                const d = new Date(scheduledFor);
+                const valid = !isNaN(d.getTime());
+                const future = valid && d.getTime() > Date.now();
+                return (
+                  <p className={`text-xs mt-1 ${future ? "text-primary" : "text-amber-600"}`}>
+                    {!valid
+                      ? "Invalid date/time"
+                      : future
+                        ? `Will go live on ${d.toLocaleString("en-GB")}`
+                        : "Scheduled time is in the past — post will publish immediately on save"}
+                  </p>
+                );
+              })()}
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Times use your device's timezone. The post auto-publishes at this moment.
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
