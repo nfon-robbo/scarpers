@@ -41,7 +41,17 @@ const AppLayout = () => {
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Sync all connected services whenever the user navigates within the app.
+  // Each service is throttled internally so this is safe to fire on every route change.
+  useEffect(() => {
+    const syncRoutes = ["/dashboard", "/training-plan", "/activities", "/insights"];
+    if (user && syncRoutes.some((r) => location.pathname.startsWith(r))) {
+      runAllSyncs();
+    }
+  }, [location.pathname, user]);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSE_KEY) === "1";
