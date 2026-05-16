@@ -239,6 +239,7 @@ const AdminSEO = () => {
         body: {
           keyword: suggestionsKeyword,
           action: "apply",
+          provider: aiProvider,
           suggestionTitle: s.title,
           suggestionDescription: s.description,
           suggestionType: s.type,
