@@ -134,6 +134,7 @@ const AdminSEO = () => {
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
+  const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
 
   // Keyword action tracking
   type KeywordAction = { id: string; keyword: string; action_taken: string; notes: string | null; actioned_by: string; actioned_by_email: string | null; actioned_at: string; next_review_at: string };
@@ -238,6 +239,7 @@ const AdminSEO = () => {
         body: {
           keyword: suggestionsKeyword,
           action: "apply",
+          provider: aiProvider,
           suggestionTitle: s.title,
           suggestionDescription: s.description,
           suggestionType: s.type,
@@ -1049,6 +1051,22 @@ const AdminSEO = () => {
               {suggestionsPosition ? `Currently ranking #${suggestionsPosition}` : "Not currently ranking"}
             </p>
           </DialogHeader>
+
+          <div className="flex items-center justify-between gap-2 px-1 py-2 mb-1 rounded-md bg-muted/30 border border-border/50">
+            <div className="flex flex-col">
+              <span className="text-xs font-medium">AI provider</span>
+              <span className="text-[10px] text-muted-foreground">Used when generating blog drafts</span>
+            </div>
+            <Select value={aiProvider} onValueChange={(v) => setAiProvider(v as "lovable" | "claude")}>
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lovable">Lovable AI (Gemini)</SelectItem>
+                <SelectItem value="claude">Claude (Anthropic)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {suggestionsLoading ? (
             <div className="flex flex-col items-center py-8 gap-3">
