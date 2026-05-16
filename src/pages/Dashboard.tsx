@@ -888,7 +888,7 @@ const Dashboard = () => {
             </Card>
           </div>
 
-          {/* ── Readiness ── */}
+          {/* ── Readiness ── Temporarily hidden; keep code for future re-enable.
           <section className="space-y-3" aria-label="Readiness">
             <div className="flex items-center gap-2 px-1">
               <Heart className="h-4 w-4 text-primary" />
@@ -913,6 +913,7 @@ const Dashboard = () => {
               );
             })()}
           </section>
+          */}
 
 
           {/* ── Recent Runs + Resting HR ── */}
