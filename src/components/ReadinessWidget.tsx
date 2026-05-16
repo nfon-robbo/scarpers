@@ -1059,10 +1059,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     if (todayPts.length < 3) {
                       return (
                         <div className="rounded-xl border border-border/40 bg-card/30 px-4 py-5 text-center">
-                          <div className="text-3xl font-bold text-foreground leading-none">{Math.round(last.score)}</div>
-                          <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
+                          <div className={cn("text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
                           <p className="mt-3 text-[11px] text-muted-foreground leading-snug">
-                            Score recorded at {last.day} — check back later as more data builds throughout the day.
+                            Readiness recorded at {last.day} — check back later as more data builds throughout the day.
                           </p>
                         </div>
                       );
@@ -1092,9 +1091,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <div className="flex items-end justify-between mb-2 px-1">
                           <div>
                             <div className="flex items-baseline gap-2">
-                              <span className="text-4xl font-bold text-foreground leading-none">{Math.round(last.score)}</span>
                               <span className={cn("text-sm font-semibold", arrowClass)}>
-                                {ArrowIcon} {delta > 0 ? "+" : ""}{Math.round(delta)}
+                                {ArrowIcon}
                               </span>
                             </div>
                             <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
@@ -1135,14 +1133,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                                 const d = payload?.[0]?.payload?.day;
                                 return d ? `Time: ${d}` : "";
                               }}
-                              formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
+                              formatter={() => ["Hidden", "Readiness"]}
                             />
                             <ReferenceLine
                               y={last.score}
                               stroke={z.color}
                               strokeDasharray="3 3"
                               strokeOpacity={0.7}
-                              label={{ value: String(Math.round(last.score)), position: "right", fill: z.color, fontSize: 11, fontWeight: 700 }}
                             />
                             <ReferenceLine
                               x={effectiveWake}
@@ -1214,7 +1211,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
-                        formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
+                        formatter={() => ["Hidden", "Readiness"]}
                       />
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
                     </AreaChart>
@@ -1369,7 +1366,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
                 if (!recoveryLine && !forecastLine) return null;
                 return (
-                  <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-2.5">
+                  <div className="hidden px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-2.5">
                     {recoveryLine && (
                       <div className="text-xs leading-snug text-slate-200 space-y-0.5">
                         <p>
@@ -1398,8 +1395,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
-      {/* AI Insight Card */}
-      <Card>
+      {/* AI Insight Card — hidden while readiness score UI is disabled. */}
+      <Card className="hidden">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-foreground">Daily Readiness Insight</h3>
@@ -1450,8 +1447,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
-      {/* Wake Readiness Score + Zone Bar */}
-      <Card>
+      {/* Wake Readiness Score + Zone Bar — hidden while readiness score UI is disabled. */}
+      <Card className="hidden">
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Wake Readiness</h3>
           <ZoneBar score={displayResult.score} />
