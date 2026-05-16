@@ -97,9 +97,7 @@ export default function PlanAdaptationBanner({ userId, direction, detail, onDone
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
           <p className="text-xs text-muted-foreground mt-1">{body}</p>
-          {detail && (
-            <p className="text-[11px] text-muted-foreground/70 mt-1">{detail}</p>
-          )}
+          {/* Readiness trigger details are intentionally hidden while score UI is disabled. */}
 
           <div className="flex items-center gap-2 mt-3">
             <Button
