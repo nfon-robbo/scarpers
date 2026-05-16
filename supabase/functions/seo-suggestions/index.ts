@@ -60,24 +60,53 @@ Type: ${suggestionType}
 
 Write a comprehensive, SEO-optimised blog post addressing this recommendation and targeting "${keyword}". Voice: Coach Claire Rayners, friendly UK English. Use <h2>/<h3> subheadings, practical tips, mention BPM/cadence (170-180 spm) where relevant. 800-1200 words. Return ONLY the HTML body content.`;
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{ role: "user", content: contentPrompt }],
-        }),
-      });
-
+      const useClaude = provider === "claude";
       let generatedContent = `<h2>${finalTitle}</h2><p>Draft content for: ${keyword}</p>`;
       let generatedExcerpt = `Guide about ${keyword} for UK runners.`;
 
-      if (aiRes.ok) {
-        const aiData = await aiRes.json();
-        const raw = aiData.choices?.[0]?.message?.content || "";
-        if (raw) generatedContent = raw.replace(/```html\n?/g, "").replace(/```\n?/g, "").trim();
-        const plain = generatedContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-        generatedExcerpt = plain.substring(0, 150).trim() + "…";
+      if (useClaude) {
+        const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+        if (!anthropicKey) return json({ error: "Claude (ANTHROPIC_API_KEY) not configured" }, 500);
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5",
+            max_tokens: 4000,
+            messages: [{ role: "user", content: contentPrompt }],
+          }),
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          const raw = aiData.content?.[0]?.text || "";
+          if (raw) generatedContent = raw.replace(/```html\n?/g, "").replace(/```\n?/g, "").trim();
+          const plain = generatedContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          generatedExcerpt = plain.substring(0, 150).trim() + "…";
+        } else {
+          const errText = await aiRes.text();
+          console.error("Claude error:", aiRes.status, errText);
+          return json({ error: `Claude generation failed: ${aiRes.status}` }, 500);
+        }
+      } else {
+        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "user", content: contentPrompt }],
+          }),
+        });
+        if (aiRes.ok) {
+          const aiData = await aiRes.json();
+          const raw = aiData.choices?.[0]?.message?.content || "";
+          if (raw) generatedContent = raw.replace(/```html\n?/g, "").replace(/```\n?/g, "").trim();
+          const plain = generatedContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          generatedExcerpt = plain.substring(0, 150).trim() + "…";
+        }
       }
 
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
