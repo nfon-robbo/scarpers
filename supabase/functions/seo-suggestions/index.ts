@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     if (!lovableKey) return json({ error: "AI not configured" }, 500);
 
     const body = await req.json();
-    const { keyword, position, action, volume, difficulty } = body;
+    const { keyword, position, action, volume, difficulty, provider } = body;
     if (!keyword) return json({ error: "keyword is required" }, 400);
 
     // === APPLY: generate full blog post draft ===
