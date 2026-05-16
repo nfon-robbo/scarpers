@@ -134,6 +134,7 @@ const AdminSEO = () => {
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
   const [expandedSuggestion, setExpandedSuggestion] = useState<number | null>(null);
   const [actionedIndices, setActionedIndices] = useState<Set<number>>(new Set());
+  const [aiProvider, setAiProvider] = useState<"lovable" | "claude">("lovable");
 
   // Keyword action tracking
   type KeywordAction = { id: string; keyword: string; action_taken: string; notes: string | null; actioned_by: string; actioned_by_email: string | null; actioned_at: string; next_review_at: string };
