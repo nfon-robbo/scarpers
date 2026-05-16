@@ -120,10 +120,9 @@ const BlogPost = () => {
       datePublished: post.published_at || undefined,
       dateModified: post.published_at || undefined,
       author: {
-        "@type": "Person",
-        name: "Coach Claire Rayners",
-        description: "AI running coach persona at Scarpers, reviewed by the Scarpers editorial team.",
-        url: "https://www.scarpers.co.uk/coach/claire-rayners",
+        "@type": "Organization",
+        name: "Scarpers",
+        url: "https://www.scarpers.co.uk/",
       },
       publisher: { "@type": "Organization", name: "Scarpers", logo: { "@type": "ImageObject", url: "https://www.scarpers.co.uk/og-image.png" } },
       mainEntityOfPage: { "@type": "WebPage", "@id": `https://www.scarpers.co.uk/blog/${post.slug}` },
@@ -211,9 +210,7 @@ const BlogPost = () => {
               {new Date(post.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
             </span>
             <span aria-hidden="true">·</span>
-            <span>
-              By <Link to="/coach/claire-rayners" className="text-foreground hover:underline">Coach Claire Rayners</Link>, reviewed by the Scarpers team
-            </span>
+            <span>By the Scarpers team</span>
           </div>
         )}
 
