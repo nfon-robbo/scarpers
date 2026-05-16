@@ -1059,10 +1059,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     if (todayPts.length < 3) {
                       return (
                         <div className="rounded-xl border border-border/40 bg-card/30 px-4 py-5 text-center">
-                          <div className="text-3xl font-bold text-foreground leading-none">{Math.round(last.score)}</div>
-                          <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
+                          <div className={cn("text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
                           <p className="mt-3 text-[11px] text-muted-foreground leading-snug">
-                            Score recorded at {last.day} — check back later as more data builds throughout the day.
+                            Readiness recorded at {last.day} — check back later as more data builds throughout the day.
                           </p>
                         </div>
                       );
@@ -1092,9 +1091,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <div className="flex items-end justify-between mb-2 px-1">
                           <div>
                             <div className="flex items-baseline gap-2">
-                              <span className="text-4xl font-bold text-foreground leading-none">{Math.round(last.score)}</span>
                               <span className={cn("text-sm font-semibold", arrowClass)}>
-                                {ArrowIcon} {delta > 0 ? "+" : ""}{Math.round(delta)}
+                                {ArrowIcon}
                               </span>
                             </div>
                             <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
@@ -1135,14 +1133,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                                 const d = payload?.[0]?.payload?.day;
                                 return d ? `Time: ${d}` : "";
                               }}
-                              formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
+                              formatter={() => ["Hidden", "Readiness"]}
                             />
                             <ReferenceLine
                               y={last.score}
                               stroke={z.color}
                               strokeDasharray="3 3"
                               strokeOpacity={0.7}
-                              label={{ value: String(Math.round(last.score)), position: "right", fill: z.color, fontSize: 11, fontWeight: 700 }}
                             />
                             <ReferenceLine
                               x={effectiveWake}
