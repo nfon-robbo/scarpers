@@ -210,9 +210,7 @@ const BlogPost = () => {
               {new Date(post.published_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
             </span>
             <span aria-hidden="true">·</span>
-            <span>
-              By <Link to="/coach/claire-rayners" className="text-foreground hover:underline">Coach Claire Rayners</Link>, reviewed by the Scarpers team
-            </span>
+            <span>By the Scarpers team</span>
           </div>
         )}
 
