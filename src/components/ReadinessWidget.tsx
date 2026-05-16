@@ -1366,7 +1366,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
                 if (!recoveryLine && !forecastLine) return null;
                 return (
-                  <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-2.5">
+                  <div className="hidden px-3 py-3 border-t border-border/40 bg-[#0d1525]/60 space-y-2.5">
                     {recoveryLine && (
                       <div className="text-xs leading-snug text-slate-200 space-y-0.5">
                         <p>
