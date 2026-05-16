@@ -919,9 +919,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             );
 
             return (
-              <div className="flex flex-col md:flex-row gap-5">
-                {/* Left column: gauge + 7-day trend */}
-                <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
+                <div className="flex flex-col md:flex-row gap-5">
+                {/* Left column: gauge + readiness trend hidden while readiness score UI is disabled. */}
+                <div className="hidden flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   {/* Gauge hidden — keep mounted in DOM-free form for future re-enable.
                   <div className="relative flex items-center justify-center">
                     <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
