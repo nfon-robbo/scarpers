@@ -131,7 +131,10 @@ function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: num
         {tickEls}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+        {/* Score number temporarily hidden — keep logic intact for future re-enable.
         <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
+        */}
+        <span className="text-6xl font-black tracking-tight text-muted-foreground/40 leading-none">—</span>
         <span className="text-sm font-semibold mt-2" style={{ color }}>{statusLabel}</span>
         <div className="mt-1 text-[11px] text-slate-400 leading-snug">{subNode}</div>
       </div>
@@ -150,7 +153,7 @@ function ZoneBar({ score }: { score: number }) {
   return (
     <div className="w-full space-y-2">
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-foreground">{score}</span>
+        {/* <span className="text-2xl font-bold text-foreground">{score}</span> */}
         <span className={cn("text-sm font-semibold", labelColor)}>{label}</span>
       </div>
       <div className="relative">
