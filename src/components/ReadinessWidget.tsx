@@ -1211,7 +1211,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
-                        formatter={(value: any) => [`${Math.round(Number(value))}`, "Readiness"]}
+                        formatter={() => ["Hidden", "Readiness"]}
                       />
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
                     </AreaChart>
@@ -1395,8 +1395,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
-      {/* AI Insight Card */}
-      <Card>
+      {/* AI Insight Card — hidden while readiness score UI is disabled. */}
+      <Card className="hidden">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-foreground">Daily Readiness Insight</h3>
@@ -1447,8 +1447,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
-      {/* Wake Readiness Score + Zone Bar */}
-      <Card>
+      {/* Wake Readiness Score + Zone Bar — hidden while readiness score UI is disabled. */}
+      <Card className="hidden">
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Wake Readiness</h3>
           <ZoneBar score={displayResult.score} />
