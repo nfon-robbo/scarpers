@@ -153,7 +153,7 @@ function ZoneBar({ score }: { score: number }) {
   return (
     <div className="w-full space-y-2">
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-foreground">{score}</span>
+        {/* <span className="text-2xl font-bold text-foreground">{score}</span> */}
         <span className={cn("text-sm font-semibold", labelColor)}>{label}</span>
       </div>
       <div className="relative">
