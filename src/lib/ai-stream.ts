@@ -61,6 +61,8 @@ export async function streamAICoach({
     if (todayWorkout) body.today_workout = todayWorkout;
     if (activitySummary) body.activity_summary = activitySummary;
     if (plannedWorkout) body.planned_workout = plannedWorkout;
+    if (preservePast) body.preserve_past = true;
+    if (planStartFromDate) body.plan_start_from_date = planStartFromDate;
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
