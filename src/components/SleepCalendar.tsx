@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Moon, Loader2 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
+import { mergeSleepStages, type RawSleepStageRow } from "@/lib/sleep-merge";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface SleepStageRow {
@@ -36,13 +37,14 @@ const SleepCalendar = () => {
     // Only use Google Fit + Health Connect via sleep_stages
     const { data } = await supabase
       .from("sleep_stages")
-      .select("date, stage, duration_seconds, source")
+      .select("date, stage, duration_seconds, source, start_time, end_time")
       .eq("user_id", user.id)
       .in("source", ["google_fit", "health_connect"])
       .gte("date", since)
       .order("date", { ascending: true });
 
-    setRows(((data as SleepStageRow[]) || []).map(r => ({
+    const merged = mergeSleepStages((data as RawSleepStageRow[]) || []);
+    setRows(merged.map(r => ({
       date: r.date,
       stage: r.stage,
       duration_seconds: r.duration_seconds,
