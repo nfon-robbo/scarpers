@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
           end_time: new Date(sessionEnd).toISOString(),
           source: "google_fit",
         };
-        const { error: fallbackInsertError } = await supabase.from("sleep_stages").insert(fallbackPayload);
+        const { error: fallbackInsertError } = await supabase.from("sleep_stages").upsert(fallbackPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
         trace.log("database.sleep_stages.insert.session_fallback", {
           sessionId: session.id,
           payload: fallbackPayload,
