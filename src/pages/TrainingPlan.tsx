@@ -2065,31 +2065,77 @@ const TrainingPlanPage = () => {
           </div>
         )}
 
-        {reviewResult && !loading && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <p className="text-sm font-medium mb-3">What would you like to do?</p>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => applyAdjustment("apply")}>
-                  <Check className="w-4 h-4 mr-2" />
-                  Apply Suggestions
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => applyAdjustment("easier")}>
-                  <ThumbsDown className="w-4 h-4 mr-2" />
-                  Make Easier
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => applyAdjustment("harder")}>
-                  <ThumbsUp className="w-4 h-4 mr-2" />
-                  Make Harder
-                </Button>
-                <Button size="sm" variant="ghost" onClick={keepCurrentPlan}>
-                  <X className="w-4 h-4 mr-2" />
-                  Keep Current Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Plan Progress Review Dialog */}
+        <Dialog
+          open={reviewDialogOpen}
+          onOpenChange={(open) => {
+            if (!open && !reviewing) {
+              setReviewDialogOpen(false);
+              setReviewStreaming("");
+              setReviewResult(null);
+              setOriginalPlanBeforeReview(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-primary" />
+                Plan Progress Review
+              </DialogTitle>
+              <DialogDescription>
+                Your plan is untouched — review the coach's notes, then decide how to adjust.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {reviewing && !reviewStreaming && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Reviewing your progress...</span>
+                </div>
+              )}
+              {reviewStreaming && (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <MarkdownRenderer content={reviewStreaming} />
+                </div>
+              )}
+              {reviewing && reviewStreaming && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Still writing...</span>
+                </div>
+              )}
+
+              {reviewResult && !reviewing && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardContent className="p-4">
+                    <p className="text-sm font-medium mb-3">What would you like to do?</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => applyAdjustment("apply")}>
+                        <Check className="w-4 h-4 mr-2" />
+                        Apply Suggestions
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => applyAdjustment("easier")}>
+                        <ThumbsDown className="w-4 h-4 mr-2" />
+                        Make Easier
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => applyAdjustment("harder")}>
+                        <ThumbsUp className="w-4 h-4 mr-2" />
+                        Make Harder
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={keepCurrentPlan}>
+                        <X className="w-4 h-4 mr-2" />
+                        Close
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
 
         {/* Day Ahead Assessment Dialog */}
         <Dialog open={dayAdjustDialogOpen} onOpenChange={(open) => { if (!open && !dayAdjusting) dismissDayAdjust(); }}>
