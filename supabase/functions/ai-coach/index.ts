@@ -33,7 +33,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
       try {
@@ -707,16 +707,32 @@ Review this athlete's progress against their training plan. Compare what was pla
         adjustInstruction = "Apply the recommended adjustments from the review as-is.";
       }
 
+      const preservePast = preserve_past === true;
+      const planStartUK = (() => {
+        if (!plan_start_from_date) return "";
+        const [y, m, d] = String(plan_start_from_date).split("-");
+        return y && m && d ? `${d}/${m}/${y}` : "";
+      })();
+
+      const scopeBlock = preservePast
+        ? `SCOPE — FUTURE WORKOUTS ONLY:
+- You have been given ONLY the workouts dated ${planStartUK || "today"} onward.
+- Generate ONLY workouts dated ${planStartUK || "today"} or later.
+- DO NOT output any workouts dated before ${planStartUK || "today"} — past workouts are preserved verbatim from the original plan and will be prepended automatically.
+- DO NOT repeat the Season Strategy Overview — it is already preserved.
+- Start your response directly with the first weekly heading covering ${planStartUK || "today"}.`
+        : `Generate a COMPLETE REVISED training plan for the remaining weeks.`;
+
       systemPrompt = `You are an elite endurance coach AI adjusting a ${raceLabel} training plan based on a progress review.
 
 ${adjustInstruction}
 
 You have been given:
-1. The ORIGINAL TRAINING PLAN
+1. The ${preservePast ? "REMAINING TRAINING PLAN (today onward)" : "ORIGINAL TRAINING PLAN"}
 2. The PROGRESS REVIEW with analysis
 3. The athlete's ACTIVITY DATA
 
-Generate a COMPLETE REVISED training plan for the remaining weeks. 
+${scopeBlock}
 
 CRITICAL FORMAT RULES: 
 1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column).
@@ -726,20 +742,20 @@ CRITICAL FORMAT RULES:
 5. For interval segments, ALWAYS express durations in MINUTES (e.g., "4 x 3 min", "6 x 2 min") — NEVER use zone labels as the duration.
 6. When a segment has a specific distance target (e.g., long run of 10km, intervals of 800m), include BOTH the distance AND the estimated duration in the Duration column (e.g., "10km (~55 min)" or "4 x 800m (~3.5 min each)").
 7. EVERY running segment MUST include a music BPM target in the Notes column (🎵 150-175 BPM range based on intensity).
-8. Include the Season Strategy Overview section before the weekly plan.
-9. Start from the next upcoming week based on today's date.`;
+${preservePast ? "" : "8. Include the Season Strategy Overview section before the weekly plan.\n"}${preservePast ? "8" : "9"}. Start from the next upcoming week based on today's date.`;
 
       userPrompt = `${athleteContext}
 
 ${dataContext}
 
-ORIGINAL TRAINING PLAN:
+${preservePast ? "REMAINING TRAINING PLAN (today onward — past workouts are NOT shown and must NOT be regenerated):" : "ORIGINAL TRAINING PLAN:"}
 ${current_plan || "No plan provided"}
 
 PROGRESS REVIEW:
 ${review_text || "No review provided"}
 
-Generate the complete revised ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate the ${preservePast ? "revised future-only portion of the" : "complete revised"} ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+
     } else if (type === "training-plan") {
       const raceLabel = {
         "5k": "5K",

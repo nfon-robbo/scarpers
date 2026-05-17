@@ -17,6 +17,8 @@ export async function streamAICoach({
   todayWorkout,
   activitySummary,
   plannedWorkout,
+  preservePast,
+  planStartFromDate,
   onDelta,
   onDone,
   onError,
@@ -37,6 +39,8 @@ export async function streamAICoach({
   todayWorkout?: string;
   activitySummary?: string;
   plannedWorkout?: string;
+  preservePast?: boolean;
+  planStartFromDate?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -57,6 +61,8 @@ export async function streamAICoach({
     if (todayWorkout) body.today_workout = todayWorkout;
     if (activitySummary) body.activity_summary = activitySummary;
     if (plannedWorkout) body.planned_workout = plannedWorkout;
+    if (preservePast) body.preserve_past = true;
+    if (planStartFromDate) body.plan_start_from_date = planStartFromDate;
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",

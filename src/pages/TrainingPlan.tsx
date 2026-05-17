@@ -28,6 +28,7 @@ import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
 import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
+import { splitPlanByDate } from "@/lib/plan-split";
 
 interface ApiStep {
   duration: number;
@@ -869,6 +870,15 @@ const TrainingPlanPage = () => {
 
     const originalForUndo = originalPlanBeforeReview;
 
+    // Split plan so we only ask the AI to rewrite today-onward workouts.
+    const todayISO = toLocalISODate(new Date());
+    const { preservedPast, futureToAdjust, splitWorked } = splitPlanByDate(originalForUndo, todayISO);
+    const planForPrompt = splitWorked ? futureToAdjust : originalForUndo;
+    const prefix = splitWorked && preservedPast ? preservedPast + "\n\n" : "";
+
+    // Show the past portion immediately so the calendar isn't blank while streaming.
+    if (prefix) setContent(prefix);
+
     let accumulated = "";
     streamAICoach({
       type: "plan-adjust",
@@ -879,18 +889,21 @@ const TrainingPlanPage = () => {
       currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(startDate),
-      currentPlan: originalPlanBeforeReview,
+      currentPlan: planForPrompt,
       adjustment,
       reviewText: reviewResult,
+      preservePast: splitWorked,
+      planStartFromDate: splitWorked ? todayISO : undefined,
       onDelta: (text) => {
         accumulated += text;
-        setContent(accumulated);
+        setContent(prefix + accumulated);
       },
       onDone: async () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalForUndo });
+        const finalContent = prefix + accumulated;
+        const planId = await savePlan(finalContent, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalForUndo });
         toastPlanChange("Plan updated", "Your adjusted training plan has been saved.", planId);
       },
       onError: (err) => {

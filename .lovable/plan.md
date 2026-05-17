@@ -1,52 +1,87 @@
-# Fix: "Review Progress" wipes the workouts
+# Make Apply / Easier / Harder rewrites future-only
 
-## What's actually happening
+## Goal
 
-`reviewProgress()` in `src/pages/TrainingPlan.tsx` does:
+When the user clicks **Apply Suggestions / Make Easier / Make Harder** after a progress review, the regenerated plan must keep every workout dated **before today** exactly as it was. The AI only rewrites workouts from **today onward**.
 
-1. `setContent("")` — clears the plan markdown.
-2. Streams the AI review (prose with headings like "📊 Progress Summary", "✅ What Went Well"…) into `content` via `onDelta`.
-3. Renders Apply / Easier / Harder / **Keep current plan** buttons.
+The progress-review text itself is unchanged — it still analyses planned vs actual across the whole plan.
 
-Because the calendar, day list and PlanOverview all parse workouts out of `content`, when `content` is review prose instead of a workout table the UI correctly shows **zero workouts**. Nothing is deleted in the database — `originalPlanBeforeReview` is held in state, and "Keep current plan" restores it. But it looks alarming and you lose the ability to see the plan while reading the review.
+## How the plan markdown is structured
 
-## Fix
+Day blocks look like:
 
-Keep the plan visible. Stream the review into a **separate panel / dialog** instead of into `content`.
+```
+### **Friday 15/05/2026** — Easy run (Total: 30min)
+| Segment | Duration | Target | Notes |
+| ... table rows ... |
+```
 
-### Changes in `src/pages/TrainingPlan.tsx`
+Date is parseable as DD/MM/YYYY from the heading. There is also a preamble (Season Strategy Overview, week summaries) before the first day heading.
 
-1. **Remove the destructive writes in `reviewProgress`:**
-   - Delete `setContent("")` and `setLoading(true)`.
-   - Stop streaming review text into `setContent`. Stream into a new `reviewStreaming` state instead.
-   - Keep `originalPlanBeforeReview` only as a snapshot for the adjust step (no UI restore needed since we never touched `content`).
+## Implementation
 
-2. **New UI: Review panel / dialog**
-   - Add a `Sheet` (or `Dialog`) that opens automatically when `reviewing || reviewResult` is truthy.
-   - Body: live-streamed markdown review (re-use `MarkdownRenderer`).
-   - Footer actions when streaming finishes:
-     - **Apply suggestions** → `applyAdjustment("apply")`
-     - **Make it easier** → `applyAdjustment("easier")`
-     - **Make it harder** → `applyAdjustment("harder")`
-     - **Close** → just dismiss the panel (replaces "Keep current plan"; nothing to restore).
-   - While streaming, show a spinner and disable the action buttons.
+### 1. New util `src/lib/plan-split.ts`
 
-3. **`applyAdjustment` stays mostly the same** but:
-   - It still snapshots `originalPlanBeforeReview` (already in state from step 1) and passes it as `currentPlan` to the `plan-adjust` stream.
-   - It now needs to clear the plan view during regeneration because it is rewriting the plan — that's the legitimate case for `setContent("")` + `setLoading(true)`.
-   - On done: save via `savePlan(..., { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview })` (unchanged) and close the review panel.
+```ts
+splitPlanByDate(markdown, todayISO): {
+  preservedPast: string;   // preamble + every day block whose date < today
+  futureToAdjust: string;  // day blocks whose date >= today
+  splitWorked: boolean;    // false if no datable headings found
+}
+```
 
-4. **`keepCurrentPlan`** can be deleted — there's nothing to restore because we never overwrote `content`.
+- Tokenise the markdown into a preamble + an ordered list of day blocks (a block starts at a `### **…DD/MM/YYYY**…` line and runs until the next such line or EOF).
+- Parse each block's date; bucket past vs today/future.
+- Reassemble. If no date headings parse, return `splitWorked: false` and the caller falls back to current behaviour.
 
-5. **Button label**: keep "Review Progress" wording on the trigger button; just make sure the spinner state ties to `reviewing` only (not `loading`).
+Unit test: `src/lib/plan-split.test.ts` covering all-past, all-future, mixed, preamble preserved, no-date fallback.
 
-## Technical details
+### 2. `applyAdjustment` in `src/pages/TrainingPlan.tsx`
 
-- State to add: `const [reviewStreaming, setReviewStreaming] = useState("");` plus reuse existing `reviewResult`, `reviewing`, `originalPlanBeforeReview`.
-- Sheet open condition: `open={reviewing || !!reviewResult}` with `onOpenChange` clearing `reviewResult`, `reviewStreaming`, `originalPlanBeforeReview` when closed.
-- No edge-function changes — the `plan-review` and `plan-adjust` prompts in `supabase/functions/ai-coach/index.ts` stay as-is.
-- No database changes.
+Before calling `streamAICoach`:
 
-## Result
+```ts
+const todayISO = toLocalISODate(new Date());
+const { preservedPast, futureToAdjust, splitWorked } =
+  splitPlanByDate(originalPlanBeforeReview, todayISO);
+```
 
-Clicking **Review Progress** opens a side panel that streams the coach's review while the plan stays fully visible behind it. The user can then choose Apply / Easier / Harder to actually rewrite the plan, or close the panel to dismiss the review with no change.
+Then:
+
+- If `splitWorked`, send `currentPlan: futureToAdjust` and a new flag `preservePast: true` (plus `planStartFromDate: todayISO`) to the edge function. While streaming, display `preservedPast + "\n\n" + accumulated` as `content` so the user always sees their full plan with past sessions intact.
+- On `onDone`, save `preservedPast + "\n\n" + accumulated` (not just `accumulated`).
+- If `!splitWorked`, fall back to current behaviour (send whole plan, replace whole plan).
+
+### 3. `streamAICoach` payload (`src/lib/ai-stream.ts`)
+
+Add optional fields to the request body: `preservePast?: boolean`, `planStartFromDate?: string`. No other changes.
+
+### 4. Edge function `supabase/functions/ai-coach/index.ts`
+
+In the `isPlanAdjust` branch, destructure the new fields and, when `preserve_past === true`:
+
+- Change the wording from "COMPLETE REVISED training plan for the remaining weeks" to:
+
+  > Generate ONLY the workouts from **{planStartFromDate UK-formatted} onward**. Do NOT output any workouts dated before {planStartFromDate}. Do NOT output the Season Strategy Overview again — it will be preserved from the original plan. Start your response directly with the first weekly heading for the week containing {planStartFromDate}.
+
+- The user prompt's "ORIGINAL TRAINING PLAN" section becomes the **future-only** slice (`current_plan` already is when `preserve_past` is set), labelled "REMAINING TRAINING PLAN (today onward)".
+- Keep all other format rules (UK dates, tables, BPM, etc).
+
+When `preserve_past` is falsy, the existing prompt and behaviour stay exactly as today.
+
+### 5. Undo / save
+
+`savePlan(...)` already takes `prevContent: originalPlanBeforeReview` for the undo entry — keep passing the full original plan so undo restores everything correctly. Only the new saved content changes (preserved past + AI future).
+
+## Out of scope (intentionally)
+
+- `plan-review` prompt — unchanged. It still summarises planned vs actual across the whole plan; the user explicitly wants only the rewrite to be future-only.
+- Auto-adapt (`plan-auto-adapt`) — unchanged.
+- Day-ahead surgical edits — already future-only by nature.
+
+## Acceptance check
+
+1. Build a plan with today = a Wednesday in week 3.
+2. Click Review Progress → Make Easier.
+3. After regeneration: every day-heading with date < today is byte-identical to the original; everything from today onward reflects an easier load.
+4. Undo restores the full original plan.
