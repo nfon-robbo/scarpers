@@ -45,20 +45,56 @@ Deno.serve(async (req) => {
       const finalSlug = (blogSlug || `${keyword}-${suggestionType || "guide"}`)
         .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+      const SCARPERS_BLOG_RULES = `
+PERMANENT BLOG RULES (cannot be overridden):
+
+AUTHOR/ATTRIBUTION:
+- Never attribute the post to any named individual (no "Claire Rayners", no coach name, no reviewer name).
+- Do not write in first person as a coach. No "I", "as your coach", "Hello fellow runners", or similar.
+- No byline inside the body. Attribution is handled by the site as "By the Scarpers Team".
+
+CONTENT ACCURACY:
+- Never invent case studies, testimonials, or named user stories. If illustrating, use clearly hypothetical phrasing like "for example, a runner who...".
+- Do NOT claim Scarpers has Apple Watch integration, calendar integration, or any feature not confirmed as live. Stick to: AI training plans, Garmin/Strava/Google Fit data import, readiness/Running IQ insights.
+- No superlatives like "UK's leading" or unverifiable marketing claims.
+
+TONE:
+- Direct, informative, authoritative. No coaching persona, no casual openers, minimal marketing language.
+- Prefer prose paragraphs over bullet-list-heavy structure. Use lists only when genuinely list-like.
+- Reserve the Scarpers call-to-action for the FINAL section only.
+
+RUNNING SCIENCE (apply where relevant, accurately):
+- 80/20 rule: ~80% easy aerobic, ~20% hard.
+- 10% rule: never increase weekly mileage by more than ~10% week-on-week.
+- 5-zone heart-rate model, with zone 2 as the primary aerobic development zone.
+- Cadence: 170-180 spm as an efficiency target for most runners; acknowledge this is not absolute, especially for beginners.
+- Progressive overload with a deload week every 3-4 weeks.
+- Adaptation happens during recovery, not during the run.
+- Specificity: training should reflect the goal race distance and pace.
+- Never recommend unsafe volumes/intensities for the stated level. Always acknowledge injury history as a plan-design factor.
+
+SEO/STRUCTURE:
+- Single H1 containing the primary keyword. H2 subheadings throughout (H3 only where genuinely nested).
+- Minimum 800 words. No keyword stuffing — write for the reader first.
+- End with one natural call-to-action linking to https://www.scarpers.co.uk/.
+- UK English spelling throughout. Return ONLY the HTML body content (no <html>/<body> tags, no markdown fences).`;
+
       const contentPrompt = suggestionType === "blog_post" && blogOutline
         ? `Write a comprehensive, SEO-optimised blog post for scarpers.co.uk (an AI running coach app for UK runners) targeting the keyword "${keyword}".
-Title: "${finalTitle}"
+H1 title: "${finalTitle}"
 Cover these points in detail:
 ${blogOutline.map((p: string) => `- ${p}`).join("\n")}
 
-Voice: Coach Claire Rayners — friendly, expert UK English, no fluff. Use <h2> and <h3> subheadings. Include practical tips and BPM/cadence guidance where relevant (170-180 spm for runs). 800-1200 words. Return ONLY the HTML body content (no <html> or <body> tags).`
-        : `You write SEO content for scarpers.co.uk, an AI running coach app for UK runners.
+${SCARPERS_BLOG_RULES}`
+        : `Write SEO content for scarpers.co.uk, an AI running coach app for UK runners.
 Recommendation for keyword "${keyword}":
 Title: ${suggestionTitle}
 Description: ${suggestionDescription}
 Type: ${suggestionType}
 
-Write a comprehensive, SEO-optimised blog post addressing this recommendation and targeting "${keyword}". Voice: Coach Claire Rayners, friendly UK English. Use <h2>/<h3> subheadings, practical tips, mention BPM/cadence (170-180 spm) where relevant. 800-1200 words. Return ONLY the HTML body content.`;
+Write a comprehensive, SEO-optimised blog post addressing this recommendation and targeting "${keyword}".
+
+${SCARPERS_BLOG_RULES}`;
 
       const useClaude = provider === "claude";
       let generatedContent = `<h2>${finalTitle}</h2><p>Draft content for: ${keyword}</p>`;
