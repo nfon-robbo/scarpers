@@ -797,6 +797,8 @@ const TrainingPlanPage = () => {
 
   const [reviewing, setReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<string | null>(null);
+  const [reviewStreaming, setReviewStreaming] = useState("");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
@@ -806,19 +808,21 @@ const TrainingPlanPage = () => {
   const reviewProgress = async () => {
     if (!user || !content) return;
     setReviewing(true);
+    setReviewResult(null);
+    setReviewStreaming("");
+    setReviewDialogOpen(true);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
       setReviewing(false);
+      setReviewDialogOpen(false);
       return;
     }
 
-    // Store original plan for reference
+    // Snapshot original plan so adjustments can reference it (plan stays visible)
     const originalPlan = content;
     setOriginalPlanBeforeReview(originalPlan);
-    setContent("");
-    setLoading(true);
 
     let accumulated = "";
     streamAICoach({
@@ -833,20 +837,18 @@ const TrainingPlanPage = () => {
       currentPlan: originalPlan,
       onDelta: (text) => {
         accumulated += text;
-        setContent(accumulated);
+        setReviewStreaming(accumulated);
       },
       onDone: () => {
-        setLoading(false);
         setReviewing(false);
         setReviewResult(accumulated);
-        // Don't auto-save — let user decide
       },
       onError: (err) => {
         toast({ title: "Review failed", description: err, variant: "destructive" });
-        setContent(originalPlan); // Restore original on failure
-        setOriginalPlanBeforeReview(null);
-        setLoading(false);
         setReviewing(false);
+        setReviewDialogOpen(false);
+        setReviewStreaming("");
+        setOriginalPlanBeforeReview(null);
       },
     });
   };
@@ -862,6 +864,10 @@ const TrainingPlanPage = () => {
 
     setLoading(true);
     setContent("");
+    setReviewDialogOpen(false);
+    setReviewStreaming("");
+
+    const originalForUndo = originalPlanBeforeReview;
 
     let accumulated = "";
     streamAICoach({
@@ -884,24 +890,23 @@ const TrainingPlanPage = () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
+        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalForUndo });
         toastPlanChange("Plan updated", "Your adjusted training plan has been saved.", planId);
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
-        setContent(originalPlanBeforeReview);
+        setContent(originalForUndo || "");
         setLoading(false);
       },
     });
   };
 
   const keepCurrentPlan = () => {
-    if (originalPlanBeforeReview) {
-      setContent(originalPlanBeforeReview);
-    }
+    // Plan was never overwritten — just dismiss the review.
     setReviewResult(null);
+    setReviewStreaming("");
+    setReviewDialogOpen(false);
     setOriginalPlanBeforeReview(null);
-    toast({ title: "Keeping current plan" });
   };
 
   const runPostPlanAnalysis = async () => {
@@ -2060,31 +2065,77 @@ const TrainingPlanPage = () => {
           </div>
         )}
 
-        {reviewResult && !loading && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <p className="text-sm font-medium mb-3">What would you like to do?</p>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => applyAdjustment("apply")}>
-                  <Check className="w-4 h-4 mr-2" />
-                  Apply Suggestions
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => applyAdjustment("easier")}>
-                  <ThumbsDown className="w-4 h-4 mr-2" />
-                  Make Easier
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => applyAdjustment("harder")}>
-                  <ThumbsUp className="w-4 h-4 mr-2" />
-                  Make Harder
-                </Button>
-                <Button size="sm" variant="ghost" onClick={keepCurrentPlan}>
-                  <X className="w-4 h-4 mr-2" />
-                  Keep Current Plan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Plan Progress Review Dialog */}
+        <Dialog
+          open={reviewDialogOpen}
+          onOpenChange={(open) => {
+            if (!open && !reviewing) {
+              setReviewDialogOpen(false);
+              setReviewStreaming("");
+              setReviewResult(null);
+              setOriginalPlanBeforeReview(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-primary" />
+                Plan Progress Review
+              </DialogTitle>
+              <DialogDescription>
+                Your plan is untouched — review the coach's notes, then decide how to adjust.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {reviewing && !reviewStreaming && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Reviewing your progress...</span>
+                </div>
+              )}
+              {reviewStreaming && (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <MarkdownRenderer content={reviewStreaming} />
+                </div>
+              )}
+              {reviewing && reviewStreaming && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Still writing...</span>
+                </div>
+              )}
+
+              {reviewResult && !reviewing && (
+                <Card className="border-primary/30 bg-primary/5">
+                  <CardContent className="p-4">
+                    <p className="text-sm font-medium mb-3">What would you like to do?</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => applyAdjustment("apply")}>
+                        <Check className="w-4 h-4 mr-2" />
+                        Apply Suggestions
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => applyAdjustment("easier")}>
+                        <ThumbsDown className="w-4 h-4 mr-2" />
+                        Make Easier
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => applyAdjustment("harder")}>
+                        <ThumbsUp className="w-4 h-4 mr-2" />
+                        Make Harder
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={keepCurrentPlan}>
+                        <X className="w-4 h-4 mr-2" />
+                        Close
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
 
         {/* Day Ahead Assessment Dialog */}
         <Dialog open={dayAdjustDialogOpen} onOpenChange={(open) => { if (!open && !dayAdjusting) dismissDayAdjust(); }}>
