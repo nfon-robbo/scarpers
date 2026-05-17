@@ -14,6 +14,29 @@
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      // Google Consent Mode v2 — default everything to denied until user chooses
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        functionality_storage: 'granted',
+        security_storage: 'granted',
+        wait_for_update: 500
+      });
+      // Apply any previously saved consent before GA config
+      try {
+        var saved = localStorage.getItem('scarpers_cookie_consent_v1');
+        if (saved) {
+          var p = JSON.parse(saved);
+          gtag('consent', 'update', {
+            ad_storage: p.marketing ? 'granted' : 'denied',
+            ad_user_data: p.marketing ? 'granted' : 'denied',
+            ad_personalization: p.marketing ? 'granted' : 'denied',
+            analytics_storage: p.analytics ? 'granted' : 'denied'
+          });
+        }
+      } catch (e) {}
       gtag('js', new Date());
       gtag('config', 'G-7LFFG1Z4TK');
     </script>
