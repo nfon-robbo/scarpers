@@ -7,7 +7,6 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { format, parseISO, subDays } from "date-fns";
-import { mergeSleepStages, type RawSleepStageRow } from "@/lib/sleep-merge";
 
 interface SleepStageRow {
   date: string;
@@ -33,12 +32,11 @@ const SleepStagesChart = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     const { data } = await supabase
       .from("sleep_stages")
-      .select("date, stage, duration_seconds, source, start_time, end_time")
+      .select("date, stage, duration_seconds")
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: true });
-    const merged = mergeSleepStages((data as RawSleepStageRow[]) || []);
-    setStages(merged.map(m => ({ date: m.date, stage: m.stage, duration_seconds: m.duration_seconds })));
+    setStages((data as SleepStageRow[]) || []);
     setLoading(false);
   };
 

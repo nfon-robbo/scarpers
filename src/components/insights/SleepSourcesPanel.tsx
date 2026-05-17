@@ -31,52 +31,22 @@ const SleepSourcesPanel = () => {
       const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
       const { data } = await supabase
         .from("sleep_stages")
-        .select("date, stage, duration_seconds, source, start_time, end_time")
+        .select("date, stage, duration_seconds, source")
         .eq("user_id", user.id)
         .gte("date", since)
         .in("source", ["google_fit", "health_connect"]);
 
-      // Dedupe overlapping segments per (date, source, stage): Google Fit can
-      // record the same night as two sessions (phone + watch), producing
-      // duplicate segments and ~doubled totals. We merge overlapping ranges.
-      type Seg = { start: number; end: number };
-      const byKey = new Map<string, Seg[]>();
+      // group by date -> source -> stage totals
+      const map = new Map<string, Map<string, StageTotals>>();
       for (const r of data ?? []) {
         const src = (r.source ?? "google_fit") as string;
         if (src !== "google_fit" && src !== "health_connect") continue;
-        if (!r.start_time || !r.end_time) continue;
-        const k = `${r.date}|${src}|${r.stage}`;
-        if (!byKey.has(k)) byKey.set(k, []);
-        byKey.get(k)!.push({
-          start: new Date(r.start_time).getTime(),
-          end: new Date(r.end_time).getTime(),
-        });
-      }
-      const mergedSecs = new Map<string, number>();
-      for (const [k, segs] of byKey) {
-        segs.sort((a, b) => a.start - b.start);
-        let total = 0;
-        let curStart = -1, curEnd = -1;
-        for (const s of segs) {
-          if (curEnd < 0 || s.start > curEnd) {
-            if (curEnd >= 0) total += curEnd - curStart;
-            curStart = s.start; curEnd = s.end;
-          } else {
-            curEnd = Math.max(curEnd, s.end);
-          }
-        }
-        if (curEnd >= 0) total += curEnd - curStart;
-        mergedSecs.set(k, Math.round(total / 1000));
-      }
-
-      const map = new Map<string, Map<string, StageTotals>>();
-      for (const [k, secs] of mergedSecs) {
-        const [date, src, stage] = k.split("|");
-        if (!map.has(date)) map.set(date, new Map());
-        const sm = map.get(date)!;
+        if (!map.has(r.date)) map.set(r.date, new Map());
+        const sm = map.get(r.date)!;
         if (!sm.has(src)) sm.set(src, { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 });
-        const t = sm.get(src)! as any;
-        if (stage in t) t[stage] += secs;
+        const t = sm.get(src)!;
+        const key = r.stage as keyof StageTotals;
+        if (key in t) t[key] += r.duration_seconds || 0;
       }
 
       const built: Row[] = Array.from(map.entries())
