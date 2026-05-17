@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
               source: "google_fit",
             };
 
-            const { error: insertError } = await supabase.from("sleep_stages").insert(insertPayload);
+            const { error: insertError } = await supabase.from("sleep_stages").upsert(insertPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
             trace.log("database.sleep_stages.insert.session_point", {
               sessionId: session.id,
               payload: insertPayload,
@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
           end_time: new Date(sessionEnd).toISOString(),
           source: "google_fit",
         };
-        const { error: fallbackInsertError } = await supabase.from("sleep_stages").insert(fallbackPayload);
+        const { error: fallbackInsertError } = await supabase.from("sleep_stages").upsert(fallbackPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
         trace.log("database.sleep_stages.insert.session_fallback", {
           sessionId: session.id,
           payload: fallbackPayload,
@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
                 end_time: new Date(endNanos / 1e6).toISOString(),
                 source: "google_fit",
               };
-              const { error: rawInsertError } = await supabase.from("sleep_stages").insert(rawInsertPayload);
+              const { error: rawInsertError } = await supabase.from("sleep_stages").upsert(rawInsertPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
               trace.log("database.sleep_stages.insert.raw_segment", { date, payload: rawInsertPayload, error: rawInsertError?.message || null });
               totalStages++;
               addStage(date, stageName, durationSeconds);
