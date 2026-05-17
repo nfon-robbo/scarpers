@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Moon, Loader2 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
+import { mergeSleepStages, type RawSleepStageRow } from "@/lib/sleep-merge";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface SleepStageRow {
