@@ -2123,7 +2123,8 @@ const TrainingPlanPage = () => {
               {reviewResult && !reviewing && (
                 <Card className="border-primary/30 bg-primary/5">
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium mb-3">What would you like to do?</p>
+                    <p className="text-sm font-medium mb-1">What would you like to do?</p>
+                    <p className="text-xs text-muted-foreground mb-3">Changes apply to today and future sessions only. Your completed workouts will not be modified.</p>
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => applyAdjustment("apply")}>
                         <Check className="w-4 h-4 mr-2" />
