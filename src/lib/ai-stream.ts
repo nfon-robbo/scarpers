@@ -17,6 +17,8 @@ export async function streamAICoach({
   todayWorkout,
   activitySummary,
   plannedWorkout,
+  preservePast,
+  planStartFromDate,
   onDelta,
   onDone,
   onError,
