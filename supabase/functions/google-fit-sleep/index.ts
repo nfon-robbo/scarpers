@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
               source: "google_fit",
             };
 
-            const { error: insertError } = await supabase.from("sleep_stages").insert(insertPayload);
+            const { error: insertError } = await supabase.from("sleep_stages").upsert(insertPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
             trace.log("database.sleep_stages.insert.session_point", {
               sessionId: session.id,
               payload: insertPayload,
