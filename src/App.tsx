@@ -43,6 +43,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <SupabaseErrorBanner />
+        <CookieConsent />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
