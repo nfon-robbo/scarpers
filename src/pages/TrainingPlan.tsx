@@ -797,6 +797,8 @@ const TrainingPlanPage = () => {
 
   const [reviewing, setReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<string | null>(null);
+  const [reviewStreaming, setReviewStreaming] = useState("");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
