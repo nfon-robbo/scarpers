@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
                 end_time: new Date(endNanos / 1e6).toISOString(),
                 source: "google_fit",
               };
-              const { error: rawInsertError } = await supabase.from("sleep_stages").insert(rawInsertPayload);
+              const { error: rawInsertError } = await supabase.from("sleep_stages").upsert(rawInsertPayload, { onConflict: "user_id,source,start_time,end_time,stage", ignoreDuplicates: true });
               trace.log("database.sleep_stages.insert.raw_segment", { date, payload: rawInsertPayload, error: rawInsertError?.message || null });
               totalStages++;
               addStage(date, stageName, durationSeconds);
