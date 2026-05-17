@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { format, parseISO, subDays } from "date-fns";
+import { mergeSleepStages, type RawSleepStageRow } from "@/lib/sleep-merge";
 
 interface SleepStageRow {
   date: string;
