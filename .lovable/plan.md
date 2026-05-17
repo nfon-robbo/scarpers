@@ -1,139 +1,52 @@
-Fix: Sleep total showing 15:56 on 17/05 (and other nights)
+# Fix: "Review Progress" wipes the workouts
 
-&nbsp;
+## What's actually happening
 
-Why it's happening
+`reviewProgress()` in `src/pages/TrainingPlan.tsx` does:
 
-&nbsp;
+1. `setContent("")` — clears the plan markdown.
+2. Streams the AI review (prose with headings like "📊 Progress Summary", "✅ What Went Well"…) into `content` via `onDelta`.
+3. Renders Apply / Easier / Harder / **Keep current plan** buttons.
 
-The "Sleep — Google Fit & Health Connect" panel reads every row in sleep_stages for the date/source and sums duration_seconds. The database currently contains exact duplicate rows for every Google Fit sleep segment (e.g. 17/05 has 42 rows but only 21 unique segments), so the displayed total is roughly 2× the real value. 15:56 is double the actual ~7:58.
+Because the calendar, day list and PlanOverview all parse workouts out of `content`, when `content` is review prose instead of a workout table the UI correctly shows **zero workouts**. Nothing is deleted in the database — `originalPlanBeforeReview` is held in state, and "Keep current plan" restores it. But it looks alarming and you lose the ability to see the plan while reading the review.
 
-&nbsp;
+## Fix
 
-The SleepCalendar / SleepStagesChart views may also be inflated.
+Keep the plan visible. Stream the review into a **separate panel / dialog** instead of into `content`.
 
-&nbsp;
+### Changes in `src/pages/TrainingPlan.tsx`
 
-Root cause
+1. **Remove the destructive writes in `reviewProgress`:**
+   - Delete `setContent("")` and `setLoading(true)`.
+   - Stop streaming review text into `setContent`. Stream into a new `reviewStreaming` state instead.
+   - Keep `originalPlanBeforeReview` only as a snapshot for the adjust step (no UI restore needed since we never touched `content`).
 
-&nbsp;
+2. **New UI: Review panel / dialog**
+   - Add a `Sheet` (or `Dialog`) that opens automatically when `reviewing || reviewResult` is truthy.
+   - Body: live-streamed markdown review (re-use `MarkdownRenderer`).
+   - Footer actions when streaming finishes:
+     - **Apply suggestions** → `applyAdjustment("apply")`
+     - **Make it easier** → `applyAdjustment("easier")`
+     - **Make it harder** → `applyAdjustment("harder")`
+     - **Close** → just dismiss the panel (replaces "Keep current plan"; nothing to restore).
+   - While streaming, show a spinner and disable the action buttons.
 
-&nbsp;
+3. **`applyAdjustment` stays mostly the same** but:
+   - It still snapshots `originalPlanBeforeReview` (already in state from step 1) and passes it as `currentPlan` to the `plan-adjust` stream.
+   - It now needs to clear the plan view during regeneration because it is rewriting the plan — that's the legitimate case for `setContent("")` + `setLoading(true)`.
+   - On done: save via `savePlan(..., { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview })` (unchanged) and close the review panel.
 
-&nbsp;
+4. **`keepCurrentPlan`** can be deleted — there's nothing to restore because we never overwrote `content`.
 
-&nbsp;
+5. **Button label**: keep "Review Progress" wording on the trigger button; just make sure the spinner state ties to `reviewing` only (not `loading`).
 
-&nbsp;
+## Technical details
 
-supabase/functions/google-fit-sleep/index.ts re-inserts overlapping segments on every sync instead of upserting.
+- State to add: `const [reviewStreaming, setReviewStreaming] = useState("");` plus reuse existing `reviewResult`, `reviewing`, `originalPlanBeforeReview`.
+- Sheet open condition: `open={reviewing || !!reviewResult}` with `onOpenChange` clearing `reviewResult`, `reviewStreaming`, `originalPlanBeforeReview` when closed.
+- No edge-function changes — the `plan-review` and `plan-adjust` prompts in `supabase/functions/ai-coach/index.ts` stay as-is.
+- No database changes.
 
-&nbsp;
+## Result
 
-&nbsp;
-
-&nbsp;
-
-The sleep_stages table has no unique constraint to prevent duplicates.
-
-&nbsp;
-
-Plan
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Clean existing duplicates
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Migration: delete duplicate sleep_stages rows, keeping one per (user_id, source, start_time, end_time, stage).
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Prevent future duplicates
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Migration: add a unique index on sleep_stages (user_id, source, start_time, end_time, stage).
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Update the Edge Function
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-google-fit-sleep: switch the insert to upsert with onConflict matching the new unique index (idempotent re-syncs).
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Verify
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Re-query 17/05 totals; expect ~7:58.
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-Re-run a Google Fit sync and confirm row count is stable.
-
-&nbsp;
-
-&nbsp;
-
-No UI changes required — the panel is correct once data is deduped.
+Clicking **Review Progress** opens a side panel that streams the coach's review while the plan stays fully visible behind it. The user can then choose Apply / Easier / Harder to actually rewrite the plan, or close the panel to dismiss the review with no change.
