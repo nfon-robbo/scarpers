@@ -33,11 +33,12 @@ const SleepStagesChart = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     const { data } = await supabase
       .from("sleep_stages")
-      .select("date, stage, duration_seconds")
+      .select("date, stage, duration_seconds, source, start_time, end_time")
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: true });
-    setStages((data as SleepStageRow[]) || []);
+    const merged = mergeSleepStages((data as RawSleepStageRow[]) || []);
+    setStages(merged.map(m => ({ date: m.date, stage: m.stage, duration_seconds: m.duration_seconds })));
     setLoading(false);
   };
 
