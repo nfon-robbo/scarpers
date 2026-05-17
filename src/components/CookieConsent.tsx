@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Cookie, X } from "lucide-react";
@@ -109,9 +109,9 @@ const CookieConsent = () => {
               <p className="mt-1 text-sm text-muted-foreground">
                 We use cookies to keep Scarpers running and to understand how it's used. You can accept all,
                 reject non-essential, or choose what to allow. See our{" "}
-                <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                <a href="/privacy" className="underline underline-offset-2 hover:text-foreground">
                   Privacy Policy
-                </Link>
+                </a>
                 .
               </p>
             </div>
