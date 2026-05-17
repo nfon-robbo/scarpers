@@ -864,6 +864,10 @@ const TrainingPlanPage = () => {
 
     setLoading(true);
     setContent("");
+    setReviewDialogOpen(false);
+    setReviewStreaming("");
+
+    const originalForUndo = originalPlanBeforeReview;
 
     let accumulated = "";
     streamAICoach({
@@ -886,24 +890,23 @@ const TrainingPlanPage = () => {
         setLoading(false);
         setReviewResult(null);
         setOriginalPlanBeforeReview(null);
-        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalPlanBeforeReview });
+        const planId = await savePlan(accumulated, { inPlace: true, undoLabel: "plan adjustment", prevContent: originalForUndo });
         toastPlanChange("Plan updated", "Your adjusted training plan has been saved.", planId);
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
-        setContent(originalPlanBeforeReview);
+        setContent(originalForUndo || "");
         setLoading(false);
       },
     });
   };
 
   const keepCurrentPlan = () => {
-    if (originalPlanBeforeReview) {
-      setContent(originalPlanBeforeReview);
-    }
+    // Plan was never overwritten — just dismiss the review.
     setReviewResult(null);
+    setReviewStreaming("");
+    setReviewDialogOpen(false);
     setOriginalPlanBeforeReview(null);
-    toast({ title: "Keeping current plan" });
   };
 
   const runPostPlanAnalysis = async () => {
