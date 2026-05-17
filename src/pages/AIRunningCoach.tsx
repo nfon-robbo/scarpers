@@ -4,7 +4,7 @@ import MarketingPageLayout from "@/components/MarketingPageLayout";
 
 const AIRunningCoach = () => (
   <MarketingPageLayout
-    title="AI Running Coach — How Scarpers Builds Your Personalised Plan"
+    title="AI Running Coach — Personalised Plans by Scarpers"
     description="Scarpers is an AI running coach that builds personalised training plans from your running data, sleep, readiness and goals. See how it works and how it differs from a human coach."
     canonicalPath="/ai-running-coach"
   >
