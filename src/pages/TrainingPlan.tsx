@@ -808,19 +808,21 @@ const TrainingPlanPage = () => {
   const reviewProgress = async () => {
     if (!user || !content) return;
     setReviewing(true);
+    setReviewResult(null);
+    setReviewStreaming("");
+    setReviewDialogOpen(true);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
       setReviewing(false);
+      setReviewDialogOpen(false);
       return;
     }
 
-    // Store original plan for reference
+    // Snapshot original plan so adjustments can reference it (plan stays visible)
     const originalPlan = content;
     setOriginalPlanBeforeReview(originalPlan);
-    setContent("");
-    setLoading(true);
 
     let accumulated = "";
     streamAICoach({
@@ -835,20 +837,18 @@ const TrainingPlanPage = () => {
       currentPlan: originalPlan,
       onDelta: (text) => {
         accumulated += text;
-        setContent(accumulated);
+        setReviewStreaming(accumulated);
       },
       onDone: () => {
-        setLoading(false);
         setReviewing(false);
         setReviewResult(accumulated);
-        // Don't auto-save — let user decide
       },
       onError: (err) => {
         toast({ title: "Review failed", description: err, variant: "destructive" });
-        setContent(originalPlan); // Restore original on failure
-        setOriginalPlanBeforeReview(null);
-        setLoading(false);
         setReviewing(false);
+        setReviewDialogOpen(false);
+        setReviewStreaming("");
+        setOriginalPlanBeforeReview(null);
       },
     });
   };
