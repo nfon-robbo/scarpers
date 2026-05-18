@@ -37,7 +37,7 @@ import {
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
-import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog } from "@/lib/plan-validation";
+import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
 interface ApiStep {
