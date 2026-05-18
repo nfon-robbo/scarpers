@@ -1485,7 +1485,7 @@ ${upcoming.join("\n")}
           attempts++;
 
           const resumeFrom = (() => {
-            if (!last) return planStart;
+            if (!last) return _planStart;
             const d = new Date(last + "T00:00:00");
             d.setDate(d.getDate() + 1);
             return d.toISOString().slice(0, 10);
@@ -1493,13 +1493,13 @@ ${upcoming.join("\n")}
 
           console.log(`[training-plan] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
 
-          const continuationUser = `The plan above stopped at ${last || "the start"}. Continue the plan from ${resumeFrom} through ${targetIso} (${raceDayName}, ${raceDateUKLong}) inclusive.
+          const continuationUser = `The plan above stopped at ${last || "the start"}. Continue the plan from ${resumeFrom} through ${targetIso} (${_raceDayName}, ${_raceDateUKLong}) inclusive.
 
-Use the EXACT same markdown format (week headings, day headings in DD/MM/YYYY, 4-column workout tables with music BPM in Notes), the same training-day schedule (${daysStr}), and the same pace/HR anchors as the plan above. Continue the periodisation seamlessly (do NOT restart Week 1).
+Use the EXACT same markdown format (week headings, day headings in DD/MM/YYYY, 4-column workout tables with music BPM in Notes), the same training-day schedule (${_daysStr}), and the same pace/HR anchors as the plan above. Continue the periodisation seamlessly (do NOT restart Week 1).
 
 Output ONLY the new days from ${resumeFrom} onwards — do NOT repeat earlier weeks, do NOT include the season overview again, and do NOT add a preamble.
 
-The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${raceLabel}"${goal_time ? `, goal ${goal_time}` : ""}${racePaceStr ? ` at ${racePaceStr}` : ""}.`;
+The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_raceLabel}"${goal_time ? `, goal ${goal_time}` : ""}${_racePaceStr ? ` at ${_racePaceStr}` : ""}.`;
 
           const contResp = await callAI({
             stream: true,
