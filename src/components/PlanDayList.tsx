@@ -60,12 +60,20 @@ function sumSegmentSeconds(w: ParsedWorkout): number {
     const d = (seg.duration || "").trim();
     if (!d) continue;
     // "N x M min/sec" pattern
-    const reps = d.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b/i);
+    // "N x M min/sec [ / R min walk ]" pattern — include inline rest in the per-rep time
+    const reps = d.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b(?:\s*\/\s*(\d+(?:\.\d+)?)\s*(min|sec|s|m)\b[^|]*)?/i);
     if (reps) {
       const n = parseInt(reps[1], 10);
       const v = parseFloat(reps[2]);
       const unit = reps[3].toLowerCase();
-      total += n * (unit.startsWith("s") ? v : v * 60);
+      const workSecs = unit.startsWith("s") ? v : v * 60;
+      let restSecs = 0;
+      if (reps[4]) {
+        const rv = parseFloat(reps[4]);
+        const ru = reps[5].toLowerCase();
+        restSecs = ru.startsWith("s") ? rv : rv * 60;
+      }
+      total += n * (workSecs + restSecs);
       continue;
     }
     // "MM:SS" or "M:SS" — anywhere in the field (e.g. "5K (~30:00)")
