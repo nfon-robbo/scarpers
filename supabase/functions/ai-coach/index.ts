@@ -977,6 +977,24 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
       const raceDayName = race_date && race_date !== "ai-recommend"
         ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
         : null;
+      const raceDateUKLong = race_date && race_date !== "ai-recommend"
+        ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : null;
+      // Compute goal race pace string (e.g. "6:00/km") for the explicit RACE DAY line.
+      const racePaceStr = (() => {
+        if (!goal_time) return null;
+        const parts = String(goal_time).trim().split(":").map((x: string) => parseInt(x, 10));
+        let totalSec = 0;
+        if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+        const distKm = ({ "5k": 5, "10k": 10, "half-marathon": 21.0975, "marathon": 42.195 } as Record<string, number>)[race_distance as string] || 0;
+        if (!totalSec || !distKm) return null;
+        const paceSec = Math.round(totalSec / distKm);
+        return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
+      })();
+      const explicitRaceDayLine = (raceDayName && raceDateUKLong)
+        ? `RACE DAY ${raceDayName} ${raceDateUKLong}, goal ${raceLabel}${goal_time ? ` in ${goal_time}` : ""}${racePaceStr ? ` at ${racePaceStr}` : ""}.`
+        : "";
 
       // Build the EXACT list of required workout dates so the model cannot stop early
       // or round to a week boundary. Includes every training-day-of-week between
