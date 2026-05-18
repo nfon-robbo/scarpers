@@ -146,13 +146,15 @@ const AIChatbot = () => {
       if (!session?.user) return;
       const { data: plan } = await supabase
         .from("training_plans")
-        .select("content")
+        .select("content, race_date")
         .eq("user_id", session.user.id)
         .eq("archived", false)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!cancelled && plan?.content) setActivePlanContent(plan.content);
+      if (cancelled) return;
+      if (plan?.content) setActivePlanContent(plan.content);
+      setActivePlanRaceDate(plan?.race_date ?? null);
     })();
     return () => { cancelled = true; };
   }, [open, messages.length]);
