@@ -265,8 +265,19 @@ const AIChatbot = () => {
           pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Use the **Undo** button at the top of the Training Plan to revert.`);
-          toast({ title: "Workout updated", description: scope.dateUk });
+          await logPlanEdit({
+            planId: plan.id,
+            userId: session.user.id,
+            dateUk: scope.dateUk,
+            action: "edit",
+            template: null,
+            beforeTitle: target.title,
+            afterTitle: newTitle,
+            summary: `Applied AI coach recommendation: ${newTitle}`,
+            details: { source: "chatbot_suggestion", recommendation: recommendationText.slice(0, 2000) },
+          });
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated to **${newTitle}** as recommended. Use the **Undo** button at the top of the Training Plan to revert.`);
+          toast({ title: `Workout updated to ${newTitle}`, description: `${scope.dateUk} — as recommended` });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
       });
