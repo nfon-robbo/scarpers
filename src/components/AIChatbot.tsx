@@ -693,14 +693,28 @@ const AIChatbot = () => {
                         >
                           Skip this session
                         </Button>
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs justify-start"
-                          disabled={loading}
-                          onClick={() => applyDayAction(scope.dateUk, "move")}
-                        >
-                          Move to tomorrow
-                        </Button>
+                        {(() => {
+                          const sourceMatch = scope.dateUk.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                          const sourceDate = sourceMatch
+                            ? new Date(Number(sourceMatch[3]), Number(sourceMatch[2]) - 1, Number(sourceMatch[1]))
+                            : null;
+                          const targetDate = activePlanContent
+                            ? getMoveTargetDate(activePlanContent, scope.dateUk)
+                            : null;
+                          const label = sourceDate && targetDate
+                            ? `Move to ${formatMoveTargetLabel(sourceDate, targetDate)}`
+                            : "Move to next training day";
+                          return (
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs justify-start"
+                              disabled={loading}
+                              onClick={() => applyDayAction(scope.dateUk, "move")}
+                            >
+                              {label}
+                            </Button>
+                          );
+                        })()}
                         <Button
                           size="sm"
                           className="h-8 text-xs justify-start"
