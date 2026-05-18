@@ -1500,6 +1500,12 @@ ${upcoming.join("\n")}
         const mm = String(m[5]).padStart(2, "0");
         return `${m[6]}-${mm}-${dd}`;
       };
+      const hasRaceDayEntry = (txt: string, targetIso: string): boolean => {
+        const [y, m, d] = targetIso.split("-");
+        const targetUk = `${d}/${m}/${y}`;
+        const lines = txt.split("\n").filter((line) => /race\s*day/i.test(line));
+        return lines.some((line) => line.includes(targetIso) || line.includes(targetUk));
+      };
 
       try {
         await consumeStream(response.body!);
@@ -1511,11 +1517,13 @@ ${upcoming.join("\n")}
 
         while (attempts < MAX_CONTINUATIONS) {
           const last = lastIsoDate(assistantSoFar);
-          if (last && last >= targetIso) break;
+          const raceDayPresent = hasRaceDayEntry(assistantSoFar, targetIso);
+          if (last && last >= targetIso && raceDayPresent) break;
           attempts++;
 
           const resumeFrom = (() => {
             if (!last) return _planStart;
+            if (last >= targetIso) return targetIso;
             const d = new Date(last + "T00:00:00");
             d.setDate(d.getDate() + 1);
             return d.toISOString().slice(0, 10);
