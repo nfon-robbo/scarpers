@@ -488,16 +488,7 @@ const TrainingPlanPage = () => {
         // Union with weekdays of any dated session already in the saved
         // content so user-initiated moves to off-schedule days (e.g.
         // Mon/Wed/Fri plan → Thursday) survive a reload.
-        const WD = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-        const presentDays = new Set<string>();
-        const headingRe = /^(?:###\s+\*\*|\s*)([A-Za-z]+)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/gm;
-        let hm: RegExpExecArray | null;
-        while ((hm = headingRe.exec(data.content)) !== null) {
-          const [, , d, m, y] = hm;
-          const dt = new Date(Date.UTC(+y, +m - 1, +d));
-          if (!isNaN(dt.getTime())) presentDays.add(WD[dt.getUTCDay()]);
-        }
-        const effectiveLoadDays = Array.from(new Set([...loadedTrainingDays, ...presentDays]));
+        const effectiveLoadDays = Array.from(new Set([...loadedTrainingDays, ...weekdaysPresentInPlan(data.content)]));
         const validatedOnLoad = validatePlanForSave(data.content, {
           trainingDays: effectiveLoadDays,
           source: "active plan load",
