@@ -1333,6 +1333,28 @@ Analyse whether the new plan aligns with the athlete's recent activity history, 
       const pw = planned_workout || "N/A";
       const as = activity_summary || "N/A";
       userPrompt = "## Planned Workout\n" + pw + "\n\n## Actual Activity\n" + as + "\n\nReview this workout with encouraging, supportive feedback.";
+    } else if (type === "plan-continuation" || type === "plan-easier" || type === "plan-harder" || type === "plan-apply") {
+      // Tail-extension / aliased plan-rewrite. The client sends the existing
+      // (possibly truncated) plan and asks us to emit ONLY the missing days
+      // through race_date so the final saved plan always reaches 🏁 RACE DAY.
+      const raceLabel = ({
+        "5k": "5K", "10k": "10K", "half-marathon": "Half Marathon", "marathon": "Marathon",
+      } as Record<string, string>)[race_distance as string] || "Half Marathon";
+      const daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+      const raceLine = race_date && race_date !== "ai-recommend"
+        ? `"🏁 RACE DAY — ${raceLabel}"${goal_time ? `, goal ${goal_time}` : ""} on ${race_date}`
+        : `"🏁 RACE DAY — ${raceLabel}"`;
+      systemPrompt = `You are an elite running coach extending an existing training plan to race day.
+The plan below stops short of the race. Output ONLY the missing days in the SAME markdown format the plan already uses (## Week N headers, ### day headers in DD/MM/YYYY, 5-column workout tables with music BPM in the Notes column). Continue the periodisation seamlessly — do NOT restart Week 1, do NOT repeat earlier weeks, do NOT add a preamble or commentary. The FINAL entry MUST be ${raceLine}. RACE DAY is a single continuous race effort over the full race distance — no walk/run intervals, no training sets. Workout segment tables must never contain mobility/stretching/foam-rolling/yoga rows.`;
+      userPrompt = `Training days: ${daysStr}
+Race: ${raceLabel}${race_date && race_date !== "ai-recommend" ? ` on ${race_date}` : ""}${goal_time ? ` (goal ${goal_time})` : ""}
+
+EXISTING PLAN (already saved — do NOT repeat any of it, output only what comes AFTER the last date below):
+${current_plan || "No plan provided"}
+
+Today's date is ${new Date().toISOString().split("T")[0]}. Continue from the day after the last dated entry above through race day inclusive.`;
     }
 
     const { callAI } = await import("../_shared/ai.ts");
