@@ -37,7 +37,8 @@ import {
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
-import { enforceAndLog } from "@/lib/plan-validation";
+import { enforceAndLog, validatePlanReachesRaceDay } from "@/lib/plan-validation";
+import { streamAICoach } from "@/lib/ai-stream";
 import { splitPlanByDate } from "@/lib/plan-split";
 
 interface ApiStep {
