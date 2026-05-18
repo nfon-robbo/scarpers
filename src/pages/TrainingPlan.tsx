@@ -462,15 +462,25 @@ const TrainingPlanPage = () => {
         .maybeSingle();
 
       if (data) {
-        setContent(data.content);
+        const loadedTrainingDays = data.training_days || [];
+        const validatedOnLoad = validatePlanForSave(data.content, {
+          trainingDays: loadedTrainingDays,
+          source: "active plan load",
+        }).content;
+        setContent(validatedOnLoad);
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
         setGoalTime((data as any).goal_time || "");
-        setTrainingDays(data.training_days);
+        setTrainingDays(loadedTrainingDays);
         setStartDate(parseLocalISODate(data.start_date));
+        if (validatedOnLoad !== data.content) {
+          supabase.from("training_plans").update({ content: validatedOnLoad }).eq("id", data.id).then(({ error }) => {
+            if (error) console.error("plan validation self-heal failed:", error);
+          });
+        }
         // Markdown plan is the source of truth for race day. If the stored
         // race_date disagrees with the RACE DAY heading in content, self-heal.
-        const derived = extractRaceDateFromMarkdown(data.content);
+        const derived = extractRaceDateFromMarkdown(validatedOnLoad);
         const effectiveRace = derived ?? (data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null);
         if (effectiveRace) {
           setRaceDate(parseLocalISODate(effectiveRace));

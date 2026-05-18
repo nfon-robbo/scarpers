@@ -116,6 +116,16 @@ function recomputeSessionTotals(markdown: string): { content: string; correction
 
 // Rule 1 — drop duplicate `### **WEEK N**` headings (same week range) and
 // duplicate day blocks (same date). Mirrors src/lib/plan-validation.ts.
+const MARKDOWN_DAY_HEADING_RE = /^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/;
+const PLAIN_DAY_HEADING_RE = /^([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:[—–-]|:)\s*\S+/;
+function matchDayHeading(line: string): { weekday: string; date: string } | null {
+  const markdown = line.match(MARKDOWN_DAY_HEADING_RE);
+  if (markdown) return { weekday: markdown[1], date: markdown[2] };
+  const plain = line.match(PLAIN_DAY_HEADING_RE);
+  if (plain) return { weekday: plain[1], date: plain[2] };
+  return null;
+}
+
 function dedupePlan(markdown: string): string {
   if (!markdown) return markdown;
   const lines = markdown.split("\n");
@@ -142,14 +152,14 @@ function dedupePlan(markdown: string): string {
   const out: string[] = [];
   let i = 0;
   while (i < liveLines.length) {
-    const m = liveLines[i].match(/^###\s+\*\*[A-Za-z]+\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
-    if (m && seenDates.has(m[1])) {
-      // Skip this block until next ### / ##
+    const m = matchDayHeading(liveLines[i]);
+    if (m && seenDates.has(m.date)) {
+      // Skip this block until next markdown section heading or date heading.
       i++;
-      while (i < liveLines.length && !/^##\s+/.test(liveLines[i]) && !/^###\s+/.test(liveLines[i])) i++;
+      while (i < liveLines.length && !/^##\s+/.test(liveLines[i]) && !matchDayHeading(liveLines[i])) i++;
       continue;
     }
-    if (m) seenDates.add(m[1]);
+    if (m) seenDates.add(m.date);
     out.push(liveLines[i]); i++;
   }
   return out.join("\n");
@@ -163,7 +173,7 @@ function injectWarmupCooldown(markdown: string): string {
   // Find day blocks (reverse to keep indices stable)
   const heads: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+    if (matchDayHeading(lines[i])) heads.push(i);
   }
   for (let h = heads.length - 1; h >= 0; h--) {
     const s = heads[h];
@@ -213,20 +223,20 @@ function enforceSchedule(markdown: string, trainingDays: string[] | null | undef
   const lines = markdown.split("\n");
   const heads: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+    if (matchDayHeading(lines[i])) heads.push(i);
   }
   const dropMask = new Array<boolean>(lines.length).fill(false);
   for (let h = 0; h < heads.length; h++) {
     const s = heads[h];
     const e = h + 1 < heads.length ? heads[h + 1] : lines.length;
-    const m = lines[s].match(/^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
+    const m = matchDayHeading(lines[s]);
     if (!m) continue;
     // Trust the actual calendar weekday, not the label.
-    const actual = weekdayFromDateAA(m[2]) || m[1];
+    const actual = weekdayFromDateAA(m.date) || m.weekday;
     if (allowed.has(actual)) continue;
     if (/race\s*day|rest\s*day/i.test(lines[s])) continue;
-    if (actual !== m[1]) {
-      console.warn(`[plan-auto-adapt] dropped off-schedule session: label says ${m[1]} but ${m[2]} is ${actual}`);
+    if (actual !== m.weekday) {
+      console.warn(`[plan-auto-adapt] dropped off-schedule session: label says ${m.weekday} but ${m.date} is ${actual}`);
     }
     for (let k = s; k < e; k++) dropMask[k] = true;
   }
