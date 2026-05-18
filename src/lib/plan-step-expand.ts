@@ -19,8 +19,6 @@ export interface ExpandedStep {
 }
 
 const WALK_PACE = "9:25/km";
-/** Fixed duration (seconds) for warm-up, cool-down, and walk/recovery steps. */
-const WALK_DURATION_SEC = 5 * 60; // 5:00
 
 export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
@@ -333,13 +331,12 @@ export function expandWorkoutSteps(
     let duration = parseDurationSeconds(seg.duration);
     const pace = intensity === "Interval" || intensity === "Active" ? maybeClamp(paceForSegment(seg, intensity)) : paceForSegment(seg, intensity);
     let label: string;
-    if (isWarmup && !isJogWarmCool) { label = seg.segment || "Warm Up"; duration = WALK_DURATION_SEC; }
-    else if (isCooldown && !isJogWarmCool) { label = seg.segment || "Cool Down"; duration = WALK_DURATION_SEC; }
+    if (isWarmup && !isJogWarmCool) { label = seg.segment || "Warm Up"; }
+    else if (isCooldown && !isJogWarmCool) { label = seg.segment || "Cool Down"; }
     else if (isJogWarmCool) { label = seg.segment || (isWarmup ? "Warm Up Jog" : "Cool Down Jog"); }
     else if (intensity === "Recovery" || intensity === "Rest") {
       walkIdx++;
       label = `Walk ${walkIdx}`;
-      duration = WALK_DURATION_SEC;
     } else {
       runIdx++;
       label = seg.segment || (isMain ? `Run ${runIdx}` : `Run ${runIdx}`);
