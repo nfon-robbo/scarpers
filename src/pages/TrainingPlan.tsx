@@ -875,7 +875,8 @@ const TrainingPlanPage = () => {
             return;
           }
         }
-        newContent = validatePlanForSave(newContent, { trainingDays, source: "start-date shift" }).content;
+        const effectiveShiftDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent)]));
+        newContent = validatePlanForSave(newContent, { trainingDays: effectiveShiftDays, source: "start-date shift" }).content;
         const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
@@ -1518,7 +1519,8 @@ const TrainingPlanPage = () => {
 
     const previousContent = content;
     const previousRaceDate = raceDate;
-    const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `day-ahead action: ${action}` }).content;
+    const effectiveDayAheadDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(result.updatedPlan)]));
+    const validated = validatePlanForSave(result.updatedPlan, { trainingDays: effectiveDayAheadDays, source: `day-ahead action: ${action}` }).content;
     setContent(validated);
     if (newRaceDate) {
       try { setRaceDate(parseLocalISODate(newRaceDate)); setLetAIDecide(false); } catch {}
