@@ -224,6 +224,35 @@ const AIChatbot = () => {
         return;
       }
 
+      // ── DETERMINISTIC PATH ──
+      // If the chat recommendation already contains a structured workout, splice
+      // it in directly — no second LLM round-trip. This avoids the day-adjust
+      // "SURGICAL EDIT MODE" rules silently preserving the original session type.
+      const parsed = parseChatRecommendation(recommendationText);
+      if (parsed) {
+        const result = applyEditWorkout(plan.content, scope.dateUk, parsed.edited);
+        if (result) {
+          const updated = enforceAndLog(result.updatedPlan, "chat recommendation direct apply").content;
+          pushUndoEntry(plan.id, plan.content, `${scope.dateUk} session`);
+          await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
+          setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk: scope.dateUk });
+          await logPlanEdit({
+            planId: plan.id,
+            userId: session.user.id,
+            dateUk: scope.dateUk,
+            action: "edit",
+            template: null,
+            beforeTitle: target.title,
+            afterTitle: parsed.edited.title,
+            summary: `Applied chat recommendation: ${parsed.edited.title}`,
+            details: { source: "chatbot_suggestion_direct", recommendation: recommendationText.slice(0, 2000) },
+          });
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been replaced with **${parsed.edited.title}** exactly as suggested. Use the **Undo** button at the top of the Training Plan to revert.`);
+          toast({ title: `Workout replaced with ${parsed.edited.title}`, description: `${scope.dateUk} — applied directly` });
+          return;
+        }
+      }
+
       // Build today_workout block (same shape the day-adjust prompt expects).
       let todayWorkoutBlock = `**${target.title}**\n`;
       if (target.segments.length > 0) {
@@ -233,8 +262,9 @@ const AIChatbot = () => {
           todayWorkoutBlock += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${s.notes || ""} |\n`;
         }
       }
-      // Append the chat recommendation so the AI knows WHAT to change.
-      todayWorkoutBlock += `\n\nCOACH RECOMMENDATION TO APPLY (from chat):\n${recommendationText}`;
+      // Fallback: pipe through day-adjust with a FULL REPLACEMENT directive so
+      // the surgical-edit guard doesn't preserve the original session type.
+      todayWorkoutBlock += `\n\nCOACH RECOMMENDATION TO APPLY (from chat):\nFULL REPLACEMENT: ${recommendationText}`;
 
       let dayResp = "";
       streamAICoach({
