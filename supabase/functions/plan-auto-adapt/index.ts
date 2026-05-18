@@ -116,6 +116,16 @@ function recomputeSessionTotals(markdown: string): { content: string; correction
 
 // Rule 1 — drop duplicate `### **WEEK N**` headings (same week range) and
 // duplicate day blocks (same date). Mirrors src/lib/plan-validation.ts.
+const MARKDOWN_DAY_HEADING_RE = /^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/;
+const PLAIN_DAY_HEADING_RE = /^([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:[—–-]|:)\s*\S+/;
+function matchDayHeading(line: string): { weekday: string; date: string } | null {
+  const markdown = line.match(MARKDOWN_DAY_HEADING_RE);
+  if (markdown) return { weekday: markdown[1], date: markdown[2] };
+  const plain = line.match(PLAIN_DAY_HEADING_RE);
+  if (plain) return { weekday: plain[1], date: plain[2] };
+  return null;
+}
+
 function dedupePlan(markdown: string): string {
   if (!markdown) return markdown;
   const lines = markdown.split("\n");
@@ -142,14 +152,14 @@ function dedupePlan(markdown: string): string {
   const out: string[] = [];
   let i = 0;
   while (i < liveLines.length) {
-    const m = liveLines[i].match(/^###\s+\*\*[A-Za-z]+\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
-    if (m && seenDates.has(m[1])) {
-      // Skip this block until next ### / ##
+    const m = matchDayHeading(liveLines[i]);
+    if (m && seenDates.has(m.date)) {
+      // Skip this block until next markdown section heading or date heading.
       i++;
-      while (i < liveLines.length && !/^##\s+/.test(liveLines[i]) && !/^###\s+/.test(liveLines[i])) i++;
+      while (i < liveLines.length && !/^##\s+/.test(liveLines[i]) && !matchDayHeading(liveLines[i])) i++;
       continue;
     }
-    if (m) seenDates.add(m[1]);
+    if (m) seenDates.add(m.date);
     out.push(liveLines[i]); i++;
   }
   return out.join("\n");
