@@ -1,57 +1,36 @@
-## Goal
-Fix the active training plan markdown in the database, then add four post-generation validation rules that run on every write path (generation, adjust, easier, harder, apply suggestions, Day Ahead, auto-adapt).
+## Plan
 
-## Part 1 — One-off database fix for plan `5f0faaf7…`
+1. **Fetch the active plan content**
+   - Read the latest non-archived row from `training_plans`.
+   - Work from the returned `content` string directly, not through the existing validator.
 
-Edit `training_plans.content` for the active plan:
+2. **Manually remove only the second duplicate plain-text lines**
+   - Replace consecutive duplicate occurrences of:
+     - `Monday 18/05/2026 — Rest Day (session moved)`
+     - `Monday 29/06/2026 — Rest Day`
+   - Keep exactly one copy of each line when those duplicate pairs exist.
+   - Save the corrected full content back to the same active `training_plans` row with a direct database update.
 
-1. **Duplicate Week 2 headings**: the plan has three back-to-back `### **WEEK 2: …**` blocks (Intensity & Volume Ramp / Mechanical Reset / Intensity Introduction) above the single Monday 18/05 row. This is what's making "Monday 18 May" appear duplicated in the calendar view. Collapse to a single `### **WEEK 2** — *Week of 18/05/2026 – 24/05/2026*` heading.
-2. **Monday 29/06 "duplicate"**: source only has one row, but the same week-heading issue may apply. Verify only one `### **Monday 29/06/2026**` remains after the fix; if a stray WEEK 8 dup exists, collapse it too.
-3. **Friday 29/05/2026 — Long Run Progression**: prepend `Warm-up | 5 min | Easy jog` row; existing 10 min cool-down stays. Bump total 60 → 65 min.
-4. **Friday 19/06/2026 — Easy Shakeout**: add `Warm-up | 5 min | Easy walk` and `Cool-down | 5 min | Walk` around the 40 min main set. Total 40 → 50 min.
-5. **Monday 22/06/2026 — Easy Run**: add 5 min walk warm-up + 5 min walk cool-down. Total 30 → 40 min.
-6. **Friday 26/06/2026 — Short & Easy**: add 5 min walk warm-up + 5 min walk cool-down. Total 25 → 35 min.
-7. **Thursday 21/05/2026 — Extended Intervals**: not a scheduled day (Mon/Wed/Fri). Wed 20/05 and Fri 22/05 already have sessions, so **remove** the Thursday block entirely (don't merge — the existing Wed/Fri sessions are already substantial).
+3. **Verify the database update**
+   - Fetch the same row back after the update.
+   - Count exact plain-text line occurrences for both target lines.
+   - Confirm each appears no more than once in returned `content`.
+   - Also confirm the date-start count for each target date is not duplicated unexpectedly.
 
-Done as a one-shot `UPDATE training_plans` via the insert tool.
+4. **Simplify and harden `dedupeDates`**
+   - Add an early pass in `src/lib/plan-validation.ts` that checks consecutive lines.
+   - If two consecutive lines start with the same `Weekday DD/MM/YYYY` pattern, remove the second line, regardless of markdown/plain-text format.
+   - This will catch:
+     - `Monday 18/05/2026 — ...`
+     - `### **Monday 18/05/2026** — ...`
+     - mixed consecutive duplicates where both lines start with the same logical date.
 
-## Part 2 — Permanent validation rules
+5. **Validate the validator change**
+   - Run a focused local smoke test against sample markdown containing two consecutive identical plain date lines.
+   - Confirm `dedupeDates` removes the second line and reports a correction.
 
-Add a single shared validator with four checks. Run it on every save path, before persisting.
+## Technical details
 
-### `src/lib/plan-validation.ts` (extend)
-
-Add four new exported functions, each returning `{ content, corrections[] }`:
-
-- `dedupeDates(markdown)` — Rule 1. Walk `### **<Day> DD/MM/YYYY**` headings; if a date repeats, keep the first occurrence's block and drop subsequent ones (and drop duplicated `### **WEEK N**` headings that share the same week range).
-- `enforceWarmupCooldown(markdown)` — Rule 2. For every day block that has a segment table whose rows include any of `Main Set | Interval | Threshold | Tempo | Steady | VO2 | Hill | Fartlek | Strides | Long Run | Race Pace`, ensure first row is `Warm-up` (≥5 min) and last row is `Cool-down` (≥5 min). If missing, inject `| Warm-up | 5 min | Easy walk | |` / `| Cool-down | 5 min | Walk | |` and bump the heading total.
-- `enforceScheduledDays(markdown, trainingDays)` — Rule 3. Parse `training_days` (e.g. `['Mon','Wed','Fri']`). If a session falls on another weekday **and** it is not labelled "Rest Day" or "RACE DAY", drop the block. Log every removal. (Race day + rest day stay.)
-- `recomputeSessionTotals` already exists — Rule 4 is already done, keep it as the final step.
-
-Public wrapper `validatePlanForSave(markdown, { trainingDays, raceDateIso, source })` runs all five (dedupe → schedule → warm-up/cool-down → existing warm-up minimums → recompute totals → `validatePlanReachesRaceDay`) and returns `{ content, corrections, blockingErrors }`. Console-logs every correction with the source label.
-
-### Wire-up
-
-Replace existing `recomputeAndLog` + `enforceAndLog` call sites with the new `validatePlanForSave`:
-
-- `src/pages/TrainingPlan.tsx` — `savePlan()` and the race-day continuation flow. Pass `plan.training_days` and `plan.race_date`.
-- `supabase/functions/ai-coach/index.ts` — every branch that writes back to `training_plans.content`: `plan-generate`, `plan-adjust`, `plan-easier`, `plan-harder`, `plan-apply`, `day-ahead` surgical-edit save, and any other type that mutates `content`. Port the same four checks into the edge function (mirroring the existing port pattern for `recomputeSessionTotals`). Read `training_days` and `race_date` from the loaded plan row.
-- `supabase/functions/plan-auto-adapt/index.ts` — same; already has totals + warm-up min, add dedupe + scheduled-day + warm-up/cool-down injection.
-
-### Non-goals
-
-- No schema changes (training_days already on `training_plans`).
-- No UI changes — `PlanDayList` already renders from the corrected markdown.
-- No new prompt rules added to the AI system message; validators are deterministic post-processing only (the AI prompt already says these things, validators are the safety net).
-
-## Files touched
-
-- `src/lib/plan-validation.ts` (extend)
-- `src/pages/TrainingPlan.tsx` (call site)
-- `supabase/functions/ai-coach/index.ts` (port + call sites)
-- `supabase/functions/plan-auto-adapt/index.ts` (port + call site)
-- One `UPDATE training_plans` via insert tool for the active plan fix.
-
-## Verification
-
-After implementation: re-fetch the active plan from DB, eyeball the seven fixed sessions, and confirm console logs show zero corrections on a clean re-save (idempotent).
+- Use `supabase.insert` for the database `UPDATE` because this is a data change, not a schema migration.
+- Avoid relying on the existing full validation pipeline for the database cleanup; perform the direct string correction first.
+- Keep the validator change scoped to duplicate consecutive date-start lines only, so it does not alter unrelated plan content.
