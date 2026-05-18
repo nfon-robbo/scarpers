@@ -343,6 +343,7 @@ If the user prompt contains a "COACH RECOMMENDATION TO APPLY" block, you are NOT
 - NEVER change the workout title unless the structural type changed.
 - Preserve every other segment exactly as written, including warm-up, cool-down, paces, BPM, notes.
 - Output the COMPLETE modified workout under "## 📝 Recommended Workout" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
+- 🔥 EXCEPTION — FULL REPLACEMENT: If the recommendation block begins with "FULL REPLACEMENT:" then the user has explicitly confirmed a complete session swap. In that case IGNORE the "preserve session type / title / segments" rules above and output the new workout verbatim as described — new title, new segments, new pace, new everything. Do NOT keep any of the original session's structure.
 
 
 
