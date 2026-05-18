@@ -120,6 +120,26 @@ function intensityFromText(text: string, hrZone: string): string {
 }
 
 // ── shape A: intervals.icu line list ───────────────────────────────────────
+function parseStrictIntervalsLine(line: string): EditedSegment | null {
+  const segmentPattern = /^(.+?)\s*—\s*(\d{1,2}:\d{2})\s*\(mm:ss\)\s*—\s*(?:(\d{1,2}:\d{2})\s*Pace\s*\(min\/km\)|—|No pace)/i;
+  const match = line.trim().match(segmentPattern);
+  if (!match) return null;
+
+  const segment = match[1].trim();
+  if (!segment || MOBILITY_RE.test(segment)) return null;
+
+  const duration = match[2];
+  const pace = match[3] || null;
+
+  return {
+    segment,
+    duration,
+    target: pace ? `${pace}/km` : "—",
+    hrZone: "",
+    notes: "",
+  };
+}
+
 function tryParseIntervalsList(text: string): EditedSegment[] | null {
   const out: EditedSegment[] = [];
   // Pattern: "1. Warm Up Walk — 05:00 (mm:ss) — No pace"
@@ -128,6 +148,11 @@ function tryParseIntervalsList(text: string): EditedSegment[] | null {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const [, name, dur, paceRaw] = m;
+    const strict = parseStrictIntervalsLine(`${name.trim()} — ${dur} (mm:ss) — ${paceRaw.trim()}`);
+    if (strict) {
+      out.push(strict);
+      continue;
+    }
     if (MOBILITY_RE.test(name)) continue;
     let pace: string;
     if (/no pace/i.test(paceRaw)) pace = "—";
