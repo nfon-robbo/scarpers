@@ -610,7 +610,9 @@ const TrainingPlanPage = () => {
     if (!user) return null;
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
-    const effectiveSaveTrainingDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]));
+    const effectiveSaveTrainingDays = options.inPlace
+      ? Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]))
+      : trainingDays;
     const validatedPlan = validatePlanForSave(planContent, {
       trainingDays: effectiveSaveTrainingDays,
       source: options.inPlace ? "in-place save" : "new plan save",
