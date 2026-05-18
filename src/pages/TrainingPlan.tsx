@@ -775,6 +775,8 @@ const TrainingPlanPage = () => {
     if (fromParts.length !== 3 || toParts.length !== 3) return;
     const fromDmy = `${fromParts[2]}/${fromParts[1]}/${fromParts[0]}`;
     const toDmy = `${toParts[2]}/${toParts[1]}/${toParts[0]}`;
+    const toDateObj = parseLocalISODate(toIso);
+    const toWeekday = WEEKDAY_NAMES[toDateObj.getDay()];
 
     // Replace inside **...DD/MM/YYYY...** date headers only
     const lines = content.split("\n");
@@ -785,7 +787,9 @@ const TrainingPlanPage = () => {
       const m = ln.match(headerRe);
       if (m && m[1] === fromDmy) {
         replaced = true;
-        return ln.replace(fromDmy, toDmy);
+        return ln
+          .replace(fromDmy, toDmy)
+          .replace(/(\*\*[^*]*?)(Sun|Mon|Tues?|Wed(?:nes)?|Thur?s?|Fri|Sat)[a-z]*([^*]*\d{1,2}\/\d{1,2}\/\d{4})/i, `$1${toWeekday}$3`);
       }
       return ln;
     });
@@ -819,7 +823,6 @@ const TrainingPlanPage = () => {
       // Include every weekday already present in the current plan plus the
       // target weekday, so previous manual moves are not stripped by the
       // validator during a later move.
-      const toWeekday = WEEKDAY_NAMES[parseLocalISODate(toIso).getDay()];
       const moveDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent), toWeekday]));
       newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
