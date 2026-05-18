@@ -308,7 +308,7 @@ const AIChatbot = () => {
         action === "skip"
           ? applySkipSession(plan.content, dateUk)
           : action === "move"
-            ? applyMoveToTomorrow(plan.content, dateUk)
+            ? applyMoveSession(plan.content, dateUk)
             : applyReplaceWithRecovery(plan.content, dateUk);
 
       if (!result) {
