@@ -246,6 +246,10 @@ export function parseChatRecommendation(text: string): ParsedRecommendation | nu
   if (!segments || segments.length < 2) return null;
 
   let title = extractTitle(text);
+  if (title) {
+    // Strip preamble verbs like "Replace ... with X"
+    title = title.replace(/^(replace|change|swap|update)\b[^:]*?\bwith\s+/i, "").replace(/[:.]$/, "").trim();
+  }
   if (!title) {
     // Last-ditch: use first non-empty line that looks like a name.
     const first = text.split("\n").find((l) => l.trim() && !/^[#\->|]/.test(l.trim()));
