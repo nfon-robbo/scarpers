@@ -258,6 +258,15 @@ ${plan.content}`;
       );
     }
 
+    // Guardrail: recompute each session's `(Total: Nmin)` from segment durations.
+    const totalsFix = recomputeSessionTotals(newContent);
+    newContent = totalsFix.content;
+    for (const c of totalsFix.corrections) {
+      console.warn(
+        `[plan-auto-adapt] recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
+      );
+    }
+
     // Persist
     const { error: updErr } = await supabase
       .from("training_plans")
