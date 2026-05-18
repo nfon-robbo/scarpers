@@ -1365,8 +1365,8 @@ ${upcoming.join("\n")}
 
 `;
     })();
-    const isPlanGen = type === "training-plan";
-    // Route plan generation to a higher-capacity model (Gemini Flash preview caps
+    const needsRaceDateContinuation = (type === "training-plan" || type === "plan-adjust") && !!race_date && race_date !== "ai-recommend";
+    // Route full plan generation/adjustment to a higher-capacity model (Gemini Flash preview caps
     // output at ~8-16k tokens which truncates long multi-month plans before they
     // reach race day). Other types keep the gateway default.
     const planLovableModel = "google/gemini-2.5-pro";
@@ -1381,7 +1381,7 @@ ${upcoming.join("\n")}
       stream: true,
       maxTokens: 64000,
       label: `ai-coach:${type || "chat"}`,
-      lovableModel: isPlanGen ? planLovableModel : undefined,
+      lovableModel: needsRaceDateContinuation ? planLovableModel : undefined,
       messages: initialMessages,
     });
 
@@ -1411,8 +1411,8 @@ ${upcoming.join("\n")}
       "X-Accel-Buffering": "no",
     };
 
-    // Non-plan types: zero-buffer pass-through (latency-sensitive).
-    if (!isPlanGen || !race_date || race_date === "ai-recommend") {
+    // Non-full-plan types: zero-buffer pass-through (latency-sensitive).
+    if (!needsRaceDateContinuation) {
       const { readable, writable } = new TransformStream();
       response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
       return new Response(readable, { headers: sseHeaders });
