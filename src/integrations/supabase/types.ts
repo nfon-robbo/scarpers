@@ -727,6 +727,48 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_edit_log: {
+        Row: {
+          action: string
+          after_title: string | null
+          before_title: string | null
+          created_at: string
+          date_uk: string
+          details: Json | null
+          id: string
+          plan_id: string
+          summary: string
+          template: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          after_title?: string | null
+          before_title?: string | null
+          created_at?: string
+          date_uk: string
+          details?: Json | null
+          id?: string
+          plan_id: string
+          summary: string
+          template?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          after_title?: string | null
+          before_title?: string | null
+          created_at?: string
+          date_uk?: string
+          details?: Json | null
+          id?: string
+          plan_id?: string
+          summary?: string
+          template?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           athlete_context: string | null
