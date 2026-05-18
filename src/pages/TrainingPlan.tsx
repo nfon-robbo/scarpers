@@ -2411,7 +2411,14 @@ const TrainingPlanPage = () => {
                   return;
                 }
                 const previousContent = content;
-                const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `edit-workout: ${action}` }).content;
+                // For user-initiated moves, allow the target weekday even if
+                // it's outside the normal scheduled training days.
+                let effectiveTrainingDays = trainingDays;
+                if (change.kind === "move") {
+                  const wd = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(change.isoTarget + "T12:00:00").getDay()];
+                  effectiveTrainingDays = Array.from(new Set([...(trainingDays || []), wd]));
+                }
+                const validated = validatePlanForSave(result.updatedPlan, { trainingDays: effectiveTrainingDays, source: `edit-workout: ${action}` }).content;
                 setContent(validated);
                 const planId = await savePlan(validated, {
                   inPlace: true,
