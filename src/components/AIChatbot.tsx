@@ -383,7 +383,12 @@ const AIChatbot = () => {
       }
 
       const validated = enforceAndLog(result.updatedPlan, `chat day action: ${action}`).content;
-      pushUndoEntry(plan.id, plan.content, `${dateUk} session (${action})`);
+      pushUndoEntry(
+        plan.id,
+        plan.content,
+        `${dateUk} session (${action})`,
+        newRaceDate ? { prevRaceDate: plan.race_date } : undefined,
+      );
       const updatePayload: { content: string; race_date?: string } = { content: validated };
       if (newRaceDate) updatePayload.race_date = newRaceDate;
       const { error } = await supabase
