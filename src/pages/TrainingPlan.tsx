@@ -1611,6 +1611,19 @@ const TrainingPlanPage = () => {
                   <span className="text-[10px] tabular-nums opacity-70">{undoCount}</span>
                 </Button>
               )}
+              {redoCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRedo()}
+                  className="gap-2"
+                  title={`Redo last undone change (${redoCount} step${redoCount === 1 ? "" : "s"} available)`}
+                >
+                  <Redo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Redo</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{redoCount}</span>
+                </Button>
+              )}
               <Button
                 variant="default"
                 size="sm"
