@@ -133,11 +133,9 @@ export function deriveWorkoutTitleFromSteps(
     return `${capitalize(base)} ${totalMins}min (Total: ${totalMins} min)`;
   }
 
-  const descs = groups.map((g) =>
-    g.restDur > 0
-      ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
-      : `${g.reps}x${fmtDur(g.workDur)}`,
-  );
+  // Title shows the work blocks only — walk/rest details belong in the segment table,
+  // not in the headline label. Total comes from summing all step durations.
+  const descs = groups.map((g) => `${g.reps}x${fmtDur(g.workDur)}`);
   const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
   return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
 }
@@ -212,11 +210,8 @@ export function deriveWorkoutTitleFromSegments(
 
   let body: string;
   if (groups.length > 0 && (groups.some((g) => g.reps > 1) || groups.some((g) => g.rest > 0))) {
-    const descs = groups.map((g) =>
-      g.rest > 0
-        ? `${g.reps}x${fmtDur(g.work)} run / ${fmtDur(g.rest)} walk`
-        : `${g.reps}x${fmtDur(g.work)}`,
-    );
+    // Title shows work blocks only — walk/rest details live in the segment table.
+    const descs = groups.map((g) => `${g.reps}x${fmtDur(g.work)}`);
     const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
     body = `${descs.join(" + ")} ${intentLabel} ${totalMins}min`;
   } else {
