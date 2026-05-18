@@ -27,6 +27,13 @@ export interface ParsedWorkout {
   intervalsText?: string; // Native intervals.icu workout text block (from DOCX import)
 }
 
+function cleanMarkdownCell(value: string): string {
+  return value
+    .replace(/\\([*_`])/g, "$1")
+    .replace(/[*_`]/g, "")
+    .trim();
+}
+
 /**
  * Parse a markdown training plan to extract individual workouts.
  * Looks for bold date + workout title patterns followed by segment tables.
@@ -96,7 +103,7 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
           while (i < lines.length && lines[i].includes("|") && !/^\s*\|?\s*[-:]+[-|:\s]+$/.test(lines[i])) {
             const cells = lines[i].split("|").map(c => c.trim()).filter(Boolean);
             if (cells.length >= 3) {
-              const getCell = (idx: number, fallback = "") => (idx >= 0 ? (cells[idx] || fallback) : fallback);
+              const getCell = (idx: number, fallback = "") => cleanMarkdownCell(idx >= 0 ? (cells[idx] || fallback) : fallback);
               const segName = getCell(segmentIdx, cells[0] || "");
               // Strip mobility / stretching / yoga / foam-rolling segments — these
               // should never appear as workout rows (per user instruction).
