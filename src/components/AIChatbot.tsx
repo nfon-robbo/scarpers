@@ -23,6 +23,7 @@ import {
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
+import { logPlanEdit } from "@/lib/plan-edit-log";
 
 interface Message {
   role: "user" | "assistant";
@@ -264,8 +265,19 @@ const AIChatbot = () => {
           pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
-          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated. Use the **Undo** button at the top of the Training Plan to revert.`);
-          toast({ title: "Workout updated", description: scope.dateUk });
+          await logPlanEdit({
+            planId: plan.id,
+            userId: session.user.id,
+            dateUk: scope.dateUk,
+            action: "edit",
+            template: null,
+            beforeTitle: target.title,
+            afterTitle: newTitle,
+            summary: `Applied AI coach recommendation: ${newTitle}`,
+            details: { source: "chatbot_suggestion", recommendation: recommendationText.slice(0, 2000) },
+          });
+          finishWith(`✅ Done — your **${scope.dateUk}** session has been updated to **${newTitle}** as recommended. Use the **Undo** button at the top of the Training Plan to revert.`);
+          toast({ title: `Workout updated to ${newTitle}`, description: `${scope.dateUk} — as recommended` });
         },
         onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
       });
@@ -742,6 +754,15 @@ const AIChatbot = () => {
                       <div className="flex flex-col gap-1.5">
                         <Button
                           size="sm"
+                          className="h-8 text-xs justify-start bg-primary"
+                          disabled={loading}
+                          onClick={() => applyChange(cleaned, scope)}
+                        >
+                          ✨ Apply suggested workout
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           className="h-8 text-xs justify-start"
                           disabled={loading}
                           onClick={() => applyDayAction(scope.dateUk, "skip")}
