@@ -1,0 +1,1 @@
+UPDATE public.training_plans SET content = regexp_replace(content, E'### \\*\\*Wednesday 24/06/2026\\*\\* — You''re addressing Wednesday 24/06/2026 \\(Total: 40min\\)', '### **Wednesday 24/06/2026** — Race Pace Dress Rehearsal (Total: 40min)') WHERE id = '03acc823-ea35-4d23-8554-1851baf941f0';
