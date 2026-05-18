@@ -1387,7 +1387,8 @@ ${upcoming.join("\n")}
 
 `;
     })();
-    const needsRaceDateContinuation = (type === "training-plan" || type === "plan-adjust") && !!race_date && race_date !== "ai-recommend";
+    const planRewriteTypes = new Set(["training-plan", "plan-adjust", "plan-easier", "plan-harder", "plan-apply", "plan-continuation"]);
+    const needsRaceDateContinuation = planRewriteTypes.has(type) && !!race_date && race_date !== "ai-recommend";
     // Route full plan generation/adjustment to a higher-capacity model (Gemini Flash preview caps
     // output at ~8-16k tokens which truncates long multi-month plans before they
     // reach race day). Other types keep the gateway default.
