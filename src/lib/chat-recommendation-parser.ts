@@ -127,7 +127,6 @@ function tryParseIntervalsList(text: string): EditedSegment[] | null {
     /(?:^|\s)\d+\.\s*(.+?)\s*[—–-]\s*(\d{1,2}:\d{2})(?:\s*\([^)]*\))?\s*[—–-]\s*([\s\S]*?)(?=\s+\d+\.\s*|\s+Total:\s*\d+\s*(?:min|minutes)\b|$)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
-    const m = raw.match(re);
     const [, name, dur, paceRaw] = m;
     if (MOBILITY_RE.test(name)) continue;
     let pace: string;
