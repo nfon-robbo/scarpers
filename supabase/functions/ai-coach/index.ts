@@ -1411,6 +1411,31 @@ ${upcoming.join("\n")}
       const writer = writable.getWriter();
       let fullText = "";
 
+      // Recompute plan-context locals (they live inside the training-plan branch
+      // above and aren't in scope here).
+      const _planStart = start_date || new Date().toISOString().split("T")[0];
+      const _daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+      const _raceLabel = ({
+        "5k": "5K", "10k": "10K", "half-marathon": "Half Marathon", "marathon": "Marathon",
+      } as Record<string, string>)[race_distance as string] || "Half Marathon";
+      const _raceDayName = new Date((race_date as string) + "T00:00:00")
+        .toLocaleDateString("en-GB", { weekday: "long" });
+      const _raceDateUKLong = new Date((race_date as string) + "T00:00:00")
+        .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const _racePaceStr = (() => {
+        if (!goal_time) return null;
+        const parts = String(goal_time).trim().split(":").map((x: string) => parseInt(x, 10));
+        let totalSec = 0;
+        if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+        const distKm = ({ "5k": 5, "10k": 10, "half-marathon": 21.0975, "marathon": 42.195 } as Record<string, number>)[race_distance as string] || 0;
+        if (!totalSec || !distKm) return null;
+        const paceSec = Math.round(totalSec / distKm);
+        return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
+      })();
+
       const consumeStream = async (body: ReadableStream<Uint8Array>) => {
         const reader = body.getReader();
         const decoder = new TextDecoder();
