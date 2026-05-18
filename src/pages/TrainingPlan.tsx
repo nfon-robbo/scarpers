@@ -575,6 +575,11 @@ const TrainingPlanPage = () => {
     // Guardrail: enforce 5-min minimum on every Warm-up / Cool-down before saving.
     const validated = enforceAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
     planContent = validated.content;
+    // Guardrail: rewrite each session's `(Total: Nmin)` heading to match the
+    // sum of its segment-table durations. Prevents AI-estimated totals from
+    // contradicting the actual workout steps.
+    const totalsFix = recomputeAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
+    planContent = totalsFix.content;
     if (validated.corrections.length) {
       toast({
         title: "Plan auto-corrected",
