@@ -308,19 +308,16 @@ export function dedupeDates(markdown: string): { content: string; corrections: D
   const dropMask = new Array<boolean>(lines.length).fill(false);
   const seenWeekRanges = new Set<string>();
   let currentMarkdownDate = "";
-  let currentMarkdownWeekday = "";
   const seenPlainLines = new Set<string>();
   for (let i = 0; i < lines.length; i++) {
     const markdownDay = lines[i].match(MARKDOWN_DAY_HEADING_RE);
     if (markdownDay) {
-      currentMarkdownWeekday = markdownDay[1];
       currentMarkdownDate = markdownDay[2];
       seenPlainLines.clear();
       continue;
     }
     if (/^##\s+/.test(lines[i])) {
       currentMarkdownDate = "";
-      currentMarkdownWeekday = "";
       seenPlainLines.clear();
     }
 
