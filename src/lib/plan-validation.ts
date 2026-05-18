@@ -240,3 +240,263 @@ export function recomputeAndLog(markdown: string, source: string): { content: st
   }
   return result;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Day-block helpers. A "day block" is the lines from `### **Day DD/MM/YYYY**`
+// (exclusive of higher-level `##` or `---`-only) up to the next `###` heading.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DayBlock {
+  startLine: number; // index of the `### **...**` line
+  endLine: number;   // exclusive
+  date: string;      // DD/MM/YYYY (or "" if non-dated)
+  weekday: string;   // Monday/Tuesday/...
+  heading: string;   // full heading line
+}
+
+const WEEKDAY_LIST = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const WEEKDAY_SHORT: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday",
+  Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+};
+
+function findDayBlocks(lines: string[]): DayBlock[] {
+  const blocks: DayBlock[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
+    if (!m) continue;
+    // Find next `###` (any level-3 heading) or `##` heading
+    let end = lines.length;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (/^##\s+/.test(lines[j]) || /^###\s+/.test(lines[j])) { end = j; break; }
+    }
+    blocks.push({ startLine: i, endLine: end, date: m[2], weekday: m[1], heading: lines[i] });
+  }
+  return blocks;
+}
+
+function normaliseDate(dmy: string): string {
+  const [d, m, y] = dmy.split("/");
+  return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rule 1 — No duplicate dates. Keep the first occurrence, drop subsequent ones.
+// Also strips back-to-back duplicate `### **WEEK N: …**` headings that share
+// the same "Week of DD/MM – DD/MM" sub-line.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface DedupeCorrection { kind: "date" | "week"; label: string; }
+
+export function dedupeDates(markdown: string): { content: string; corrections: DedupeCorrection[] } {
+  if (!markdown) return { content: markdown, corrections: [] };
+  const lines = markdown.split("\n");
+  const corrections: DedupeCorrection[] = [];
+
+  // Pass 1: drop duplicate `### **WEEK N: …**` headings sharing the same
+  // immediate `*Week of …*` sub-line (handles 3× WEEK 2 case).
+  const dropMask = new Array<boolean>(lines.length).fill(false);
+  const seenWeekRanges = new Set<string>();
+  for (let i = 0; i < lines.length; i++) {
+    const wh = lines[i].match(/^###\s+\*\*WEEK\s+\d+/i);
+    if (!wh) continue;
+    // Peek next non-blank line for `*Week of …*`
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+    const sub = lines[j]?.match(/^\*Week of\s+(.+?)\*\s*$/i);
+    if (!sub) continue;
+    const key = sub[1].trim();
+    if (seenWeekRanges.has(key)) {
+      // Drop this heading + the sub line + a trailing blank/--- if present.
+      dropMask[i] = true;
+      dropMask[j] = true;
+      let k = j + 1;
+      while (k < lines.length && (lines[k].trim() === "" || lines[k].trim() === "---")) {
+        dropMask[k] = true; k++;
+        if (lines[k - 1].trim() === "---") break;
+      }
+      corrections.push({ kind: "week", label: `WEEK heading for "${key}"` });
+    } else {
+      seenWeekRanges.add(key);
+    }
+  }
+
+  // Pass 2: drop subsequent day-blocks sharing the same date.
+  // (Operate on the post-pass-1 view via dropMask so deleted weeks don't
+  // interfere with block boundaries.)
+  const liveLines = lines.map((l, i) => (dropMask[i] ? null : l));
+  const compact = liveLines.filter((l): l is string => l !== null);
+  const indexMap: number[] = []; // compact index -> original index
+  for (let i = 0; i < lines.length; i++) if (!dropMask[i]) indexMap.push(i);
+  const blocks = findDayBlocks(compact);
+  const seenDates = new Set<string>();
+  for (const b of blocks) {
+    if (seenDates.has(b.date)) {
+      // Drop original-indexed range [b.startLine, b.endLine) of compact -> mark drop
+      const startOrig = indexMap[b.startLine];
+      const endOrigExclusive = b.endLine < indexMap.length ? indexMap[b.endLine] : lines.length;
+      for (let k = startOrig; k < endOrigExclusive; k++) dropMask[k] = true;
+      corrections.push({ kind: "date", label: `${b.weekday} ${b.date}` });
+    } else {
+      seenDates.add(b.date);
+    }
+  }
+
+  const out = lines.filter((_, i) => !dropMask[i]).join("\n");
+  return { content: out, corrections };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rule 2 — Every running session with a "main set" / interval row must have a
+// Warm-up row first and a Cool-down row last. Inject 5-min defaults if missing.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface WCCorrection { day: string; added: ("Warm-up" | "Cool-down")[]; }
+
+const MAIN_ROW_RE = /\|\s*(Main\s*Set|Interval(?:\s*Set)?|Threshold|Tempo|Steady|VO2|Hill|Fartlek|Strides|Long\s*Run|Race\s*Pace|Race|Easy\s*Run|Cruise|Sharpening|Repeats?|Reps?|Pre-?Race)\b/i;
+const WU_RE = /^\|\s*Warm-?up\s*\|/i;
+const CD_RE = /^\|\s*Cool-?down\s*\|/i;
+const RACE_DAY_RE = /race\s*day/i;
+const REST_DAY_RE = /rest\s*day/i;
+
+export function enforceWarmupCooldown(markdown: string): { content: string; corrections: WCCorrection[] } {
+  if (!markdown) return { content: markdown, corrections: [] };
+  const lines = markdown.split("\n");
+  const corrections: WCCorrection[] = [];
+  const blocks = findDayBlocks(lines);
+
+  // Walk blocks in reverse so line insertions don't shift earlier indices.
+  for (let bi = blocks.length - 1; bi >= 0; bi--) {
+    const b = blocks[bi];
+    const heading = lines[b.startLine];
+    if (RACE_DAY_RE.test(heading) || REST_DAY_RE.test(heading)) continue;
+
+    // Locate the segment table inside the block.
+    let firstRowIdx = -1, lastRowIdx = -1, hasMain = false;
+    for (let i = b.startLine + 1; i < b.endLine; i++) {
+      const ln = lines[i];
+      if (!/^\|/.test(ln)) continue;
+      // Skip header + separator rows
+      if (/^\|\s*Segment\s*\|/i.test(ln)) continue;
+      if (/^\|\s*[-:\s|]+\|\s*$/.test(ln)) continue;
+      if (firstRowIdx === -1) firstRowIdx = i;
+      lastRowIdx = i;
+      if (MAIN_ROW_RE.test(ln)) hasMain = true;
+    }
+    if (firstRowIdx === -1 || !hasMain) continue;
+
+    const hasWU = WU_RE.test(lines[firstRowIdx]);
+    const hasCD = CD_RE.test(lines[lastRowIdx]);
+    if (hasWU && hasCD) continue;
+
+    const added: ("Warm-up" | "Cool-down")[] = [];
+    let addedMins = 0;
+    if (!hasCD) {
+      lines.splice(lastRowIdx + 1, 0, "| Cool-down | 5 min | Walk | 🎵 150 BPM |");
+      added.push("Cool-down");
+      addedMins += 5;
+    }
+    if (!hasWU) {
+      lines.splice(firstRowIdx, 0, "| Warm-up | 5 min | Easy walk | 🎵 150 BPM |");
+      added.push("Warm-up");
+      addedMins += 5;
+    }
+    // Bump heading Total by addedMins.
+    if (addedMins > 0) {
+      lines[b.startLine] = lines[b.startLine].replace(/\(Total:\s*(\d+)\s*min\)/i, (_m, n) =>
+        `(Total: ${parseInt(n, 10) + addedMins}min)`
+      );
+    }
+    corrections.push({ day: `${b.weekday} ${b.date}`, added });
+  }
+  return { content: lines.join("\n"), corrections };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rule 3 — Sessions only on scheduled training days. Drop any session on a
+// non-scheduled weekday unless it's a rest day or race day.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface DayScheduleCorrection { day: string; reason: string; }
+
+export function enforceScheduledDays(
+  markdown: string,
+  trainingDays: string[] | null | undefined,
+): { content: string; corrections: DayScheduleCorrection[] } {
+  if (!markdown || !trainingDays?.length) return { content: markdown, corrections: [] };
+  const allowed = new Set<string>(
+    trainingDays.map((d) => WEEKDAY_SHORT[d] || (WEEKDAY_LIST.includes(d) ? d : "")).filter(Boolean)
+  );
+  if (!allowed.size) return { content: markdown, corrections: [] };
+
+  const lines = markdown.split("\n");
+  const blocks = findDayBlocks(lines);
+  const corrections: DayScheduleCorrection[] = [];
+  const dropMask = new Array<boolean>(lines.length).fill(false);
+
+  for (const b of blocks) {
+    if (allowed.has(b.weekday)) continue;
+    if (RACE_DAY_RE.test(b.heading) || REST_DAY_RE.test(b.heading)) continue;
+    for (let k = b.startLine; k < b.endLine; k++) dropMask[k] = true;
+    corrections.push({ day: `${b.weekday} ${b.date}`, reason: `not in scheduled days (${[...allowed].join(",")})` });
+  }
+  const out = lines.filter((_, i) => !dropMask[i]).join("\n");
+  return { content: out, corrections };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public combined wrapper. Order matters:
+//   dedupe → schedule → warm-up/cool-down inject → warm-up min ≥5 → totals
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ValidatePlanOptions {
+  trainingDays?: string[] | null;
+  source?: string;
+}
+
+export interface ValidatePlanResult {
+  content: string;
+  corrections: {
+    dedupes: DedupeCorrection[];
+    scheduleDrops: DayScheduleCorrection[];
+    warmupsAdded: WCCorrection[];
+    warmupBumps: PlanCorrection[];
+    totalsRecomputed: TotalCorrection[];
+  };
+}
+
+export function validatePlanForSave(markdown: string, opts: ValidatePlanOptions = {}): ValidatePlanResult {
+  const source = opts.source || "plan-save";
+  let content = markdown;
+
+  const d = dedupeDates(content);
+  content = d.content;
+  for (const c of d.corrections) {
+    console.warn(`[plan-validation] ${source}: dropped duplicate ${c.kind} → ${c.label}`);
+  }
+
+  const s = enforceScheduledDays(content, opts.trainingDays);
+  content = s.content;
+  for (const c of s.corrections) {
+    console.warn(`[plan-validation] ${source}: removed off-schedule session ${c.day} (${c.reason})`);
+  }
+
+  const wc = enforceWarmupCooldown(content);
+  content = wc.content;
+  for (const c of wc.corrections) {
+    console.warn(`[plan-validation] ${source}: added ${c.added.join("+")} to ${c.day}`);
+  }
+
+  const wu = enforceAndLog(content, source);
+  content = wu.content;
+
+  const totals = recomputeAndLog(content, source);
+  content = totals.content;
+
+  return {
+    content,
+    corrections: {
+      dedupes: d.corrections,
+      scheduleDrops: s.corrections,
+      warmupsAdded: wc.corrections,
+      warmupBumps: wu.corrections,
+      totalsRecomputed: totals.corrections,
+    },
+  };
+}
