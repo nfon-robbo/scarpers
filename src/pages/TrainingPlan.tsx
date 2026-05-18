@@ -610,8 +610,9 @@ const TrainingPlanPage = () => {
     if (!user) return null;
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
+    const effectiveSaveTrainingDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]));
     const validatedPlan = validatePlanForSave(planContent, {
-      trainingDays,
+      trainingDays: effectiveSaveTrainingDays,
       source: options.inPlace ? "in-place save" : "new plan save",
     });
     planContent = validatedPlan.content;
@@ -650,7 +651,8 @@ const TrainingPlanPage = () => {
         });
         const extended = await extendPlanToRaceDay(planContent, raceIsoForGuard);
         if (extended) {
-          planContent = validatePlanForSave(extended, { trainingDays, source: "race-day continuation" }).content;
+          const effectiveExtendedDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(extended)]));
+          planContent = validatePlanForSave(extended, { trainingDays: effectiveExtendedDays, source: "race-day continuation" }).content;
         }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
