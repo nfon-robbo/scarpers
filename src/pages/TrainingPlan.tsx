@@ -74,6 +74,21 @@ function extractRaceDateFromMarkdown(md: string | null | undefined): string | nu
   return null;
 }
 
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
+  if (!markdown) return [];
+  const days = new Set<string>();
+  const headingRe = /^#{1,6}\s+\*\*[^*]*?(\d{1,2})\/(\d{1,2})\/(\d{4})[^*]*\*\*/gm;
+  let match: RegExpExecArray | null;
+  while ((match = headingRe.exec(markdown)) !== null) {
+    const [, d, m, y] = match;
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    if (!isNaN(dt.getTime())) days.add(WEEKDAY_NAMES[dt.getDay()]);
+  }
+  return Array.from(days);
+}
+
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
@@ -473,16 +488,7 @@ const TrainingPlanPage = () => {
         // Union with weekdays of any dated session already in the saved
         // content so user-initiated moves to off-schedule days (e.g.
         // Mon/Wed/Fri plan → Thursday) survive a reload.
-        const WD = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-        const presentDays = new Set<string>();
-        const headingRe = /^(?:###\s+\*\*|\s*)([A-Za-z]+)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/gm;
-        let hm: RegExpExecArray | null;
-        while ((hm = headingRe.exec(data.content)) !== null) {
-          const [, , d, m, y] = hm;
-          const dt = new Date(Date.UTC(+y, +m - 1, +d));
-          if (!isNaN(dt.getTime())) presentDays.add(WD[dt.getUTCDay()]);
-        }
-        const effectiveLoadDays = Array.from(new Set([...loadedTrainingDays, ...presentDays]));
+        const effectiveLoadDays = Array.from(new Set([...loadedTrainingDays, ...weekdaysPresentInPlan(data.content)]));
         const validatedOnLoad = validatePlanForSave(data.content, {
           trainingDays: effectiveLoadDays,
           source: "active plan load",
@@ -604,8 +610,11 @@ const TrainingPlanPage = () => {
     if (!user) return null;
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
+    const effectiveSaveTrainingDays = options.inPlace
+      ? Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]))
+      : trainingDays;
     const validatedPlan = validatePlanForSave(planContent, {
-      trainingDays,
+      trainingDays: effectiveSaveTrainingDays,
       source: options.inPlace ? "in-place save" : "new plan save",
     });
     planContent = validatedPlan.content;
@@ -644,7 +653,8 @@ const TrainingPlanPage = () => {
         });
         const extended = await extendPlanToRaceDay(planContent, raceIsoForGuard);
         if (extended) {
-          planContent = validatePlanForSave(extended, { trainingDays, source: "race-day continuation" }).content;
+          const effectiveExtendedDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(extended)]));
+          planContent = validatePlanForSave(extended, { trainingDays: effectiveExtendedDays, source: "race-day continuation" }).content;
         }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
@@ -767,6 +777,8 @@ const TrainingPlanPage = () => {
     if (fromParts.length !== 3 || toParts.length !== 3) return;
     const fromDmy = `${fromParts[2]}/${fromParts[1]}/${fromParts[0]}`;
     const toDmy = `${toParts[2]}/${toParts[1]}/${toParts[0]}`;
+    const toDateObj = parseLocalISODate(toIso);
+    const toWeekday = WEEKDAY_NAMES[toDateObj.getDay()];
 
     // Replace inside **...DD/MM/YYYY...** date headers only
     const lines = content.split("\n");
@@ -777,7 +789,9 @@ const TrainingPlanPage = () => {
       const m = ln.match(headerRe);
       if (m && m[1] === fromDmy) {
         replaced = true;
-        return ln.replace(fromDmy, toDmy);
+        return ln
+          .replace(fromDmy, toDmy)
+          .replace(/(\*\*[^*]*?)(Sun|Mon|Tues?|Wed(?:nes)?|Thur?s?|Fri|Sat)[a-z]*([^*]*\d{1,2}\/\d{1,2}\/\d{4})/i, `$1${toWeekday}$3`);
       }
       return ln;
     });
@@ -808,10 +822,10 @@ const TrainingPlanPage = () => {
           return;
         }
       }
-      // Include the target weekday so a user-initiated move to an off-schedule
-      // day (e.g. Mon/Wed/Fri plan → Thursday) is not stripped by the validator.
-      const toWeekday = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(toIso + "T12:00:00").getDay()];
-      const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
+      // Include every weekday already present in the current plan plus the
+      // target weekday, so previous manual moves are not stripped by the
+      // validator during a later move.
+      const moveDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent), toWeekday]));
       newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
@@ -866,7 +880,8 @@ const TrainingPlanPage = () => {
             return;
           }
         }
-        newContent = validatePlanForSave(newContent, { trainingDays, source: "start-date shift" }).content;
+        const effectiveShiftDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent)]));
+        newContent = validatePlanForSave(newContent, { trainingDays: effectiveShiftDays, source: "start-date shift" }).content;
         const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
@@ -1509,7 +1524,8 @@ const TrainingPlanPage = () => {
 
     const previousContent = content;
     const previousRaceDate = raceDate;
-    const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `day-ahead action: ${action}` }).content;
+    const effectiveDayAheadDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(result.updatedPlan)]));
+    const validated = validatePlanForSave(result.updatedPlan, { trainingDays: effectiveDayAheadDays, source: `day-ahead action: ${action}` }).content;
     setContent(validated);
     if (newRaceDate) {
       try { setRaceDate(parseLocalISODate(newRaceDate)); setLetAIDecide(false); } catch {}
@@ -2428,8 +2444,8 @@ const TrainingPlanPage = () => {
                 // it's outside the normal scheduled training days.
                 let effectiveTrainingDays = trainingDays;
                 if (change.kind === "move") {
-                  const wd = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(change.isoTarget + "T12:00:00").getDay()];
-                  effectiveTrainingDays = Array.from(new Set([...(trainingDays || []), wd]));
+                  const wd = WEEKDAY_NAMES[parseLocalISODate(change.isoTarget).getDay()];
+                  effectiveTrainingDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(result.updatedPlan), wd]));
                 }
                 const validated = validatePlanForSave(result.updatedPlan, { trainingDays: effectiveTrainingDays, source: `edit-workout: ${action}` }).content;
                 setContent(validated);
