@@ -133,11 +133,9 @@ export function deriveWorkoutTitleFromSteps(
     return `${capitalize(base)} ${totalMins}min (Total: ${totalMins} min)`;
   }
 
-  const descs = groups.map((g) =>
-    g.restDur > 0
-      ? `${g.reps}x${fmtDur(g.workDur)} run / ${fmtDur(g.restDur)} walk`
-      : `${g.reps}x${fmtDur(g.workDur)}`,
-  );
+  // Title shows the work blocks only — walk/rest details belong in the segment table,
+  // not in the headline label. Total comes from summing all step durations.
+  const descs = groups.map((g) => `${g.reps}x${fmtDur(g.workDur)}`);
   const intentLabel = intent && intent !== "recovery" ? `${intent} intervals` : "intervals";
   return `${descs.join(" + ")} ${intentLabel} (Total: ${totalMins} min)`;
 }
