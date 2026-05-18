@@ -1286,7 +1286,90 @@ const TrainingPlanPage = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
     setDayAdjustDialogOpen(false);
+    setDayAdjustConflict(null);
   };
+
+  // Helpers for the Day Ahead "Move it" path. Mirrors AIChatbot.applyDayAction
+  // so the user gets identical behavior whether they triggered the check via
+  // the chat sleep notification or via Assess Day Ahead.
+  const dayAheadDateUk = (): string | null => {
+    if (!dayAdjustTargetDate) return null;
+    const d = dayAdjustTargetDate;
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  };
+
+  const commitDayAheadAction = async (
+    action: "skip" | "move" | "move-compressed" | "move-shift-race"
+  ) => {
+    if (!savedPlanId || !content) return;
+    const dateUk = dayAheadDateUk();
+    if (!dateUk) return;
+    const raceIso = raceDate ? toLocalISODate(raceDate) : null;
+
+    // Race-date conflict gate (only for the plain "move" tap).
+    if (action === "move" && raceIso) {
+      const preview = previewMoveCascade(content, dateUk);
+      if (preview) {
+        const conflict = detectRaceDateConflict(preview, raceIso);
+        if (conflict.hasConflict) {
+          // Compute shifted race label for option 2.
+          let shiftedRaceLabel = "";
+          const raceMatch = raceIso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (raceMatch) {
+            const newRace = new Date(Number(raceMatch[1]), Number(raceMatch[2]) - 1, Number(raceMatch[3]));
+            newRace.setDate(newRace.getDate() + Math.max(1, conflict.cascadeDays));
+            shiftedRaceLabel = formatRaceDateLabel(
+              `${newRace.getFullYear()}-${String(newRace.getMonth() + 1).padStart(2, "0")}-${String(newRace.getDate()).padStart(2, "0")}`
+            );
+          }
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const raceDateObj = raceMatch ? new Date(Number(raceMatch[1]), Number(raceMatch[2]) - 1, Number(raceMatch[3])) : null;
+          const daysToRace = raceDateObj
+            ? Math.round((raceDateObj.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+            : Infinity;
+          setDayAdjustConflict({ dateUk, shiftedRaceLabel, daysToRace });
+          return;
+        }
+      }
+    }
+
+    setDayAdjustActioning(true);
+    let result: { updatedPlan: string; summary: string } | null = null;
+    let newRaceDate: string | null = null;
+    if (action === "skip") result = applySkipSession(content, dateUk);
+    else if (action === "move") result = applyMoveSession(content, dateUk);
+    else if (action === "move-compressed" && raceIso) {
+      result = applyMoveCompressed(content, dateUk, raceIso);
+    } else if (action === "move-shift-race" && raceIso) {
+      const out = applyMoveAndShiftRace(content, dateUk, raceIso);
+      if (out) { result = out.result; newRaceDate = out.newRaceDateIso; }
+    }
+
+    if (!result) {
+      setDayAdjustActioning(false);
+      toast({ title: "Couldn't update plan", description: `No session found on ${dateUk}.`, variant: "destructive" });
+      return;
+    }
+
+    const previousContent = content;
+    const previousRaceDate = raceDate;
+    const validated = enforceAndLog(result.updatedPlan, `day-ahead action: ${action}`).content;
+    setContent(validated);
+    if (newRaceDate) {
+      try { setRaceDate(parseLocalISODate(newRaceDate)); setLetAIDecide(false); } catch {}
+    }
+    await savePlan(validated, {
+      inPlace: true,
+      undoLabel: `${dateUk} session (${action})`,
+      prevContent: previousContent,
+    });
+    setDayAdjustActioning(false);
+    const raceNote = newRaceDate ? ` Race date shifted to ${formatRaceDateLabel(newRaceDate)}.` : "";
+    toast({ title: "Plan updated", description: `${result.summary}${raceNote}` });
+    dismissDayAdjust();
+  };
+
 
   const [showSyncInstructions, setShowSyncInstructions] = useState(false);
   const [syncing, setSyncing] = useState(false);
