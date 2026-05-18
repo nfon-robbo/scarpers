@@ -44,7 +44,9 @@ const StravaConnect = () => {
   useEffect(() => {
     checkStatus();
 
+    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
     const handler = (e: MessageEvent) => {
+      if (e.origin !== expectedOrigin) return;
       if (e.data === "strava-connected") {
         setConnected(true);
         toast({ title: "Strava connected!", description: "You can now import your activities." });
