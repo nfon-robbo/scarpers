@@ -977,6 +977,24 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
       const raceDayName = race_date && race_date !== "ai-recommend"
         ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
         : null;
+      const raceDateUKLong = race_date && race_date !== "ai-recommend"
+        ? new Date(race_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : null;
+      // Compute goal race pace string (e.g. "6:00/km") for the explicit RACE DAY line.
+      const racePaceStr = (() => {
+        if (!goal_time) return null;
+        const parts = String(goal_time).trim().split(":").map((x: string) => parseInt(x, 10));
+        let totalSec = 0;
+        if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+        const distKm = ({ "5k": 5, "10k": 10, "half-marathon": 21.0975, "marathon": 42.195 } as Record<string, number>)[race_distance as string] || 0;
+        if (!totalSec || !distKm) return null;
+        const paceSec = Math.round(totalSec / distKm);
+        return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
+      })();
+      const explicitRaceDayLine = (raceDayName && raceDateUKLong)
+        ? `RACE DAY ${raceDayName} ${raceDateUKLong}, goal ${raceLabel}${goal_time ? ` in ${goal_time}` : ""}${racePaceStr ? ` at ${racePaceStr}` : ""}.`
+        : "";
 
       // Build the EXACT list of required workout dates so the model cannot stop early
       // or round to a week boundary. Includes every training-day-of-week between
@@ -1011,13 +1029,16 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
 
       const planLengthInstruction = isAIDecide
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed. ${firstWorkoutRule}`
-        : `Generate the COMPLETE plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKFmt}).
+        : `${explicitRaceDayLine}
+
+Generate the COMPLETE plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKLong}).
 ${firstWorkoutRule}
 After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery.
 
 ⚠️ CRITICAL — RACE DAY IS MANDATORY:
-The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}). Label it "🏁 RACE DAY — ${raceLabel}".
-RACE DAY IS THE RACE ONLY — it is a single continuous effort over the full race distance (${raceLabel}) at goal pace${goal_time ? ` to hit ${goal_time}` : ""}. Do NOT prescribe walk/run intervals, do NOT split it into sets, do NOT add training intervals on race day. A short pre-race routine (light jog warm-up + strides + fuelling/pacing notes) may be described in the notes column, but the workout itself must be ONE entry: the race. Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary.${requiredDatesBlock}`;
+${explicitRaceDayLine}
+The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKLong}). Label it "🏁 RACE DAY — ${raceLabel}".
+RACE DAY IS THE RACE ONLY — it is a single continuous effort over the full race distance (${raceLabel}) at goal pace${goal_time ? ` to hit ${goal_time}` : ""}. Do NOT prescribe walk/run intervals, do NOT split it into sets, do NOT add training intervals on race day. A short pre-race routine (light jog warm-up + strides + fuelling/pacing notes) may be described in the notes column, but the workout itself must be ONE entry: the race. Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary. There is NO session-count cap and NO week-count cap — keep emitting weeks until you have written the race day entry. If you feel the response is getting long, KEEP GOING anyway — truncation is a failure.${requiredDatesBlock}`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
@@ -1327,15 +1348,24 @@ ${upcoming.join("\n")}
 
 `;
     })();
+    const isPlanGen = type === "training-plan";
+    // Route plan generation to a higher-capacity model (Gemini Flash preview caps
+    // output at ~8-16k tokens which truncates long multi-month plans before they
+    // reach race day). Other types keep the gateway default.
+    const planLovableModel = "google/gemini-2.5-pro";
+
+    const initialMessages = [
+      { role: "system" as const, content: nowPrelude + systemPrompt },
+      ...priorTurns,
+      { role: "user" as const, content: userPrompt },
+    ];
+
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
       label: `ai-coach:${type || "chat"}`,
-      messages: [
-        { role: "system", content: nowPrelude + systemPrompt },
-        ...priorTurns,
-        { role: "user", content: userPrompt },
-      ],
+      lovableModel: isPlanGen ? planLovableModel : undefined,
+      messages: initialMessages,
     });
 
     if (!response.ok) {
@@ -1356,21 +1386,156 @@ ${upcoming.join("\n")}
       throw new Error("AI gateway error");
     }
 
-    // Pipe upstream body through a passthrough TransformStream — this forces
-    // Deno Deploy / Supabase Edge to use chunked transfer encoding and flush
-    // each delta byte to the client immediately instead of buffering.
-    const { readable, writable } = new TransformStream();
-    response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
+    const sseHeaders = {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    };
 
-    return new Response(readable, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        "Connection": "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
-    });
+    // Non-plan types: zero-buffer pass-through (latency-sensitive).
+    if (!isPlanGen || !race_date || race_date === "ai-recommend") {
+      const { readable, writable } = new TransformStream();
+      response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
+      return new Response(readable, { headers: sseHeaders });
+    }
+
+    // Plan generation: buffered streaming. Re-emit upstream deltas live AND
+    // capture the full text so we can detect early truncation and run
+    // continuation passes until the plan reaches race_date.
+    const encoder = new TextEncoder();
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+
+    (async () => {
+      const writer = writable.getWriter();
+      let fullText = "";
+
+      // Recompute plan-context locals (they live inside the training-plan branch
+      // above and aren't in scope here).
+      const _planStart = start_date || new Date().toISOString().split("T")[0];
+      const _daysStr = (training_days as string[] | undefined)?.length
+        ? (training_days as string[]).join(", ")
+        : "Mon, Wed, Fri, Sat";
+      const _raceLabel = ({
+        "5k": "5K", "10k": "10K", "half-marathon": "Half Marathon", "marathon": "Marathon",
+      } as Record<string, string>)[race_distance as string] || "Half Marathon";
+      const _raceDayName = new Date((race_date as string) + "T00:00:00")
+        .toLocaleDateString("en-GB", { weekday: "long" });
+      const _raceDateUKLong = new Date((race_date as string) + "T00:00:00")
+        .toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const _racePaceStr = (() => {
+        if (!goal_time) return null;
+        const parts = String(goal_time).trim().split(":").map((x: string) => parseInt(x, 10));
+        let totalSec = 0;
+        if (parts.length === 3) totalSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        else if (parts.length === 2) totalSec = parts[0] * 60 + parts[1];
+        const distKm = ({ "5k": 5, "10k": 10, "half-marathon": 21.0975, "marathon": 42.195 } as Record<string, number>)[race_distance as string] || 0;
+        if (!totalSec || !distKm) return null;
+        const paceSec = Math.round(totalSec / distKm);
+        return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
+      })();
+
+      const consumeStream = async (body: ReadableStream<Uint8Array>) => {
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        let sawDone = false;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          // Pass raw bytes straight to the client for live typing.
+          await writer.write(value);
+          buf += decoder.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = buf.indexOf("\n")) !== -1) {
+            const line = buf.slice(0, idx).replace(/\r$/, "");
+            buf = buf.slice(idx + 1);
+            if (!line.startsWith("data: ")) continue;
+            const json = line.slice(6).trim();
+            if (!json) continue;
+            if (json === "[DONE]") { sawDone = true; continue; }
+            try {
+              const evt = JSON.parse(json);
+              const delta = evt?.choices?.[0]?.delta?.content;
+              if (typeof delta === "string") fullText += delta;
+            } catch { /* ignore */ }
+          }
+        }
+        return sawDone;
+      };
+
+      // Pull last YYYY-MM-DD from the accumulated plan text.
+      const lastIsoDate = (txt: string): string | null => {
+        const matches = txt.match(/\b(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g);
+        return matches && matches.length ? matches[matches.length - 1] : null;
+      };
+
+      try {
+        await consumeStream(response.body!);
+
+        const targetIso = race_date as string;
+        const MAX_CONTINUATIONS = 3;
+        let attempts = 0;
+        let assistantSoFar = fullText;
+
+        while (attempts < MAX_CONTINUATIONS) {
+          const last = lastIsoDate(assistantSoFar);
+          if (last && last >= targetIso) break;
+          attempts++;
+
+          const resumeFrom = (() => {
+            if (!last) return _planStart;
+            const d = new Date(last + "T00:00:00");
+            d.setDate(d.getDate() + 1);
+            return d.toISOString().slice(0, 10);
+          })();
+
+          console.log(`[training-plan] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
+
+          const continuationUser = `The plan above stopped at ${last || "the start"}. Continue the plan from ${resumeFrom} through ${targetIso} (${_raceDayName}, ${_raceDateUKLong}) inclusive.
+
+Use the EXACT same markdown format (week headings, day headings in DD/MM/YYYY, 4-column workout tables with music BPM in Notes), the same training-day schedule (${_daysStr}), and the same pace/HR anchors as the plan above. Continue the periodisation seamlessly (do NOT restart Week 1).
+
+Output ONLY the new days from ${resumeFrom} onwards — do NOT repeat earlier weeks, do NOT include the season overview again, and do NOT add a preamble.
+
+The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_raceLabel}"${goal_time ? `, goal ${goal_time}` : ""}${_racePaceStr ? ` at ${_racePaceStr}` : ""}.`;
+
+          const contResp = await callAI({
+            stream: true,
+            maxTokens: 64000,
+            label: `ai-coach:training-plan:cont${attempts}`,
+            lovableModel: planLovableModel,
+            messages: [
+              { role: "system", content: nowPrelude + systemPrompt },
+              { role: "user", content: userPrompt },
+              { role: "assistant", content: assistantSoFar },
+              { role: "user", content: continuationUser },
+            ],
+          });
+
+          if (!contResp.ok || !contResp.body) {
+            console.error(`[training-plan] continuation ${attempts} failed: ${contResp.status}`);
+            break;
+          }
+
+          const beforeLen = fullText.length;
+          await consumeStream(contResp.body);
+          const added = fullText.slice(beforeLen);
+          assistantSoFar = assistantSoFar + "\n" + added;
+        }
+
+        // Always emit a final [DONE] so the client unblocks even if upstream
+        // didn't send one or we appended continuations.
+        await writer.write(encoder.encode("data: [DONE]\n\n"));
+      } catch (e) {
+        console.error("[training-plan] buffered stream error:", e);
+      } finally {
+        try { await writer.close(); } catch { /* ignore */ }
+      }
+    })();
+
+    return new Response(readable, { headers: sseHeaders });
   } catch (e) {
     console.error("ai-coach error:", e);
     return new Response(
