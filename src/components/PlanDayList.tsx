@@ -777,6 +777,21 @@ export default function PlanDayList({
                             );
                           })()}
                         </div>
+                        {onEditWorkout && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Edit or replace this workout"
+                            title="Edit / replace workout"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditWorkout(workout);
+                            }}
+                            className="shrink-0 w-7 h-7 rounded-full bg-muted hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                         {onSyncWorkout && (
                           <span
                             role="button"
