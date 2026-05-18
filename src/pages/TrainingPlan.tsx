@@ -345,7 +345,7 @@ const TrainingPlanPage = () => {
     // Capture current state into the redo stack BEFORE applying the undo, so
     // the user can step forward again.
     const currentContent = content;
-    const currentRaceDateIso = raceDate ? toLocalISODate(raceDate) : null;
+    const currentRaceDateIso = raceDateRef.current ? toLocalISODate(raceDateRef.current) : null;
     const redoOpts = "prevRaceDate" in entry ? { prevRaceDate: currentRaceDateIso } : undefined;
     pushRedoEntry(targetPlanId, currentContent, entry.label, redoOpts);
     const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
@@ -365,7 +365,7 @@ const TrainingPlanPage = () => {
       } catch {}
     }
     toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
-  }, [savedPlanId, user, toast, content, raceDate]);
+  }, [savedPlanId, user, toast, content]);
 
   const handleRedo = useCallback(async (planIdOverride?: string) => {
     const targetPlanId = typeof planIdOverride === "string" ? planIdOverride : savedPlanId;
@@ -376,7 +376,7 @@ const TrainingPlanPage = () => {
     if (!entry) return;
     // Push current state back onto the undo stack (preserving the redo stack).
     const currentContent = content;
-    const currentRaceDateIso = raceDate ? toLocalISODate(raceDate) : null;
+    const currentRaceDateIso = raceDateRef.current ? toLocalISODate(raceDateRef.current) : null;
     const undoOpts: { prevRaceDate?: string | null; preserveRedo: boolean } = { preserveRedo: true };
     if ("prevRaceDate" in entry) undoOpts.prevRaceDate = currentRaceDateIso;
     pushUndoEntry(targetPlanId, currentContent, entry.label, undoOpts);
@@ -397,7 +397,7 @@ const TrainingPlanPage = () => {
       } catch {}
     }
     toast({ title: "Reapplied", description: `Redid change to ${entry.label}.` });
-  }, [savedPlanId, user, toast, content, raceDate]);
+  }, [savedPlanId, user, toast, content]);
 
   const toastPlanChange = useCallback((title: string, description: string, planId?: string | null) => {
     toast({
