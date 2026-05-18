@@ -248,7 +248,7 @@ serve(async (req) => {
     // Load active plan
     const { data: plan, error: planErr } = await supabase
       .from("training_plans")
-      .select("id, content, start_date, race_date, race_distance, last_adapted_at")
+      .select("id, content, start_date, race_date, race_distance, last_adapted_at, training_days")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
