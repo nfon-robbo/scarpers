@@ -1586,6 +1586,51 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
           assistantSoFar = assistantSoFar + "\n" + added;
         }
 
+        // ── Final mandatory validation pass ──
+        // If after 3 normal continuations the plan still doesn't contain the
+        // race day entry on race_date, force ONE extra pass (separate budget)
+        // with a stronger directive. This guarantees no streamed plan ever
+        // ends short of race day, regardless of model truncation.
+        {
+          const targetIso = race_date as string;
+          const last = lastIsoDate(assistantSoFar);
+          const raceDayPresent = hasRaceDayEntry(assistantSoFar, targetIso);
+          if (!last || last < targetIso || !raceDayPresent) {
+            console.log(`[${type}] final validation pass: last=${last} raceDayPresent=${raceDayPresent} → forcing one extra continuation`);
+            const resumeFrom = (() => {
+              if (!last) return _planStart;
+              if (last >= targetIso) return targetIso;
+              const d = new Date(last + "T00:00:00");
+              d.setDate(d.getDate() + 1);
+              return d.toISOString().slice(0, 10);
+            })();
+            const finalUser = `VALIDATION FAILURE: the plan above does NOT contain a "🏁 RACE DAY" entry on ${targetIso}. This is INVALID and unsaveable. Output ONLY the missing days from ${resumeFrom} through ${targetIso} (${_raceDayName}, ${_raceDateUKLong}) inclusive, in the same markdown format. The very last entry MUST be "🏁 RACE DAY — ${_raceLabel}"${goal_time ? `, goal ${goal_time}` : ""}${_racePaceStr ? ` at ${_racePaceStr}` : ""} on ${targetIso}. No preamble, no commentary — just the missing markdown.`;
+            try {
+              const finalResp = await callAI({
+                stream: true,
+                maxTokens: 64000,
+                label: `ai-coach:${type}:final-validation`,
+                lovableModel: planLovableModel,
+                messages: [
+                  { role: "system", content: nowPrelude + systemPrompt },
+                  { role: "user", content: userPrompt },
+                  { role: "assistant", content: assistantSoFar },
+                  { role: "user", content: finalUser },
+                ],
+              });
+              if (finalResp.ok && finalResp.body) {
+                const beforeLen = fullText.length;
+                await consumeStream(finalResp.body);
+                assistantSoFar = assistantSoFar + "\n" + fullText.slice(beforeLen);
+              } else {
+                console.error(`[${type}] final validation pass failed: ${finalResp.status}`);
+              }
+            } catch (e) {
+              console.error(`[${type}] final validation pass exception:`, e);
+            }
+          }
+        }
+
         // Always emit a final [DONE] so the client unblocks even if upstream
         // didn't send one or we appended continuations.
         await writer.write(encoder.encode("data: [DONE]\n\n"));
