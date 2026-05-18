@@ -2384,16 +2384,88 @@ const TrainingPlanPage = () => {
             {!dayAdjusting && dayAdjustResult && (
               <div className="flex flex-wrap gap-2 pt-3 border-t">
                 {dayAdjustIsModified ? (
-                  <>
-                    <Button size="sm" onClick={applyDayAdjustment}>
-                      <Check className="w-4 h-4 mr-2" />
-                      {dayAdjustMode === "next" ? `Apply to ${dayAdjustTargetDate ? format(dayAdjustTargetDate, "EEE d MMM") : "next workout"}` : "Apply Adjusted Workout"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={dismissDayAdjust}>
-                      <Dumbbell className="w-4 h-4 mr-2" />
-                      Keep Original
-                    </Button>
-                  </>
+                  dayAdjustMode === "next" ? (
+                    // Coach-recommendation path: keep the simple apply/discard pair.
+                    <>
+                      <Button size="sm" onClick={applyDayAdjustment} disabled={dayAdjustActioning}>
+                        <Check className="w-4 h-4 mr-2" />
+                        {`Apply to ${dayAdjustTargetDate ? format(dayAdjustTargetDate, "EEE d MMM") : "next workout"}`}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={dismissDayAdjust} disabled={dayAdjustActioning}>
+                        <Dumbbell className="w-4 h-4 mr-2" />
+                        Keep Original
+                      </Button>
+                    </>
+                  ) : dayAdjustConflict ? (
+                    // Race-date conflict — show the same three sub-options
+                    // the chatbot offers, plus a "keep as it is" escape hatch.
+                    <div className="w-full space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Moving this session would push later sessions past your race date. Choose how to resolve it:
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        disabled={dayAdjustActioning}
+                        onClick={() => commitDayAheadAction("move-compressed")}
+                      >
+                        Stick to race date (compress sessions)
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        disabled={dayAdjustActioning}
+                        onClick={() => commitDayAheadAction("move-shift-race")}
+                      >
+                        {dayAdjustConflict.shiftedRaceLabel
+                          ? `Move race date to ${dayAdjustConflict.shiftedRaceLabel}`
+                          : "Move race date forward"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        disabled={dayAdjustActioning}
+                        onClick={() => commitDayAheadAction("skip")}
+                      >
+                        Skip this session (keep plan & race date)
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full justify-start text-xs"
+                        disabled={dayAdjustActioning}
+                        onClick={() => setDayAdjustConflict(null)}
+                      >
+                        Back
+                      </Button>
+                    </div>
+                  ) : (
+                    // Sleep-sync-aligned three-button action set.
+                    <>
+                      <Button size="sm" onClick={applyDayAdjustment} disabled={dayAdjustActioning}>
+                        <ThumbsDown className="w-4 h-4 mr-2" />
+                        Make it easier
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => commitDayAheadAction("move")}
+                        disabled={dayAdjustActioning}
+                      >
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        Move it
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={dismissDayAdjust}
+                        disabled={dayAdjustActioning}
+                      >
+                        <Dumbbell className="w-4 h-4 mr-2" />
+                        Keep it
+                      </Button>
+                    </>
+                  )
                 ) : (
                   <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
                     <Check className="w-4 h-4 mr-2" />
