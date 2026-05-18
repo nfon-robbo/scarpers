@@ -693,6 +693,9 @@ const AIChatbot = () => {
             const dayMatch = msg.role === "assistant"
               ? msg.content.match(/\[\[ACTION:day:(\d{1,2}\/\d{1,2}\/\d{4})\]\]/)
               : null;
+            const conflictMatch = msg.role === "assistant"
+              ? msg.content.match(/\[\[ACTION:race-conflict:(\d{1,2}\/\d{1,2}\/\d{4})\]\]/)
+              : null;
             const planMatch = msg.role === "assistant"
               ? /\[\[ACTION:plan\]\]/.test(msg.content)
               : false;
@@ -701,7 +704,7 @@ const AIChatbot = () => {
               ? /\[\[ACTION:recommendation\]\]/.test(msg.content)
               : false;
             const hasUndo = msg.role === "assistant" && /\[\[UNDO\]\]/.test(msg.content);
-            const hasAction = !!dayMatch || planMatch || legacyMatch;
+            const hasAction = !!dayMatch || planMatch || legacyMatch || !!conflictMatch;
             const cleaned = (hasAction || hasUndo)
               ? msg.content
                   .replace(ACTION_MARKER_REGEX, "")
@@ -710,8 +713,9 @@ const AIChatbot = () => {
               : msg.content;
             const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
             const isConcrete = isConcreteWorkoutEdit(cleaned);
-            const showActions = hasAction && isConcrete && isLastAssistant && !loading;
-            const showNoChange = hasAction && !isConcrete && isLastAssistant && !loading;
+            const showActions = !conflictMatch && hasAction && isConcrete && isLastAssistant && !loading;
+            const showConflict = !!conflictMatch && isLastAssistant && !loading;
+            const showNoChange = !conflictMatch && hasAction && !isConcrete && isLastAssistant && !loading;
             const showUndo = hasUndo && isLastAssistant && !loading && !!lastUndo;
             const scope: { kind: "day"; dateUk: string } | { kind: "plan" } = dayMatch
               ? { kind: "day", dateUk: dayMatch[1] }
