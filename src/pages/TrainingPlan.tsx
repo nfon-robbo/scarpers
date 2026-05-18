@@ -74,6 +74,21 @@ function extractRaceDateFromMarkdown(md: string | null | undefined): string | nu
   return null;
 }
 
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
+  if (!markdown) return [];
+  const days = new Set<string>();
+  const headingRe = /^#{1,6}\s+\*\*[^*]*?(\d{1,2})\/(\d{1,2})\/(\d{4})[^*]*\*\*/gm;
+  let match: RegExpExecArray | null;
+  while ((match = headingRe.exec(markdown)) !== null) {
+    const [, d, m, y] = match;
+    const dt = new Date(Number(y), Number(m) - 1, Number(d));
+    if (!isNaN(dt.getTime())) days.add(WEEKDAY_NAMES[dt.getDay()]);
+  }
+  return Array.from(days);
+}
+
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
