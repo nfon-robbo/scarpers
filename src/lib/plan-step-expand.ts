@@ -65,13 +65,20 @@ export function hrZoneToBpm(hrZone: string): { low: number; high: number } {
 }
 
 function paceForSegment(seg: ParsedSegment, intensity: string): string {
-  const txt = `${seg.segment} ${seg.duration} ${seg.target} ${seg.notes || ""}`.toLowerCase();
   if (/no\s*pace|^\s*[—-]\s*$/i.test(seg.target || "")) return "";
+  if (/^\s*walking\s+pace\s*$/i.test(seg.target || "")) return "";
+
+  // Only inspect target/notes for explicit pace. The duration column is often
+  // also MM:SS, so including it here turns "20:00 duration + 6:00/km pace" into
+  // the false pace "20:00/km".
+  const paceSource = `${seg.target} ${seg.notes || ""}`.toLowerCase();
   // Range like "7:00/km-7:30/km" or "7:00-7:30/km" — slower bound.
-  const range = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi))?\s*[-–]\s*(\d{1,2}:\d{2})/);
+  const range = paceSource.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi))?\s*[-–]\s*(\d{1,2}:\d{2})/);
   if (range) return `${range[2]}/km`;
-  const explicit = txt.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
+  const explicit = paceSource.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
   if (explicit) return `${explicit[1]}/km`;
+
+  const txt = `${seg.segment} ${seg.target} ${seg.notes || ""}`.toLowerCase();
   // Warm-up, cool-down, recovery, rest, and walks are no-target unless the
   // plan explicitly supplies a jog/run pace (e.g. Warm Up Jog — 7:15/km).
   if (/warmup|cooldown|recovery|rest/i.test(intensity)) return "";
