@@ -199,6 +199,14 @@ const WEEKDAY_SHORT_AA: Record<string, string> = {
   Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday",
   Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
 };
+const WEEKDAY_LIST_AA = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+function weekdayFromDateAA(dmy: string): string {
+  const [d, m, y] = dmy.split("/").map((s) => parseInt(s, 10));
+  if (!d || !m || !y) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (isNaN(dt.getTime())) return "";
+  return WEEKDAY_LIST_AA[(dt.getUTCDay() + 6) % 7];
+}
 function enforceSchedule(markdown: string, trainingDays: string[] | null | undefined): string {
   if (!markdown || !trainingDays?.length) return markdown;
   const allowed = new Set(trainingDays.map((d) => WEEKDAY_SHORT_AA[d] || d));
@@ -211,10 +219,15 @@ function enforceSchedule(markdown: string, trainingDays: string[] | null | undef
   for (let h = 0; h < heads.length; h++) {
     const s = heads[h];
     const e = h + 1 < heads.length ? heads[h + 1] : lines.length;
-    const m = lines[s].match(/^###\s+\*\*([A-Za-z]+)\s+/);
+    const m = lines[s].match(/^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
     if (!m) continue;
-    if (allowed.has(m[1])) continue;
+    // Trust the actual calendar weekday, not the label.
+    const actual = weekdayFromDateAA(m[2]) || m[1];
+    if (allowed.has(actual)) continue;
     if (/race\s*day|rest\s*day/i.test(lines[s])) continue;
+    if (actual !== m[1]) {
+      console.warn(`[plan-auto-adapt] dropped off-schedule session: label says ${m[1]} but ${m[2]} is ${actual}`);
+    }
     for (let k = s; k < e; k++) dropMask[k] = true;
   }
   return lines.filter((_, i) => !dropMask[i]).join("\n");
