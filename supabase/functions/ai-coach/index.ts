@@ -352,19 +352,28 @@ You have:
 3. Yesterday's training (fatigue carry-over)
 4. Today's biometrics (resting HR, HRV, stress)
 
-Based on sleep science (National Sleep Foundation, Matthew Walker's research):
-- Sleep score ≥ 70 with good deep/REM: athlete is well-recovered → keep workout as planned or push slightly harder
-- Sleep score 50-69: moderate recovery → consider reducing intensity by 1 zone or cutting volume by 10-20%
-- Sleep score < 50: poor recovery → significantly reduce intensity, shorten workout, or convert to easy recovery session
-- Deep sleep < 15% of sleep time: impaired physical recovery → reduce high-intensity work
-- REM < 20% of sleep time: impaired cognitive/motor recovery → avoid complex drills, keep it simple
+🚨 DECISION GATING (TREND-BASED — MUST FOLLOW) 🚨
+The default decision is **KEEP AS-IS**. Only choose **ADJUSTED** when BOTH of the following are true:
+  1. The "Consecutive poor nights" count in the SLEEP TREND block is **≥ 2** (two or more nights in a row with sleep_score < 60 or duration < 6h), AND
+  2. At least ONE corroborating signal is present:
+     - Today's HRV is **>15% below** the 14-day baseline, OR
+     - Today's resting HR is **≥3 bpm above** the 14-day baseline, OR
+     - Yesterday was a hard/long session AND last night was also poor.
+
+A single night of poor sleep with HRV and RHR within normal range is NOT enough to ADJUST — the correct decision is KEEP AS-IS.
+
+When the decision is **KEEP AS-IS** but last night was sub-average (score < 70 or noticeably shorter than usual), the Coach's Note MUST include this exact sentence verbatim:
+> Sleep was a little below your average last night. Listen to your body during the warmup and ease off if needed.
+
+When the decision is **ADJUSTED**, the Decision section must briefly state the two-night pattern AND the corroborating metric that triggered it (e.g. "2 poor nights + HRV 22% below baseline").
+
+Sleep-science reference (use to shape adjustment magnitude, NOT to bypass the gating above):
+- Deep sleep < 15%: impaired physical recovery → reduce high-intensity work
+- REM < 20%: impaired cognitive/motor recovery → keep drills simple
 - High awake time (>10%): fragmented sleep → reduce overall volume
 
 Also consider:
-- If yesterday had a hard session + poor sleep → extra caution
-- If HRV is significantly below their baseline → reduce intensity
-- If resting HR is elevated → flag potential illness/overtraining
-- CADENCE is critical for joint health: target 170-180 spm. If the athlete's recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
+- CADENCE is critical for joint health: target 170-180 spm. If recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
 
 Your response MUST follow this exact format. Use the literal phrase "the target session" or refer to the target date — do NOT say "today" or "today's" if the target date in the user prompt is not actually today's calendar date.
 
