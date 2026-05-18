@@ -123,7 +123,12 @@ function tryParseIntervalsList(text: string): EditedSegment[] | null {
     if (!m) continue;
     const [, name, dur, paceRaw] = m;
     if (MOBILITY_RE.test(name)) continue;
-    const pace = /no pace/i.test(paceRaw) ? "—" : extractPace(paceRaw) || paceRaw.trim();
+    let pace: string;
+    if (/no pace/i.test(paceRaw)) pace = "—";
+    else {
+      const p = extractPace(paceRaw) || paceRaw.trim();
+      pace = /\/km|\/mi/i.test(p) ? p : (/min\/km/i.test(paceRaw) ? `${p}/km` : p);
+    }
     out.push({
       segment: name.trim(),
       duration: normaliseDuration(dur),
