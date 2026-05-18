@@ -173,7 +173,7 @@ function injectWarmupCooldown(markdown: string): string {
   // Find day blocks (reverse to keep indices stable)
   const heads: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+    if (matchDayHeading(lines[i])) heads.push(i);
   }
   for (let h = heads.length - 1; h >= 0; h--) {
     const s = heads[h];
@@ -223,20 +223,20 @@ function enforceSchedule(markdown: string, trainingDays: string[] | null | undef
   const lines = markdown.split("\n");
   const heads: number[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+    if (matchDayHeading(lines[i])) heads.push(i);
   }
   const dropMask = new Array<boolean>(lines.length).fill(false);
   for (let h = 0; h < heads.length; h++) {
     const s = heads[h];
     const e = h + 1 < heads.length ? heads[h + 1] : lines.length;
-    const m = lines[s].match(/^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
+    const m = matchDayHeading(lines[s]);
     if (!m) continue;
     // Trust the actual calendar weekday, not the label.
-    const actual = weekdayFromDateAA(m[2]) || m[1];
+    const actual = weekdayFromDateAA(m.date) || m.weekday;
     if (allowed.has(actual)) continue;
     if (/race\s*day|rest\s*day/i.test(lines[s])) continue;
-    if (actual !== m[1]) {
-      console.warn(`[plan-auto-adapt] dropped off-schedule session: label says ${m[1]} but ${m[2]} is ${actual}`);
+    if (actual !== m.weekday) {
+      console.warn(`[plan-auto-adapt] dropped off-schedule session: label says ${m.weekday} but ${m.date} is ${actual}`);
     }
     for (let k = s; k < e; k++) dropMask[k] = true;
   }
