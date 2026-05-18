@@ -830,8 +830,13 @@ const TrainingPlanPage = () => {
       return;
     }
     const previousContent = content;
+    const todayISO = toLocalISODate(new Date());
+    const { preservedPast, splitWorked } = splitPlanByDate(previousContent, todayISO);
+    const prefix = splitWorked && preservedPast ? preservedPast + "\n\n" : "";
+    const effectiveStartISO = prefix ? todayISO : toLocalISODate(startDate);
+
     setLoading(true);
-    setContent("");
+    setContent(prefix);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -849,16 +854,17 @@ const TrainingPlanPage = () => {
       currentPaceMin,
       currentPaceMax,
       trainingDays,
-      startDate: toLocalISODate(startDate),
+      startDate: effectiveStartISO,
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
       onDelta: (text) => {
         accumulated += text;
-        setContent(accumulated);
+        setContent(prefix + accumulated);
       },
       onDone: async () => {
         setLoading(false);
-        const planId = await savePlan(accumulated, { undoLabel: "plan generation", prevContent: previousContent });
-        toastPlanChange("Plan saved", "Your training plan has been saved.", previousContent ? planId : null);
+        const finalContent = prefix + accumulated;
+        const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
+        toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
