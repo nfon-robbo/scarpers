@@ -645,7 +645,16 @@ ${chatExtraContext}`;
           return `${match} (${fmt(next)})`;
         });
       };
-      userPrompt = immediateDiaryCorrection + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
+      // Extract explicit DD/MM/YYYY dates from the CURRENT user message so the
+      // model can't silently swap to a date discussed in a previous turn.
+      const explicitDates = Array.from(
+        (chatMessages || "").matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g),
+      ).map((m) => `${m[1].padStart(2, "0")}/${m[2].padStart(2, "0")}/${m[3]}`);
+      const uniqueDates = Array.from(new Set(explicitDates));
+      const datePin = uniqueDates.length
+        ? `\n\n🚨 DATES EXPLICITLY NAMED IN THIS USER MESSAGE: ${uniqueDates.join(", ")}. Your reply MUST act on ${uniqueDates.length === 1 ? "this exact date" : "these exact dates"} and no other. Do NOT substitute a date from earlier in the conversation. Quote the date back in your first sentence.\n`
+        : "";
+      userPrompt = immediateDiaryCorrection + datePin + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
 
