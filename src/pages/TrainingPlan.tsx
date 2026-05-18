@@ -797,11 +797,29 @@ const TrainingPlanPage = () => {
     try {
       const deltaDays = Math.round((newStart.getTime() - startDate.getTime()) / 86400000);
       const previousContent = content;
-      const newContent = shiftPlanDates(content, deltaDays);
+      let newContent = shiftPlanDates(content, deltaDays);
       let undoPlanId: string | null = null;
       setContent(newContent);
       setStartDate(newStart);
       if (savedPlanId && user) {
+        // shiftPlanDates moves every date including race day, so the guard is
+        // mostly a no-op here — but keep it so any future write path is safe.
+        const raceIsoForGuard = raceDate ? toLocalISODate(raceDate) : null;
+        if (raceIsoForGuard && !validatePlanReachesRaceDay(newContent, raceIsoForGuard)) {
+          const extended = await extendPlanToRaceDay(newContent, raceIsoForGuard);
+          if (extended && validatePlanReachesRaceDay(extended, raceIsoForGuard)) {
+            newContent = extended;
+            setContent(newContent);
+          } else {
+            toast({
+              title: "Couldn't extend the plan to race day",
+              description: "No changes saved. Please try again.",
+              variant: "destructive",
+            });
+            setContent(previousContent);
+            return;
+          }
+        }
         const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
