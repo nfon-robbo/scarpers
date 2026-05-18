@@ -315,7 +315,10 @@ const AIChatbot = () => {
    * sees exactly what will happen before they tap.
    */
   const applyDayAction = useCallback(
-    async (dateUk: string, action: "skip" | "move" | "recovery") => {
+    async (
+      dateUk: string,
+      action: "skip" | "move" | "recovery" | "move-compressed" | "move-shift-race",
+    ) => {
       if (loading) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
@@ -324,7 +327,7 @@ const AIChatbot = () => {
       }
       const { data: plan } = await supabase
         .from("training_plans")
-        .select("id, content")
+        .select("id, content, race_date")
         .eq("user_id", session.user.id)
         .eq("archived", false)
         .order("created_at", { ascending: false })
@@ -335,12 +338,40 @@ const AIChatbot = () => {
         return;
       }
 
-      const result =
-        action === "skip"
-          ? applySkipSession(plan.content, dateUk)
-          : action === "move"
-            ? applyMoveSession(plan.content, dateUk)
-            : applyReplaceWithRecovery(plan.content, dateUk);
+      // Race-date conflict gate: when the user taps the plain "move" button
+      // and the cascade would push sessions past race day, surface the three
+      // resolution options in chat instead of writing silently.
+      if (action === "move" && plan.race_date) {
+        const preview = previewMoveCascade(plan.content, dateUk);
+        if (preview) {
+          const conflict = detectRaceDateConflict(preview, plan.race_date);
+          if (conflict.hasConflict) {
+            const targetLabel = `${["Sun","Mon","Tues","Wed","Thurs","Fri","Sat"][preview.targetDate.getDay()]} ${String(preview.targetDate.getDate()).padStart(2,"0")}/${String(preview.targetDate.getMonth()+1).padStart(2,"0")}`;
+            const raceLabel = formatRaceDateLabel(plan.race_date);
+            const msg =
+              `⚠️ Moving this session to **${targetLabel}** would push ` +
+              `**${conflict.overflowCount} later session${conflict.overflowCount === 1 ? "" : "s"} past your race date of ${raceLabel}**.\n\n` +
+              `Here are your options:\n\n[[ACTION:race-conflict:${dateUk}]]`;
+            setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
+            return;
+          }
+        }
+      }
+
+      let result: { updatedPlan: string; summary: string } | null = null;
+      let newRaceDate: string | null = null;
+      if (action === "skip") result = applySkipSession(plan.content, dateUk);
+      else if (action === "recovery") result = applyReplaceWithRecovery(plan.content, dateUk);
+      else if (action === "move") result = applyMoveSession(plan.content, dateUk);
+      else if (action === "move-compressed" && plan.race_date) {
+        result = applyMoveCompressed(plan.content, dateUk, plan.race_date);
+      } else if (action === "move-shift-race" && plan.race_date) {
+        const out = applyMoveAndShiftRace(plan.content, dateUk, plan.race_date);
+        if (out) {
+          result = out.result;
+          newRaceDate = out.newRaceDateIso;
+        }
+      }
 
       if (!result) {
         toast({
@@ -353,20 +384,27 @@ const AIChatbot = () => {
 
       const validated = enforceAndLog(result.updatedPlan, `chat day action: ${action}`).content;
       pushUndoEntry(plan.id, plan.content, `${dateUk} session (${action})`);
+      const updatePayload: { content: string; race_date?: string } = { content: validated };
+      if (newRaceDate) updatePayload.race_date = newRaceDate;
       const { error } = await supabase
         .from("training_plans")
-        .update({ content: validated })
+        .update(updatePayload)
         .eq("id", plan.id);
       if (error) {
         toast({ title: "Couldn't save change", description: error.message, variant: "destructive" });
         return;
       }
-      setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk });
+      setLastUndo({ planId: plan.id, prevContent: plan.content, prevRaceDate: plan.race_date, dateUk });
+      setActivePlanContent(validated);
+      if (newRaceDate) setActivePlanRaceDate(newRaceDate);
+      const raceNote = newRaceDate
+        ? ` Race date shifted to **${formatRaceDateLabel(newRaceDate)}**.`
+        : "";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `✅ ${result.summary}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
+          content: `✅ ${result!.summary}${raceNote}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
         },
       ]);
       toast({ title: "Plan updated", description: result.summary });
