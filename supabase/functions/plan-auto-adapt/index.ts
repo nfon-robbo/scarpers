@@ -220,6 +220,11 @@ function enforceSchedule(markdown: string, trainingDays: string[] | null | undef
   return lines.filter((_, i) => !dropMask[i]).join("\n");
 }
 
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
@@ -243,7 +248,7 @@ function enforceSchedule(markdown: string, trainingDays: string[] | null | undef
     // Load active plan
     const { data: plan, error: planErr } = await supabase
       .from("training_plans")
-      .select("id, content, start_date, race_date, race_distance, last_adapted_at")
+      .select("id, content, start_date, race_date, race_distance, last_adapted_at, training_days")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
@@ -352,21 +357,43 @@ ${plan.content}`;
     newContent = newContent.replace(/^```(?:markdown)?\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     if (newContent.length < 50) throw new Error("AI returned empty/short content");
 
-    // Guardrail: enforce 5-min minimum on Warm-up / Cool-down rows.
+    // ── Validation pipeline (rules 1–4) ──
+    // Rule 1: dedupe duplicate week headings / date blocks
+    const beforeDedupe = newContent;
+    newContent = dedupePlan(newContent);
+    if (newContent !== beforeDedupe) {
+      console.warn("[plan-auto-adapt] rule1: deduped duplicate week/date headings");
+    }
+
+    // Rule 3: drop sessions on non-scheduled days
+    const beforeSched = newContent;
+    newContent = enforceSchedule(newContent, (plan as any).training_days);
+    if (newContent !== beforeSched) {
+      console.warn("[plan-auto-adapt] rule3: removed sessions on non-scheduled days");
+    }
+
+    // Rule 2: ensure warm-up / cool-down rows exist on running sessions
+    const beforeInject = newContent;
+    newContent = injectWarmupCooldown(newContent);
+    if (newContent !== beforeInject) {
+      console.warn("[plan-auto-adapt] rule2: injected missing warm-up/cool-down rows");
+    }
+
+    // Rule 2b: enforce 5-min minimum on existing warm-up / cool-down rows
     const validated = enforceWarmupCooldownMinimums(newContent);
     newContent = validated.content;
     for (const c of validated.corrections) {
       console.warn(
-        `[plan-auto-adapt] bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
+        `[plan-auto-adapt] rule2b: bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
       );
     }
 
-    // Guardrail: recompute each session's `(Total: Nmin)` from segment durations.
+    // Rule 4: recompute each session's `(Total: Nmin)` from segment durations
     const totalsFix = recomputeSessionTotals(newContent);
     newContent = totalsFix.content;
     for (const c of totalsFix.corrections) {
       console.warn(
-        `[plan-auto-adapt] recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
+        `[plan-auto-adapt] rule4: recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
       );
     }
 
