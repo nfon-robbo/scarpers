@@ -225,8 +225,8 @@ ${JSON.stringify(activitySummary, null, 2)}
 ${metricsContext}
 ${sleepContext}`;
 
-    let systemPrompt: string;
-    let userPrompt: string;
+    let systemPrompt = "";
+    let userPrompt = "";
 
     const isPlanAdjust = type === "plan-adjust";
 
