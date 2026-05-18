@@ -1455,6 +1455,10 @@ ${upcoming.join("\n")}
         return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
       })();
 
+      const emitDelta = async (delta: string) => {
+        await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+      };
+
       const consumeStream = async (body: ReadableStream<Uint8Array>) => {
         const reader = body.getReader();
         const decoder = new TextDecoder();
@@ -1463,8 +1467,6 @@ ${upcoming.join("\n")}
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          // Pass raw bytes straight to the client for live typing.
-          await writer.write(value);
           buf += decoder.decode(value, { stream: true });
           let idx: number;
           while ((idx = buf.indexOf("\n")) !== -1) {
@@ -1477,7 +1479,10 @@ ${upcoming.join("\n")}
             try {
               const evt = JSON.parse(json);
               const delta = evt?.choices?.[0]?.delta?.content;
-              if (typeof delta === "string") fullText += delta;
+              if (typeof delta === "string") {
+                fullText += delta;
+                await emitDelta(delta);
+              }
             } catch { /* ignore */ }
           }
         }
