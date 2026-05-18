@@ -460,6 +460,7 @@ export default function PlanDayList({
   syncing = false,
   goalTime,
   raceDistance,
+  onEditWorkout,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
