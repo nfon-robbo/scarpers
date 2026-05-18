@@ -1,82 +1,49 @@
+## Problem
 
-## Goal
-Give every workout in every plan a unified action menu so users can skip, move, swap with a templated alternative, or fully edit the session — with each change logged so the AI coach can see why the plan diverged.
+When you click **"✨ Apply suggested workout"** in the AI chatbot, the button doesn't apply your exact spec. It calls the `day-adjust` Edge Function a *second* time with the chat recommendation as a "COACH RECOMMENDATION TO APPLY" block. That prompt's "🚨 SURGICAL EDIT MODE" rules tell the LLM to *preserve* the original session type and "make the SMALLEST POSSIBLE change" — so when you asked to *replace* a VO2 max session, the model kept the VO2 max intervals and only nudged the title. Result: 6×2′ VO2 repeats survived; your race-pace block was discarded.
 
-## Scope
-All workouts across all surfaces that render a plan session card today:
-- `src/components/PlanDayList.tsx` (List view on `/training-plan`)
-- `src/components/PlanCalendarView.tsx` (Month view)
-- Workout detail dialog inside `PlanDayList`
-- AIChatbot adjust-session row (already has Skip / Move / Recovery — extend with new entry points)
+Re-rolling through the LLM at apply-time is the wrong architecture. The chatbot has already produced a structured workout in its reply. The Apply button should treat that reply as the source of truth and splice it in deterministically.
 
-## New / changed files
+## Fix
 
-1. **`src/lib/plan-day-actions.ts`** — extend with:
-   - `applyReplaceWithTemplate(planContent, dateUk, template, opts)` for the 7 alternatives (Easy Run, Tempo, Race-Pace, Intervals, Long Run, Recovery Walk, Rest).
-   - `applyEditWorkout(planContent, dateUk, edited)` that rewrites a single day block from a structured `EditedWorkout` model (title, segments[], notes, BPM).
-   - `applyMoveSessionToDate(planContent, dateUk, isoTarget)` (move to a *specific* date chosen in a date picker — current `applyMoveSession` only moves to next training day).
-   - Builders: `buildEasyRunBlock`, `buildTempoBlock`, `buildRacePaceBlock`, `buildIntervalsBlock`, `buildLongRunBlock`, `buildRecoveryWalkBlock`, `buildRestBlock`. Each takes the date + params and returns markdown matching the existing 5-column table format the validators expect.
+Replace the "Apply suggested workout" handler so it parses the chatbot's most recent assistant message into a workout block and writes it straight into the plan — no second AI call.
 
-2. **`src/lib/plan-edit-log.ts`** (new) — persists a change-history list keyed by plan id:
-   - `logPlanEdit(planId, entry)` → inserts into a new `plan_edit_log` table (one row per change: `plan_id`, `user_id`, `date_uk`, `action`, `before_title`, `after_title`, `summary`, `details jsonb`, `created_at`).
-   - `fetchPlanEditLog(planId, limit)` for the AI chatbot context builder.
+### Files
 
-3. **DB migration** (`plan_edit_log` table + RLS: users CRUD their own rows).
+1. **`src/lib/chat-recommendation-parser.ts`** (new)
+   - `parseChatRecommendation(text, dateUk)` → `{ title, totalMin, segments: EditedSegment[], musicBpm? } | null`
+   - Handles the two shapes the chatbot emits today:
+     - **Numbered list** (`1. Warm-up • 5 min walk, 10 min easy jog • Z1-Z2 • 🎵 150-155 BPM; …`)
+     - **Bullet/dash list** under a bold title
+   - Recognises `intervals.icu`-style explicit specs ("Warm Up Walk — 05:00 — No pace", "Race Pace Block — 20:00 — 6:00 Pace (min/km)").
+   - Normalises each row into the 5-column segment shape (`segment / duration / target / hrZone / notes`).
+   - Drops any mobility/stretching/yoga rows (existing constraint).
+   - Computes `totalMin` from the sum of segment durations when not explicit.
 
-4. **`src/components/WorkoutEditDialog.tsx`** (new) — the "Edit/Replace Workout" UI:
-   - **Action list** at the top: Skip, Move to…, Replace with recovery walk, Replace with alternative ▾, Edit workout details.
-   - **Move to…** opens a shadcn Calendar popover (date picker).
-   - **Replace with alternative** opens a dropdown of the 7 templates; each template reveals its own param form (duration / pace / structure).
-   - **Edit workout details** switches the dialog body to a full structured editor:
-     - Title input
-     - Segments table (add/remove rows): segment name, duration, pace target, HR zone, notes
-     - Coaching notes textarea
-     - BPM suggestion input
-   - Save calls the relevant `apply…` helper, then persists the new plan content + logs the edit + triggers existing post-save flow (revalidate, refresh activities, sync to Intervals if user opts in).
+2. **`src/lib/plan-day-actions.ts`**
+   - Add `applyChatRecommendationDirect(planContent, dateUk, parsed)` that:
+     - Locates the day's raw block via the existing date-line regex used in other helpers.
+     - Builds a fresh markdown block: bold date line + `**{title} (Total: {N}min)**` + 5-column segment table + optional `🎵 {bpm}` line.
+     - Splices it into `planContent`, runs the existing `enforceAndLog` validator, returns the new content + `{ beforeTitle, afterTitle }`.
 
-5. **Wire-up in `PlanDayList.tsx` and `PlanCalendarView.tsx`**:
-   - Add a small "Edit / Replace" button (Pencil icon) on each workout card and inside the workout detail dialog.
-   - Clicking opens `WorkoutEditDialog` with the workout + plan content.
-   - Lifted via two new props on `PlanDayList` / `PlanCalendarView`: `onEditWorkout(dateUk)` and `planContent`.
+3. **`src/components/AIChatbot.tsx`** — change the Apply suggested workout path:
+   - Pull the last assistant message text the user is responding to (already on the message that owns the action row).
+   - Call `parseChatRecommendation(recommendationText, scope.dateUk)`.
+   - On success: call `applyChatRecommendationDirect`, write to `training_plans.content`, push undo, call existing `logPlanEdit({ action: "edit", template: null, summary: "Applied chat recommendation: {title}", details: { source: "chatbot_suggestion_direct", … } })`, toast `"Workout replaced with {title}"`.
+   - On parse failure (rare — recommendation isn't a structured workout): fall back to today's AI path **with a stronger directive** prepended to the COACH RECOMMENDATION block: `"REPLACE the entire session with the workout described below — ignore the surgical-edit 'preserve session type' rule, this is an explicit user-confirmed full replacement."` This stops the surgical-edit guard from clobbering an explicit replace.
 
-6. **`src/pages/TrainingPlan.tsx`**:
-   - New handler `handleEditWorkout(dateUk, change)` that:
-     - Pushes current content onto undo stack (existing `pushUndoEntry`).
-     - Updates `training_plans.content` (and `race_date` if a date moved past race day, reusing existing conflict-resolution helpers).
-     - Calls `logPlanEdit(...)` with a concise summary.
-     - Triggers existing post-edit refreshes (`refreshLinkedActivities`, plan re-parse, optional Intervals re-sync banner).
-   - Passes `planContent` + `onEditWorkout` down to `PlanDayList` and `PlanCalendarView`.
+4. **`supabase/functions/ai-coach/index.ts`** (small guard, only for the fallback)
+   - In the day-adjust SURGICAL EDIT MODE section, add: *"EXCEPTION: if the recommendation block starts with `FULL REPLACEMENT:` then output the new session verbatim — do NOT preserve the original session type, title, or segments."*
+   - This only fires in the fallback path; the happy path no longer touches the LLM.
 
-7. **AI chatbot context** (`supabase/functions/ai-coach/index.ts` and `src/components/AIChatbot.tsx`):
-   - When building the user-context payload for chat, include the last ~20 plan edits from `plan_edit_log` so the model can reference *why* the plan diverged.
+### Why this fixes it
 
-## Validation & safety
-- All template builders emit markdown that passes existing `enforceAndLog` / `recomputeAndLog` validation (warm-up, cool-down, no mobility rows, correct `(Total: Nmin)`).
-- `applyEditWorkout` runs the validator before returning.
-- Each apply helper goes through the same undo/redo plumbing already used for Skip / Move.
-- Race-day conflict: if "Move to…" lands on or past race day, reuse `detectRaceDateConflict` + the existing compressed / shift-race dialog flow.
+- The chatbot already produced exactly the workout you wanted. The bug was an unnecessary LLM round-trip that re-interpreted it through "surgical edit" rules.
+- Skipping that round-trip means what you see in chat is bit-for-bit what lands in the plan.
+- The fallback only runs when parsing genuinely fails, and it carries an explicit override so the AI can't ignore a full replacement request.
 
-## Out of scope (explicitly not built)
-- Bulk multi-day edits.
-- AI rewrite of the edited session (the structured editor is deterministic; users can still ask the chatbot to redesign).
-- A separate revision-history viewer UI — log is consumed by the AI coach only for now.
+### Out of scope
 
-## Migration
-```sql
-CREATE TABLE public.plan_edit_log (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  plan_id uuid not null,
-  date_uk text not null,
-  action text not null,           -- skip | move | replace_recovery | replace_template | edit
-  template text,                  -- easy_run | tempo | race_pace | intervals | long_run | recovery_walk | rest | null
-  before_title text,
-  after_title text,
-  summary text not null,
-  details jsonb,
-  created_at timestamptz not null default now()
-);
-ALTER TABLE public.plan_edit_log ENABLE ROW LEVEL SECURITY;
--- standard owner CRUD policies
-CREATE INDEX plan_edit_log_plan_id_created_idx ON public.plan_edit_log (plan_id, created_at DESC);
-```
+- No changes to plan generation, intervals.icu sync, or any other Apply path (Skip / Move / Recovery Walk / Edit dialog).
+- No new DB tables — reuses `plan_edit_log`.
+- No UI changes besides what the button does on click.
