@@ -76,6 +76,13 @@ function extractRaceDateFromMarkdown(md: string | null | undefined): string | nu
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+function workoutContentKey(w: ParsedWorkout, dateStr: string): string {
+  let hash = 0;
+  const text = `${w.title}\n${w.rawText || ""}`;
+  for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  return `${dateStr}:${Math.abs(hash).toString(36)}`;
+}
+
 function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
   if (!markdown) return [];
   const days = new Set<string>();
