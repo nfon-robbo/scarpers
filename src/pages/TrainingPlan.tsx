@@ -446,6 +446,7 @@ const TrainingPlanPage = () => {
   const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
+  const [editingWorkout, setEditingWorkout] = useState<ParsedWorkout | null>(null);
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
   const [postAnalyzing, setPostAnalyzing] = useState(false);
