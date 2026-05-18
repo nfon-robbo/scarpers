@@ -760,7 +760,14 @@ const TrainingPlanPage = () => {
     setStartDate(newStart);
     setRaceDate(newEnd);
     setLetAIDecide(false);
-    setContent("");
+
+    const previousContent = content;
+    const todayISO = toLocalISODate(new Date());
+    const { preservedPast, splitWorked } = splitPlanByDate(previousContent, todayISO);
+    const prefix = splitWorked && preservedPast ? preservedPast + "\n\n" : "";
+    const effectiveStartISO = prefix ? todayISO : toLocalISODate(newStart);
+
+    setContent(prefix);
     setLoading(true);
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -775,13 +782,14 @@ const TrainingPlanPage = () => {
       currentPaceMin,
       currentPaceMax,
       trainingDays,
-      startDate: toLocalISODate(newStart),
+      startDate: effectiveStartISO,
       raceDate: toLocalISODate(newEnd),
-      onDelta: (text) => { accumulated += text; setContent(accumulated); },
+      onDelta: (text) => { accumulated += text; setContent(prefix + accumulated); },
       onDone: async () => {
         setLoading(false);
-        const planId = await savePlan(accumulated, { undoLabel: "end date regeneration", prevContent: content });
-        toastPlanChange("Plan regenerated", "New plan built for updated end date.", content ? planId : null);
+        const finalContent = prefix + accumulated;
+        const planId = await savePlan(finalContent, { undoLabel: "end date regeneration", prevContent: previousContent });
+        toastPlanChange("Plan regenerated", prefix ? "Past workouts preserved; future rebuilt." : "New plan built for updated end date.", previousContent ? planId : null);
       },
       onError: (err) => {
         toast({ title: "Regeneration failed", description: err, variant: "destructive" });
