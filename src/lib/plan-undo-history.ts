@@ -7,6 +7,8 @@ const MAX_ENTRIES = 50;
 
 export interface UndoEntry {
   prevContent: string;
+  /** When set, the entry also restores `training_plans.race_date`. */
+  prevRaceDate?: string | null;
   label: string;       // e.g. "17/06/2026 session" or "full plan rewrite"
   timestamp: number;
 }
@@ -31,12 +33,19 @@ function write(planId: string, stack: UndoEntry[]) {
   }
 }
 
-export function pushUndoEntry(planId: string, prevContent: string, label: string) {
+export function pushUndoEntry(
+  planId: string,
+  prevContent: string,
+  label: string,
+  opts?: { prevRaceDate?: string | null },
+) {
   if (!planId || typeof prevContent !== "string") return;
   const stack = read(planId);
   // Skip duplicate consecutive entries.
   if (stack.length > 0 && stack[stack.length - 1].prevContent === prevContent) return;
-  stack.push({ prevContent, label, timestamp: Date.now() });
+  const entry: UndoEntry = { prevContent, label, timestamp: Date.now() };
+  if (opts && "prevRaceDate" in opts) entry.prevRaceDate = opts.prevRaceDate ?? null;
+  stack.push(entry);
   write(planId, stack);
 }
 

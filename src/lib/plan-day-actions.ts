@@ -203,3 +203,208 @@ export function applyMoveSession(planContent: string, dateUk: string): DayAction
 
 /** @deprecated Use applyMoveSession — kept for backwards compatibility. */
 export const applyMoveToTomorrow = applyMoveSession;
+
+// -------------------------------------------------------------------------
+// Race-date conflict detection + resolution helpers (chatbot "Move" flow).
+// -------------------------------------------------------------------------
+
+export interface MoveCascadePreview {
+  /** Date the moved session lands on. */
+  targetDate: Date;
+  /**
+   * All sessions in their post-move state — first entry is the moved session
+   * itself at targetDate; subsequent entries are the displaced chain at +1d
+   * each. `originalDate` is null for the moved session (it came from `dateUk`).
+   */
+  shifted: Array<{ originalDate: Date | null; newDate: Date; rawText: string }>;
+}
+
+function parseIsoDate(iso: string): Date | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/**
+ * Pure simulation of what `applyMoveSession` would produce, without touching
+ * the plan text. Used to detect race-date conflicts before applying anything.
+ */
+export function previewMoveCascade(planContent: string, dateUk: string): MoveCascadePreview | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const futureWorkouts = loc.workouts
+    .filter((w) => w !== loc.target && w.dateObj && toIso(w.dateObj) > loc.iso)
+    .sort((a, b) => toIso(a.dateObj!).localeCompare(toIso(b.dateObj!)));
+  const targetDate = futureWorkouts[0]?.dateObj ?? addDays(loc.dateObj, 1);
+
+  const shifted: MoveCascadePreview["shifted"] = [
+    { originalDate: null, newDate: targetDate, rawText: loc.target.rawText! },
+  ];
+  if (futureWorkouts[0] && toIso(futureWorkouts[0].dateObj!) === toIso(targetDate)) {
+    const chain = [futureWorkouts[0]];
+    let cursor = futureWorkouts[0].dateObj!;
+    while (true) {
+      const next = addDays(cursor, 1);
+      const found = loc.workouts.find((w) => w.dateObj && toIso(w.dateObj) === toIso(next));
+      if (!found?.rawText) break;
+      chain.push(found);
+      cursor = next;
+    }
+    for (const block of chain) {
+      shifted.push({
+        originalDate: block.dateObj!,
+        newDate: addDays(block.dateObj!, 1),
+        rawText: block.rawText!,
+      });
+    }
+  }
+  return { targetDate, shifted };
+}
+
+export interface RaceConflict {
+  hasConflict: boolean;
+  /** Number of shifted sessions that would land on or after race day. */
+  overflowCount: number;
+  /** Max calendar-day delta produced by the cascade (1 in today's model). */
+  cascadeDays: number;
+}
+
+export function detectRaceDateConflict(
+  preview: MoveCascadePreview,
+  raceDateIso: string | null,
+): RaceConflict {
+  if (!raceDateIso) return { hasConflict: false, overflowCount: 0, cascadeDays: 1 };
+  const race = parseIsoDate(raceDateIso);
+  if (!race) return { hasConflict: false, overflowCount: 0, cascadeDays: 1 };
+  const raceIso = toIso(race);
+  let overflow = 0;
+  let cascadeDays = 0;
+  for (const s of preview.shifted) {
+    if (toIso(s.newDate) >= raceIso) overflow++;
+    if (s.originalDate) {
+      const delta =
+        (s.newDate.getTime() - s.originalDate.getTime()) / (24 * 60 * 60 * 1000);
+      if (delta > cascadeDays) cascadeDays = delta;
+    }
+  }
+  return { hasConflict: overflow > 0, overflowCount: overflow, cascadeDays: Math.max(1, cascadeDays) };
+}
+
+/** Pretty UK label: "Friday 3 July". */
+export function formatRaceDateLabel(iso: string): string {
+  const d = parseIsoDate(iso);
+  if (!d) return iso;
+  return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()]}`;
+}
+
+/** Build a fresh markdown block for a session at `newDate`. */
+function rewriteBlockToDate(rawText: string, newDate: Date): string {
+  const lines = rawText.split("\n");
+  lines[0] = rewriteHeadingDate(lines[0], newDate);
+  let text = lines.join("\n");
+  if (!text.endsWith("\n")) text += "\n";
+  if (!text.endsWith("\n\n")) text += "\n";
+  return text;
+}
+
+/**
+ * Move the session and compress the displaced chain so every session lands
+ * strictly before `raceDateIso`. The moved session keeps its computed target
+ * date; the displaced chain is packed tightly toward race day. If we run out
+ * of room, sessions stack on the final day before the race.
+ */
+export function applyMoveCompressed(
+  planContent: string,
+  dateUk: string,
+  raceDateIso: string,
+): DayActionResult | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const preview = previewMoveCascade(planContent, dateUk);
+  if (!preview) return null;
+  const race = parseIsoDate(raceDateIso);
+  if (!race) return null;
+
+  const prefix = getHeadingPrefix(loc.target.rawText!);
+  const restAtOriginal = makeRestBlock(loc.dateObj, prefix, "session moved");
+
+  // No conflict — fall back to standard move so behaviour is identical.
+  const conflict = detectRaceDateConflict(preview, raceDateIso);
+  if (!conflict.hasConflict) return applyMoveSession(planContent, dateUk);
+
+  // Compute new dates: pack [moved, ...displaced] toward (raceDate - 1).
+  const totalLen = preview.shifted.length;
+  const earliestStart = preview.targetDate;
+  // raceDate - totalLen would put the last session on (raceDate - 1).
+  const packedStart = addDays(race, -totalLen);
+  const startDate = toIso(packedStart) < toIso(earliestStart) ? earliestStart : packedStart;
+  const raceIso = toIso(race);
+
+  const newDates: Date[] = [];
+  let stackedOnLastDay = false;
+  for (let i = 0; i < totalLen; i++) {
+    let d = addDays(startDate, i);
+    if (toIso(d) >= raceIso) {
+      d = addDays(race, -1);
+      stackedOnLastDay = true;
+    }
+    newDates.push(d);
+  }
+
+  // Build replacement text. We replace from the original block through the
+  // last displaced block. Anything BETWEEN the source and the target stays in
+  // place; the moved + displaced blocks are re-emitted with their new dates
+  // immediately after that interior region.
+  const lastShifted = preview.shifted[preview.shifted.length - 1];
+  const chainStartIdx =
+    preview.shifted.length > 1
+      ? planContent.indexOf(preview.shifted[1].rawText)
+      : planContent.indexOf(preview.shifted[0].rawText);
+  // When there is no displaced chain, fall back to standard move.
+  if (preview.shifted.length === 1) return applyMoveSession(planContent, dateUk);
+
+  const chainEndIdx =
+    planContent.indexOf(lastShifted.rawText) + lastShifted.rawText.length;
+  if (chainStartIdx <= loc.idx || chainEndIdx <= chainStartIdx) return null;
+
+  const before = planContent.slice(0, loc.idx);
+  const between = planContent.slice(loc.idx + loc.target.rawText!.length, chainStartIdx);
+  const after = planContent.slice(chainEndIdx);
+
+  let emitted = "";
+  for (let i = 0; i < preview.shifted.length; i++) {
+    emitted += rewriteBlockToDate(preview.shifted[i].rawText, newDates[i]);
+  }
+
+  const updated = before + restAtOriginal + between + emitted + after;
+  const movedToLabel = `${DAY_NAMES[preview.targetDate.getDay()]} ${toUk(preview.targetDate)}`;
+  const tailNote = stackedOnLastDay
+    ? ` Some sessions stacked on the final taper day — review your plan.`
+    : ` ${conflict.overflowCount} later session${conflict.overflowCount === 1 ? "" : "s"} compressed to fit before race day.`;
+  return {
+    updatedPlan: updated,
+    summary: `Session moved to ${movedToLabel}.${tailNote}`,
+  };
+}
+
+/**
+ * Move the session normally AND compute a new race date shifted forward by
+ * the cascade. The caller is responsible for persisting `newRaceDateIso`
+ * alongside the plan content.
+ */
+export function applyMoveAndShiftRace(
+  planContent: string,
+  dateUk: string,
+  raceDateIso: string,
+): { result: DayActionResult; newRaceDateIso: string } | null {
+  const preview = previewMoveCascade(planContent, dateUk);
+  if (!preview) return null;
+  const conflict = detectRaceDateConflict(preview, raceDateIso);
+  const race = parseIsoDate(raceDateIso);
+  if (!race) return null;
+  const result = applyMoveSession(planContent, dateUk);
+  if (!result) return null;
+  const newRace = addDays(race, Math.max(1, conflict.cascadeDays));
+  return { result, newRaceDateIso: toIso(newRace) };
+}
+

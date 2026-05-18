@@ -335,9 +335,11 @@ const TrainingPlanPage = () => {
     if (!peek) return;
     const entry = popUndoEntry(targetPlanId);
     if (!entry) return;
+    const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
+    if ("prevRaceDate" in entry) updatePayload.race_date = entry.prevRaceDate ?? null;
     const { error } = await supabase
       .from("training_plans")
-      .update({ content: entry.prevContent })
+      .update(updatePayload)
       .eq("id", targetPlanId);
     if (error) {
       toast({ title: "Undo failed", description: error.message, variant: "destructive" });
