@@ -30,7 +30,7 @@ interface Message {
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-coach`;
-const ACTION_MARKER_REGEX = /\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g;
+const ACTION_MARKER_REGEX = /\[\[ACTION:(?:day:\d{1,2}\/\d{1,2}\/\d{4}|race-conflict:\d{1,2}\/\d{1,2}\/\d{4}|plan|recommendation)\]\]/g;
 
 const isConcreteWorkoutEdit = (text: string) => {
   const lower = text.toLowerCase();
