@@ -2364,6 +2364,70 @@ const TrainingPlanPage = () => {
               syncing={syncing}
               goalTime={goalTime}
               raceDistance={raceDistance}
+              onEditWorkout={(w) => setEditingWorkout(w)}
+            />
+            <WorkoutEditDialog
+              open={!!editingWorkout}
+              onOpenChange={(o) => { if (!o) setEditingWorkout(null); }}
+              workout={editingWorkout}
+              onApply={async (change) => {
+                if (!editingWorkout || !content || !user) return;
+                const d = editingWorkout.dateObj;
+                if (!d) return;
+                const dateUk = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+                let result: { updatedPlan: string; summary: string } | null = null;
+                let action: "skip" | "move" | "replace_recovery" | "replace_template" | "edit" = "edit";
+                let template: string | null = null;
+                let afterTitle: string | null = null;
+                if (change.kind === "skip") {
+                  action = "skip";
+                  result = applySkipSession(content, dateUk);
+                  afterTitle = "Rest Day";
+                } else if (change.kind === "move") {
+                  action = "move";
+                  result = applyMoveSessionToDate(content, dateUk, change.isoTarget);
+                  afterTitle = editingWorkout.title;
+                } else if (change.kind === "replace_recovery") {
+                  action = "replace_recovery";
+                  result = applyReplaceWithRecovery(content, dateUk);
+                  afterTitle = "Recovery Walk";
+                } else if (change.kind === "replace_template") {
+                  action = "replace_template";
+                  template = change.template;
+                  result = applyReplaceWithTemplate(content, dateUk, change.template, change.opts);
+                  afterTitle = change.template;
+                } else if (change.kind === "edit") {
+                  action = "edit";
+                  result = applyEditWorkout(content, dateUk, change.edited);
+                  afterTitle = change.edited.title;
+                }
+                if (!result) {
+                  toast({ title: "Couldn't update plan", description: `No session found on ${dateUk}.`, variant: "destructive" });
+                  return;
+                }
+                const previousContent = content;
+                const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `edit-workout: ${action}` }).content;
+                setContent(validated);
+                const planId = await savePlan(validated, {
+                  inPlace: true,
+                  undoLabel: `${dateUk} ${action}`,
+                  prevContent: previousContent,
+                });
+                if (planId) {
+                  await logPlanEdit({
+                    planId,
+                    userId: user.id,
+                    dateUk,
+                    action,
+                    template: template as any,
+                    beforeTitle: editingWorkout.title,
+                    afterTitle,
+                    summary: result.summary,
+                    details: change.kind === "edit" ? { segments: change.edited.segments.length } : null,
+                  });
+                }
+                toast({ title: "Workout updated", description: result.summary });
+              }}
             />
           </>
         )}
