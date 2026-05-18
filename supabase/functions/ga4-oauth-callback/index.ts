@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
       { headers: { "Content-Type": "text/html" } },
     );
 
-  if (errorParam) return html(`Authorization denied: ${errorParam}`);
+  if (errorParam) return html("Authorization denied.");
   if (!code || !state) return html("Missing code or state.");
 
   try {
