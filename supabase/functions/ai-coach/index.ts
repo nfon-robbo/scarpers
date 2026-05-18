@@ -1428,9 +1428,11 @@ ${upcoming.join("\n")}
       const writer = writable.getWriter();
       let fullText = "";
 
-      // Recompute plan-context locals (they live inside the training-plan branch
-      // above and aren't in scope here).
-      const _planStart = start_date || new Date().toISOString().split("T")[0];
+      // Recompute plan-context locals (they live inside the plan branches above
+      // and aren't in scope here).
+      const _planStart = preserve_past && plan_start_from_date
+        ? String(plan_start_from_date)
+        : (start_date || new Date().toISOString().split("T")[0]);
       const _daysStr = (training_days as string[] | undefined)?.length
         ? (training_days as string[]).join(", ")
         : "Mon, Wed, Fri, Sat";
@@ -1482,10 +1484,16 @@ ${upcoming.join("\n")}
         return sawDone;
       };
 
-      // Pull last YYYY-MM-DD from the accumulated plan text.
+      // Pull the last date from the accumulated plan text, accepting both ISO
+      // and UK markdown headings so continuation works for generated/adjusted plans.
       const lastIsoDate = (txt: string): string | null => {
-        const matches = txt.match(/\b(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g);
-        return matches && matches.length ? matches[matches.length - 1] : null;
+        const matches = [...txt.matchAll(/\b(?:(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|([0-3]?\d)\/(0?\d)\/(20\d{2}))\b/g)];
+        if (!matches.length) return null;
+        const m = matches[matches.length - 1];
+        if (m[1] && m[2] && m[3]) return `${m[1]}-${m[2]}-${m[3]}`;
+        const dd = String(m[4]).padStart(2, "0");
+        const mm = String(m[5]).padStart(2, "0");
+        return `${m[6]}-${mm}-${dd}`;
       };
 
       try {
