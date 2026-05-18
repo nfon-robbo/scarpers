@@ -1516,7 +1516,7 @@ ${upcoming.join("\n")}
             return d.toISOString().slice(0, 10);
           })();
 
-          console.log(`[training-plan] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
+          console.log(`[${type}] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
 
           const continuationUser = `The plan above stopped at ${last || "the start"}. Continue the plan from ${resumeFrom} through ${targetIso} (${_raceDayName}, ${_raceDateUKLong}) inclusive.
 
@@ -1529,7 +1529,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
           const contResp = await callAI({
             stream: true,
             maxTokens: 64000,
-            label: `ai-coach:training-plan:cont${attempts}`,
+            label: `ai-coach:${type}:cont${attempts}`,
             lovableModel: planLovableModel,
             messages: [
               { role: "system", content: nowPrelude + systemPrompt },
