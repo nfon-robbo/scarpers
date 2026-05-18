@@ -26,7 +26,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalenda
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
-import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
+import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry, popRedoEntry, getRedoCount, peekRedoEntry, pushRedoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
