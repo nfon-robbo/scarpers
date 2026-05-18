@@ -654,13 +654,52 @@ const AIChatbot = () => {
                   ) : (
                     cleaned
                   )}
-                  {showActions && (
+                  {showActions && scope.kind === "day" && (
                     <div className="mt-3 space-y-2">
-                      {scope.kind === "day" && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Affects only your <strong>{scope.dateUk}</strong> session.
-                        </p>
-                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Affects only your <strong>{scope.dateUk}</strong> session. Pick exactly what you'd like to do:
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "skip")}
+                        >
+                          Skip this session
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "move")}
+                        >
+                          Move to tomorrow
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "recovery")}
+                        >
+                          Replace with 20-min recovery walk
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => {
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                          }}
+                        >
+                          Keep as it is
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {showActions && scope.kind === "plan" && (
+                    <div className="mt-3 space-y-2">
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -668,7 +707,7 @@ const AIChatbot = () => {
                           disabled={loading}
                           onClick={() => applyChange(cleaned, scope)}
                         >
-                          Make the change
+                          Apply this change to my plan
                         </Button>
                         <Button
                           size="sm"
@@ -676,7 +715,7 @@ const AIChatbot = () => {
                           className="flex-1 h-8 text-xs"
                           disabled={loading}
                           onClick={() => {
-                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the plan as it is." }]);
                           }}
                         >
                           Keep as it is
