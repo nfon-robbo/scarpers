@@ -13,8 +13,10 @@ import { pushUndoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
 import {
   applySkipSession,
-  applyMoveToTomorrow,
+  applyMoveSession,
   applyReplaceWithRecovery,
+  getMoveTargetDate,
+  formatMoveTargetLabel,
 } from "@/lib/plan-day-actions";
 
 interface Message {
@@ -43,6 +45,7 @@ const AIChatbot = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
+  const [activePlanContent, setActivePlanContent] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +128,28 @@ const AIChatbot = () => {
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
+
+  // Cache the active plan content so the "Move" button can show its
+  // dynamically computed target date (e.g. "Move to Wednesday 20 May")
+  // without an async fetch at render time.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data: plan } = await supabase
+        .from("training_plans")
+        .select("content")
+        .eq("user_id", session.user.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && plan?.content) setActivePlanContent(plan.content);
+    })();
+    return () => { cancelled = true; };
+  }, [open, messages.length]);
 
   const applyChange = useCallback(async (
     recommendationText: string,
@@ -306,7 +331,7 @@ const AIChatbot = () => {
         action === "skip"
           ? applySkipSession(plan.content, dateUk)
           : action === "move"
-            ? applyMoveToTomorrow(plan.content, dateUk)
+            ? applyMoveSession(plan.content, dateUk)
             : applyReplaceWithRecovery(plan.content, dateUk);
 
       if (!result) {
@@ -668,14 +693,28 @@ const AIChatbot = () => {
                         >
                           Skip this session
                         </Button>
-                        <Button
-                          size="sm"
-                          className="h-8 text-xs justify-start"
-                          disabled={loading}
-                          onClick={() => applyDayAction(scope.dateUk, "move")}
-                        >
-                          Move to tomorrow
-                        </Button>
+                        {(() => {
+                          const sourceMatch = scope.dateUk.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                          const sourceDate = sourceMatch
+                            ? new Date(Number(sourceMatch[3]), Number(sourceMatch[2]) - 1, Number(sourceMatch[1]))
+                            : null;
+                          const targetDate = activePlanContent
+                            ? getMoveTargetDate(activePlanContent, scope.dateUk)
+                            : null;
+                          const label = sourceDate && targetDate
+                            ? `Move to ${formatMoveTargetLabel(sourceDate, targetDate)}`
+                            : "Move to next training day";
+                          return (
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs justify-start"
+                              disabled={loading}
+                              onClick={() => applyDayAction(scope.dateUk, "move")}
+                            >
+                              {label}
+                            </Button>
+                          );
+                        })()}
                         <Button
                           size="sm"
                           className="h-8 text-xs justify-start"
