@@ -754,6 +754,15 @@ const AIChatbot = () => {
                       <div className="flex flex-col gap-1.5">
                         <Button
                           size="sm"
+                          className="h-8 text-xs justify-start bg-primary"
+                          disabled={loading}
+                          onClick={() => applyChange(cleaned, scope)}
+                        >
+                          ✨ Apply suggested workout
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           className="h-8 text-xs justify-start"
                           disabled={loading}
                           onClick={() => applyDayAction(scope.dateUk, "skip")}
