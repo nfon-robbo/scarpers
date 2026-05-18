@@ -1710,6 +1710,13 @@ const TrainingPlanPage = () => {
           </button>
         )}
         {content && !loading && (
+          <PlanStatsBar
+            planContent={content}
+            linkedActivities={linkedActivities}
+            raceDateIso={raceDate ? toLocalISODate(raceDate) : null}
+          />
+        )}
+        {content && !loading && (
           <div className="flex flex-wrap gap-2">
             {Object.keys(linkedActivities).length > 0 && (
               <Button className="w-full sm:w-auto" onClick={reviewProgress} disabled={syncing || reviewing || dayAdjusting}>
