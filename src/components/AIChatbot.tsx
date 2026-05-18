@@ -792,6 +792,85 @@ const AIChatbot = () => {
                       </div>
                     </div>
                   )}
+                  {showConflict && conflictMatch && activePlanRaceDate && (() => {
+                    const dateUk = conflictMatch[1];
+                    const raceIso = activePlanRaceDate;
+                    const raceMatch = raceIso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    const raceDate = raceMatch
+                      ? new Date(Number(raceMatch[1]), Number(raceMatch[2]) - 1, Number(raceMatch[3]))
+                      : null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysToRace = raceDate
+                      ? Math.round((raceDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+                      : Infinity;
+                    const recommended: "compress" | "skip" = daysToRace > 28 ? "compress" : "skip";
+                    // Preview the shifted race date label for Option 2.
+                    let shiftedRaceLabel = "";
+                    if (activePlanContent) {
+                      const preview = previewMoveCascade(activePlanContent, dateUk);
+                      if (preview) {
+                        const conflict = detectRaceDateConflict(preview, raceIso);
+                        if (raceDate) {
+                          const newRace = new Date(raceDate);
+                          newRace.setDate(newRace.getDate() + Math.max(1, conflict.cascadeDays));
+                          shiftedRaceLabel = formatRaceDateLabel(
+                            `${newRace.getFullYear()}-${String(newRace.getMonth() + 1).padStart(2, "0")}-${String(newRace.getDate()).padStart(2, "0")}`,
+                          );
+                        }
+                      }
+                    }
+                    const RecChip = () => (
+                      <span className="ml-2 text-[10px] uppercase tracking-wide bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                        Recommended
+                      </span>
+                    );
+                    return (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex flex-col gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-auto min-h-8 text-xs justify-between text-left py-2"
+                            disabled={loading}
+                            onClick={() => applyDayAction(dateUk, "move-compressed")}
+                          >
+                            <span>Stick to race date (compress sessions)</span>
+                            {recommended === "compress" && <RecChip />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-auto min-h-8 text-xs justify-start text-left py-2"
+                            disabled={loading}
+                            onClick={() => applyDayAction(dateUk, "move-shift-race")}
+                          >
+                            {shiftedRaceLabel
+                              ? `Move race date to ${shiftedRaceLabel}`
+                              : "Move race date forward"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-auto min-h-8 text-xs justify-between text-left py-2"
+                            disabled={loading}
+                            onClick={() => applyDayAction(dateUk, "skip")}
+                          >
+                            <span>Skip this session (keep plan & race date)</span>
+                            {recommended === "skip" && <RecChip />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs justify-start"
+                            disabled={loading}
+                            onClick={() => {
+                              setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                            }}
+                          >
+                            Keep as it is
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {showActions && scope.kind === "plan" && (
                     <div className="mt-3 space-y-2">
                       <div className="flex gap-2">
