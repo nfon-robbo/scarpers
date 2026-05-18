@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
+import { PlanStatsBar } from "@/components/PlanStatsBar";
 import RaceTimeEstimate from "@/components/RaceTimeEstimate";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
