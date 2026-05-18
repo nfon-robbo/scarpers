@@ -28,6 +28,15 @@ import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normal
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
 import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry, popRedoEntry, getRedoCount, peekRedoEntry, pushRedoEntry } from "@/lib/plan-undo-history";
+import {
+  applySkipSession,
+  applyMoveSession,
+  previewMoveCascade,
+  detectRaceDateConflict,
+  applyMoveCompressed,
+  applyMoveAndShiftRace,
+  formatRaceDateLabel,
+} from "@/lib/plan-day-actions";
 import { enforceAndLog } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
