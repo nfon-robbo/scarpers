@@ -45,6 +45,7 @@ const AIChatbot = () => {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; dateUk: string } | null>(null);
+  const [activePlanContent, setActivePlanContent] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
