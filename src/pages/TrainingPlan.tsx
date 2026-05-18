@@ -13,7 +13,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp, Undo2, BarChart3, ArrowRight } from "lucide-react";
+import { Calendar, Loader2, RotateCcw, Target, Layers, Clock, CalendarIcon, Trash2, Upload, RefreshCw, FileDown, Watch, ChevronDown, ChevronUp, ClipboardCheck, MoreVertical, ThumbsDown, ThumbsUp, Check, X, Sun, Activity, Moon, Brain, Dumbbell, Search, FileUp, Undo2, Redo2, BarChart3, ArrowRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -26,7 +26,7 @@ import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalenda
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
 import { importFitPlan } from "@/lib/fit-plan-import";
-import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry } from "@/lib/plan-undo-history";
+import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry, popRedoEntry, getRedoCount, peekRedoEntry, pushRedoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
@@ -311,10 +311,17 @@ const TrainingPlanPage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
+  // Forward-declared ref so the undo/redo callbacks can read the latest race date
+  // without depending on the (later-declared) `raceDate` state binding.
+  const raceDateRef = useRef<Date | undefined>(undefined);
 
-  // Track undo stack size for the active plan; refresh when chat pushes/pops entries.
+  // Track undo/redo stack sizes for the active plan; refresh when chat pushes/pops entries.
   useEffect(() => {
-    const refresh = () => setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+    const refresh = () => {
+      setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+      setRedoCount(savedPlanId ? getRedoCount(savedPlanId) : 0);
+    };
     refresh();
     const onChange = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -335,6 +342,12 @@ const TrainingPlanPage = () => {
     if (!peek) return;
     const entry = popUndoEntry(targetPlanId);
     if (!entry) return;
+    // Capture current state into the redo stack BEFORE applying the undo, so
+    // the user can step forward again.
+    const currentContent = content;
+    const currentRaceDateIso = raceDateRef.current ? toLocalISODate(raceDateRef.current) : null;
+    const redoOpts = "prevRaceDate" in entry ? { prevRaceDate: currentRaceDateIso } : undefined;
+    pushRedoEntry(targetPlanId, currentContent, entry.label, redoOpts);
     const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
     if ("prevRaceDate" in entry) updatePayload.race_date = entry.prevRaceDate ?? null;
     const { error } = await supabase
@@ -346,8 +359,45 @@ const TrainingPlanPage = () => {
       return;
     }
     setContent(entry.prevContent);
+    if ("prevRaceDate" in entry) {
+      try {
+        setRaceDate(entry.prevRaceDate ? parseLocalISODate(entry.prevRaceDate) : undefined);
+      } catch {}
+    }
     toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
-  }, [savedPlanId, user, toast]);
+  }, [savedPlanId, user, toast, content]);
+
+  const handleRedo = useCallback(async (planIdOverride?: string) => {
+    const targetPlanId = typeof planIdOverride === "string" ? planIdOverride : savedPlanId;
+    if (!targetPlanId || !user) return;
+    const peek = peekRedoEntry(targetPlanId);
+    if (!peek) return;
+    const entry = popRedoEntry(targetPlanId);
+    if (!entry) return;
+    // Push current state back onto the undo stack (preserving the redo stack).
+    const currentContent = content;
+    const currentRaceDateIso = raceDateRef.current ? toLocalISODate(raceDateRef.current) : null;
+    const undoOpts: { prevRaceDate?: string | null; preserveRedo: boolean } = { preserveRedo: true };
+    if ("prevRaceDate" in entry) undoOpts.prevRaceDate = currentRaceDateIso;
+    pushUndoEntry(targetPlanId, currentContent, entry.label, undoOpts);
+    const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
+    if ("prevRaceDate" in entry) updatePayload.race_date = entry.prevRaceDate ?? null;
+    const { error } = await supabase
+      .from("training_plans")
+      .update(updatePayload)
+      .eq("id", targetPlanId);
+    if (error) {
+      toast({ title: "Redo failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setContent(entry.prevContent);
+    if ("prevRaceDate" in entry) {
+      try {
+        setRaceDate(entry.prevRaceDate ? parseLocalISODate(entry.prevRaceDate) : undefined);
+      } catch {}
+    }
+    toast({ title: "Reapplied", description: `Redid change to ${entry.label}.` });
+  }, [savedPlanId, user, toast, content]);
 
   const toastPlanChange = useCallback((title: string, description: string, planId?: string | null) => {
     toast({
@@ -373,6 +423,7 @@ const TrainingPlanPage = () => {
     return d;
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
+  useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
@@ -1558,6 +1609,19 @@ const TrainingPlanPage = () => {
                   <Undo2 className="w-4 h-4" />
                   <span className="hidden sm:inline">Undo</span>
                   <span className="text-[10px] tabular-nums opacity-70">{undoCount}</span>
+                </Button>
+              )}
+              {redoCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRedo()}
+                  className="gap-2"
+                  title={`Redo last undone change (${redoCount} step${redoCount === 1 ? "" : "s"} available)`}
+                >
+                  <Redo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Redo</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{redoCount}</span>
                 </Button>
               )}
               <Button
