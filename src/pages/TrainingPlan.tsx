@@ -745,10 +745,28 @@ const TrainingPlanPage = () => {
       return;
     }
     const previousContent = content;
-    const newContent = newLines.join("\n");
+    let newContent = newLines.join("\n");
     let undoPlanId: string | null = null;
     setContent(newContent);
     if (savedPlanId && user) {
+      // Race-day reachability guard — extend via AI if the splice somehow
+      // dropped the race day entry (e.g. moving the race itself).
+      const raceIsoForGuard = raceDate ? toLocalISODate(raceDate) : null;
+      if (raceIsoForGuard && !validatePlanReachesRaceDay(newContent, raceIsoForGuard)) {
+        const extended = await extendPlanToRaceDay(newContent, raceIsoForGuard);
+        if (extended && validatePlanReachesRaceDay(extended, raceIsoForGuard)) {
+          newContent = extended;
+          setContent(newContent);
+        } else {
+          toast({
+            title: "Couldn't extend the plan to race day",
+            description: "No changes saved. Please try again.",
+            variant: "destructive",
+          });
+          setContent(previousContent);
+          return;
+        }
+      }
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
         pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
