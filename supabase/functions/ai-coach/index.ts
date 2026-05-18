@@ -761,11 +761,22 @@ Review this athlete's progress against their training plan. Compare what was pla
       }
 
       const preservePast = preserve_past === true;
+      const effectiveAdjustStartISO = preservePast && plan_start_from_date
+        ? String(plan_start_from_date)
+        : (start_date || new Date().toISOString().split("T")[0]);
       const planStartUK = (() => {
-        if (!plan_start_from_date) return "";
-        const [y, m, d] = String(plan_start_from_date).split("-");
+        const [y, m, d] = effectiveAdjustStartISO.split("-");
         return y && m && d ? `${d}/${m}/${y}` : "";
       })();
+      const raceDayName = race_date && race_date !== "ai-recommend"
+        ? new Date(String(race_date) + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
+        : null;
+      const raceDateUKLong = race_date && race_date !== "ai-recommend"
+        ? new Date(String(race_date) + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : null;
+      const planAdjustRaceLine = raceDayName && raceDateUKLong
+        ? `RACE DAY ${raceDayName} ${raceDateUKLong}, goal ${raceLabel}${goal_time ? ` in ${goal_time}` : ""}.`
+        : "";
 
       const scopeBlock = preservePast
         ? `SCOPE — FUTURE WORKOUTS ONLY:
@@ -787,6 +798,12 @@ You have been given:
 
 ${scopeBlock}
 
+${race_date && race_date !== "ai-recommend" ? `RACE DATE IS MANDATORY:
+- Generate continuously from ${effectiveAdjustStartISO} through ${race_date} inclusive.
+- ${planAdjustRaceLine}
+- The FINAL entry MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKLong}), labelled "🏁 RACE DAY — ${raceLabel}".
+- Do NOT stop at a week boundary, do NOT stop after a fixed number of sessions, and do NOT omit the final race day.` : ""}
+
 CRITICAL FORMAT RULES: 
 1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column).
 2. Use UK date format (DD/MM/YYYY) for all dates.
@@ -807,7 +824,7 @@ ${current_plan || "No plan provided"}
 PROGRESS REVIEW:
 ${review_text || "No review provided"}
 
-Generate the ${preservePast ? "revised future-only portion of the" : "complete revised"} ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate the ${preservePast ? "revised future-only portion of the" : "complete revised"} ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. ${race_date && race_date !== "ai-recommend" ? `It must run through to ${race_date} and end with ${planAdjustRaceLine}` : ""} Today's date is ${new Date().toISOString().split("T")[0]}.`;
 
     } else if (type === "training-plan") {
       const raceLabel = {
