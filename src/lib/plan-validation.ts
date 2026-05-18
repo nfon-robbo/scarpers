@@ -296,7 +296,7 @@ function normaliseDate(dmy: string): string {
 // Also strips back-to-back duplicate `### **WEEK N: …**` headings that share
 // the same "Week of DD/MM – DD/MM" sub-line.
 // ─────────────────────────────────────────────────────────────────────────────
-export interface DedupeCorrection { kind: "date" | "week"; label: string; }
+export interface DedupeCorrection { kind: "date" | "week" | "plain-date-line"; label: string; }
 
 export function dedupeDates(markdown: string): { content: string; corrections: DedupeCorrection[] } {
   if (!markdown) return { content: markdown, corrections: [] };
@@ -307,7 +307,32 @@ export function dedupeDates(markdown: string): { content: string; corrections: D
   // immediate `*Week of …*` sub-line (handles 3× WEEK 2 case).
   const dropMask = new Array<boolean>(lines.length).fill(false);
   const seenWeekRanges = new Set<string>();
+  let currentMarkdownDate = "";
+  const seenPlainLines = new Set<string>();
   for (let i = 0; i < lines.length; i++) {
+    const markdownDay = lines[i].match(MARKDOWN_DAY_HEADING_RE);
+    if (markdownDay) {
+      currentMarkdownDate = markdownDay[2];
+      seenPlainLines.clear();
+      continue;
+    }
+    if (/^##\s+/.test(lines[i])) {
+      currentMarkdownDate = "";
+      seenPlainLines.clear();
+    }
+
+    const plainDay = lines[i].match(PLAIN_DAY_HEADING_RE);
+    if (plainDay) {
+      const label = `${plainDay[1]} ${plainDay[2]}`;
+      const key = lines[i].trim().replace(/\s+/g, " ");
+      if (plainDay[2] === currentMarkdownDate || seenPlainLines.has(key)) {
+        dropMask[i] = true;
+        corrections.push({ kind: "plain-date-line", label });
+        continue;
+      }
+      seenPlainLines.add(key);
+    }
+
     const wh = lines[i].match(/^###\s+\*\*WEEK\s+\d+/i);
     if (!wh) continue;
     // Peek next non-blank line for `*Week of …*`
