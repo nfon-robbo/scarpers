@@ -522,9 +522,12 @@ export default function PlanDayList({
       const date = (e as CustomEvent<{ date?: string }>).detail?.date;
       if (!date) return;
       setOverrides((prev) => {
-        if (!prev[date]) return prev;
+        if (!Object.keys(prev).some((key) => key === date || key.startsWith(`${date}:`))) return prev;
         const next = { ...prev };
         delete next[date];
+        for (const key of Object.keys(next)) {
+          if (key.startsWith(`${date}:`)) delete next[key];
+        }
         return next;
       });
     };
