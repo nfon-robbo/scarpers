@@ -233,6 +233,15 @@ const AIChatbot = () => {
         const result = applyEditWorkout(plan.content, scope.dateUk, parsed.edited);
         if (result) {
           const updated = enforceAndLog(result.updatedPlan, "chat recommendation direct apply").content;
+          try {
+            const rawOverrides = localStorage.getItem("plan-step-overrides");
+            const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+            if (overrides && typeof overrides === "object") {
+              delete overrides[isoDate];
+              localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
+              window.dispatchEvent(new CustomEvent("plan-step-overrides-cleared", { detail: { date: isoDate } }));
+            }
+          } catch {}
           pushUndoEntry(plan.id, plan.content, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk: scope.dateUk });
