@@ -17,6 +17,11 @@ import {
   applyReplaceWithRecovery,
   getMoveTargetDate,
   formatMoveTargetLabel,
+  previewMoveCascade,
+  detectRaceDateConflict,
+  applyMoveCompressed,
+  applyMoveAndShiftRace,
+  formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
 
 interface Message {
