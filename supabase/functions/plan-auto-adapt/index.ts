@@ -357,21 +357,43 @@ ${plan.content}`;
     newContent = newContent.replace(/^```(?:markdown)?\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     if (newContent.length < 50) throw new Error("AI returned empty/short content");
 
-    // Guardrail: enforce 5-min minimum on Warm-up / Cool-down rows.
+    // ── Validation pipeline (rules 1–4) ──
+    // Rule 1: dedupe duplicate week headings / date blocks
+    const beforeDedupe = newContent;
+    newContent = dedupePlan(newContent);
+    if (newContent !== beforeDedupe) {
+      console.warn("[plan-auto-adapt] rule1: deduped duplicate week/date headings");
+    }
+
+    // Rule 3: drop sessions on non-scheduled days
+    const beforeSched = newContent;
+    newContent = enforceSchedule(newContent, (plan as any).training_days);
+    if (newContent !== beforeSched) {
+      console.warn("[plan-auto-adapt] rule3: removed sessions on non-scheduled days");
+    }
+
+    // Rule 2: ensure warm-up / cool-down rows exist on running sessions
+    const beforeInject = newContent;
+    newContent = injectWarmupCooldown(newContent);
+    if (newContent !== beforeInject) {
+      console.warn("[plan-auto-adapt] rule2: injected missing warm-up/cool-down rows");
+    }
+
+    // Rule 2b: enforce 5-min minimum on existing warm-up / cool-down rows
     const validated = enforceWarmupCooldownMinimums(newContent);
     newContent = validated.content;
     for (const c of validated.corrections) {
       console.warn(
-        `[plan-auto-adapt] bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
+        `[plan-auto-adapt] rule2b: bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`
       );
     }
 
-    // Guardrail: recompute each session's `(Total: Nmin)` from segment durations.
+    // Rule 4: recompute each session's `(Total: Nmin)` from segment durations
     const totalsFix = recomputeSessionTotals(newContent);
     newContent = totalsFix.content;
     for (const c of totalsFix.corrections) {
       console.warn(
-        `[plan-auto-adapt] recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
+        `[plan-auto-adapt] rule4: recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
       );
     }
 
