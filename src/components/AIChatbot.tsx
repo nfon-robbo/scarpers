@@ -15,6 +15,7 @@ import {
   applySkipSession,
   applyMoveSession,
   applyReplaceWithRecovery,
+  applyEditWorkout,
   getMoveTargetDate,
   formatMoveTargetLabel,
   previewMoveCascade,
@@ -24,6 +25,7 @@ import {
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
 import { logPlanEdit } from "@/lib/plan-edit-log";
+import { parseChatRecommendation } from "@/lib/chat-recommendation-parser";
 
 interface Message {
   role: "user" | "assistant";
