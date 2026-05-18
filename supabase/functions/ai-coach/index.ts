@@ -225,8 +225,8 @@ ${JSON.stringify(activitySummary, null, 2)}
 ${metricsContext}
 ${sleepContext}`;
 
-    let systemPrompt: string;
-    let userPrompt: string;
+    let systemPrompt = "";
+    let userPrompt = "";
 
     const isPlanAdjust = type === "plan-adjust";
 
@@ -761,11 +761,22 @@ Review this athlete's progress against their training plan. Compare what was pla
       }
 
       const preservePast = preserve_past === true;
+      const effectiveAdjustStartISO = preservePast && plan_start_from_date
+        ? String(plan_start_from_date)
+        : (start_date || new Date().toISOString().split("T")[0]);
       const planStartUK = (() => {
-        if (!plan_start_from_date) return "";
-        const [y, m, d] = String(plan_start_from_date).split("-");
+        const [y, m, d] = effectiveAdjustStartISO.split("-");
         return y && m && d ? `${d}/${m}/${y}` : "";
       })();
+      const raceDayName = race_date && race_date !== "ai-recommend"
+        ? new Date(String(race_date) + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long" })
+        : null;
+      const raceDateUKLong = race_date && race_date !== "ai-recommend"
+        ? new Date(String(race_date) + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+        : null;
+      const planAdjustRaceLine = raceDayName && raceDateUKLong
+        ? `RACE DAY ${raceDayName} ${raceDateUKLong}, goal ${raceLabel}${goal_time ? ` in ${goal_time}` : ""}.`
+        : "";
 
       const scopeBlock = preservePast
         ? `SCOPE — FUTURE WORKOUTS ONLY:
@@ -787,6 +798,12 @@ You have been given:
 
 ${scopeBlock}
 
+${race_date && race_date !== "ai-recommend" ? `RACE DATE IS MANDATORY:
+- Generate continuously from ${effectiveAdjustStartISO} through ${race_date} inclusive.
+- ${planAdjustRaceLine}
+- The FINAL entry MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKLong}), labelled "🏁 RACE DAY — ${raceLabel}".
+- Do NOT stop at a week boundary, do NOT stop after a fixed number of sessions, and do NOT omit the final race day.` : ""}
+
 CRITICAL FORMAT RULES: 
 1. EVERY workout MUST have a full markdown table with Segment/Duration/Target/Notes columns (NO HR Zone column).
 2. Use UK date format (DD/MM/YYYY) for all dates.
@@ -807,7 +824,7 @@ ${current_plan || "No plan provided"}
 PROGRESS REVIEW:
 ${review_text || "No review provided"}
 
-Generate the ${preservePast ? "revised future-only portion of the" : "complete revised"} ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. Today's date is ${new Date().toISOString().split("T")[0]}.`;
+Generate the ${preservePast ? "revised future-only portion of the" : "complete revised"} ${raceLabel} training plan based on the review and the ${adjustmentDirection} adjustment requested. ${race_date && race_date !== "ai-recommend" ? `It must run through to ${race_date} and end with ${planAdjustRaceLine}` : ""} Today's date is ${new Date().toISOString().split("T")[0]}.`;
 
     } else if (type === "training-plan") {
       const raceLabel = {
@@ -1348,8 +1365,8 @@ ${upcoming.join("\n")}
 
 `;
     })();
-    const isPlanGen = type === "training-plan";
-    // Route plan generation to a higher-capacity model (Gemini Flash preview caps
+    const needsRaceDateContinuation = (type === "training-plan" || type === "plan-adjust") && !!race_date && race_date !== "ai-recommend";
+    // Route full plan generation/adjustment to a higher-capacity model (Gemini Flash preview caps
     // output at ~8-16k tokens which truncates long multi-month plans before they
     // reach race day). Other types keep the gateway default.
     const planLovableModel = "google/gemini-2.5-pro";
@@ -1364,7 +1381,7 @@ ${upcoming.join("\n")}
       stream: true,
       maxTokens: 64000,
       label: `ai-coach:${type || "chat"}`,
-      lovableModel: isPlanGen ? planLovableModel : undefined,
+      lovableModel: needsRaceDateContinuation ? planLovableModel : undefined,
       messages: initialMessages,
     });
 
@@ -1394,8 +1411,8 @@ ${upcoming.join("\n")}
       "X-Accel-Buffering": "no",
     };
 
-    // Non-plan types: zero-buffer pass-through (latency-sensitive).
-    if (!isPlanGen || !race_date || race_date === "ai-recommend") {
+    // Non-full-plan types: zero-buffer pass-through (latency-sensitive).
+    if (!needsRaceDateContinuation) {
       const { readable, writable } = new TransformStream();
       response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
       return new Response(readable, { headers: sseHeaders });
@@ -1411,9 +1428,11 @@ ${upcoming.join("\n")}
       const writer = writable.getWriter();
       let fullText = "";
 
-      // Recompute plan-context locals (they live inside the training-plan branch
-      // above and aren't in scope here).
-      const _planStart = start_date || new Date().toISOString().split("T")[0];
+      // Recompute plan-context locals (they live inside the plan branches above
+      // and aren't in scope here).
+      const _planStart = preserve_past && plan_start_from_date
+        ? String(plan_start_from_date)
+        : (start_date || new Date().toISOString().split("T")[0]);
       const _daysStr = (training_days as string[] | undefined)?.length
         ? (training_days as string[]).join(", ")
         : "Mon, Wed, Fri, Sat";
@@ -1436,6 +1455,10 @@ ${upcoming.join("\n")}
         return `${Math.floor(paceSec / 60)}:${(paceSec % 60).toString().padStart(2, "0")}/km`;
       })();
 
+      const emitDelta = async (delta: string) => {
+        await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+      };
+
       const consumeStream = async (body: ReadableStream<Uint8Array>) => {
         const reader = body.getReader();
         const decoder = new TextDecoder();
@@ -1444,8 +1467,6 @@ ${upcoming.join("\n")}
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          // Pass raw bytes straight to the client for live typing.
-          await writer.write(value);
           buf += decoder.decode(value, { stream: true });
           let idx: number;
           while ((idx = buf.indexOf("\n")) !== -1) {
@@ -1458,17 +1479,32 @@ ${upcoming.join("\n")}
             try {
               const evt = JSON.parse(json);
               const delta = evt?.choices?.[0]?.delta?.content;
-              if (typeof delta === "string") fullText += delta;
+              if (typeof delta === "string") {
+                fullText += delta;
+                await emitDelta(delta);
+              }
             } catch { /* ignore */ }
           }
         }
         return sawDone;
       };
 
-      // Pull last YYYY-MM-DD from the accumulated plan text.
+      // Pull the last date from the accumulated plan text, accepting both ISO
+      // and UK markdown headings so continuation works for generated/adjusted plans.
       const lastIsoDate = (txt: string): string | null => {
-        const matches = txt.match(/\b(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/g);
-        return matches && matches.length ? matches[matches.length - 1] : null;
+        const matches = [...txt.matchAll(/\b(?:(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|([0-3]?\d)\/(0?\d)\/(20\d{2}))\b/g)];
+        if (!matches.length) return null;
+        const m = matches[matches.length - 1];
+        if (m[1] && m[2] && m[3]) return `${m[1]}-${m[2]}-${m[3]}`;
+        const dd = String(m[4]).padStart(2, "0");
+        const mm = String(m[5]).padStart(2, "0");
+        return `${m[6]}-${mm}-${dd}`;
+      };
+      const hasRaceDayEntry = (txt: string, targetIso: string): boolean => {
+        const [y, m, d] = targetIso.split("-");
+        const targetUk = `${d}/${m}/${y}`;
+        const lines = txt.split("\n").filter((line) => /race\s*day/i.test(line));
+        return lines.some((line) => line.includes(targetIso) || line.includes(targetUk));
       };
 
       try {
@@ -1481,17 +1517,19 @@ ${upcoming.join("\n")}
 
         while (attempts < MAX_CONTINUATIONS) {
           const last = lastIsoDate(assistantSoFar);
-          if (last && last >= targetIso) break;
+          const raceDayPresent = hasRaceDayEntry(assistantSoFar, targetIso);
+          if (last && last >= targetIso && raceDayPresent) break;
           attempts++;
 
           const resumeFrom = (() => {
             if (!last) return _planStart;
+            if (last >= targetIso) return targetIso;
             const d = new Date(last + "T00:00:00");
             d.setDate(d.getDate() + 1);
             return d.toISOString().slice(0, 10);
           })();
 
-          console.log(`[training-plan] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
+          console.log(`[${type}] continuation pass ${attempts}: last=${last} → resume ${resumeFrom} → target ${targetIso}`);
 
           const continuationUser = `The plan above stopped at ${last || "the start"}. Continue the plan from ${resumeFrom} through ${targetIso} (${_raceDayName}, ${_raceDateUKLong}) inclusive.
 
@@ -1504,7 +1542,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
           const contResp = await callAI({
             stream: true,
             maxTokens: 64000,
-            label: `ai-coach:training-plan:cont${attempts}`,
+            label: `ai-coach:${type}:cont${attempts}`,
             lovableModel: planLovableModel,
             messages: [
               { role: "system", content: nowPrelude + systemPrompt },
