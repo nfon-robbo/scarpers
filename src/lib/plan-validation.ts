@@ -300,8 +300,33 @@ export interface DedupeCorrection { kind: "date" | "week" | "plain-date-line"; l
 
 export function dedupeDates(markdown: string): { content: string; corrections: DedupeCorrection[] } {
   if (!markdown) return { content: markdown, corrections: [] };
-  const lines = markdown.split("\n");
+  let lines = markdown.split("\n");
   const corrections: DedupeCorrection[] = [];
+
+  // Pass 0: collapse consecutive lines that start with the same
+  // `Weekday DD/MM/YYYY` date — regardless of markdown heading syntax or
+  // plain text format. Catches "Monday 18/05/2026 — Rest Day" appearing
+  // immediately after the same line (markdown or plain), and mixed pairs.
+  const dateStartRe = /^\s*(?:#{1,6}\s+)?\**\s*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\b/;
+  const dateKey = (line: string): string | null => {
+    const m = line.match(dateStartRe);
+    if (!m) return null;
+    return `${m[1].toLowerCase()} ${m[2]}`;
+  };
+  const collapsed: string[] = [];
+  let prevDateKey: string | null = null;
+  let prevDateLine = "";
+  for (const line of lines) {
+    const key = dateKey(line);
+    if (key && key === prevDateKey && line.trim() === prevDateLine.trim()) {
+      corrections.push({ kind: "plain-date-line", label: line.trim() });
+      continue;
+    }
+    if (key) { prevDateKey = key; prevDateLine = line; }
+    else if (line.trim() !== "") { prevDateKey = null; prevDateLine = ""; }
+    collapsed.push(line);
+  }
+  lines = collapsed;
 
   // Pass 1: drop duplicate `### **WEEK N: …**` headings sharing the same
   // immediate `*Week of …*` sub-line (handles 3× WEEK 2 case).
