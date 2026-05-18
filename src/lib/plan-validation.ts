@@ -138,3 +138,105 @@ export function validatePlanReachesRaceDay(content: string, raceDateIso: string 
   if (!last || last < raceDateIso) return false;
   return hasRaceDayEntry(content, raceDateIso);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-recompute session totals from the segment table.
+// The AI often gets `(Total: Nmin)` in the session heading wrong (estimates
+// instead of summing). This walks each `### **Day…**` block, parses every
+// table row's Duration cell (including `N x M min` and `N x M min / R min walk`
+// repeats), sums them, and rewrites the heading total. This guarantees the
+// derived label and the heading agree, on every write path.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const parseDurSecs = (text: string): number => {
+  const cleaned = text.replace(/[()]/g, " ").trim();
+  const colon = cleaned.match(/(\d{1,3}):(\d{2})/);
+  if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
+  const hour = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)s?\b/i);
+  const min = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:m|min|minute)s?\b/i);
+  const sec = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:s|sec|second)s?\b/i);
+  let total = 0;
+  if (hour) total += parseFloat(hour[1]) * 3600;
+  if (min) total += parseFloat(min[1]) * 60;
+  if (sec) total += parseFloat(sec[1]);
+  return Math.round(total);
+};
+
+const parseSegmentSeconds = (cell: string): number => {
+  const c = cell.replace(/×/g, "x");
+  const repeat = c.match(/(\d+)\s*x\s*(.+)$/i);
+  if (repeat) {
+    const reps = parseInt(repeat[1], 10);
+    const [workPart, restPart] = repeat[2].split(/\s*\/\s*/);
+    const w = parseDurSecs(workPart || "");
+    const r = parseDurSecs(restPart || "");
+    if (reps && w) return reps * (w + r);
+  }
+  return parseDurSecs(c);
+};
+
+export interface TotalCorrection {
+  day: string;
+  from: number;
+  to: number;
+}
+
+export function recomputeSessionTotals(markdown: string): {
+  content: string;
+  corrections: TotalCorrection[];
+} {
+  if (!markdown) return { content: markdown, corrections: [] };
+  const lines = markdown.split("\n");
+  const corrections: TotalCorrection[] = [];
+
+  let dayIdx = -1;
+  let dayLabel = "";
+  let daySecs = 0;
+
+  const flush = () => {
+    if (dayIdx < 0 || daySecs <= 0) return;
+    const heading = lines[dayIdx];
+    const m = heading.match(/\(Total:\s*(\d+)\s*min\)/i);
+    const newTotal = Math.round(daySecs / 60);
+    if (m) {
+      const cur = parseInt(m[1], 10);
+      if (cur !== newTotal) {
+        lines[dayIdx] = heading.replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${newTotal}min)`);
+        corrections.push({ day: dayLabel, from: cur, to: newTotal });
+      }
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const h = line.match(/^###\s+\*\*([^*]+)\*\*/);
+    if (h) {
+      flush();
+      dayIdx = i;
+      dayLabel = h[1].trim();
+      daySecs = 0;
+      continue;
+    }
+    // 5-col table row: | Segment | Duration | ... | ... |
+    const row = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
+    if (!row) continue;
+    const seg = row[1];
+    const dur = row[2];
+    if (/^segment$/i.test(seg) || /^[-:\s]+$/.test(seg)) continue;
+    if (/mobility|stretch|foam|yoga/i.test(seg)) continue;
+    const secs = parseSegmentSeconds(dur);
+    if (secs > 0) daySecs += secs;
+  }
+  flush();
+  return { content: lines.join("\n"), corrections };
+}
+
+export function recomputeAndLog(markdown: string, source: string): { content: string; corrections: TotalCorrection[] } {
+  const result = recomputeSessionTotals(markdown);
+  for (const c of result.corrections) {
+    console.warn(
+      `[plan-validation] ${source}: recomputed Total on ${c.day} from ${c.from} min → ${c.to} min (sum of segments)`
+    );
+  }
+  return result;
+}
