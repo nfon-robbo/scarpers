@@ -31,7 +31,9 @@ const GoogleFitConnect = () => {
   useEffect(() => {
     checkStatus();
 
+    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
     const handler = (e: MessageEvent) => {
+      if (e.origin !== expectedOrigin) return;
       if (e.data === "google-fit-connected") {
         setConnected(true);
         toast({ title: "Google Fit connected!", description: "You can now sync sleep stage data." });
