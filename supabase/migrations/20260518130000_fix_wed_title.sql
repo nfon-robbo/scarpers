@@ -1,4 +1,4 @@
-UPDATE public.training_plans SET content = \$plan\$# 5K Training Plan for Rob
+UPDATE public.training_plans SET content = $plan$# 5K Training Plan for Rob
 
 ## **SEASON OVERVIEW**
 
@@ -432,4 +432,4 @@ Rob, you're a 45-year-old beginner with knee and ankle concerns, targeting a 30:
 **Enjoy it!** This is the fun part. You've trained for 7 weeks for 30 minutes of glory. Soak it in. High-five spectators. Smile at the finish line.
 
 **Good luck, Rob. Go get that sub-30!** 🏆
-\$plan\$ WHERE id = '03acc823-ea35-4d23-8554-1851baf941f0';
+$plan$ WHERE id = '03acc823-ea35-4d23-8554-1851baf941f0';
