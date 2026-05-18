@@ -795,7 +795,11 @@ const TrainingPlanPage = () => {
           return;
         }
       }
-      newContent = validatePlanForSave(newContent, { trainingDays, source: "workout move" }).content;
+      // Include the target weekday so a user-initiated move to an off-schedule
+      // day (e.g. Mon/Wed/Fri plan → Thursday) is not stripped by the validator.
+      const toWeekday = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(toIso + "T12:00:00").getDay()];
+      const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
+      newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
         pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
@@ -2407,7 +2411,14 @@ const TrainingPlanPage = () => {
                   return;
                 }
                 const previousContent = content;
-                const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `edit-workout: ${action}` }).content;
+                // For user-initiated moves, allow the target weekday even if
+                // it's outside the normal scheduled training days.
+                let effectiveTrainingDays = trainingDays;
+                if (change.kind === "move") {
+                  const wd = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date(change.isoTarget + "T12:00:00").getDay()];
+                  effectiveTrainingDays = Array.from(new Set([...(trainingDays || []), wd]));
+                }
+                const validated = validatePlanForSave(result.updatedPlan, { trainingDays: effectiveTrainingDays, source: `edit-workout: ${action}` }).content;
                 setContent(validated);
                 const planId = await savePlan(validated, {
                   inPlace: true,
