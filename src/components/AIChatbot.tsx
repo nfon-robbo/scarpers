@@ -129,6 +129,28 @@ const AIChatbot = () => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
 
+  // Cache the active plan content so the "Move" button can show its
+  // dynamically computed target date (e.g. "Move to Wednesday 20 May")
+  // without an async fetch at render time.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data: plan } = await supabase
+        .from("training_plans")
+        .select("content")
+        .eq("user_id", session.user.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && plan?.content) setActivePlanContent(plan.content);
+    })();
+    return () => { cancelled = true; };
+  }, [open, messages.length]);
+
   const applyChange = useCallback(async (
     recommendationText: string,
     scope: { kind: "day"; dateUk: string } | { kind: "plan" },
