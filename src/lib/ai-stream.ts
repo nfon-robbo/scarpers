@@ -23,7 +23,7 @@ export async function streamAICoach({
   onDone,
   onError,
 }: {
-  type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review" | "post-plan-analysis";
+  type: "analysis" | "training-plan" | "plan-review" | "plan-adjust" | "day-adjust" | "workout-review" | "post-plan-analysis" | "plan-continuation" | "plan-easier" | "plan-harder" | "plan-apply";
   token: string;
   raceDistance?: string;
   goalTime?: string;
