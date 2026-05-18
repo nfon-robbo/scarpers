@@ -264,6 +264,49 @@ ${sleepContext}`;
         metricsToday = `\nTODAY'S METRICS:\nResting HR: ${todayMetrics.resting_heart_rate ? Math.round(todayMetrics.resting_heart_rate) + " bpm" : "N/A"}\nHRV: ${todayMetrics.hrv ? Math.round(todayMetrics.hrv) + " ms" : "N/A"}\nStress: ${todayMetrics.stress_score ?? "N/A"}\n`;
       }
 
+      // ── Trend context for trend-based ADJUSTED gating ──
+      // Pull last 14 days of metrics to compute baselines + count consecutive
+      // poor nights. Enforces "2+ consecutive poor nights + 1 corroborating
+      // metric" rule so a single bad night doesn't trigger ADJUSTED.
+      const trendStart = new Date(targetDateStr);
+      trendStart.setDate(trendStart.getDate() - 14);
+      const trendStartStr = trendStart.toISOString().split("T")[0];
+      const { data: trendMetrics } = await supabase
+        .from("daily_metrics")
+        .select("date, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, awake_during_night_minutes, hrv, resting_heart_rate")
+        .eq("user_id", user.id)
+        .gte("date", trendStartStr)
+        .lte("date", targetDateStr)
+        .order("date", { ascending: false });
+
+      let trendContext = "";
+      if (trendMetrics && trendMetrics.length > 0) {
+        const nights = trendMetrics.slice(0, 7);
+        const nightsLine = nights.map((n: any) => {
+          const score = n.sleep_score != null ? Math.round(n.sleep_score) : null;
+          const hrs = n.sleep_duration_seconds ? (n.sleep_duration_seconds / 3600).toFixed(1) + "h" : "n/a";
+          return `${n.date}: score ${score ?? "n/a"}, ${hrs}`;
+        }).join(" | ");
+
+        const hrvValues = trendMetrics.map((m: any) => m.hrv).filter((v: any) => v != null && Number.isFinite(v));
+        const rhrValues = trendMetrics.map((m: any) => m.resting_heart_rate).filter((v: any) => v != null && Number.isFinite(v));
+        const baselineHrv = hrvValues.length ? Math.round(hrvValues.reduce((a: number, b: number) => a + b, 0) / hrvValues.length) : null;
+        const baselineRhr = rhrValues.length ? Math.round(rhrValues.reduce((a: number, b: number) => a + b, 0) / rhrValues.length) : null;
+
+        const POOR = (n: any) =>
+          (n.sleep_score != null && n.sleep_score < 60) ||
+          (n.sleep_duration_seconds != null && n.sleep_duration_seconds < 6 * 3600);
+        let consecutivePoor = 0;
+        for (const n of nights) { if (POOR(n)) consecutivePoor++; else break; }
+
+        const todayHrv = todayMetrics?.hrv ?? null;
+        const todayRhr = todayMetrics?.resting_heart_rate ?? null;
+        const hrvDeltaPct = (todayHrv != null && baselineHrv) ? ((todayHrv - baselineHrv) / baselineHrv * 100) : null;
+        const rhrDelta = (todayRhr != null && baselineRhr != null) ? (todayRhr - baselineRhr) : null;
+
+        trendContext = `\nSLEEP TREND (last ${nights.length} nights, most recent first):\n${nightsLine}\nConsecutive poor nights (score<60 or <6h) ending today: ${consecutivePoor}\n\nBASELINES (last 14d avg):\nHRV: ${baselineHrv ?? "n/a"} ms (today ${todayHrv != null ? Math.round(todayHrv) + " ms" : "n/a"}${hrvDeltaPct != null ? `, ${hrvDeltaPct >= 0 ? "+" : ""}${hrvDeltaPct.toFixed(0)}% vs baseline` : ""})\nResting HR: ${baselineRhr ?? "n/a"} bpm (today ${todayRhr != null ? Math.round(todayRhr) + " bpm" : "n/a"}${rhrDelta != null ? `, ${rhrDelta >= 0 ? "+" : ""}${rhrDelta.toFixed(0)} bpm vs baseline` : ""})\n`;
+      }
+
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
       cadenceSince.setDate(cadenceSince.getDate() - 30);
