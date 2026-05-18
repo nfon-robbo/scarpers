@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, isToday } from "date-fns";
-import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -16,9 +16,10 @@ interface PlanCalendarViewProps {
   workouts: ParsedWorkout[];
   planStartDate?: Date;
   completedDates?: Set<string>;
+  onEditWorkout?: (workout: ParsedWorkout) => void;
 }
 
-export default function PlanCalendarView({ workouts, planStartDate, completedDates = new Set() }: PlanCalendarViewProps) {
+export default function PlanCalendarView({ workouts, planStartDate, completedDates = new Set(), onEditWorkout }: PlanCalendarViewProps) {
   const [weekStart, setWeekStart] = useState<Date>(() => {
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
@@ -234,7 +235,15 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {shortLabel(selectedWorkout)}
+                  <span className="flex-1 min-w-0">{shortLabel(selectedWorkout)}</span>
+                  {onEditWorkout && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 px-2 text-xs"
+                      onClick={() => { const w = selectedWorkout; setSelectedWorkout(null); onEditWorkout(w!); }}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" /> Edit / Replace
+                    </Button>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}

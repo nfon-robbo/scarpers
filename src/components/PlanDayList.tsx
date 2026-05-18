@@ -29,6 +29,7 @@ interface PlanDayListProps {
   syncing?: boolean;
   goalTime?: string;
   raceDistance?: string;
+  onEditWorkout?: (workout: ParsedWorkout) => void;
 }
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
@@ -459,6 +460,7 @@ export default function PlanDayList({
   syncing = false,
   goalTime,
   raceDistance,
+  onEditWorkout,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
@@ -775,6 +777,21 @@ export default function PlanDayList({
                             );
                           })()}
                         </div>
+                        {onEditWorkout && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Edit or replace this workout"
+                            title="Edit / replace workout"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditWorkout(workout);
+                            }}
+                            className="shrink-0 w-7 h-7 rounded-full bg-muted hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                         {onSyncWorkout && (
                           <span
                             role="button"
@@ -824,7 +841,19 @@ export default function PlanDayList({
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {shortLabel(selectedWorkout)}
+                  <span className="flex-1 min-w-0">{shortLabel(selectedWorkout)}</span>
+                  {onEditWorkout && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const w = selectedWorkout;
+                        setSelectedWorkout(null);
+                        onEditWorkout(w!);
+                      }}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" /> Edit / Replace
+                    </Button>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}

@@ -204,6 +204,250 @@ export function applyMoveSession(planContent: string, dateUk: string): DayAction
 /** @deprecated Use applyMoveSession — kept for backwards compatibility. */
 export const applyMoveToTomorrow = applyMoveSession;
 
+// =========================================================================
+// Templated replacements + structured edit + move-to-specific-date.
+// =========================================================================
+
+export type ReplacementTemplate =
+  | "easy_run"
+  | "tempo"
+  | "race_pace"
+  | "intervals"
+  | "long_run"
+  | "recovery_walk"
+  | "rest";
+
+export interface TemplateOpts {
+  durationMin?: number;
+  pace?: string;            // e.g. "5:30/km" — used for tempo / race pace
+  reps?: number;            // intervals
+  repWorkSec?: number;      // intervals
+  repRestSec?: number;      // intervals
+}
+
+const tableHeader =
+  `| Segment | Duration | Target | HR Zone | Notes |\n` +
+  `|---------|----------|--------|---------|-------|\n`;
+
+function totalLine(date: Date, prefix: string, title: string, totalMin: number): string {
+  const dayName = DAY_NAMES[date.getDay()];
+  return `${prefix}**${dayName} ${toUk(date)}** — ${title} (Total: ${totalMin}min)\n\n`;
+}
+
+function buildEasyRunBlock(date: Date, prefix: string, durationMin = 40): string {
+  const main = Math.max(10, durationMin - 10);
+  return (
+    totalLine(date, prefix, `Easy Run`, main + 10) +
+    tableHeader +
+    `| Warm-up | 5 min | Walk/easy jog | Z1 | 🎵 150 BPM; settle in |\n` +
+    `| Easy Run | ${main} min | Conversational | Z2 | 🎵 170 BPM; nose-breathing pace |\n` +
+    `| Cool-down | 5 min | Walk | Z1 | 🎵 140 BPM; reset |\n\n`
+  );
+}
+
+function buildTempoBlock(date: Date, prefix: string, durationMin = 35, pace = "5:30/km"): string {
+  const main = Math.max(10, durationMin - 10);
+  return (
+    totalLine(date, prefix, `Tempo Run`, main + 10) +
+    tableHeader +
+    `| Warm-up | 5 min | Walk/easy jog | Z1 | 🎵 150 BPM |\n` +
+    `| Tempo | ${main} min | ${pace} | Z3-Z4 | 🎵 175 BPM; comfortably hard |\n` +
+    `| Cool-down | 5 min | Walk | Z1 | 🎵 140 BPM |\n\n`
+  );
+}
+
+function buildRacePaceBlock(date: Date, prefix: string, durationMin = 30, pace = "5:00/km"): string {
+  const main = Math.max(10, durationMin - 10);
+  return (
+    totalLine(date, prefix, `Race Pace Dress Rehearsal`, main + 10) +
+    tableHeader +
+    `| Warm-up | 5 min | Easy jog | Z1 | 🎵 150 BPM |\n` +
+    `| Race Pace | ${main} min | ${pace} | Z4 | 🎵 180 BPM; goal race effort |\n` +
+    `| Cool-down | 5 min | Walk | Z1 | 🎵 140 BPM |\n\n`
+  );
+}
+
+function buildIntervalsBlock(
+  date: Date, prefix: string,
+  reps = 6, workSec = 60, restSec = 90,
+): string {
+  const workMin = workSec >= 60 ? `${Math.round(workSec / 60)} min` : `${workSec} sec`;
+  const restMin = restSec >= 60 ? `${Math.round(restSec / 60)} min` : `${restSec} sec`;
+  const repsTotalSec = reps * (workSec + restSec);
+  const total = Math.round(10 + repsTotalSec / 60);
+  return (
+    totalLine(date, prefix, `Interval Session`, total) +
+    tableHeader +
+    `| Warm-up | 5 min | Easy jog | Z1-Z2 | 🎵 150 BPM |\n` +
+    `| Intervals | ${reps} x ${workMin} / ${restMin} walk | Hard | Z4-Z5 | 🎵 180 BPM; strong, controlled reps |\n` +
+    `| Cool-down | 5 min | Walk | Z1 | 🎵 140 BPM |\n\n`
+  );
+}
+
+function buildLongRunBlock(date: Date, prefix: string, durationMin = 75): string {
+  const main = Math.max(20, durationMin - 10);
+  return (
+    totalLine(date, prefix, `Long Run`, main + 10) +
+    tableHeader +
+    `| Warm-up | 5 min | Walk/easy jog | Z1 | 🎵 150 BPM |\n` +
+    `| Long Run | ${main} min | Easy, sustainable | Z2 | 🎵 170 BPM; aerobic endurance |\n` +
+    `| Cool-down | 5 min | Walk | Z1 | 🎵 140 BPM |\n\n`
+  );
+}
+
+export function applyReplaceWithTemplate(
+  planContent: string,
+  dateUk: string,
+  template: ReplacementTemplate,
+  opts: TemplateOpts = {},
+): DayActionResult | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const prefix = getHeadingPrefix(loc.target.rawText!);
+  let block = "";
+  let label = "";
+  switch (template) {
+    case "easy_run":
+      block = buildEasyRunBlock(loc.dateObj, prefix, opts.durationMin ?? 40);
+      label = `Easy Run (${opts.durationMin ?? 40} min)`;
+      break;
+    case "tempo":
+      block = buildTempoBlock(loc.dateObj, prefix, opts.durationMin ?? 35, opts.pace ?? "5:30/km");
+      label = `Tempo Run`;
+      break;
+    case "race_pace":
+      block = buildRacePaceBlock(loc.dateObj, prefix, opts.durationMin ?? 30, opts.pace ?? "5:00/km");
+      label = `Race Pace Dress Rehearsal`;
+      break;
+    case "intervals":
+      block = buildIntervalsBlock(
+        loc.dateObj, prefix,
+        opts.reps ?? 6, opts.repWorkSec ?? 60, opts.repRestSec ?? 90,
+      );
+      label = `Interval Session`;
+      break;
+    case "long_run":
+      block = buildLongRunBlock(loc.dateObj, prefix, opts.durationMin ?? 75);
+      label = `Long Run (${opts.durationMin ?? 75} min)`;
+      break;
+    case "recovery_walk":
+      block = makeRecoveryWalkBlock(loc.dateObj, prefix);
+      label = `Recovery Walk`;
+      break;
+    case "rest":
+      block = makeRestBlock(loc.dateObj, prefix, "user-selected rest");
+      label = `Rest Day`;
+      break;
+  }
+  const updated =
+    planContent.slice(0, loc.idx) + block + planContent.slice(loc.idx + loc.target.rawText!.length);
+  return {
+    updatedPlan: updated,
+    summary: `Session on ${dateUk} replaced with ${label}.`,
+  };
+}
+
+/** Move a session to a *specific* user-chosen date. */
+export function applyMoveSessionToDate(
+  planContent: string,
+  dateUk: string,
+  isoTarget: string,
+): DayActionResult | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const tgt = parseIsoDate(isoTarget);
+  if (!tgt) return null;
+  if (toIso(tgt) === loc.iso) return null;
+
+  const prefix = getHeadingPrefix(loc.target.rawText!);
+  const lines = loc.target.rawText!.split("\n");
+  lines[0] = rewriteHeadingDate(lines[0], tgt);
+  let movedBlock = lines.join("\n");
+  if (!movedBlock.endsWith("\n")) movedBlock += "\n";
+  if (!movedBlock.endsWith("\n\n")) movedBlock += "\n";
+
+  const restAtOriginal = makeRestBlock(loc.dateObj, prefix, "session moved");
+
+  // If the target date already has a session, append the moved block after
+  // it (stack); otherwise just replace + insert.
+  const existing = loc.workouts.find((w) => w.dateObj && toIso(w.dateObj) === toIso(tgt) && w !== loc.target);
+  let updated: string;
+  if (existing?.rawText) {
+    const existingIdx = planContent.indexOf(existing.rawText);
+    const removed =
+      planContent.slice(0, loc.idx) + restAtOriginal + planContent.slice(loc.idx + loc.target.rawText!.length);
+    const adjustedExistingIdx = existingIdx > loc.idx
+      ? existingIdx - loc.target.rawText!.length + restAtOriginal.length
+      : existingIdx;
+    const insertAt = adjustedExistingIdx + existing.rawText.length;
+    updated = removed.slice(0, insertAt) + "\n" + movedBlock + removed.slice(insertAt);
+  } else {
+    updated =
+      planContent.slice(0, loc.idx) +
+      restAtOriginal +
+      movedBlock +
+      planContent.slice(loc.idx + loc.target.rawText!.length);
+  }
+  const label = `${DAY_NAMES[tgt.getDay()]} ${toUk(tgt)}`;
+  return { updatedPlan: updated, summary: `Session moved to ${label}.` };
+}
+
+// ---- Structured edit -----------------------------------------------------
+
+export interface EditedSegment {
+  segment: string;
+  duration: string;
+  target: string;
+  hrZone: string;
+  notes?: string;
+}
+
+export interface EditedWorkout {
+  title: string;
+  segments: EditedSegment[];
+  totalMin?: number;
+  coachingNotes?: string;
+  musicBpm?: string;
+}
+
+function buildEditedBlock(date: Date, prefix: string, edited: EditedWorkout): string {
+  const dayName = DAY_NAMES[date.getDay()];
+  const total = edited.totalMin ? ` (Total: ${edited.totalMin}min)` : "";
+  let block = `${prefix}**${dayName} ${toUk(date)}** — ${edited.title.trim()}${total}\n\n`;
+  if (edited.segments.length > 0) {
+    block += tableHeader;
+    for (const s of edited.segments) {
+      let notes = (s.notes || "").trim();
+      if (edited.musicBpm && !/🎵|bpm/i.test(notes)) {
+        notes = notes ? `🎵 ${edited.musicBpm}; ${notes}` : `🎵 ${edited.musicBpm}`;
+      }
+      block += `| ${s.segment} | ${s.duration} | ${s.target} | ${s.hrZone} | ${notes} |\n`;
+    }
+    block += `\n`;
+  }
+  if (edited.coachingNotes?.trim()) {
+    block += `${edited.coachingNotes.trim()}\n\n`;
+  }
+  return block;
+}
+
+export function applyEditWorkout(
+  planContent: string,
+  dateUk: string,
+  edited: EditedWorkout,
+): DayActionResult | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const prefix = getHeadingPrefix(loc.target.rawText!);
+  const block = buildEditedBlock(loc.dateObj, prefix, edited);
+  const updated =
+    planContent.slice(0, loc.idx) + block + planContent.slice(loc.idx + loc.target.rawText!.length);
+  return {
+    updatedPlan: updated,
+    summary: `Session on ${dateUk} edited (${edited.title}).`,
+  };
+}
+
 // -------------------------------------------------------------------------
 // Race-date conflict detection + resolution helpers (chatbot "Move" flow).
 // -------------------------------------------------------------------------
