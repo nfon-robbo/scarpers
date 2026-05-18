@@ -966,6 +966,7 @@ const TrainingPlanPage = () => {
       currentPaceMax,
       trainingDays,
       startDate: toLocalISODate(startDate),
+      raceDate: raceDate ? toLocalISODate(raceDate) : undefined,
       currentPlan: planForPrompt,
       adjustment,
       reviewText: reviewResult,
