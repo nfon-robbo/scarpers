@@ -411,6 +411,7 @@ LAST NIGHT'S SLEEP DATA:
 ${sleepContext || "No sleep data available for last night."}
 
 ${metricsToday}
+${trendContext}
 ${yesterdayContext}
 ${cadenceContext}
 
