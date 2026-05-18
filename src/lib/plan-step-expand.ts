@@ -342,7 +342,7 @@ export function expandWorkoutSteps(
       duration = WALK_DURATION_SEC;
     } else {
       runIdx++;
-      label = isMain ? `Run ${runIdx}` : seg.segment || `Run ${runIdx}`;
+      label = seg.segment || (isMain ? `Run ${runIdx}` : `Run ${runIdx}`);
     }
     pushStep({ duration, hrLow: low, hrHigh: high, hrZone, intensity, pace }, label);
 
