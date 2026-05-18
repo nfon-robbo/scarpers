@@ -423,6 +423,7 @@ const TrainingPlanPage = () => {
     return d;
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
+  useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
