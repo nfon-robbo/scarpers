@@ -609,7 +609,10 @@ const TrainingPlanPage = () => {
           description: "The plan stopped short — generating the missing days.",
         });
         const extended = await extendPlanToRaceDay(planContent, raceIsoForGuard);
-        if (extended) planContent = enforceAndLog(extended, "race-day continuation").content;
+        if (extended) {
+          planContent = enforceAndLog(extended, "race-day continuation").content;
+          planContent = recomputeAndLog(planContent, "race-day continuation").content;
+        }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
             title: "Couldn't extend the plan to race day",
