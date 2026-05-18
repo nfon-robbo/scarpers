@@ -11,6 +11,11 @@ import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
+import {
+  applySkipSession,
+  applyMoveToTomorrow,
+  applyReplaceWithRecovery,
+} from "@/lib/plan-day-actions";
 
 interface Message {
   role: "user" | "assistant";
