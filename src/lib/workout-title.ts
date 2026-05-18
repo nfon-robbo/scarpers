@@ -200,9 +200,12 @@ export function deriveWorkoutTitleFromSegments(
     if (cur.reps > 1) {
       // explicit "Nx" segment — pair with following recovery if any
       const next = parsed[i + 1];
+      const hasInlineRest = (cur.restSecs ?? 0) > 0;
       const rest = cur.restSecs || (next && next.role === "recovery" ? next.secs : 0);
       groups.push({ work: cur.secs, rest, reps: cur.reps });
-      if (rest) i++;
+      // Only skip the next segment if its rest was a separate recovery row,
+      // not when the rest was already inline ("4 x 3 min / 1 min walk").
+      if (rest && !hasInlineRest && next && next.role === "recovery") i++;
     }
   }
 
