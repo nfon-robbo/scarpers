@@ -474,8 +474,16 @@ export default function PlanDayList({
   const workoutKey = (w: ParsedWorkout) =>
     w.dateObj ? format(w.dateObj, "yyyy-MM-dd") : w.date;
 
+  const workoutContentKey = (w: ParsedWorkout) => {
+    const base = workoutKey(w);
+    let hash = 0;
+    const text = `${w.title}\n${w.rawText || ""}`;
+    for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return `${base}:${Math.abs(hash).toString(36)}`;
+  };
+
   const setStepOverride = (w: ParsedWorkout, idx: number, field: "duration" | "pace", value: string) => {
-    const key = workoutKey(w);
+    const key = workoutContentKey(w);
     setOverrides((prev) => ({
       ...prev,
       [key]: {
@@ -486,7 +494,7 @@ export default function PlanDayList({
   };
 
   const resetStepOverride = (w: ParsedWorkout, idx: number) => {
-    const key = workoutKey(w);
+    const key = workoutContentKey(w);
     setOverrides((prev) => {
       const forKey = { ...(prev[key] || {}) };
       delete forKey[idx];
