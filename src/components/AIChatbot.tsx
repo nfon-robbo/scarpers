@@ -242,10 +242,24 @@ const AIChatbot = () => {
         todayWorkout: todayWorkoutBlock,
         onDelta: (t) => { dayResp += t; },
         onDone: async () => {
-          // Extract the new "## 📝 Workout for Today" block.
-          const sec = dayResp.match(/##\s*📝\s*Workout for Today\s*\n([\s\S]*?)(?=\n##\s|$)/i);
-          if (!sec) { finishWith("⚠️ Couldn't extract the adjusted workout."); return; }
-          const adjusted = sec[1].trim();
+          // Extract the new workout block. The day-adjust prompt emits
+          // "## 📝 Recommended Workout — {date}", but be permissive so older
+          // / slightly-off headers still apply.
+          const sec =
+            dayResp.match(/##\s*📝\s*Recommended Workout[^\n]*\n([\s\S]*?)(?=\n##\s|$)/i) ||
+            dayResp.match(/##\s*📝\s*Workout for Today[^\n]*\n([\s\S]*?)(?=\n##\s|$)/i) ||
+            dayResp.match(/##\s*📝[^\n]*\n([\s\S]*?)(?=\n##\s|$)/i);
+          // Final fallback: grab from the first **Title (Total: …)** line onward.
+          let adjusted = sec ? sec[1].trim() : "";
+          if (!adjusted) {
+            const titleIdx = dayResp.search(/\*\*[^*\n]*Total:\s*~?\d+\s*min[^*\n]*\*\*/i);
+            if (titleIdx >= 0) {
+              const rest = dayResp.slice(titleIdx);
+              const stop = rest.search(/\n##\s/);
+              adjusted = (stop > 0 ? rest.slice(0, stop) : rest).trim();
+            }
+          }
+          if (!adjusted) { finishWith("⚠️ Couldn't extract the adjusted workout."); return; }
 
           // Splice it into the existing plan in place of the original raw block.
           const rawLines = target.rawText!.split("\n");
