@@ -29,6 +29,7 @@ interface PlanDayListProps {
   syncing?: boolean;
   goalTime?: string;
   raceDistance?: string;
+  onEditWorkout?: (workout: ParsedWorkout) => void;
 }
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
