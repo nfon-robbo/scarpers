@@ -31,12 +31,19 @@ import { popUndoEntry, getUndoCount, peekUndoEntry, pushUndoEntry, popRedoEntry,
 import {
   applySkipSession,
   applyMoveSession,
+  applyReplaceWithRecovery,
+  applyReplaceWithTemplate,
+  applyMoveSessionToDate,
+  applyEditWorkout,
   previewMoveCascade,
   detectRaceDateConflict,
   applyMoveCompressed,
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
+import WorkoutEditDialog, { type EditWorkoutChange } from "@/components/WorkoutEditDialog";
+import { logPlanEdit } from "@/lib/plan-edit-log";
+import type { ParsedWorkout } from "@/lib/plan-export";
 import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
