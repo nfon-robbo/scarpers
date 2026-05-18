@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, isToday } from "date-fns";
-import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -16,9 +16,10 @@ interface PlanCalendarViewProps {
   workouts: ParsedWorkout[];
   planStartDate?: Date;
   completedDates?: Set<string>;
+  onEditWorkout?: (workout: ParsedWorkout) => void;
 }
 
-export default function PlanCalendarView({ workouts, planStartDate, completedDates = new Set() }: PlanCalendarViewProps) {
+export default function PlanCalendarView({ workouts, planStartDate, completedDates = new Set(), onEditWorkout }: PlanCalendarViewProps) {
   const [weekStart, setWeekStart] = useState<Date>(() => {
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
