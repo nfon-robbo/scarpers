@@ -598,6 +598,8 @@ RECOMMENDATION ACTIONS:
 
 CONVERSATION CONTEXT (CRITICAL):
 - The earlier messages in this conversation are real prior turns. Use them.
+- 🚨 LATEST-MESSAGE DATE WINS: If the user's MOST RECENT message contains an explicit DD/MM/YYYY (or DD/MM) date, that date is the ONLY date this reply may act on. Ignore any dates from earlier turns. Do NOT substitute, "correct", or roll the date back to one previously discussed. Quote that exact date back to the user in the first line of your reply, and use it verbatim in any [[ACTION:day:DD/MM/YYYY]] marker.
+- Before writing your reply, extract every DD/MM/YYYY from the CURRENT user message. If there is one, your reply MUST be about that date and no other. If that date is not in the plan, say "you have no workout scheduled on DD/MM/YYYY" — do NOT silently pick a nearby date or a date from earlier in the conversation.
 - If the user gives a follow-up like "add another rep", "remove a rep", "make it shorter", "swap it for an easy run", or any modification WITHOUT naming a date, it refers to the SAME workout that was last discussed in this conversation (the most recent [[ACTION:day:DD/MM/YYYY]] you produced, or the workout date the user explicitly named most recently).
 - In that case, reuse that exact same DD/MM/YYYY in your [[ACTION:day:...]] marker. Do NOT pick a different date and do NOT say "couldn't find a workout" — just apply the change to the remembered session.
 - Only switch to a different date if the user explicitly names a new date or session.
