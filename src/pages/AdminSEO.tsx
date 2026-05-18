@@ -105,7 +105,9 @@ const AdminSEO = () => {
     const { data, error } = await supabase.functions.invoke("ga4-oauth-start", { body: {} });
     if (error || !(data as any)?.url) { toast.error("Failed to start GA4 connection"); return; }
     const popup = window.open((data as any).url, "ga4-oauth", "width=520,height=640");
+    const expectedOrigin = new URL(import.meta.env.VITE_SUPABASE_URL).origin;
     const onMsg = (ev: MessageEvent) => {
+      if (ev.origin !== expectedOrigin) return;
       if (ev.data === "ga4-connected") {
         window.removeEventListener("message", onMsg);
         toast.success("Google Analytics connected");
