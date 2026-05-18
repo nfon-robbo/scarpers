@@ -76,6 +76,13 @@ function extractRaceDateFromMarkdown(md: string | null | undefined): string | nu
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+function workoutContentKey(w: ParsedWorkout, dateStr: string): string {
+  let hash = 0;
+  const text = `${w.title}\n${w.rawText || ""}`;
+  for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  return `${dateStr}:${Math.abs(hash).toString(36)}`;
+}
+
 function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
   if (!markdown) return [];
   const days = new Set<string>();
@@ -1613,7 +1620,7 @@ const TrainingPlanPage = () => {
         const d = w.dateObj!;
         const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-        const overridesForWorkout = stepOverrides[dateStr] || {};
+        const overridesForWorkout = stepOverrides[workoutContentKey(w, dateStr)] || stepOverrides[dateStr] || {};
         const expanded = expandWorkoutSteps(w.segments, w.title, w.rawText ?? "", { goalTime, raceDistance });
         const aiSteps = expanded.map((step, idx) => ({
           duration: overridesForWorkout[idx]?.duration ? sharedParseDuration(overridesForWorkout[idx].duration!) : step.duration,

@@ -474,8 +474,16 @@ export default function PlanDayList({
   const workoutKey = (w: ParsedWorkout) =>
     w.dateObj ? format(w.dateObj, "yyyy-MM-dd") : w.date;
 
+  const workoutContentKey = (w: ParsedWorkout) => {
+    const base = workoutKey(w);
+    let hash = 0;
+    const text = `${w.title}\n${w.rawText || ""}`;
+    for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return `${base}:${Math.abs(hash).toString(36)}`;
+  };
+
   const setStepOverride = (w: ParsedWorkout, idx: number, field: "duration" | "pace", value: string) => {
-    const key = workoutKey(w);
+    const key = workoutContentKey(w);
     setOverrides((prev) => ({
       ...prev,
       [key]: {
@@ -486,7 +494,7 @@ export default function PlanDayList({
   };
 
   const resetStepOverride = (w: ParsedWorkout, idx: number) => {
-    const key = workoutKey(w);
+    const key = workoutContentKey(w);
     setOverrides((prev) => {
       const forKey = { ...(prev[key] || {}) };
       delete forKey[idx];
@@ -514,9 +522,12 @@ export default function PlanDayList({
       const date = (e as CustomEvent<{ date?: string }>).detail?.date;
       if (!date) return;
       setOverrides((prev) => {
-        if (!prev[date]) return prev;
+        if (!Object.keys(prev).some((key) => key === date || key.startsWith(`${date}:`))) return prev;
         const next = { ...prev };
         delete next[date];
+        for (const key of Object.keys(next)) {
+          if (key.startsWith(`${date}:`)) delete next[key];
+        }
         return next;
       });
     };
@@ -926,8 +937,8 @@ export default function PlanDayList({
                                     <Icon className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 grid grid-cols-2 divide-x">
-                                    <EditableStat
-                                      value={isCustom ? durStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.duration ?? durStr)}
+                                      <EditableStat
+                                        value={isCustom ? durStr : (overrides[workoutContentKey(selectedWorkout)]?.[i]?.duration ?? durStr)}
                                       label="Time (mm:ss)"
                                       placeholder="mm:ss"
                                       onSave={(v) => isCustom && customRef
@@ -937,7 +948,7 @@ export default function PlanDayList({
                                             return { ...prev, [key]: list };
                                           })
                                         : setStepOverride(selectedWorkout, i, "duration", v)}
-                                      isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.duration}
+                                      isOverridden={isCustom ? false : !!overrides[workoutContentKey(selectedWorkout)]?.[i]?.duration}
                                     />
                                     {isWarmCool ? (
                                       <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
@@ -946,7 +957,7 @@ export default function PlanDayList({
                                       </div>
                                     ) : (
                                       <EditableStat
-                                        value={isCustom ? paceStr : (overrides[workoutKey(selectedWorkout)]?.[i]?.pace ?? paceStr)}
+                                        value={isCustom ? paceStr : (overrides[workoutContentKey(selectedWorkout)]?.[i]?.pace ?? paceStr)}
                                         label="Pace (min/km)"
                                         placeholder="m:ss"
                                         onSave={(v) => isCustom && customRef
@@ -956,7 +967,7 @@ export default function PlanDayList({
                                               return { ...prev, [key]: list };
                                             })
                                           : setStepOverride(selectedWorkout, i, "pace", v)}
-                                        isOverridden={isCustom ? false : !!overrides[workoutKey(selectedWorkout)]?.[i]?.pace}
+                                        isOverridden={isCustom ? false : !!overrides[workoutContentKey(selectedWorkout)]?.[i]?.pace}
                                       />
                                     )}
                                   </div>
@@ -970,7 +981,7 @@ export default function PlanDayList({
                                       <Trash2 className="w-4 h-4" />
                                     </button>
                                   ) : (() => {
-                                    const ov = overrides[workoutKey(selectedWorkout)]?.[i];
+                                    const ov = overrides[workoutContentKey(selectedWorkout)]?.[i];
                                     const isModified = !!(ov?.duration || ov?.pace);
                                     if (!isModified) return null;
                                     return (
