@@ -416,6 +416,17 @@ export function enforceWarmupCooldown(markdown: string): { content: string; corr
 // ─────────────────────────────────────────────────────────────────────────────
 export interface DayScheduleCorrection { day: string; reason: string; }
 
+/** Compute the canonical weekday name for a DD/MM/YYYY date string.
+ *  Uses UTC to avoid timezone drift. Returns "" on parse failure. */
+function weekdayFromDate(dmy: string): string {
+  const [d, m, y] = dmy.split("/").map((s) => parseInt(s, 10));
+  if (!d || !m || !y) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (isNaN(dt.getTime())) return "";
+  // getUTCDay: Sun=0..Sat=6 → remap to Mon=0..Sun=6 then index into WEEKDAY_LIST.
+  return WEEKDAY_LIST[(dt.getUTCDay() + 6) % 7];
+}
+
 export function enforceScheduledDays(
   markdown: string,
   trainingDays: string[] | null | undefined,
@@ -432,10 +443,18 @@ export function enforceScheduledDays(
   const dropMask = new Array<boolean>(lines.length).fill(false);
 
   for (const b of blocks) {
-    if (allowed.has(b.weekday)) continue;
-    if (RACE_DAY_RE.test(b.heading) || REST_DAY_RE.test(b.heading)) continue;
+    const isRest = REST_DAY_RE.test(b.heading);
+    const isRace = RACE_DAY_RE.test(b.heading);
+    // Trust the *actual* calendar weekday, not the label — the AI sometimes
+    // mislabels (e.g. "Wednesday 14/05/2026" when 14/05/2026 is a Thursday).
+    const actual = weekdayFromDate(b.date) || b.weekday;
+    if (allowed.has(actual)) continue;
+    if (isRest || isRace) continue;
     for (let k = b.startLine; k < b.endLine; k++) dropMask[k] = true;
-    corrections.push({ day: `${b.weekday} ${b.date}`, reason: `not in scheduled days (${[...allowed].join(",")})` });
+    const reason = actual !== b.weekday
+      ? `label says ${b.weekday} but ${b.date} is ${actual}; not in scheduled days (${[...allowed].join(",")})`
+      : `not in scheduled days (${[...allowed].join(",")})`;
+    corrections.push({ day: `${b.weekday} ${b.date}`, reason });
   }
   const out = lines.filter((_, i) => !dropMask[i]).join("\n");
   return { content: out, corrections };
