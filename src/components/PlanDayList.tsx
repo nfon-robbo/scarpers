@@ -509,6 +509,20 @@ export default function PlanDayList({
       localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
     } catch {}
   }, [overrides]);
+  useEffect(() => {
+    const onCleared = (e: Event) => {
+      const date = (e as CustomEvent<{ date?: string }>).detail?.date;
+      if (!date) return;
+      setOverrides((prev) => {
+        if (!prev[date]) return prev;
+        const next = { ...prev };
+        delete next[date];
+        return next;
+      });
+    };
+    window.addEventListener("plan-step-overrides-cleared", onCleared as EventListener);
+    return () => window.removeEventListener("plan-step-overrides-cleared", onCleared as EventListener);
+  }, []);
 
   // Custom user-added steps (warm-up / rep / cool-down / custom).
   // Stored locally; appended after AI steps both in UI and on Intervals.icu sync.
