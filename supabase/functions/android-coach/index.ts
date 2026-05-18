@@ -33,12 +33,11 @@ async function authenticateRequest(
     }
   }
 
-  // Fallback to API key (stateless mode)
-  const ANDROID_API_KEY = Deno.env.get("ANDROID_API_KEY");
-  if (ANDROID_API_KEY && body.api_key === ANDROID_API_KEY) {
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    return { userId: (body.user_id as string) || "", supabase: serviceClient };
-  }
+  // API key fallback is intentionally NOT trusted for user-scoped data:
+  // it previously allowed any holder of ANDROID_API_KEY to read/write any
+  // user's data by passing an arbitrary body.user_id with a service-role
+  // client. All data ops now require a valid user JWT.
+  void SUPABASE_SERVICE_ROLE_KEY;
 
   throw new Error("Unauthorized");
 }
