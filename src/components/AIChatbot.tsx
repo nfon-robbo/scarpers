@@ -11,6 +11,11 @@ import { streamAICoach } from "@/lib/ai-stream";
 import { parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { pushUndoEntry } from "@/lib/plan-undo-history";
 import { enforceAndLog } from "@/lib/plan-validation";
+import {
+  applySkipSession,
+  applyMoveToTomorrow,
+  applyReplaceWithRecovery,
+} from "@/lib/plan-day-actions";
 
 interface Message {
   role: "user" | "assistant";
@@ -269,6 +274,72 @@ const AIChatbot = () => {
       onError: (err) => finishWith(`⚠️ Couldn't apply the change: ${err}`),
     });
   }, [loading, toast]);
+
+  /**
+   * Deterministic single-day actions (Skip / Move to tomorrow / Replace
+   * with recovery) used when the coach flags a session due to illness, low
+   * readiness, or injury. Each action edits the plan directly so the user
+   * sees exactly what will happen before they tap.
+   */
+  const applyDayAction = useCallback(
+    async (dateUk: string, action: "skip" | "move" | "recovery") => {
+      if (loading) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({ title: "Please sign in", variant: "destructive" });
+        return;
+      }
+      const { data: plan } = await supabase
+        .from("training_plans")
+        .select("id, content")
+        .eq("user_id", session.user.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!plan?.content) {
+        toast({ title: "No active plan", variant: "destructive" });
+        return;
+      }
+
+      const result =
+        action === "skip"
+          ? applySkipSession(plan.content, dateUk)
+          : action === "move"
+            ? applyMoveToTomorrow(plan.content, dateUk)
+            : applyReplaceWithRecovery(plan.content, dateUk);
+
+      if (!result) {
+        toast({
+          title: "Couldn't update plan",
+          description: `No session found on ${dateUk}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const validated = enforceAndLog(result.updatedPlan, `chat day action: ${action}`).content;
+      pushUndoEntry(plan.id, plan.content, `${dateUk} session (${action})`);
+      const { error } = await supabase
+        .from("training_plans")
+        .update({ content: validated })
+        .eq("id", plan.id);
+      if (error) {
+        toast({ title: "Couldn't save change", description: error.message, variant: "destructive" });
+        return;
+      }
+      setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ ${result.summary}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
+        },
+      ]);
+      toast({ title: "Plan updated", description: result.summary });
+    },
+    [loading, toast],
+  );
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -583,13 +654,52 @@ const AIChatbot = () => {
                   ) : (
                     cleaned
                   )}
-                  {showActions && (
+                  {showActions && scope.kind === "day" && (
                     <div className="mt-3 space-y-2">
-                      {scope.kind === "day" && (
-                        <p className="text-[11px] text-muted-foreground">
-                          Affects only your <strong>{scope.dateUk}</strong> session.
-                        </p>
-                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Affects only your <strong>{scope.dateUk}</strong> session. Pick exactly what you'd like to do:
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "skip")}
+                        >
+                          Skip this session
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "move")}
+                        >
+                          Move to tomorrow
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => applyDayAction(scope.dateUk, "recovery")}
+                        >
+                          Replace with 20-min recovery walk
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs justify-start"
+                          disabled={loading}
+                          onClick={() => {
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                          }}
+                        >
+                          Keep as it is
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {showActions && scope.kind === "plan" && (
+                    <div className="mt-3 space-y-2">
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -597,7 +707,7 @@ const AIChatbot = () => {
                           disabled={loading}
                           onClick={() => applyChange(cleaned, scope)}
                         >
-                          Make the change
+                          Apply this change to my plan
                         </Button>
                         <Button
                           size="sm"
@@ -605,7 +715,7 @@ const AIChatbot = () => {
                           className="flex-1 h-8 text-xs"
                           disabled={loading}
                           onClick={() => {
-                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the session as planned." }]);
+                            setMessages(prev => [...prev, { role: "assistant", content: "Got it — keeping the plan as it is." }]);
                           }}
                         >
                           Keep as it is
