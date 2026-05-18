@@ -1029,13 +1029,16 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
 
       const planLengthInstruction = isAIDecide
         ? `Generate the FULL training plan from start date to race date. Every week must have detailed daily workouts. Do NOT limit to 4 weeks — output the complete plan for however many weeks are needed. ${firstWorkoutRule}`
-        : `Generate the COMPLETE plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKFmt}).
+        : `${explicitRaceDayLine}
+
+Generate the COMPLETE plan starting from ${planStart} and ending on ${race_date} (${raceDayName}, ${raceDateUKLong}).
 ${firstWorkoutRule}
 After the start date, only schedule workouts on: ${daysStr}. All other days are rest/recovery.
 
 ⚠️ CRITICAL — RACE DAY IS MANDATORY:
-The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKFmt}). Label it "🏁 RACE DAY — ${raceLabel}".
-RACE DAY IS THE RACE ONLY — it is a single continuous effort over the full race distance (${raceLabel}) at goal pace${goal_time ? ` to hit ${goal_time}` : ""}. Do NOT prescribe walk/run intervals, do NOT split it into sets, do NOT add training intervals on race day. A short pre-race routine (light jog warm-up + strides + fuelling/pacing notes) may be described in the notes column, but the workout itself must be ONE entry: the race. Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary.${requiredDatesBlock}`;
+${explicitRaceDayLine}
+The FINAL entry in the plan MUST be the race itself on ${race_date} (${raceDayName}, ${raceDateUKLong}). Label it "🏁 RACE DAY — ${raceLabel}".
+RACE DAY IS THE RACE ONLY — it is a single continuous effort over the full race distance (${raceLabel}) at goal pace${goal_time ? ` to hit ${goal_time}` : ""}. Do NOT prescribe walk/run intervals, do NOT split it into sets, do NOT add training intervals on race day. A short pre-race routine (light jog warm-up + strides + fuelling/pacing notes) may be described in the notes column, but the workout itself must be ONE entry: the race. Do NOT stop the plan before this date. The final week must extend all the way through to ${race_date} inclusive — do NOT round down to a clean week boundary. There is NO session-count cap and NO week-count cap — keep emitting weeks until you have written the race day entry. If you feel the response is getting long, KEEP GOING anyway — truncation is a failure.${requiredDatesBlock}`;
 
       const ageYears = profile?.date_of_birth
         ? Math.floor((Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
