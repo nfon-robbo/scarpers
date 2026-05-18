@@ -235,7 +235,15 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" />
-                  {shortLabel(selectedWorkout)}
+                  <span className="flex-1 min-w-0">{shortLabel(selectedWorkout)}</span>
+                  {onEditWorkout && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 px-2 text-xs"
+                      onClick={() => { const w = selectedWorkout; setSelectedWorkout(null); onEditWorkout(w!); }}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" /> Edit / Replace
+                    </Button>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
