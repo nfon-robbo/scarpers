@@ -23,6 +23,7 @@ import {
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
+import { logPlanEdit } from "@/lib/plan-edit-log";
 
 interface Message {
   role: "user" | "assistant";
