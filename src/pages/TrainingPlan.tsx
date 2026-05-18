@@ -1086,6 +1086,10 @@ const TrainingPlanPage = () => {
   const [dayAdjustDialogOpen, setDayAdjustDialogOpen] = useState(false);
   const [dayAdjustPhase, setDayAdjustPhase] = useState<"sleep" | "metrics" | "analyzing" | "done">("sleep");
   const [dayAdjustShifted, setDayAdjustShifted] = useState(false);
+  // Inline conflict prompt for the "Move it" action when cascading would
+  // push later sessions past race day. Mirrors the chatbot's race-conflict UI.
+  const [dayAdjustConflict, setDayAdjustConflict] = useState<{ dateUk: string; shiftedRaceLabel: string; daysToRace: number } | null>(null);
+  const [dayAdjustActioning, setDayAdjustActioning] = useState(false);
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
