@@ -114,8 +114,111 @@ function recomputeSessionTotals(markdown: string): { content: string; correction
   return { content: lines.join("\n"), corrections };
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+// Rule 1 — drop duplicate `### **WEEK N**` headings (same week range) and
+// duplicate day blocks (same date). Mirrors src/lib/plan-validation.ts.
+function dedupePlan(markdown: string): string {
+  if (!markdown) return markdown;
+  const lines = markdown.split("\n");
+  const dropMask = new Array<boolean>(lines.length).fill(false);
+  const seenWeeks = new Set<string>();
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^###\s+\*\*WEEK\s+\d+/i.test(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === "") j++;
+    const sub = lines[j]?.match(/^\*Week of\s+(.+?)\*\s*$/i);
+    if (!sub) continue;
+    const key = sub[1].trim();
+    if (seenWeeks.has(key)) {
+      dropMask[i] = true; dropMask[j] = true;
+      let k = j + 1;
+      while (k < lines.length && (lines[k].trim() === "" || lines[k].trim() === "---")) {
+        dropMask[k] = true; k++;
+        if (lines[k - 1].trim() === "---") break;
+      }
+    } else seenWeeks.add(key);
+  }
+  const liveLines = lines.filter((_, i) => !dropMask[i]);
+  const seenDates = new Set<string>();
+  const out: string[] = [];
+  let i = 0;
+  while (i < liveLines.length) {
+    const m = liveLines[i].match(/^###\s+\*\*[A-Za-z]+\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
+    if (m && seenDates.has(m[1])) {
+      // Skip this block until next ### / ##
+      i++;
+      while (i < liveLines.length && !/^##\s+/.test(liveLines[i]) && !/^###\s+/.test(liveLines[i])) i++;
+      continue;
+    }
+    if (m) seenDates.add(m[1]);
+    out.push(liveLines[i]); i++;
+  }
+  return out.join("\n");
+}
+
+// Rule 2 — inject Warm-up/Cool-down rows into running blocks that lack them.
+function injectWarmupCooldown(markdown: string): string {
+  if (!markdown) return markdown;
+  const lines = markdown.split("\n");
+  const MAIN_RE = /\|\s*(Main\s*Set|Interval(?:\s*Set)?|Threshold|Tempo|Steady|VO2|Hill|Fartlek|Strides|Long\s*Run|Race\s*Pace|Race|Easy\s*Run|Cruise|Sharpening|Repeats?|Reps?|Pre-?Race)\b/i;
+  // Find day blocks (reverse to keep indices stable)
+  const heads: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+  }
+  for (let h = heads.length - 1; h >= 0; h--) {
+    const s = heads[h];
+    const e = h + 1 < heads.length ? heads[h + 1] : lines.length;
+    const heading = lines[s];
+    if (/race\s*day|rest\s*day/i.test(heading)) continue;
+    let firstRow = -1, lastRow = -1, hasMain = false;
+    for (let i = s + 1; i < e; i++) {
+      const ln = lines[i];
+      if (!/^\|/.test(ln)) continue;
+      if (/^\|\s*Segment\s*\|/i.test(ln)) continue;
+      if (/^\|\s*[-:\s|]+\|\s*$/.test(ln)) continue;
+      if (firstRow === -1) firstRow = i;
+      lastRow = i;
+      if (MAIN_RE.test(ln)) hasMain = true;
+    }
+    if (firstRow === -1 || !hasMain) continue;
+    const hasWU = /^\|\s*Warm-?up\s*\|/i.test(lines[firstRow]);
+    const hasCD = /^\|\s*Cool-?down\s*\|/i.test(lines[lastRow]);
+    if (hasWU && hasCD) continue;
+    let added = 0;
+    if (!hasCD) { lines.splice(lastRow + 1, 0, "| Cool-down | 5 min | Walk | 🎵 150 BPM |"); added += 5; }
+    if (!hasWU) { lines.splice(firstRow, 0, "| Warm-up | 5 min | Easy walk | 🎵 150 BPM |"); added += 5; }
+    if (added > 0) {
+      lines[s] = lines[s].replace(/\(Total:\s*(\d+)\s*min\)/i, (_m, n) => `(Total: ${parseInt(n, 10) + added}min)`);
+    }
+  }
+  return lines.join("\n");
+}
+
+// Rule 3 — drop sessions on non-scheduled weekdays (unless rest/race day).
+const WEEKDAY_SHORT_AA: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday",
+  Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
+};
+function enforceSchedule(markdown: string, trainingDays: string[] | null | undefined): string {
+  if (!markdown || !trainingDays?.length) return markdown;
+  const allowed = new Set(trainingDays.map((d) => WEEKDAY_SHORT_AA[d] || d));
+  const lines = markdown.split("\n");
+  const heads: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^###\s+\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*/.test(lines[i])) heads.push(i);
+  }
+  const dropMask = new Array<boolean>(lines.length).fill(false);
+  for (let h = 0; h < heads.length; h++) {
+    const s = heads[h];
+    const e = h + 1 < heads.length ? heads[h + 1] : lines.length;
+    const m = lines[s].match(/^###\s+\*\*([A-Za-z]+)\s+/);
+    if (!m) continue;
+    if (allowed.has(m[1])) continue;
+    if (/race\s*day|rest\s*day/i.test(lines[s])) continue;
+    for (let k = s; k < e; k++) dropMask[k] = true;
+  }
+  return lines.filter((_, i) => !dropMask[i]).join("\n");
+}
 
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

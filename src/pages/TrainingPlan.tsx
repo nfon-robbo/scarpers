@@ -37,7 +37,7 @@ import {
   applyMoveAndShiftRace,
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
-import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog } from "@/lib/plan-validation";
+import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
 interface ApiStep {
@@ -572,18 +572,22 @@ const TrainingPlanPage = () => {
 
   const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string; skipRaceDayGuard?: boolean } = {}) => {
     if (!user) return null;
-    // Guardrail: enforce 5-min minimum on every Warm-up / Cool-down before saving.
-    const validated = enforceAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
-    planContent = validated.content;
-    // Guardrail: rewrite each session's `(Total: Nmin)` heading to match the
-    // sum of its segment-table durations. Prevents AI-estimated totals from
-    // contradicting the actual workout steps.
-    const totalsFix = recomputeAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
-    planContent = totalsFix.content;
-    if (validated.corrections.length) {
+    // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
+    // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
+    const validatedPlan = validatePlanForSave(planContent, {
+      trainingDays,
+      source: options.inPlace ? "in-place save" : "new plan save",
+    });
+    planContent = validatedPlan.content;
+    const totalAuto =
+      validatedPlan.corrections.dedupes.length +
+      validatedPlan.corrections.scheduleDrops.length +
+      validatedPlan.corrections.warmupsAdded.length +
+      validatedPlan.corrections.warmupBumps.length;
+    if (totalAuto > 0) {
       toast({
         title: "Plan auto-corrected",
-        description: `Bumped ${validated.corrections.length} short warm-up/cool-down(s) to 5 min minimum.`,
+        description: `Applied ${totalAuto} fix(es) before save (duplicates, schedule, warm-up/cool-down).`,
       });
     }
     const raceDateValue = letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined) || null;
@@ -610,8 +614,7 @@ const TrainingPlanPage = () => {
         });
         const extended = await extendPlanToRaceDay(planContent, raceIsoForGuard);
         if (extended) {
-          planContent = enforceAndLog(extended, "race-day continuation").content;
-          planContent = recomputeAndLog(planContent, "race-day continuation").content;
+          planContent = validatePlanForSave(extended, { trainingDays, source: "race-day continuation" }).content;
         }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
@@ -775,6 +778,7 @@ const TrainingPlanPage = () => {
           return;
         }
       }
+      newContent = validatePlanForSave(newContent, { trainingDays, source: "workout move" }).content;
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
         pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
@@ -828,6 +832,7 @@ const TrainingPlanPage = () => {
             return;
           }
         }
+        newContent = validatePlanForSave(newContent, { trainingDays, source: "start-date shift" }).content;
         const { error } = await supabase.from("training_plans")
           .update({
             start_date: toLocalISODate(newStart),
@@ -1470,7 +1475,7 @@ const TrainingPlanPage = () => {
 
     const previousContent = content;
     const previousRaceDate = raceDate;
-    const validated = enforceAndLog(result.updatedPlan, `day-ahead action: ${action}`).content;
+    const validated = validatePlanForSave(result.updatedPlan, { trainingDays, source: `day-ahead action: ${action}` }).content;
     setContent(validated);
     if (newRaceDate) {
       try { setRaceDate(parseLocalISODate(newRaceDate)); setLetAIDecide(false); } catch {}
