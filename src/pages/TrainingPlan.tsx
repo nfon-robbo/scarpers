@@ -311,10 +311,14 @@ const TrainingPlanPage = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [undoCount, setUndoCount] = useState(0);
+  const [redoCount, setRedoCount] = useState(0);
 
-  // Track undo stack size for the active plan; refresh when chat pushes/pops entries.
+  // Track undo/redo stack sizes for the active plan; refresh when chat pushes/pops entries.
   useEffect(() => {
-    const refresh = () => setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+    const refresh = () => {
+      setUndoCount(savedPlanId ? getUndoCount(savedPlanId) : 0);
+      setRedoCount(savedPlanId ? getRedoCount(savedPlanId) : 0);
+    };
     refresh();
     const onChange = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -335,6 +339,12 @@ const TrainingPlanPage = () => {
     if (!peek) return;
     const entry = popUndoEntry(targetPlanId);
     if (!entry) return;
+    // Capture current state into the redo stack BEFORE applying the undo, so
+    // the user can step forward again.
+    const currentContent = content;
+    const currentRaceDateIso = raceDate ? toLocalISODate(raceDate) : null;
+    const redoOpts = "prevRaceDate" in entry ? { prevRaceDate: currentRaceDateIso } : undefined;
+    pushRedoEntry(targetPlanId, currentContent, entry.label, redoOpts);
     const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
     if ("prevRaceDate" in entry) updatePayload.race_date = entry.prevRaceDate ?? null;
     const { error } = await supabase
@@ -346,8 +356,45 @@ const TrainingPlanPage = () => {
       return;
     }
     setContent(entry.prevContent);
+    if ("prevRaceDate" in entry) {
+      try {
+        setRaceDate(entry.prevRaceDate ? parseLocalISODate(entry.prevRaceDate) : undefined);
+      } catch {}
+    }
     toast({ title: "Reverted", description: `Undid change to ${entry.label}.` });
-  }, [savedPlanId, user, toast]);
+  }, [savedPlanId, user, toast, content, raceDate]);
+
+  const handleRedo = useCallback(async (planIdOverride?: string) => {
+    const targetPlanId = typeof planIdOverride === "string" ? planIdOverride : savedPlanId;
+    if (!targetPlanId || !user) return;
+    const peek = peekRedoEntry(targetPlanId);
+    if (!peek) return;
+    const entry = popRedoEntry(targetPlanId);
+    if (!entry) return;
+    // Push current state back onto the undo stack (preserving the redo stack).
+    const currentContent = content;
+    const currentRaceDateIso = raceDate ? toLocalISODate(raceDate) : null;
+    const undoOpts: { prevRaceDate?: string | null; preserveRedo: boolean } = { preserveRedo: true };
+    if ("prevRaceDate" in entry) undoOpts.prevRaceDate = currentRaceDateIso;
+    pushUndoEntry(targetPlanId, currentContent, entry.label, undoOpts);
+    const updatePayload: { content: string; race_date?: string | null } = { content: entry.prevContent };
+    if ("prevRaceDate" in entry) updatePayload.race_date = entry.prevRaceDate ?? null;
+    const { error } = await supabase
+      .from("training_plans")
+      .update(updatePayload)
+      .eq("id", targetPlanId);
+    if (error) {
+      toast({ title: "Redo failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setContent(entry.prevContent);
+    if ("prevRaceDate" in entry) {
+      try {
+        setRaceDate(entry.prevRaceDate ? parseLocalISODate(entry.prevRaceDate) : undefined);
+      } catch {}
+    }
+    toast({ title: "Reapplied", description: `Redid change to ${entry.label}.` });
+  }, [savedPlanId, user, toast, content, raceDate]);
 
   const toastPlanChange = useCallback((title: string, description: string, planId?: string | null) => {
     toast({
