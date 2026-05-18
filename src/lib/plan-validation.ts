@@ -260,17 +260,28 @@ const WEEKDAY_SHORT: Record<string, string> = {
   Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday",
 };
 
+const MARKDOWN_DAY_HEADING_RE = /^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/;
+const PLAIN_DAY_HEADING_RE = /^([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:[—–-]|:)\s*\S+/;
+
+function matchDayHeading(line: string): { weekday: string; date: string; markdown: boolean } | null {
+  const markdown = line.match(MARKDOWN_DAY_HEADING_RE);
+  if (markdown) return { weekday: markdown[1], date: markdown[2], markdown: true };
+  const plain = line.match(PLAIN_DAY_HEADING_RE);
+  if (plain) return { weekday: plain[1], date: plain[2], markdown: false };
+  return null;
+}
+
 function findDayBlocks(lines: string[]): DayBlock[] {
   const blocks: DayBlock[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^###\s+\*\*([A-Za-z]+)\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/);
+    const m = matchDayHeading(lines[i]);
     if (!m) continue;
-    // Find next `###` (any level-3 heading) or `##` heading
+    // Find next markdown section heading or plain date heading.
     let end = lines.length;
     for (let j = i + 1; j < lines.length; j++) {
-      if (/^##\s+/.test(lines[j]) || /^###\s+/.test(lines[j])) { end = j; break; }
+      if (/^##\s+/.test(lines[j]) || matchDayHeading(lines[j])) { end = j; break; }
     }
-    blocks.push({ startLine: i, endLine: end, date: m[2], weekday: m[1], heading: lines[i] });
+    blocks.push({ startLine: i, endLine: end, date: m.date, weekday: m.weekday, heading: lines[i] });
   }
   return blocks;
 }
