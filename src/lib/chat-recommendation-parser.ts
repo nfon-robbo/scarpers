@@ -30,6 +30,7 @@ function cleanSegmentName(raw: string): string {
   return raw
     .replace(/^\d+\.\s*/, "")
     .replace(/^[•\-*]\s*/, "")
+    .replace(/[\\*_`]/g, "")
     .replace(/\s+$/, "")
     .trim();
 }
@@ -74,6 +75,13 @@ function extractPace(text: string): string {
 }
 
 function extractTitle(text: string): string {
+  const replacement = text.match(/\b(?:replace|change|swap|update)\b[\s\S]{0,180}?\bwith\s+([^.:\n]+?)(?:\.\s*Use\s+this\s+exact|\.\s*\d+\.|\n|$)/i);
+  if (replacement?.[1]) {
+    return replacement[1]
+      .replace(/^the\s+/i, "")
+      .replace(/\s*\(.*?\)\s*$/g, "")
+      .trim();
+  }
   // Prefer bold heading like "**Race Pace Dress Rehearsal (Total: 40min)**"
   const bold = text.match(/\*\*([^*\n]+?)\*\*/);
   if (bold) {
@@ -113,14 +121,12 @@ function intensityFromText(text: string, hrZone: string): string {
 
 // ── shape A: intervals.icu line list ───────────────────────────────────────
 function tryParseIntervalsList(text: string): EditedSegment[] | null {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const out: EditedSegment[] = [];
   // Pattern: "1. Warm Up Walk — 05:00 (mm:ss) — No pace"
   const re =
-    /^\d+\.\s*(.+?)\s*[—–-]\s*(\d{1,2}:\d{2})(?:\s*\([^)]*\))?\s*[—–-]\s*(.+)$/;
-  for (const raw of lines) {
-    const m = raw.match(re);
-    if (!m) continue;
+    /(?:^|\s)\d+\.\s*(.+?)\s*[—–-]\s*(\d{1,2}:\d{2})(?:\s*\([^)]*\))?\s*[—–-]\s*([\s\S]*?)(?=\s+\d+\.\s*|\s+Total:\s*\d+\s*(?:min|minutes)\b|$)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
     const [, name, dur, paceRaw] = m;
     if (MOBILITY_RE.test(name)) continue;
     let pace: string;
