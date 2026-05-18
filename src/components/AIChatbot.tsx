@@ -275,6 +275,72 @@ const AIChatbot = () => {
     });
   }, [loading, toast]);
 
+  /**
+   * Deterministic single-day actions (Skip / Move to tomorrow / Replace
+   * with recovery) used when the coach flags a session due to illness, low
+   * readiness, or injury. Each action edits the plan directly so the user
+   * sees exactly what will happen before they tap.
+   */
+  const applyDayAction = useCallback(
+    async (dateUk: string, action: "skip" | "move" | "recovery") => {
+      if (loading) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({ title: "Please sign in", variant: "destructive" });
+        return;
+      }
+      const { data: plan } = await supabase
+        .from("training_plans")
+        .select("id, content")
+        .eq("user_id", session.user.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!plan?.content) {
+        toast({ title: "No active plan", variant: "destructive" });
+        return;
+      }
+
+      const result =
+        action === "skip"
+          ? applySkipSession(plan.content, dateUk)
+          : action === "move"
+            ? applyMoveToTomorrow(plan.content, dateUk)
+            : applyReplaceWithRecovery(plan.content, dateUk);
+
+      if (!result) {
+        toast({
+          title: "Couldn't update plan",
+          description: `No session found on ${dateUk}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const validated = enforceAndLog(result.updatedPlan, `chat day action: ${action}`).content;
+      pushUndoEntry(plan.id, plan.content, `${dateUk} session (${action})`);
+      const { error } = await supabase
+        .from("training_plans")
+        .update({ content: validated })
+        .eq("id", plan.id);
+      if (error) {
+        toast({ title: "Couldn't save change", description: error.message, variant: "destructive" });
+        return;
+      }
+      setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `✅ ${result.summary}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
+        },
+      ]);
+      toast({ title: "Plan updated", description: result.summary });
+    },
+    [loading, toast],
+  );
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
