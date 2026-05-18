@@ -540,7 +540,37 @@ const TrainingPlanPage = () => {
     return () => window.removeEventListener("plan-undo-changed", onPlanChange);
   }, [loadSavedPlan]);
 
-  const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string } = {}) => {
+  // Ask the edge function to stream the missing tail of a plan that doesn't
+  // reach race day. Used by savePlan() as a final safety net so we never
+  // persist a truncated plan to training_plans.content.
+  const extendPlanToRaceDay = async (planContent: string, raceIso: string): Promise<string | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+      let extension = "";
+      await new Promise<void>((resolve) => {
+        streamAICoach({
+          type: "plan-continuation",
+          token: session.access_token,
+          raceDistance,
+          goalTime,
+          trainingDays,
+          raceDate: raceIso,
+          currentPlan: planContent,
+          onDelta: (text) => { extension += text; },
+          onDone: () => resolve(),
+          onError: (err) => { console.error("plan-continuation stream error:", err); resolve(); },
+        });
+      });
+      if (!extension.trim()) return null;
+      return planContent.replace(/\s+$/, "") + "\n\n" + extension.trim();
+    } catch (e) {
+      console.error("extendPlanToRaceDay failed:", e);
+      return null;
+    }
+  };
+
+  const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string; skipRaceDayGuard?: boolean } = {}) => {
     if (!user) return null;
     // Guardrail: enforce 5-min minimum on every Warm-up / Cool-down before saving.
     const validated = enforceAndLog(planContent, options.inPlace ? "in-place save" : "new plan save");
@@ -559,6 +589,33 @@ const TrainingPlanPage = () => {
     const finalRaceDate = derivedRaceDate ?? raceDateValue;
     if (derivedRaceDate && derivedRaceDate !== raceDateValue) {
       try { setRaceDate(parseLocalISODate(derivedRaceDate)); setLetAIDecide(false); } catch {}
+    }
+
+    // ── Race-day reachability guard ──
+    // Every write to training_plans.content must reach the stored race_date.
+    // If it doesn't, run one continuation pass; if it still doesn't, refuse
+    // to save and surface a toast so the prior plan is preserved.
+    const raceIsoForGuard =
+      finalRaceDate && finalRaceDate !== "ai-recommend" ? finalRaceDate : null;
+    if (!options.skipRaceDayGuard && raceIsoForGuard) {
+      if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
+        toast({
+          title: "Extending plan to race day…",
+          description: "The plan stopped short — generating the missing days.",
+        });
+        const extended = await extendPlanToRaceDay(planContent, raceIsoForGuard);
+        if (extended) planContent = enforceAndLog(extended, "race-day continuation").content;
+        if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
+          toast({
+            title: "Couldn't extend the plan to race day",
+            description: "No changes saved. Please try again.",
+            variant: "destructive",
+          });
+          return null;
+        }
+        // Keep on-screen content in sync with the extended version.
+        setContent(planContent);
+      }
     }
 
     // In-place edit: update the existing plan row so linked activities (training_plan_id)
