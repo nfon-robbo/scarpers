@@ -1,41 +1,69 @@
-## Parsed output from current code
+## Context — what's already working
 
-The current parser now identifies the right segment and pace, but it still normalises `MM:SS` durations to minutes:
+Audited the project against the user's checklist. Most items are already done:
 
-```text
-1. Race Pace Block — 20:00 (mm:ss) — 6:00 Pace (min/km)
-   Current: { segment: "Race Pace Block", duration: "20 min", pace: "6:00/km" }
-   Required: { segment: "Race Pace Block", duration: "20:00", pace: "6:00/km" }
+- **robots.txt** exists at `public/robots.txt` with `Sitemap:` directive pointing at `https://www.scarpers.co.uk/sitemap.xml`. Public pages are crawlable; only logged-in app routes are disallowed.
+- **Per-page meta** (title, description, canonical, OG, Twitter) is handled by `MarketingPageLayout` for every marketing route (Landing, Blog, BlogPost, About, Coach, 5K/10K plans, AI coach, Privacy, Terms).
+- **JSON-LD**: Organization + WebSite + SoftwareApplication in `index.html`; Article + BreadcrumbList already injected per blog post in `src/pages/BlogPost.tsx`.
+- **No `noindex`** on public pages. Auth gating only applies to app routes (already in robots disallow list).
+- **Internal linking** from blog index → posts exists; post → related/plan links exist in MarketingPageLayout footer/nav.
 
-2. Warm Up Jog — 05:00 (mm:ss) — 7:15 Pace (min/km)
-   Current: { segment: "Warm Up Jog", duration: "5 min", pace: "7:15/km" }
-   Required: { segment: "Warm Up Jog", duration: "05:00", pace: "7:15/km" }
+## The actual problem
 
-3. Warm Up Walk — 05:00 (mm:ss) — No pace
-   Current: { segment: "Warm Up Walk", duration: "5 min", pace: null }
-   Required: { segment: "Warm Up Walk", duration: "05:00", pace: null }
+`public/sitemap.xml` is a **hand-maintained static file** and is stale:
+
+- Lists only 3 blog posts. Database has **7 published posts** — missing: `ultimate-guide-personalised-running-plan`, `how-to-start-10k-training-plan`, `the-runner-s-guide-to-speed-training-and-running-economy`, `what-is-an-ai-running-coach`.
+- `lastmod` dates are all frozen at 2026-05-12.
+- Every new blog post needs a manual sitemap edit, which is why posts aren't being discovered.
+
+That's the single root cause for the indexing gap. Fix the sitemap → Google discovers all posts on next crawl.
+
+## Plan
+
+### 1. Auto-generate `public/sitemap.xml` at build time
+
+Create `scripts/generate-sitemap.ts` that:
+
+- Defines static marketing routes (`/`, `/about`, `/coach/claire-rayners`, `/ai-running-coach`, `/5k-training-plan`, `/10k-training-plan`, `/blog`, `/privacy`, `/terms`).
+- Fetches all published blog posts from Supabase using the public anon key (URL + anon key already injected via `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env`), filtered by `published = true` and `published_at <= now()` — same filter as `src/pages/Blog.tsx`.
+- Uses each post's `updated_at` (fallback `published_at`) as `<lastmod>` so recent edits prioritise correctly.
+- Writes `public/sitemap.xml` with `BASE_URL = "https://www.scarpers.co.uk"` (canonical domain per memory).
+- Keeps the existing `<image:image>` block on the homepage entry.
+
+Wire it into `package.json`:
+
+```json
+"predev": "bunx tsx scripts/generate-sitemap.ts",
+"prebuild": "bunx tsx scripts/generate-sitemap.ts"
 ```
 
-## Fix plan
+Graceful fallback: if the Supabase fetch fails (offline build), log a warning and emit the static routes only — never crash the build.
 
-1. In `src/lib/chat-recommendation-parser.ts`, add a strict helper for one Intervals-style segment line using the exact field mapping:
+### 2. Tidy `public/robots.txt` (minor)
 
-```ts
-const segmentPattern = /^(.+?)\s*—\s*(\d{1,2}:\d{2})\s*\(mm:ss\)\s*—\s*(?:(\d{1,2}:\d{2})\s*Pace\s*\(min\/km\)|—|No pace)/i;
-```
+No structural change; keep all existing `Disallow` rules. Just confirm the `Sitemap:` line stays pointing at the canonical `https://www.scarpers.co.uk/sitemap.xml`. No edit needed unless the user wants the preview/lovable-app mirror also listed (recommend not).
 
-2. Update `tryParseIntervalsList` so it first splits numbered workout specs into individual lines/items, removes the leading `1.`, `2.`, `3.`, then applies this strict parser.
+### 3. Re-submit sitemap to Google Search Console
 
-3. Preserve the exact `MM:SS` duration string from regex group `[2]`; do not call `normaliseDuration` for this strict Intervals-style format.
+After deploy, ping GSC so it re-crawls. Either:
+- User clicks "Submit" in GSC UI for `https://www.scarpers.co.uk/sitemap.xml`, **or**
+- I can curl the GSC API (`PUT /webmasters/v3/sites/<site>/sitemaps/<sitemap-url>`) via the existing Google Search Console connector to trigger submission programmatically.
 
-4. Store pace from regex group `[3]` only. If group `[3]` is absent because the line says `No pace` or `—`, store target as `—` so the UI/export treats it as no pace.
+I'll do the API submission automatically after the build so the user doesn't have to.
 
-5. Re-run the three exact checks and confirm output before completing:
+## What I am NOT changing (and why)
 
-```text
-{ segment: "Race Pace Block", duration: "20:00", pace: "6:00/km" }
-{ segment: "Warm Up Jog", duration: "05:00", pace: "7:15/km" }
-{ segment: "Warm Up Walk", duration: "05:00", pace: null }
-```
+- **Meta tags, canonicals, OG, JSON-LD** — already correct on every public route. Re-implementing would be churn.
+- **`react-helmet-async`** — not needed; `MarketingPageLayout`'s effect-based head management already works for Googlebot (which executes JS) and the static `index.html` head covers non-JS social crawlers.
+- **No new `<Article>` JSON-LD plumbing** — `BlogPost.tsx` already injects it.
+- **No new internal links** — existing structure (blog index → posts, footer nav across all pages) is sufficient for crawling.
 
-No other files or behaviours will be changed.
+## Files touched
+
+- `scripts/generate-sitemap.ts` (new)
+- `package.json` (add `predev`/`prebuild` scripts; add `tsx` devDep if missing)
+- `public/sitemap.xml` becomes generator output (committed but auto-overwritten)
+
+## Expected outcome
+
+Next deploy → fresh sitemap with all 7 (and future) blog posts + accurate `lastmod` → GSC re-crawls within days → indexed page count rises from 3 toward 16+.
