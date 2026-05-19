@@ -419,8 +419,7 @@ const Landing = () => {
               A Running Plan That Adapts To You
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white/90 max-w-xl leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Free personalised running plans built by AI around your fitness, injuries, sleep and race goal. Adapts
-              every week using your Garmin and Strava data.
+              Personalised running plans built by AI Coach - Claire Rayners
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button
