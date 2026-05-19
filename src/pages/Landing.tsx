@@ -46,7 +46,14 @@ import watchScreen8 from "@/assets/watch-screens/screen8.png";
 const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
 
 const WATCH_SCREENS = [
-  watchScreen2, watchScreen1, watchScreen4, watchScreen5, watchScreen3, watchScreen8, watchScreen7, watchScreen6,
+  watchScreen2,
+  watchScreen1,
+  watchScreen4,
+  watchScreen5,
+  watchScreen3,
+  watchScreen8,
+  watchScreen7,
+  watchScreen6,
 ];
 
 const FENIX8_SCREEN = { top: "22.2%", left: "18.1%", width: "63.9%", height: "42.6%" };
@@ -176,12 +183,36 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: Brain, title: "Adaptive Training Plans", body: "Plans that reshape themselves every week from your runs, recovery and life schedule." },
-  { icon: Watch, title: "Garmin Sync", body: "Structured workouts on your wrist via Intervals.icu — intervals, recoveries and HR targets included." },
-  { icon: Activity, title: "Strava Integration", body: "One-click OAuth. Historical runs in, new activities synced automatically." },
-  { icon: Heart, title: "Recovery-Aware Training", body: "Readiness from sleep, resting HR and load decides push or back off — honestly." },
-  { icon: Target, title: "5K to Ultra", body: "Full distance support: 5K, 10K, half marathon, marathon and 50K–100K ultra." },
-  { icon: Sparkles, title: "Dynamic Adjustments", body: "Miss a run, sleep poorly or smash a session — the plan rebuilds intelligently." },
+  {
+    icon: Brain,
+    title: "Adaptive Training Plans",
+    body: "Plans that reshape themselves every week from your runs, recovery and life schedule.",
+  },
+  {
+    icon: Watch,
+    title: "Garmin Sync",
+    body: "Structured workouts on your wrist via Intervals.icu — intervals, recoveries and HR targets included.",
+  },
+  {
+    icon: Activity,
+    title: "Strava Integration",
+    body: "One-click OAuth. Historical runs in, new activities synced automatically.",
+  },
+  {
+    icon: Heart,
+    title: "Recovery-Aware Training",
+    body: "Readiness from sleep, resting HR and load decides push or back off — honestly.",
+  },
+  {
+    icon: Target,
+    title: "5K to Ultra",
+    body: "Full distance support: 5K, 10K, half marathon, marathon and 50K–100K ultra.",
+  },
+  {
+    icon: Sparkles,
+    title: "Dynamic Adjustments",
+    body: "Miss a run, sleep poorly or smash a session — the plan rebuilds intelligently.",
+  },
 ];
 
 const TESTIMONIALS = [
@@ -242,8 +273,7 @@ const Landing = () => {
 
   useEffect(() => {
     const isStandalone =
-      window.matchMedia?.("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
+      window.matchMedia?.("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && isStandalone) navigate("/dashboard", { replace: true });
     });
@@ -323,7 +353,7 @@ const Landing = () => {
 
     return () => {
       ld.remove();
-      
+
       desc.el.content = desc.prev;
       kw.el.content = kw.prev;
     };
@@ -337,7 +367,9 @@ const Landing = () => {
           {HERO_VIDEOS.map((src, index) => (
             <video
               key={src}
-              ref={(node) => { heroVideoRefs.current[index] = node; }}
+              ref={(node) => {
+                heroVideoRefs.current[index] = node;
+              }}
               src={src}
               autoPlay={index === 0}
               muted
@@ -358,10 +390,21 @@ const Landing = () => {
             <img src={scarpersWordmark} alt="Scarpers" className="h-5 w-auto object-contain" />
           </Link>
           <nav className="flex items-center gap-1 sm:gap-3 text-sm">
-            <a href="#how" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">How it works</a>
-            <a href="#features" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">Features</a>
-            <a href="#faq" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">FAQ</a>
-            <Button asChild variant="ghost" size="sm" className="text-foreground hover:text-foreground bg-background/30 backdrop-blur rounded-full">
+            <a href="#how" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">
+              How it works
+            </a>
+            <a href="#features" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">
+              Features
+            </a>
+            <a href="#faq" className="hidden sm:inline px-3 py-2 text-foreground/80 hover:text-foreground">
+              FAQ
+            </a>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="text-foreground hover:text-foreground bg-background/30 backdrop-blur rounded-full"
+            >
               <Link to="/auth">Sign In</Link>
             </Button>
           </nav>
@@ -373,15 +416,23 @@ const Landing = () => {
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              Your AI running coach.<br />
-              Personalised 5K &amp; 10K plans.
+              Your AI running coach.
+              <br />
+              not the other way around.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white/90 max-w-xl leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              Free personalised running plans built by AI around your fitness, injuries, sleep and race goal. Adapts every week using your Garmin and Strava data.
+              Free personalised running plans built by AI around your fitness, injuries, sleep and race goal. Adapts
+              every week using your Garmin and Strava data.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base shadow-lg shadow-primary/30">
-                <Link to="/auth">Start Free <ArrowRight className="w-4 h-4 ml-1" /></Link>
+              <Button
+                asChild
+                size="lg"
+                className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base shadow-lg shadow-primary/30"
+              >
+                <Link to="/auth">
+                  Start Free <ArrowRight className="w-4 h-4 ml-1" />
+                </Link>
               </Button>
             </div>
 
@@ -398,27 +449,45 @@ const Landing = () => {
           </div>
         </div>
 
-        <a href="#dashboard" aria-label="Scroll" className="absolute bottom-5 left-1/2 -translate-x-1/2 text-foreground/70 animate-bounce z-10">
+        <a
+          href="#dashboard"
+          aria-label="Scroll"
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 text-foreground/70 animate-bounce z-10"
+        >
           <ChevronDown className="w-5 h-5" />
         </a>
       </section>
 
       {/* ====== PRODUCT MOCKUP ====== */}
-      <section id="dashboard" className="relative bg-gradient-to-b from-background via-card/60 to-background border-y border-border/60">
-        <div className="absolute inset-0 pointer-events-none opacity-50" style={{
-          backgroundImage: "radial-gradient(circle at 20% 30%, hsl(var(--primary) / 0.22) 0%, transparent 50%), radial-gradient(circle at 80% 70%, hsl(var(--accent) / 0.18) 0%, transparent 50%)",
-        }} />
+      <section
+        id="dashboard"
+        className="relative bg-gradient-to-b from-background via-card/60 to-background border-y border-border/60"
+      >
+        <div
+          className="absolute inset-0 pointer-events-none opacity-50"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 30%, hsl(var(--primary) / 0.22) 0%, transparent 50%), radial-gradient(circle at 80% 70%, hsl(var(--accent) / 0.18) 0%, transparent 50%)",
+          }}
+        />
         <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <SectionLabel>Your Run Today</SectionLabel>
               <H2>The plan that knows your week before you do.</H2>
               <p className="mt-5 text-muted-foreground leading-relaxed">
-                Open the app and your next session is waiting — paced for the runner you actually are today, not who you were on Monday.
+                Open the app and your next session is waiting — paced for the runner you actually are today, not who you
+                were on Monday.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
-                <Button asChild size="lg" className="rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0">
-                  <Link to="/auth">Start Free <ArrowRight className="w-4 h-4 ml-1" /></Link>
+                <Button
+                  asChild
+                  size="lg"
+                  className="rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0"
+                >
+                  <Link to="/auth">
+                    Start Free <ArrowRight className="w-4 h-4 ml-1" />
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -430,7 +499,9 @@ const Landing = () => {
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Today · Tuesday</p>
-                    <h3 className="mt-1 text-2xl font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>Threshold Intervals</h3>
+                    <h3 className="mt-1 text-2xl font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                      Threshold Intervals
+                    </h3>
                   </div>
                   <div className="text-right">
                     <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Readiness</p>
@@ -458,7 +529,10 @@ const Landing = () => {
                     { k: "Recovery", v: "2 min easy jog" },
                     { k: "Cool-down", v: "10 min · Z1" },
                   ].map((r) => (
-                    <li key={r.k} className="flex items-center justify-between border-b border-border/30 pb-2 last:border-0 last:pb-0">
+                    <li
+                      key={r.k}
+                      className="flex items-center justify-between border-b border-border/30 pb-2 last:border-0 last:pb-0"
+                    >
                       <span className="text-muted-foreground">{r.k}</span>
                       <span className="font-medium">{r.v}</span>
                     </li>
@@ -490,13 +564,18 @@ const Landing = () => {
                 key={s.n}
                 className="relative rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-7 hover:border-primary/40 transition-all"
               >
-                <div className="absolute top-5 right-5 text-5xl font-bold text-primary/15" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                <div
+                  className="absolute top-5 right-5 text-5xl font-bold text-primary/15"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
                   {s.n}
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/25 to-accent/25 border border-border/50 flex items-center justify-center mb-5">
                   <s.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>{s.title}</h3>
+                <h3 className="text-xl font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                  {s.title}
+                </h3>
                 <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{s.body}</p>
                 {i < STEPS.length - 1 && (
                   <ChevronRight className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
@@ -508,7 +587,10 @@ const Landing = () => {
       </section>
 
       {/* ====== FEATURES ====== */}
-      <section id="features" className="relative border-y border-border/40 bg-gradient-to-b from-primary/10 via-card/40 to-accent/10">
+      <section
+        id="features"
+        className="relative border-y border-border/40 bg-gradient-to-b from-primary/10 via-card/40 to-accent/10"
+      >
         <div className="max-w-6xl mx-auto px-5 py-24">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <SectionLabel>Features</SectionLabel>
@@ -523,7 +605,9 @@ const Landing = () => {
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 border border-border/40 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                   <f.icon className="w-5 h-5 text-primary" />
                 </div>
-                <h3 className="text-lg font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>{f.title}</h3>
+                <h3 className="text-lg font-bold" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+                  {f.title}
+                </h3>
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
               </article>
             ))}
@@ -533,16 +617,21 @@ const Landing = () => {
 
       {/* ====== WATCH ====== */}
       <section id="watch" className="relative overflow-hidden bg-background border-b border-border/60">
-        <div className="absolute inset-0 pointer-events-none opacity-50" style={{
-          backgroundImage: "radial-gradient(circle at 15% 30%, hsl(var(--primary) / 0.18) 0%, transparent 50%), radial-gradient(circle at 85% 75%, hsl(var(--accent) / 0.16) 0%, transparent 50%)",
-        }} />
+        <div
+          className="absolute inset-0 pointer-events-none opacity-50"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 15% 30%, hsl(var(--primary) / 0.18) 0%, transparent 50%), radial-gradient(circle at 85% 75%, hsl(var(--accent) / 0.16) 0%, transparent 50%)",
+          }}
+        />
         <div className="relative max-w-6xl mx-auto px-5 py-20 sm:py-28">
           <div className="grid md:grid-cols-2 gap-12 md:gap-8 items-center">
             <div>
               <SectionLabel>Garmin Sync</SectionLabel>
               <H2>Your plan, step by step, on your wrist.</H2>
               <p className="mt-5 text-muted-foreground leading-relaxed">
-                Every Scarpers workout exports as a structured Garmin workout via Intervals.icu — warm-ups, intervals, recoveries and target heart rate zones, ready to start on your watch.
+                Every Scarpers workout exports as a structured Garmin workout via Intervals.icu — warm-ups, intervals,
+                recoveries and target heart rate zones, ready to start on your watch.
               </p>
               <ul className="mt-6 space-y-2 text-sm">
                 {[
@@ -581,8 +670,14 @@ const Landing = () => {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12">
             {STATS.map((s) => (
-              <div key={s.label} className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-5 text-center">
-                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+              <div
+                key={s.label}
+                className="rounded-2xl border border-border/50 bg-card/60 backdrop-blur p-5 text-center"
+              >
+                <p
+                  className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"
+                  style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                >
                   {s.value}
                 </p>
                 <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{s.label}</p>
@@ -614,7 +709,10 @@ const Landing = () => {
           {/* Race goals */}
           <div className="mt-10 flex flex-wrap justify-center gap-2">
             {["5K", "10K", "Half Marathon", "Marathon", "50K Ultra", "100K Trail"].map((d) => (
-              <span key={d} className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider border border-border/50 bg-card/60 backdrop-blur">
+              <span
+                key={d}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider border border-border/50 bg-card/60 backdrop-blur"
+              >
                 {d}
               </span>
             ))}
@@ -629,7 +727,8 @@ const Landing = () => {
             <SectionLabel>The Difference</SectionLabel>
             <H2>Why runners switch to Scarpers.</H2>
             <p className="mt-5 text-muted-foreground leading-relaxed">
-              Static plans don't know you missed Tuesday. Generic apps don't read your heart rate. Scarpers does both — and rebuilds your week accordingly.
+              Static plans don't know you missed Tuesday. Generic apps don't read your heart rate. Scarpers does both —
+              and rebuilds your week accordingly.
             </p>
           </div>
 
@@ -641,7 +740,10 @@ const Landing = () => {
               <div className="text-center">Generic app</div>
             </div>
             {COMPARISON.map((row, i) => (
-              <div key={row.feature} className={`grid grid-cols-4 gap-2 px-5 py-3.5 text-sm items-center ${i % 2 ? "bg-background/30" : ""}`}>
+              <div
+                key={row.feature}
+                className={`grid grid-cols-4 gap-2 px-5 py-3.5 text-sm items-center ${i % 2 ? "bg-background/30" : ""}`}
+              >
                 <div className="col-span-1 font-medium">{row.feature}</div>
                 {[row.scarpers, row.static, row.generic].map((v, j) => (
                   <div key={j} className="text-center">
@@ -678,7 +780,10 @@ const Landing = () => {
       </section>
 
       {/* ====== FAQ ====== */}
-      <section id="faq" className="bg-gradient-to-b from-background via-card/70 to-background border-y border-border/60">
+      <section
+        id="faq"
+        className="bg-gradient-to-b from-background via-card/70 to-background border-y border-border/60"
+      >
         <div className="max-w-3xl mx-auto px-5 py-24">
           <div className="text-center mb-12">
             <SectionLabel>FAQ</SectionLabel>
@@ -688,7 +793,10 @@ const Landing = () => {
             {FAQS.map((f, i) => {
               const open = openFaq === i;
               return (
-                <div key={f.q} className="rounded-2xl border border-border/50 bg-background/70 backdrop-blur overflow-hidden">
+                <div
+                  key={f.q}
+                  className="rounded-2xl border border-border/50 bg-background/70 backdrop-blur overflow-hidden"
+                >
                   <button
                     type="button"
                     onClick={() => setOpenFaq(open ? null : i)}
@@ -696,7 +804,9 @@ const Landing = () => {
                     aria-expanded={open}
                   >
                     <span className="text-sm sm:text-base font-semibold">{f.q}</span>
-                    <ChevronDown className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+                    />
                   </button>
                   {open && <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{f.a}</div>}
                 </div>
@@ -708,20 +818,37 @@ const Landing = () => {
 
       {/* ====== FINAL CTA ====== */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/30 via-background to-accent/30">
-        <div className="absolute inset-0 -z-0 opacity-40" style={{
-          backgroundImage: "radial-gradient(circle at 30% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsl(var(--accent)) 0%, transparent 50%)",
-        }} />
+        <div
+          className="absolute inset-0 -z-0 opacity-40"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 30% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsl(var(--accent)) 0%, transparent 50%)",
+          }}
+        />
         <div className="relative max-w-3xl mx-auto px-5 py-24 sm:py-32 text-center">
           <H2>Your next PB starts with your next run.</H2>
           <p className="mt-5 text-lg text-foreground/80 max-w-xl mx-auto">
             Free during beta. Connect Garmin or Strava and get an adaptive plan in under two minutes.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="h-12 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 text-base">
-              <Link to="/auth">Start Free <ArrowRight className="w-4 h-4 ml-1" /></Link>
+            <Button
+              asChild
+              size="lg"
+              className="h-12 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 text-base"
+            >
+              <Link to="/auth">
+                Start Free <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="h-12 px-8 rounded-full text-base border-foreground/30">
-              <Link to="/auth"><Watch className="w-4 h-4 mr-1" /> Connect Garmin</Link>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 px-8 rounded-full text-base border-foreground/30"
+            >
+              <Link to="/auth">
+                <Watch className="w-4 h-4 mr-1" /> Connect Garmin
+              </Link>
             </Button>
           </div>
         </div>
@@ -741,18 +868,46 @@ const Landing = () => {
           <div>
             <p className="font-semibold mb-3">Product</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li><a href="#how" className="hover:text-foreground">How it works</a></li>
-              <li><a href="#features" className="hover:text-foreground">Features</a></li>
-              <li><a href="#watch" className="hover:text-foreground">Garmin sync</a></li>
-              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
+              <li>
+                <a href="#how" className="hover:text-foreground">
+                  How it works
+                </a>
+              </li>
+              <li>
+                <a href="#features" className="hover:text-foreground">
+                  Features
+                </a>
+              </li>
+              <li>
+                <a href="#watch" className="hover:text-foreground">
+                  Garmin sync
+                </a>
+              </li>
+              <li>
+                <a href="#faq" className="hover:text-foreground">
+                  FAQ
+                </a>
+              </li>
             </ul>
           </div>
           <div>
             <p className="font-semibold mb-3">Account</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li><Link to="/auth" className="hover:text-foreground">Sign in</Link></li>
-              <li><Link to="/auth" className="hover:text-foreground">Create account</Link></li>
-              <li><Link to="/privacy" className="hover:text-foreground">Privacy</Link></li>
+              <li>
+                <Link to="/auth" className="hover:text-foreground">
+                  Sign in
+                </Link>
+              </li>
+              <li>
+                <Link to="/auth" className="hover:text-foreground">
+                  Create account
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="hover:text-foreground">
+                  Privacy
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
