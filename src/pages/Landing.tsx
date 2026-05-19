@@ -416,7 +416,7 @@ const Landing = () => {
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              Your AI running coach.
+              Your running plan should adapt to your life,
               <br />
               not the other way around.
             </h1>
