@@ -416,9 +416,7 @@ const Landing = () => {
               className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              Your running plan should adapt to your life,
-              <br />
-              not the other way around.
+              A running plan that adapts to you
             </h1>
             <p className="mt-6 text-base sm:text-lg text-white/90 max-w-xl leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
               Free personalised running plans built by AI around your fitness, injuries, sleep and race goal. Adapts
