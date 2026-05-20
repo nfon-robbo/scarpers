@@ -85,7 +85,10 @@ function bodyBatteryDrain(d: ReadinessData) {
     }
     if (recentLoad < 5) passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
   }
-  return { drain: -(passiveDrain + activeDrain - passiveCharge), hoursAwake, passiveDrain, activeDrain, passiveCharge };
+  const rPassiveDrain = Math.round(passiveDrain);
+  const rActiveDrain = Math.round(activeDrain);
+  const rPassiveCharge = Math.round(passiveCharge);
+  return { drain: -(rPassiveDrain + rActiveDrain - rPassiveCharge), hoursAwake, passiveDrain: rPassiveDrain, activeDrain: rActiveDrain, passiveCharge: rPassiveCharge };
 }
 
 function scoreLabel(s: number): string {

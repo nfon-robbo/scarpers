@@ -1,24 +1,23 @@
 ## Problem
 
-The `readiness-hourly-snapshot` cron (jobid 10, schedule `45 * * * *`) fires every hour but every call returns `403 Forbidden`. The cron's `Authorization` header is built from `vault.decrypted_secrets` entry `email_queue_service_role_key`, which no longer matches the current `SUPABASE_SERVICE_ROLE_KEY` the edge function validates against. So the hourly snapshot has not actually run for hours — the snapshots you do see (07:00, 08:00, 09:19, 12:58) came from app-side morning/eod triggers.
+The Body Battery factor on the dashboard shows the raw float (e.g. `⚡90.70341916666666 charged (+9 rest)`) instead of a rounded integer.
+
+## Root cause
+
+The hourly snapshot edge function `supabase/functions/readiness-hourly-snapshot/index.ts` computes `passiveCharge` as a float and returns it un-rounded (line 88), unlike the client-side `src/lib/readiness.ts` which rounds it (line 180). When building the detail string at line 202:
+
+```ts
+const charged = Math.round(baseScore) + battery.passiveCharge; // float!
+```
+
+…the result is a long-decimal number that gets rendered directly into the `detail` string stored in `readiness_snapshots`. The dashboard then shows whatever snapshot it last loaded.
 
 ## Fix
 
-Rewrite the cron job to use the current service role key directly via Supabase secrets, removing the dependency on the stale vault entry.
+1. In `supabase/functions/readiness-hourly-snapshot/index.ts`, round `passiveCharge` (and ideally `passiveDrain` / `activeDrain` for parity) in the `bodyBatteryDrain` return — matching `src/lib/readiness.ts` line 180. This guarantees the `⚡N charged` string is always an integer.
+2. No client changes needed; the client path already rounds.
+3. Optional cleanup: trigger one fresh hourly snapshot so the currently-stored bad string is overwritten (or wait for the next :45 tick).
 
-Use the **supabase insert tool** (not migration, since this embeds the service-role key value) to:
+## Files to change
 
-1. `cron.unschedule('readiness-hourly-snapshot')`
-2. `cron.schedule('readiness-hourly-snapshot', '45 * * * *', $$ ... $$)` where the body posts to `/functions/v1/readiness-hourly-snapshot` with `Authorization: Bearer <current SUPABASE_SERVICE_ROLE_KEY>`.
-
-Also audit and fix any **other cron jobs** that reference the same stale vault secret (e.g. email queue, auto-sync) so they don't silently 403 too.
-
-## Verification
-
-- Query `cron.job_run_details` after the next :45 tick and confirm `net._http_response` returns `200`.
-- Check `readiness_snapshots` to see a new `kind = 'hourly'` (or whatever the cron writes) row appear at the next hour.
-- Confirm `supabase--edge_function_logs` for `readiness-hourly-snapshot` shows activity (currently empty — function is never reached).
-
-## Note on automatic syncs
-
-The hourly function already triggers `intervals-wellness` and `google-fit-sleep` via `auto-sync` before computing the score, so once the auth is fixed, data sync + score generation will both resume automatically every hour.
+- `supabase/functions/readiness-hourly-snapshot/index.ts` — round `passiveCharge`, `passiveDrain`, `activeDrain` in the returned object.
