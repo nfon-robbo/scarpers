@@ -346,14 +346,16 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-  // Cron-only — accept either service role or anon key bearer.
-  // (Anon key alone gives no DB access; this function uses SERVICE_KEY internally.)
   const auth = req.headers.get("Authorization") ?? "";
   const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!provided || (provided !== SERVICE_KEY && provided !== ANON_KEY)) {
-    console.log("auth-reject", { providedLen: provided.length, serviceLen: SERVICE_KEY.length, anonLen: ANON_KEY.length, providedHead: provided.slice(0, 20), anonHead: ANON_KEY.slice(0, 20) });
+  if (!provided) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  // Cron-only — verify against rotating token stored in vault.
+  const gateClient = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data: ok, error: gateErr } = await gateClient.rpc("cron_token_matches", { _token: provided });
+  if (gateErr || ok !== true) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
