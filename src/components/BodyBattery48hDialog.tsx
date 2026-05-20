@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { passiveDrainRate, activityDrain, initialBatteryFromSleep } from "@/lib/body-battery";
 
 interface Props {
   open: boolean;
