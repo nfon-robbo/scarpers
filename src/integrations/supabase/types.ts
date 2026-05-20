@@ -838,6 +838,33 @@ export type Database = {
         }
         Relationships: []
       }
+      race_time_predictions: {
+        Row: {
+          computed_at: string
+          created_at: string
+          id: string
+          prediction: Json
+          race_distance: string
+          user_id: string
+        }
+        Insert: {
+          computed_at?: string
+          created_at?: string
+          id?: string
+          prediction: Json
+          race_distance: string
+          user_id: string
+        }
+        Update: {
+          computed_at?: string
+          created_at?: string
+          id?: string
+          prediction?: Json
+          race_distance?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       readiness_snapshots: {
         Row: {
           advice: string | null
