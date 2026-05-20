@@ -271,9 +271,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         ? Math.max(0, (Date.now() - lastWakeMs) / 3600_000)
         : hoursAwake;
 
-      // ── Anchor "Now" to the same computeBodyBattery() the dashboard uses ──
-      if (readinessData && hourly.length > 0) {
-        const truth = computeBodyBattery({
+      // ── Single source of truth: computeBodyBattery() with the same inputs as the dashboard ──
+      let truthResult: BodyBatteryResult | null = null;
+      if (readinessData) {
+        truthResult = computeBodyBattery({
           sleep: {
             sleepScore: readinessData.sleepScore,
             sleepHours: readinessData.sleepHours,
@@ -287,22 +288,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           wakeTimeIso: readinessData.wakeTimeIso,
           todayActivities: readinessData.todayActivities,
         });
-        const last = hourly[hourly.length - 1];
-        const offset = truth.percent - last.battery;
-        if (offset !== 0) {
-          for (const p of hourly) {
-            const newVal = Math.max(0, Math.min(100, p.battery + offset));
-            p.battery = newVal;
-            if (p.sleepBand != null) p.sleepBand = newVal;
-            if (p.awakeBand != null) p.awakeBand = newVal;
-            if (p.activeBand != null) p.activeBand = newVal;
+        if (hourly.length > 0) {
+          const last = hourly[hourly.length - 1];
+          const offset = truthResult.percent - last.battery;
+          if (offset !== 0) {
+            for (const p of hourly) {
+              const newVal = Math.max(0, Math.min(100, p.battery + offset));
+              p.battery = newVal;
+              if (p.sleepBand != null) p.sleepBand = newVal;
+              if (p.awakeBand != null) p.awakeBand = newVal;
+              if (p.activeBand != null) p.activeBand = newVal;
+            }
           }
+          last.battery = truthResult.percent;
+          if (last.awakeBand != null) last.awakeBand = truthResult.percent;
+          if (last.activeBand != null) last.activeBand = truthResult.percent;
+          if (last.sleepBand != null) last.sleepBand = truthResult.percent;
         }
-        // Force exact match on the last point
-        last.battery = truth.percent;
-        if (last.awakeBand != null) last.awakeBand = truth.percent;
-        if (last.activeBand != null) last.activeBand = truth.percent;
-        if (last.sleepBand != null) last.sleepBand = truth.percent;
       }
 
       // Bridge nulls between phases so segments visually connect.
@@ -321,6 +323,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
       setPoints(hourly);
       setTotals(tot);
+      setTruth(truthResult);
       setLoading(false);
     });
   }, [open, user, readinessData]);
