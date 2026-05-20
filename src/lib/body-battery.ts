@@ -169,10 +169,11 @@ export function computeBodyBattery(opts: {
     active += activityDrain(a.intensityLoad);
   }
 
-  const rawPercent = startPercent - passive - active;
+  const ambient = hoursAwake * 0.5;
+  const rawPercent = startPercent - passive - active - ambient;
   const percent = Math.round(Math.max(0, Math.min(100, rawPercent)));
   const drainAwake = Math.round(passive);
-  const drainActive = Math.round(active);
+  const drainActive = Math.round(active + ambient);
 
   return {
     percent,
