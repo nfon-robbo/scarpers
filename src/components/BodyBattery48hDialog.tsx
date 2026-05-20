@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import {
   ComposedChart,
   Area,
@@ -61,6 +61,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<HourPoint[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
 
   useEffect(() => {
     if (!open || !user) return;
@@ -294,6 +295,80 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     });
   }, [open, user, readinessData]);
 
+  // Fetch AI insight once data + totals are ready.
+  useEffect(() => {
+    if (!open || !user || !totals || points.length === 0 || !readinessData) return;
+
+    const last = points[points.length - 1];
+    const percent = last.battery;
+    const status = percent >= 75 ? "high" : percent >= 50 ? "moderate" : percent >= 25 ? "low" : "depleted";
+
+    // First post-sleep point ≈ start-of-day battery
+    let startPercent = percent;
+    for (let i = 0; i < points.length; i++) {
+      if (points[i].state !== "sleep" && (i === 0 || points[i - 1].state === "sleep")) {
+        startPercent = points[i].battery;
+        break;
+      }
+    }
+
+    // Pattern detection
+    const q = Math.max(1, Math.floor(points.length / 4));
+    const avg = (arr: HourPoint[]) => arr.reduce((s, p) => s + p.battery, 0) / arr.length;
+    const q1 = avg(points.slice(0, q));
+    const mid = avg(points.slice(Math.floor(points.length / 3), Math.floor((2 * points.length) / 3)));
+    const q4 = avg(points.slice(-q));
+    let pattern = "gradual decline";
+    if (q4 > q1 + 10) pattern = "recharged overnight then steady";
+    else if (q1 - q4 > 30) pattern = "started high, gradual decline";
+    else if (Math.abs(q4 - q1) < 10) pattern = "mostly flat";
+    else if (q4 > mid + 10 && mid < q1) pattern = "dipped low then recovered";
+    else if (q4 > q1) pattern = "climbing through the day";
+    else if (q4 < 30) pattern = "low and staying low";
+    let maxDrop = { drop: 0, ts: 0 };
+    for (let i = 1; i < points.length; i++) {
+      const d = points[i - 1].battery - points[i].battery;
+      if (d > maxDrop.drop) maxDrop = { drop: d, ts: points[i].ts };
+    }
+    if (maxDrop.drop > 15) pattern += `, big drop around ${new Date(maxDrop.ts).getHours()}:00`;
+
+    // HRV vs baseline string
+    const hrv = readinessData.hrv;
+    const baseline = readinessData.hrvBaseline;
+    let hrvVsBaseline = "n/a";
+    if (hrv && baseline) {
+      const diffPct = Math.round(((hrv - baseline) / baseline) * 100);
+      if (Math.abs(diffPct) < 5) hrvVsBaseline = "baseline";
+      else hrvVsBaseline = diffPct > 0 ? `+${diffPct}%` : `${diffPct}%`;
+    }
+
+    const fallback = `Your battery is at ${percent}% after ${totals.hoursSinceWake.toFixed(1)}h awake today.`;
+    setInsight({ loading: true, text: null });
+
+    supabase.functions
+      .invoke("body-battery-insight", {
+        body: {
+          percent,
+          status,
+          hoursAwake: totals.hoursSinceWake,
+          startPercent,
+          sleepHours: readinessData.sleepHours ?? 0,
+          deepPct: readinessData.deepPct ?? 0,
+          remPct: readinessData.remPct ?? 0,
+          hrvVsBaseline,
+          drainAwake: totals.drainAwake,
+          drainActive: totals.drainActive,
+          prevSleep: null,
+          pattern,
+        },
+      })
+      .then(({ data, error }) => {
+        if (error || !data?.insight) setInsight({ loading: false, text: fallback });
+        else setInsight({ loading: false, text: data.insight });
+      })
+      .catch(() => setInsight({ loading: false, text: fallback }));
+  }, [open, user, totals, points, readinessData]);
+
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.label);
 
   const renderTooltip = ({ active, payload }: any) => {
@@ -475,6 +550,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+
+
+
+            {/* AI insight */}
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary font-medium">
+                <Sparkles className="w-3.5 h-3.5" /> What's happening
+              </div>
+              {insight.loading ? (
+                <div className="mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analysing your pattern…
+                </div>
+              ) : (
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{insight.text}</p>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS.sleep }} /> Recharging (sleep)

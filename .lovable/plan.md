@@ -1,61 +1,141 @@
-## 1. Initial charge — looser curve (`src/lib/body-battery.ts`)
+- Surfaces 402/429 to the client as { error, code } so the UI can render a fallback.
 
-Rewrite `initialBatteryFromSleep` so a normal good night lands at 95–100%:
+- Deployed via supabase--deploy_edge_functions after writing.
 
-- Baseline: `30 → 45`.
-- Duration (up to **+40**, was +35):
-  - `h <= 0`: 0
-  - `h < 7`: `(h / 7) * 40`
-  - `7 ≤ h ≤ 9`: 40 (full plateau)
-  - `9 < h ≤ 10`: `40 - (h - 9) * 3` (gentle taper)
-  - `h > 10`: `max(25, 37 - (h - 10) * 2)`
-- Stage quality: unchanged (+20 cap: deep up to +12, REM up to +8).
-- HRV vs baseline: tighten to **±10**
-  - `≥ +10%` → +10, `≥ +5%` → +7, `±5%` → 0, `≥ −15%` → −6, else −10.
-- Sleep debt (3-night vs 30-day): keep at ±5.
-- Clamp: `Math.round(clamp(charge, 10, 100))`.
+supabase/config.toml — no change needed (defaults apply).
 
-Sanity table the new formula must satisfy:
+2. Wire UI in BodyBattery48hDialog.tsx
 
-| Sleep | Stages | HRV | Expected |
-|---|---|---|---|
-| 8h | 15% deep / 22% REM | +5% | ~100% |
-| 7.5h | 12% deep / 18% REM | baseline | 95–100% |
-| 6.5h | average | baseline | 80–90% |
-| 5.5h | fragmented | −10% | 60–75% |
-| 4.5h | poor | −20% | 40–55% |
+After data loads (after setTotals), compute the chart "pattern" string from points:
 
-No changes to passive drain, activity drain, or `computeBodyBattery` flow.
+```typescript
 
-## 2. "Drained" card — today only (`src/components/BodyBattery48hDialog.tsx`)
+// Pattern detection logic
 
-The card currently sums passive + activity drain across the entire 48h window (multiple wake periods → values like −115%). Scope it to "since last wake":
+const q1Avg = points.slice(0, Math.floor(points.length/4))
 
-- During the existing per-step loop, also accumulate `todayDrainAwake` and `todayDrainActive` **only for steps whose timestamp is after the most recent `sleep → awake` transition** (i.e. the last wake of the window, falling back to the start of the awake series if no sleep was recorded in window).
-- Track `lastWakeMs`: every time `sleepAt(t)` returns non-null, reset it to `null`; the first step after a sleep block where `sleepAt(t)` is null sets `lastWakeMs = t`. Reset the today counters whenever `lastWakeMs` is re-assigned.
-- Render the Drained card from the today counters:
-  - Headline: `−{awake+active}%`
-  - Sub-rows: `Awake −{awake}%` and `Activity −{active}%`
-  - Drop the "Net" row (no longer meaningful when drain is today-scoped and recharge is 48h-scoped); replace with a small caption: `Since last wake ({hours}h ago)`.
-- Leave the Recharged card untouched (still 48h sleep total).
+  .reduce((sum, p) => sum + p.battery, 0) / Math.floor(points.length/4);
 
-## 3. Dashboard ↔ chart sync (`src/components/BodyBattery48hDialog.tsx`)
+const midAvg = points.slice(Math.floor(points.length/3), Math.floor(2*points.length/3))
 
-Today the chart simulates with `let battery = 60` and stage-weight gains, so its "Now" diverges from the dashboard tile (which uses `computeBodyBattery`). Fix by anchoring the chart's final point to the shared function:
+  .reduce((sum, p) => sum + p.battery, 0) / Math.floor(points.length/3);
 
-- After the simulation loop, call `computeBodyBattery({ sleep, wakeTimeIso, todayActivities, now })` with the **same inputs** the dashboard uses. Fetch the same sleep summary row + today's activities used by readiness (already available via existing queries; reuse the sleep_stages aggregation to derive `sleepHours`, `deepPct`, `remPct`, plus the latest `daily_metrics` row for `hrv`, `hrvBaseline`, `recentSleepAvgHours`, `baselineSleepAvgHours`, `wakeTimeIso`).
-- Overwrite the last hourly point's `battery` with `result.percent` so the line ends exactly where the dashboard tile says.
-- Add a small "Now: X%" label inside the chart card driven by `result.percent` (not by the simulated value) so the two numbers can never disagree.
-- The intermediate hourly simulation is kept for the shape of the curve, but is **rescaled** by a constant offset so that its final value equals `result.percent` (subtract `simulatedNow - result.percent` from every point, then clamp to 0–100). This keeps the visual story consistent without rewriting the whole simulator.
+const q4Avg = points.slice(Math.floor(3*points.length/4))
 
-## Out of scope
+  .reduce((sum, p) => sum + p.battery, 0) / (points.length - Math.floor(3*points.length/4));
 
-- Edge function `readiness-hourly-snapshot` (already uses shared logic; no behaviour change needed for these three fixes).
-- DB schema, AI prompts, morning readiness scoring weights.
-- Recharge math and colour bands.
+// Find largest hour-over-hour drop
 
-## Acceptance
+const maxDrop = points.slice(1).reduce((max, p, i) => {
 
-- Logged-in user with 7.5h sleep, decent stages, neutral HRV: dashboard tile and 48h "Now" both read 95–100% on wake.
-- 48h dialog Drained card shows e.g. `−62%` with `Awake −56% · Activity −6%` and never exceeds 100.
-- Dashboard tile percentage equals chart "Now: X%" to the integer at any refresh.
+  const drop = points[i].battery - p.battery;
+
+  return drop > max.drop ? { drop, hour: p.timestamp } : max;
+
+}, { drop: 0, hour: null });
+
+let pattern = '';
+
+if (q4Avg > q1Avg + 10) pattern = "recharged overnight then steady";
+
+else if (q1Avg - q4Avg > 30) pattern = "started high, gradual decline";
+
+else if (Math.abs(q4Avg - q1Avg) < 10) pattern = "mostly flat";
+
+else if (q4Avg > midAvg + 10 && midAvg < q1Avg) pattern = "dipped low then recovered";
+
+else if (q4Avg > q1Avg) pattern = "climbing through the day";
+
+else if (q4Avg < 30) pattern = "low and staying low";
+
+else pattern = "gradual decline";
+
+if (maxDrop.drop > 15) {
+
+  const hour = new Date(maxDrop.hour).getHours();
+
+  pattern += `, big drop around ${hour}:00`;
+
+}
+
+```
+
+- Derive hrvVsBaseline string from readinessData.hrv and hrvBaseline: 
+
+```typescript
+
+  const hrvVsBaseline = !readinessData.hrv || !hrvBaseline 
+
+    ? "n/a"
+
+    : Math.abs(readinessData.hrv - hrvBaseline) / hrvBaseline < 0.05
+
+    ? "baseline"
+
+    : readinessData.hrv > hrvBaseline
+
+    ? `+${Math.round((readinessData.hrv - hrvBaseline) / hrvBaseline * 100)}%`
+
+    : `${Math.round((readinessData.hrv - hrvBaseline) / hrvBaseline * 100)}%`;
+
+```
+
+- Derive prevSleep from stages aggregated by date for the night before last (if present in 48h window).
+
+- New insight state: { loading: boolean; text: string | null; error: string | null }.
+
+- useEffect triggered after totals + truth-percent are set; calls supabase.functions.invoke("body-battery-insight", { body: {...} }). Single call per dialog open (key on open + readinessData?.wakeTimeIso).
+
+- Fallback string when error: `Your battery is at ${percent}% after ${hoursAwake}h awake today.`
+
+3. UI section (above legend / dialog footer)
+
+New card placed between the 48h chart container and the existing legend row:
+
+```tsx
+
+<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+
+  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary font-medium">
+
+    <Sparkles className="w-3.5 h-3.5" /> What's happening
+
+  </div>
+
+  {loading ? (
+
+    <div className="mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
+
+      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analysing your pattern…
+
+    </div>
+
+  ) : (
+
+    <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{text}</p>
+
+  )}
+
+</div>
+
+```
+
+- Sparkles from lucide-react.
+
+- Card uses semantic tokens (primary), matches dialog styling. No new colours.
+
+Out of scope
+
+- Caching insights to the DB (each open triggers a fresh call; cheap with Gemini Flash).
+
+- Streaming the response (not worth the complexity for 2–4 sentences).
+
+- Edits to readiness math, body-battery formula, or the chart itself.
+
+Acceptance
+
+- Dialog open → spinner appears below chart, replaced within ~2s with a 2–4 sentence personalised paragraph that references the user's actual numbers.
+
+- Network failure / 402 / 429 → fallback sentence renders with the live percent and hours awake.
+
+- No LOVABLE_API_KEY ever appears in the bundle; the call goes only through the edge function.
