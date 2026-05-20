@@ -9,6 +9,230 @@ const corsHeaders = {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+// ============================================================
+// Race Time Predictor — chatbot-only feature
+// ============================================================
+const RACE_PREDICTION_INTENT = /\b(predict|prediction|estimate|forecast|finish time|target time|race time|on track for|sub-?\d|how fast|what time can i|will i (?:run|finish|hit)|can i (?:do|hit|run|break))\b/i;
+
+function distanceKm(raceDistance: string | null | undefined): number {
+  const d = String(raceDistance || "").toLowerCase();
+  if (d.includes("marathon") && !d.includes("half")) return 42.195;
+  if (d.includes("half")) return 21.0975;
+  if (d.includes("10")) return 10;
+  if (d.includes("5")) return 5;
+  return 10;
+}
+function fmtTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds <= 0) return "—";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.round(seconds % 60);
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+}
+function fmtPace(secPerKm: number): string {
+  if (!isFinite(secPerKm) || secPerKm <= 0) return "—";
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return `${m}:${String(s).padStart(2, "0")}/km`;
+}
+// VO2max -> 5K time (seconds), linearly interpolated from anchor points
+function vo2maxTo5kSeconds(vo2: number): number {
+  const anchors: Array<[number, number]> = [
+    [30, 45 * 60], [35, 37 * 60], [42, 29 * 60 + 30],
+    [50, 23 * 60 + 30], [55, 21 * 60], [60, 19 * 60],
+  ];
+  if (vo2 <= anchors[0][0]) return anchors[0][1];
+  if (vo2 >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [v1, t1] = anchors[i]; const [v2, t2] = anchors[i + 1];
+    if (vo2 >= v1 && vo2 <= v2) return t1 + ((vo2 - v1) / (v2 - v1)) * (t2 - t1);
+  }
+  return 30 * 60;
+}
+function riegel(t1Sec: number, d1Km: number, d2Km: number): number {
+  return t1Sec * Math.pow(d2Km / d1Km, 1.06);
+}
+
+interface PredictionResult {
+  raceDistance: string;
+  distanceKm: number;
+  conservative: number; target: number; stretch: number;
+  paceSecPerKm: number;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  basis: string[];
+  caveats: string[];
+  validationDate?: string;
+  block: string;
+}
+
+function buildPrediction(opts: {
+  activities: any[];
+  metrics: any[];
+  plan: any | null;
+  readinessScores: number[];
+  athleteContext: string;
+}): PredictionResult | { insufficient: true; raceDistance: string; goalTime: string | null; block: string } {
+  const { activities, metrics, plan, readinessScores, athleteContext } = opts;
+  const raceDistance = plan?.race_distance || "10K";
+  const dKm = distanceKm(raceDistance);
+  const goalTime = plan?.goal_time || null;
+
+  const now = Date.now();
+  const within = (a: any, days: number) =>
+    a.start_time && now - new Date(a.start_time).getTime() <= days * 86400000;
+
+  const runs = (activities || []).filter((a) =>
+    /run/i.test(a.activity_type || "") && Number(a.distance_meters || 0) > 800 && Number(a.duration_seconds || 0) > 300
+  );
+  const last21 = runs.filter((a) => within(a, 21));
+
+  // Insufficient data
+  if (last21.length < 3) {
+    return {
+      insufficient: true,
+      raceDistance,
+      goalTime,
+      block:
+        `RACE_TIME_PREDICTION (insufficient data):\n` +
+        `The user has only ${last21.length} completed run(s) in the last 21 days. ` +
+        `Tell them: "I need at least 2-3 completed workouts to give you a reliable estimate. ` +
+        `Your plan targets ${goalTime || "a ${raceDistance} finish"} — let's see how the first few sessions feel."`,
+    };
+  }
+
+  // Easy pace: runs with HR <= 145 OR slowest 50% by pace
+  const paceOf = (a: any) => Number(a.duration_seconds) / (Number(a.distance_meters) / 1000); // sec/km
+  const easyCandidates = last21
+    .filter((a) => !a.avg_heart_rate || Number(a.avg_heart_rate) <= 150)
+    .map(paceOf).filter((p) => isFinite(p) && p > 240 && p < 900)
+    .sort((a, b) => a - b);
+  const easyPace = easyCandidates.length
+    ? easyCandidates[Math.floor(easyCandidates.length / 2)]
+    : null;
+
+  // Tempo / race-pace: fastest sustained run >= 15 min in last 14 days
+  const tempoCandidates = runs
+    .filter((a) => within(a, 14) && Number(a.duration_seconds) >= 900)
+    .map(paceOf).filter((p) => isFinite(p) && p > 180 && p < 600)
+    .sort((a, b) => a - b);
+  const tempoPace = tempoCandidates.length ? tempoCandidates[0] : null;
+
+  // VO2max
+  const vo2 = (metrics || []).find((m) => m.vo2_max != null)?.vo2_max;
+  const vo2Num = vo2 != null ? Number(vo2) : null;
+
+  // Build estimates (sec)
+  const estimates: Array<{ src: string; time: number; weight: number }> = [];
+  if (tempoPace) {
+    const offsets: Record<string, number> = { "5K": -15, "10K": -8, "Half Marathon": 5, "Marathon": 20 };
+    const offset = offsets[raceDistance] ?? 0;
+    estimates.push({ src: "tempo", time: (tempoPace + offset) * dKm, weight: 0.5 });
+  }
+  if (vo2Num) {
+    const t5k = vo2maxTo5kSeconds(vo2Num);
+    estimates.push({ src: "vo2max", time: dKm === 5 ? t5k : riegel(t5k, 5, dKm), weight: 0.3 });
+  }
+  if (easyPace) {
+    const offsets: Record<string, number> = { "5K": -75, "10K": -75, "Half Marathon": -90, "Marathon": -90 };
+    const offset = offsets[raceDistance] ?? -75;
+    estimates.push({ src: "easy", time: (easyPace + offset) * dKm, weight: 0.2 });
+  }
+  if (estimates.length === 0) {
+    return {
+      insufficient: true, raceDistance, goalTime,
+      block: `RACE_TIME_PREDICTION (insufficient data): No usable pace or VO2max data. Goal: ${goalTime || "n/a"}.`,
+    };
+  }
+
+  const totalWeight = estimates.reduce((s, e) => s + e.weight, 0);
+  let T = estimates.reduce((s, e) => s + e.time * e.weight, 0) / totalWeight;
+
+  // Plan progression bonus
+  let weeksCompleted = 0;
+  if (plan?.start_date) {
+    weeksCompleted = Math.max(0, (Date.now() - new Date(plan.start_date).getTime()) / (7 * 86400000));
+    T *= 1 - Math.min(weeksCompleted * 0.0125, 0.08);
+  }
+
+  // Adherence penalty (rough: completed/expected scheduled days assuming training_days frequency)
+  let adherence = 1;
+  if (plan?.training_days && Array.isArray(plan.training_days) && weeksCompleted > 0) {
+    const expected = Math.max(1, Math.round(weeksCompleted) * plan.training_days.length);
+    const completed = runs.filter((a) => plan.start_date && new Date(a.start_time) >= new Date(plan.start_date)).length;
+    adherence = Math.min(1, completed / expected);
+    if (adherence < 0.7) T *= 1 + (0.7 - adherence) * 0.33;
+  }
+
+  // Readiness modifier
+  const meanReadiness = readinessScores.length
+    ? readinessScores.reduce((s, n) => s + n, 0) / readinessScores.length : null;
+  if (meanReadiness != null) {
+    if (meanReadiness < 55) T *= 1.02;
+    else if (meanReadiness > 80) T *= 0.99;
+  }
+
+  const conservative = T * 1.04;
+  const stretch = T * 0.97;
+  const paceSecPerKm = T / dKm;
+
+  // Confidence
+  const hasIntensitySession = tempoCandidates.length > 0 && runs.some((a) => within(a, 14) && Number(a.avg_heart_rate || 0) >= 160);
+  const completedLast21 = last21.length;
+  let confidence: "HIGH" | "MEDIUM" | "LOW" = "LOW";
+  if (hasIntensitySession && completedLast21 >= 6) confidence = "HIGH";
+  else if (completedLast21 >= 4 || vo2Num) confidence = "MEDIUM";
+  if (weeksCompleted < 3 && !vo2Num) confidence = "LOW";
+
+  // Validation date: next intensity session in plan content
+  let validationDate: string | undefined;
+  if (plan?.content) {
+    const re = /^#{2,4}\s+.*?\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/gm;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const matches = Array.from(String(plan.content).matchAll(re));
+    for (const m of matches) {
+      const idx = m.index ?? 0;
+      const block = String(plan.content).slice(idx, idx + 600);
+      if (/tempo|race pace|threshold|interval|time trial/i.test(block)) {
+        const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        if (d.getTime() >= today.getTime()) {
+          validationDate = `${m[1].padStart(2, "0")}/${m[2].padStart(2, "0")}/${m[3]}`;
+          break;
+        }
+      }
+    }
+  }
+
+  const basis: string[] = [];
+  if (tempoPace) basis.push(`tempo pace ${fmtPace(tempoPace)}`);
+  if (vo2Num) basis.push(`VO2max ${Math.round(vo2Num)}`);
+  if (easyPace) basis.push(`easy pace ${fmtPace(easyPace)}`);
+  if (weeksCompleted >= 1) basis.push(`week ${Math.round(weeksCompleted)} of plan`);
+  if (adherence < 1) basis.push(`${Math.round(adherence * 100)}% adherence`);
+
+  const caveats: string[] = [];
+  if (meanReadiness != null && meanReadiness < 50) caveats.push("recent readiness is low — assumes healthy race-day execution");
+  if (/injur|pain|sore/i.test(athleteContext || "")) caveats.push("injury flagged in profile — prediction assumes healthy execution");
+
+  const block =
+    `RACE_TIME_PREDICTION (use this VERBATIM if the user asked about race time / predicted finish / "on track for"; lead the reply with this block, then ONE short coaching sentence):\n` +
+    `🎯 Target: ${fmtTime(T)} (${fmtPace(paceSecPerKm)})\n` +
+    `💪 Stretch: ${fmtTime(stretch)} (if everything clicks${validationDate ? ` — validate on ${validationDate}` : ""})\n` +
+    `✅ Conservative: ${fmtTime(conservative)} (safe finish)\n\n` +
+    `Based on: ${basis.join(" · ") || "limited data"}\n` +
+    `Confidence: ${confidence}${confidence === "LOW" ? " — limited data" : confidence === "MEDIUM" ? " — need more intensity data" : ""}\n` +
+    (validationDate ? `Key validation: planned intensity session on ${validationDate}\n` : "") +
+    (caveats.length ? `⚠️ ${caveats.join("; ")}\n` : "") +
+    (goalTime ? `Plan goal: ${goalTime}\n` : "");
+
+  return {
+    raceDistance, distanceKm: dKm,
+    conservative, target: T, stretch, paceSecPerKm,
+    confidence, basis, caveats, validationDate, block,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
