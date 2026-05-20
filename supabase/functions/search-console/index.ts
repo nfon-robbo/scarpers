@@ -33,16 +33,21 @@ Deno.serve(async (req) => {
     if (!roles || roles.length === 0) return json({ error: 'Forbidden' }, 403)
 
     // Parse optional date range (in days). Allowed: 7, 28, 90. Default 28.
+    // Optional `page` filter: when present, return only queries for that page URL.
     let days = 28
+    let pageFilter: string | null = null
     try {
       if (req.method === 'POST') {
         const body = await req.json().catch(() => ({}))
         const d = Number(body?.days)
         if ([7, 28, 90].includes(d)) days = d
+        if (typeof body?.page === 'string' && body.page.startsWith('http')) pageFilter = body.page
       } else {
         const url = new URL(req.url)
         const d = Number(url.searchParams.get('days'))
         if ([7, 28, 90].includes(d)) days = d
+        const p = url.searchParams.get('page')
+        if (p && p.startsWith('http')) pageFilter = p
       }
     } catch { /* ignore */ }
 
@@ -56,15 +61,30 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     }
 
-    const query = async (dimensions: string[], rowLimit = 100) => {
+    const query = async (dimensions: string[], rowLimit = 100, filters?: any[]) => {
+      const payload: any = { startDate: startD, endDate: end, dimensions, rowLimit }
+      if (filters && filters.length) payload.dimensionFilterGroups = [{ filters }]
       const r = await fetch(`${GATEWAY}/sites/${SITE_ENC}/searchAnalytics/query`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ startDate: startD, endDate: end, dimensions, rowLimit }),
+        body: JSON.stringify(payload),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(`GSC ${dimensions.join(',')} [${r.status}]: ${JSON.stringify(d)}`)
       return d.rows ?? []
+    }
+
+    if (pageFilter) {
+      const rows = await query(['query'], 50, [
+        { dimension: 'page', operator: 'equals', expression: pageFilter },
+      ])
+      return json({
+        site: SITE,
+        range: { start: startD, end, days },
+        page: pageFilter,
+        byQuery: rows,
+        fetchedAt: new Date().toISOString(),
+      })
     }
 
     const [byQuery, byPage, byDate, totals, sitemaps] = await Promise.all([
