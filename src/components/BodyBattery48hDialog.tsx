@@ -328,24 +328,22 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     });
   }, [open, user, readinessData]);
 
-  // Fetch AI insight once data + totals are ready.
+  // Reset insight & ref when dialog reopens
   useEffect(() => {
-    if (!open || !user || !totals || points.length === 0 || !readinessData) return;
-
-    const last = points[points.length - 1];
-    const percent = last.battery;
-    const status = percent >= 75 ? "high" : percent >= 50 ? "moderate" : percent >= 25 ? "low" : "depleted";
-
-    // First post-sleep point ≈ start-of-day battery
-    let startPercent = percent;
-    for (let i = 0; i < points.length; i++) {
-      if (points[i].state !== "sleep" && (i === 0 || points[i - 1].state === "sleep")) {
-        startPercent = points[i].battery;
-        break;
-      }
+    if (!open) {
+      insightKeyRef.current = null;
+      setInsight({ loading: false, text: null });
     }
+  }, [open]);
 
-    // Pattern detection
+  // Fetch AI insight once truth + points + readinessData are ready (single call per open).
+  useEffect(() => {
+    if (!open || !user || !truth || points.length === 0 || !readinessData) return;
+    const key = `${open}|${readinessData?.wakeTimeIso ?? "no-wake"}|${truth.percent}`;
+    if (insightKeyRef.current === key) return;
+    insightKeyRef.current = key;
+
+    // Pattern detection from chart points
     const q = Math.max(1, Math.floor(points.length / 4));
     const avg = (arr: HourPoint[]) => arr.reduce((s, p) => s + p.battery, 0) / arr.length;
     const q1 = avg(points.slice(0, q));
@@ -375,23 +373,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       else hrvVsBaseline = diffPct > 0 ? `+${diffPct}%` : `${diffPct}%`;
     }
 
-    const fallback = `Your battery is at ${percent}% after ${totals.hoursSinceWake.toFixed(1)}h awake today.`;
+    const fallback = `Your battery is at ${truth.percent}% after ${truth.hoursAwake.toFixed(1)}h awake today.`;
     setInsight({ loading: true, text: null });
 
     supabase.functions
       .invoke("body-battery-insight", {
         body: {
-          percent,
-          status,
-          hoursAwake: totals.hoursSinceWake,
-          startPercent,
+          percent: truth.percent,
+          status: truth.status,
+          startPercent: truth.startPercent,
+          hoursAwake: truth.hoursAwake,
           sleepHours: readinessData.sleepHours ?? 0,
           deepPct: readinessData.deepPct ?? 0,
           remPct: readinessData.remPct ?? 0,
           hrvVsBaseline,
-          drainAwake: totals.drainAwake,
-          drainActive: totals.drainActive,
-          prevSleep: null,
+          drainAwake: truth.drainAwake,
+          drainActive: truth.drainActive,
+          prevSleep,
           pattern,
         },
       })
@@ -400,7 +398,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         else setInsight({ loading: false, text: data.insight });
       })
       .catch(() => setInsight({ loading: false, text: fallback }));
-  }, [open, user, totals, points, readinessData]);
+  }, [open, user, truth, points, readinessData, prevSleep]);
+
 
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.label);
 
