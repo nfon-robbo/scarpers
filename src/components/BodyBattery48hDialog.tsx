@@ -44,11 +44,7 @@ interface Totals {
 }
 
 function passiveDrainForHour(hoursAwake: number): number {
-  if (hoursAwake <= 4) return 1;
-  if (hoursAwake <= 8) return 1.5;
-  if (hoursAwake <= 12) return 2;
-  if (hoursAwake <= 16) return 2.5;
-  return 3;
+  return passiveDrainRate(hoursAwake);
 }
 
 const COLORS = {
