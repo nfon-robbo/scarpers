@@ -237,12 +237,17 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-  // Cron-only — accept service role or anon key bearer.
   const authHeader = req.headers.get("Authorization") ?? "";
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!provided || (provided !== SUPABASE_SERVICE_ROLE_KEY && provided !== ANON_KEY)) {
+  if (!provided) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const gateClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: ok, error: gateErr } = await gateClient.rpc("cron_token_matches", { _token: provided });
+  if (gateErr || ok !== true) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
