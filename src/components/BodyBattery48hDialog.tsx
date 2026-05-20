@@ -165,7 +165,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
       const stepMin = 15;
       const stepMs = stepMin * 60_000;
-      const totalSteps = (48 * 60) / stepMin;
+      const totalSteps = (47 * 60) / stepMin;
+      const nowMs = now.getTime();
 
       let battery = 60;
       let hoursAwake = 6;
@@ -192,6 +193,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
       for (let i = 0; i <= totalSteps; i++) {
         const t = startMs + i * stepMs;
+        if (t > nowMs) break;
         const sleep = sleepAt(t);
         const actDrain = activityAt(t);
 
