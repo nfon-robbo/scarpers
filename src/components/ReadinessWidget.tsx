@@ -961,31 +961,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
             return (
                 <div className="flex flex-col md:flex-row gap-5">
-                {/* Left column: gauge + readiness trend hidden while readiness score UI is disabled. */}
-                <div className="hidden flex-col items-stretch shrink-0 md:w-[360px] gap-4">
-                  {/* Gauge hidden — keep mounted in DOM-free form for future re-enable.
+                {/* Left column: gauge + (optional) readiness trend */}
+                <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   <div className="relative flex items-center justify-center">
-                    <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
-                      <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
-                    </div> */}
-                  <div className="relative items-center justify-center hidden">
-                    <div className={cn(suppressScore && "opacity-25 blur-[1px]")}>
-                      <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
-                    </div>
+                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
                     {suppressScore && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="rotate-[-8deg] border-2 border-yellow-400/80 rounded-md px-3 py-2 bg-yellow-400/10 backdrop-blur-sm shadow-lg max-w-[200px] text-center">
-                          <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-yellow-300 flex items-center justify-center gap-1.5">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Waiting for data
-                          </div>
-                          <div className="text-[11px] font-semibold text-yellow-100 leading-tight mt-1">
-                            {awaiting.join(" · ")}
-                          </div>
-                          <div className="text-[9px] font-normal text-yellow-200/80 leading-snug mt-1.5 normal-case tracking-normal">
-                            Check back shortly once your watch has synced.
-                          </div>
-                        </div>
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        Syncing {awaiting.join(", ")}
                       </div>
                     )}
                   </div>
