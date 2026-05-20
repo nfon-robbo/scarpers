@@ -22,6 +22,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
+import { RaceTimePredictorWidget } from "@/components/RaceTimePredictorWidget";
 import RaceTimeEstimate from "@/components/RaceTimeEstimate";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
@@ -1990,6 +1991,7 @@ const TrainingPlanPage = () => {
             raceDateIso={raceDate ? toLocalISODate(raceDate) : null}
           />
         )}
+        {content && !loading && <RaceTimePredictorWidget />}
         {content && !loading && (
           <div className="flex flex-wrap gap-2">
             {Object.keys(linkedActivities).length > 0 && (
