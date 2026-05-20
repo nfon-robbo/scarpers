@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import {
@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { passiveDrainRate, activityDrain, initialBatteryFromSleep, computeBodyBattery } from "@/lib/body-battery";
+import { passiveDrainRate, activityDrain, initialBatteryFromSleep, computeBodyBattery, type BodyBatteryResult } from "@/lib/body-battery";
 import type { ReadinessData } from "@/lib/readiness";
 
 interface Props {
