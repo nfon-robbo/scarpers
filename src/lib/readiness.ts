@@ -1,4 +1,5 @@
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
+import { computeBodyBattery, type BodyBatteryResult } from "@/lib/body-battery";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
