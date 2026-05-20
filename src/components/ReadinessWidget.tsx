@@ -885,7 +885,40 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           {(() => {
             // Compute dynamic status label + sub-message
             const score = displayResult.score;
-            const statusLabel = score >= 80 ? "Excellent" : score >= 60 ? "Good" : score > 30 ? "Moderate" : "Low";
+            const statusLabel =
+              score >= 85 ? "Excellent" :
+              score >= 70 ? "Good" :
+              score >= 55 ? "Moderate" :
+              score >= 40 ? "Fair" : "Poor";
+
+            // Primary driver — pick worst factor when score is low, best when high.
+            const factors = displayResult.factors || [];
+            let driver = "";
+            if (score >= 70) {
+              const goods = factors.filter((f) => f.status === "good");
+              const pick = goods[0] ?? factors[0];
+              if (pick) {
+                if (pick.label === "HRV") driver = "HRV strong";
+                else if (pick.label === "Sleep Quality") driver = "Sleep quality on point";
+                else if (pick.label === "Deep Sleep") driver = "Deep sleep healthy";
+                else if (pick.label === "Resting HR") driver = "Resting HR at baseline";
+                else if (pick.label === "Yesterday's Load") driver = "Fresh from yesterday";
+                else driver = "Strong recovery";
+              }
+            } else {
+              const worst = factors.find((f) => f.status === "poor") ?? factors.find((f) => f.status === "warning");
+              if (worst) {
+                if (worst.label === "Sleep Quality") driver = "Sleep quality low";
+                else if (worst.label === "HRV") driver = "HRV suppressed";
+                else if (worst.label === "Deep Sleep") driver = "Deep sleep low";
+                else if (worst.label === "Resting HR") driver = "Resting HR elevated";
+                else if (worst.label === "Yesterday's Load") driver = "Yesterday's load heavy";
+                else if (worst.label === "Body Battery") driver = "Battery running low";
+                else if (worst.label === "Sleep Debt") driver = "Sleep debt building";
+                else if (worst.label === "Today's Effort") driver = "Today's effort logged";
+                else driver = `${worst.label} flagged`;
+              }
+            }
 
             let message = "";
             let showReview = false;
@@ -911,6 +944,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
             const subNode = (
               <div className="flex flex-col items-center gap-1">
+                {driver && <span className="text-slate-300 text-[11px] font-medium leading-snug">{driver}</span>}
                 <span className="text-slate-400 text-[11px] leading-snug">{message}</span>
                 {showReview && onReviewPlan && (
                   <button
@@ -923,6 +957,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 )}
               </div>
             );
+
 
             return (
                 <div className="flex flex-col md:flex-row gap-5">
