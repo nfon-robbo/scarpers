@@ -531,12 +531,13 @@ const AdminSEO = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Top pages</CardTitle>
-                  <CardDescription>Which pages on your site Google is showing</CardDescription>
+                  <CardDescription>Click a row to see the search terms Google showed it for.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-6"></TableHead>
                         <TableHead>Page</TableHead>
                         <TableHead>Clicks</TableHead>
                         <TableHead>Impressions</TableHead>
@@ -546,21 +547,76 @@ const AdminSEO = () => {
                     </TableHeader>
                     <TableBody>
                       {gsc.byPage.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-sm text-muted-foreground">No page data yet.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-sm text-muted-foreground">No page data yet.</TableCell></TableRow>
                       )}
-                      {gsc.byPage.map((r) => (
-                        <TableRow key={r.keys?.[0]}>
-                          <TableCell className="font-mono text-xs"><a href={r.keys?.[0]} target="_blank" rel="noopener noreferrer" className="hover:underline">{r.keys?.[0]}</a></TableCell>
-                          <TableCell>{fmtNum(r.clicks)}</TableCell>
-                          <TableCell>{fmtNum(r.impressions)}</TableCell>
-                          <TableCell>{fmtPct(r.ctr)}</TableCell>
-                          <TableCell>{fmtPos(r.position)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {gsc.byPage.map((r) => {
+                        const url = r.keys?.[0] ?? "";
+                        const isOpen = expandedPage === url;
+                        const pq = pageQueries[url];
+                        return (
+                          <Fragment key={url}>
+                            <TableRow
+                              className="cursor-pointer hover:bg-muted/40"
+                              onClick={() => togglePageQueries(url)}
+                            >
+                              <TableCell>{isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}</TableCell>
+                              <TableCell className="font-mono text-xs">
+                                <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline" onClick={(e) => e.stopPropagation()}>{url}</a>
+                              </TableCell>
+                              <TableCell>{fmtNum(r.clicks)}</TableCell>
+                              <TableCell>{fmtNum(r.impressions)}</TableCell>
+                              <TableCell>{fmtPct(r.ctr)}</TableCell>
+                              <TableCell>{fmtPos(r.position)}</TableCell>
+                            </TableRow>
+                            {isOpen && (
+                              <TableRow>
+                                <TableCell colSpan={6} className="bg-muted/20">
+                                  {pq?.loading && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                                      <Loader2 className="h-3 w-3 animate-spin" /> Loading search terms…
+                                    </div>
+                                  )}
+                                  {pq?.error && (
+                                    <p className="text-xs text-destructive py-2">{pq.error}</p>
+                                  )}
+                                  {pq?.rows && pq.rows.length === 0 && (
+                                    <p className="text-xs text-muted-foreground py-2">No query data — Google hasn't reported any search terms for this page yet.</p>
+                                  )}
+                                  {pq?.rows && pq.rows.length > 0 && (
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Search term</TableHead>
+                                          <TableHead>Clicks</TableHead>
+                                          <TableHead>Impressions</TableHead>
+                                          <TableHead>CTR</TableHead>
+                                          <TableHead>Avg position</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {pq.rows.map((q) => (
+                                          <TableRow key={`${url}-${q.keys?.[0]}`}>
+                                            <TableCell className="font-medium">{q.keys?.[0]}</TableCell>
+                                            <TableCell>{fmtNum(q.clicks)}</TableCell>
+                                            <TableCell>{fmtNum(q.impressions)}</TableCell>
+                                            <TableCell>{fmtPct(q.ctr)}</TableCell>
+                                            <TableCell>{fmtPos(q.position)}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
+
 
               {gsc.sitemaps.length > 0 && (
                 <Card>
