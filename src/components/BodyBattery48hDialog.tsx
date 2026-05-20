@@ -610,7 +610,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS.active }} /> Activity drain
               </span>
               <span className="ml-auto">
-                Now: <strong className="text-foreground">{points[points.length - 1]?.battery}%</strong>
+                Now: <strong className="text-foreground">{truth?.percent ?? points[points.length - 1]?.battery}%</strong>
               </span>
             </div>
           </div>
