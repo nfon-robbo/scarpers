@@ -550,6 +550,22 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+            </div>
+
+            {/* AI insight */}
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary font-medium">
+                <Sparkles className="w-3.5 h-3.5" /> What's happening
+              </div>
+              {insight.loading ? (
+                <div className="mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analysing your pattern…
+                </div>
+              ) : (
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{insight.text}</p>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS.sleep }} /> Recharging (sleep)
