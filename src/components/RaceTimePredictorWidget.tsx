@@ -121,21 +121,21 @@ export function RaceTimePredictorWidget() {
   }, [targetAngle]);
 
   return (
-    <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-3 space-y-2 max-w-xl mx-auto">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-primary/10 border border-primary/20 p-1.5">
-            <Target className="w-4 h-4 text-primary" />
+          <div className="rounded-md bg-primary/10 border border-primary/20 p-1">
+            <Target className="w-3.5 h-3.5 text-primary" />
           </div>
-          <h3 className="font-display tracking-wide text-sm uppercase">Estimated {distance} Time</h3>
+          <h3 className="font-display tracking-wide text-xs uppercase">Estimated {distance} Time</h3>
         </div>
-        <div className="flex gap-1 rounded-lg bg-muted/40 p-1">
+        <div className="flex gap-0.5 rounded-md bg-muted/40 p-0.5">
           {DISTANCES.map((d) => (
             <button
               key={d}
               onClick={() => setDistance(d)}
               className={cn(
-                "text-xs px-2.5 py-1 rounded-md transition-colors",
+                "text-[11px] px-2 py-0.5 rounded transition-colors",
                 distance === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -146,7 +146,7 @@ export function RaceTimePredictorWidget() {
       </div>
 
       <div className="relative flex justify-center">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-sm h-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[260px] h-auto">
           {/* Background track */}
           <path d={arcPath(0, 180)} stroke="hsl(var(--muted))" strokeOpacity="0.25" strokeWidth="22" fill="none" strokeLinecap="round" />
           {/* Green band (best) */}
