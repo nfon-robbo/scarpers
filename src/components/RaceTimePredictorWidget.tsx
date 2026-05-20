@@ -148,16 +148,16 @@ export function RaceTimePredictorWidget() {
       <div className="relative flex justify-center">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[260px] h-auto">
           {/* Background track */}
-          <path d={arcPath(0, 180)} stroke="hsl(var(--muted))" strokeOpacity="0.25" strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={arcPath(0, 180)} stroke="hsl(var(--muted))" strokeOpacity="0.25" strokeWidth="16" fill="none" strokeLinecap="round" />
           {/* Green band (best) */}
-          <path d={arcPath(0, greenEnd)} stroke="hsl(142 70% 40%)" strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={arcPath(0, greenEnd)} stroke="hsl(142 70% 40%)" strokeWidth="16" fill="none" strokeLinecap="round" />
           {/* Amber band (target zone) */}
           {amberEnd > greenEnd && (
-            <path d={arcPath(greenEnd, amberEnd)} stroke="hsl(38 80% 45%)" strokeWidth="22" fill="none" />
+            <path d={arcPath(greenEnd, amberEnd)} stroke="hsl(38 80% 45%)" strokeWidth="16" fill="none" />
           )}
           {/* Red band (worst) */}
           {amberEnd < 180 && (
-            <path d={arcPath(amberEnd, 180)} stroke="hsl(0 65% 40%)" strokeWidth="22" fill="none" strokeLinecap="round" />
+            <path d={arcPath(amberEnd, 180)} stroke="hsl(0 65% 40%)" strokeWidth="16" fill="none" strokeLinecap="round" />
           )}
 
           {/* Goal marker */}
@@ -196,7 +196,7 @@ export function RaceTimePredictorWidget() {
             </text>
           ) : target != null ? (
             <g>
-              <text x={CX} y={CY - 60} fill="hsl(var(--foreground))" fontSize="26" fontWeight="700" textAnchor="middle">
+              <text x={CX} y={CY - 60} fill="hsl(var(--foreground))" fontSize="22" fontWeight="700" textAnchor="middle">
                 {fmt(target)}
               </text>
               <text x={CX} y={CY - 42} fill="hsl(var(--muted-foreground))" fontSize="11" textAnchor="middle">
