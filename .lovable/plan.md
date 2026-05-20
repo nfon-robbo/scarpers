@@ -1,141 +1,61 @@
-- Surfaces 402/429 to the client as { error, code } so the UI can render a fallback.
+Goal
 
-- Deployed via supabase--deploy_edge_functions after writing.
+Make the 48h dialog show the same numbers as the dashboard tile (Now %, hours awake, Awake drain, Activity drain), and rebuild the body-battery-insight edge function with strict prompts and Zod validation.
 
-supabase/config.toml — no change needed (defaults apply).
+1. Edge function — supabase/functions/body-battery-insight/index.ts (complete rewrite)
 
-2. Wire UI in BodyBattery48hDialog.tsx
+Replace current implementation with:
 
-After data loads (after setTotals), compute the chart "pattern" string from points:
+- CORS via import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-```typescript
+- Auth: validate Bearer token via createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization } } }) + auth.getUser(). Return 401 if missing.
 
-// Pattern detection logic
+- Body validation with Zod (npm:zod):
 
-const q1Avg = points.slice(0, Math.floor(points.length/4))
+  - percent, startPercent, hoursAwake, sleepHours, deepPct, remPct, drainAwake, drainActive → number
 
-  .reduce((sum, p) => sum + p.battery, 0) / Math.floor(points.length/4);
+  - status, hrvVsBaseline, pattern → string
 
-const midAvg = points.slice(Math.floor(points.length/3), Math.floor(2*points.length/3))
+  - prevSleep → optional { hours: number, deepPct: number, remPct: number } or null
 
-  .reduce((sum, p) => sum + p.battery, 0) / Math.floor(points.length/3);
+  - Return 400 with { error: <flattened Zod errors> } on validation failure
 
-const q4Avg = points.slice(Math.floor(3*points.length/4))
-
-  .reduce((sum, p) => sum + p.battery, 0) / (points.length - Math.floor(3*points.length/4));
-
-// Find largest hour-over-hour drop
-
-const maxDrop = points.slice(1).reduce((max, p, i) => {
-
-  const drop = points[i].battery - p.battery;
-
-  return drop > max.drop ? { drop, hour: p.timestamp } : max;
-
-}, { drop: 0, hour: null });
-
-let pattern = '';
-
-if (q4Avg > q1Avg + 10) pattern = "recharged overnight then steady";
-
-else if (q1Avg - q4Avg > 30) pattern = "started high, gradual decline";
-
-else if (Math.abs(q4Avg - q1Avg) < 10) pattern = "mostly flat";
-
-else if (q4Avg > midAvg + 10 && midAvg < q1Avg) pattern = "dipped low then recovered";
-
-else if (q4Avg > q1Avg) pattern = "climbing through the day";
-
-else if (q4Avg < 30) pattern = "low and staying low";
-
-else pattern = "gradual decline";
-
-if (maxDrop.drop > 15) {
-
-  const hour = new Date(maxDrop.hour).getHours();
-
-  pattern += `, big drop around ${hour}:00`;
-
-}
-
-```
-
-- Derive hrvVsBaseline string from readinessData.hrv and hrvBaseline: 
+- AI call via AI SDK (use this approach, not the existing callAI helper):
 
 ```typescript
 
-  const hrvVsBaseline = !readinessData.hrv || !hrvBaseline 
+import { generateText } from "npm:ai";
 
-    ? "n/a"
+import { createOpenAICompatible } from "npm:@ai-sdk/openai-compatible";
 
-    : Math.abs(readinessData.hrv - hrvBaseline) / hrvBaseline < 0.05
+const provider = createOpenAICompatible({
 
-    ? "baseline"
+  name: "lovable",
 
-    : readinessData.hrv > hrvBaseline
+  baseURL: "[https://ai.gateway.lovable.dev/v1](https://ai.gateway.lovable.dev/v1)",
 
-    ? `+${Math.round((readinessData.hrv - hrvBaseline) / hrvBaseline * 100)}%`
+  headers: {
 
-    : `${Math.round((readinessData.hrv - hrvBaseline) / hrvBaseline * 100)}%`;
+    "Lovable-API-Key": Deno.env.get("LOVABLE_API_KEY")!,
 
-```
+    "X-Lovable-AIG-SDK": "vercel-ai-sdk",
 
-- Derive prevSleep from stages aggregated by date for the night before last (if present in 48h window).
+  },
 
-- New insight state: { loading: boolean; text: string | null; error: string | null }.
+});
 
-- useEffect triggered after totals + truth-percent are set; calls supabase.functions.invoke("body-battery-insight", { body: {...} }). Single call per dialog open (key on open + readinessData?.wakeTimeIso).
+const { text } = await generateText({
 
-- Fallback string when error: `Your battery is at ${percent}% after ${hoursAwake}h awake today.`
+  model: provider("google/gemini-3-flash-preview"),
 
-3. UI section (above legend / dialog footer)
+  system: SYSTEM_PROMPT,
 
-New card placed between the 48h chart container and the existing legend row:
+  prompt: userPrompt,
 
-```tsx
+  maxTokens: 300,
 
-<div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-
-  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-primary font-medium">
-
-    <Sparkles className="w-3.5 h-3.5" /> What's happening
-
-  </div>
-
-  {loading ? (
-
-    <div className="mt-1.5 text-sm text-muted-foreground flex items-center gap-2">
-
-      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Analysing your pattern…
-
-    </div>
-
-  ) : (
-
-    <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{text}</p>
-
-  )}
-
-</div>
+});
 
 ```
 
-- Sparkles from lucide-react.
-
-- Card uses semantic tokens (primary), matches dialog styling. No new colours.
-
-Out of scope
-
-- Caching insights to the DB (each open triggers a fresh call; cheap with Gemini Flash).
-
-- Streaming the response (not worth the complexity for 2–4 sentences).
-
-- Edits to readiness math, body-battery formula, or the chart itself.
-
-Acceptance
-
-- Dialog open → spinner appears below chart, replaced within ~2s with a 2–4 sentence personalised paragraph that references the user's actual numbers.
-
-- Network failure / 402 / 429 → fallback sentence renders with the live percent and hours awake.
-
-- No LOVABLE_API_KEY ever appears in the bundle; the call goes only through the edge function.
+- System prompt (exact wording):
