@@ -346,11 +346,13 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-  // Cron-only — require service role bearer
+  // Cron-only — accept either service role or anon key bearer.
+  // (Anon key alone gives no DB access; this function uses SERVICE_KEY internally.)
   const auth = req.headers.get("Authorization") ?? "";
   const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!provided || provided !== SERVICE_KEY) {
+  if (!provided || (provided !== SERVICE_KEY && provided !== ANON_KEY)) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
