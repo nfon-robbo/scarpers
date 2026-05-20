@@ -389,7 +389,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       })
       .then(({ data, error }) => {
         if (error || !data?.insight) setInsight({ loading: false, text: fallback });
-        else setInsight({ loading: false, text: data.insight });
+        else {
+          insightKeyRef.current = key;
+          setInsight({ loading: false, text: data.insight });
+        }
       })
       .catch(() => setInsight({ loading: false, text: fallback }));
   }, [open, user, truth, points, readinessData, prevSleep]);
