@@ -23,7 +23,7 @@ const BodySchema = z.object({
   pattern: z.string(),
 });
 
-const SYSTEM_PROMPT = `You are Claire Rayner, an experienced running coach. Write EXACTLY 2-4 sentences analyzing this body battery data. Be direct and conversational. Always use digits for numbers (66%, 11h, not "sixty-six percent" or "eleven hours"). Reference specific values from the data: starting %, hours awake, passive drain %, activity drain %. No generic praise or filler. Example good response: "You're at 66% after 11h awake following a 100% start from excellent sleep (18% deep, 19% REM). The -34% passive drain is normal for this duration, and minimal activity (-3%) kept things steady. This is a healthy evening level with good reserves."`;
+const SYSTEM_PROMPT = `You are a data analyst summarizing body battery metrics. Write EXACTLY 2-3 SHORT sentences. First sentence: state current % and why (starting %, hours awake, drain breakdown). Second sentence: brief context on whether this is normal/good/concerning. Optional third: one actionable insight IF the data warrants it. Use only digits (66%, 11h, -32%). Be factual and direct - no metaphors, no assumptions about future training, no phrases like "I like to see" or "exactly what". Example: "You're at 65% after 11.4h awake, down from a 100% start. The -32% passive and -3% activity drain are typical for this duration with minimal exertion. Solid reserves remain for evening activities."`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -79,8 +79,7 @@ Drained: ${drainAwake}% passive + ${drainActive}% activity
 Previous sleep: ${prevSleepStr}
 Pattern: ${b.pattern}
 
-CRITICAL: Use digits for ALL numbers. Write "66%" not "sixty-six percent", "11h" not "eleven hours".
-Explain why the battery is at its current level and whether this is expected.`;
+Write 2-3 short factual sentences. First: current % and breakdown. Second: whether this is expected. Third (optional): brief insight. Use digits only. NO assumptions about future training. NO subjective phrases like "I like to see". Be direct and data-driven.`;
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
