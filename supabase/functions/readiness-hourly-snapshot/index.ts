@@ -50,46 +50,88 @@ function workoutIntensity(act: any): number {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-function bodyBatteryDrain(d: ReadinessData) {
-  const now = Date.now();
-  let wakeMs = d.wakeTimeIso ? new Date(d.wakeTimeIso).getTime() : (() => { const t = new Date(); t.setHours(7, 0, 0, 0); return t.getTime(); })();
-  let hoursAwake = Math.min(20, Math.max(0, (now - wakeMs) / 3600000));
-  let passiveDrain = 0;
-  for (let h = 0; h < hoursAwake; h++) {
-    const slice = Math.min(1, hoursAwake - h);
-    passiveDrain += Math.min(3, 1 + h / 8) * slice;
-  }
-  let activeDrain = 0;
-  for (const act of d.todayActivities) activeDrain += act.intensityLoad * 0.1;
-  activeDrain = Math.min(10, activeDrain);
-  let chargeRate = 2;
-  if (d.hrv != null && d.hrvBaseline != null && d.hrvBaseline > 0) {
-    if (d.hrv > d.hrvBaseline * 1.05) chargeRate = 3;
-    else if (d.hrv < d.hrvBaseline * 0.95) chargeRate = 1;
-  }
-  let passiveCharge = 0;
-  for (let h = 0; h < hoursAwake && passiveCharge < 15; h++) {
-    const sliceStart = wakeMs + h * 3600000;
-    const sliceEnd = Math.min(now, sliceStart + 3600000);
-    const sliceHours = (sliceEnd - sliceStart) / 3600000;
-    if (sliceHours <= 0) break;
-    const windowStart = sliceStart - 2 * 3600000;
-    let recentLoad = 0;
-    for (const act of d.todayActivities) {
-      const aStart = new Date(act.startIso).getTime();
-      const aEnd = aStart + (act.durationSec || 0) * 1000;
-      if (aEnd < windowStart || aStart > sliceStart) continue;
-      const overlap = Math.max(0, Math.min(aEnd, sliceStart) - Math.max(aStart, windowStart));
-      const total = Math.max(1, aEnd - aStart);
-      recentLoad += act.intensityLoad * (overlap / total);
-    }
-    if (recentLoad < 5) passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
-  }
-  const rPassiveDrain = Math.round(passiveDrain);
-  const rActiveDrain = Math.round(activeDrain);
-  const rPassiveCharge = Math.round(passiveCharge);
-  return { drain: -(rPassiveDrain + rActiveDrain - rPassiveCharge), hoursAwake, passiveDrain: rPassiveDrain, activeDrain: rActiveDrain, passiveCharge: rPassiveCharge };
+// ── Body Battery (mirror of src/lib/body-battery.ts) ──
+function passiveDrainRate(h: number): number {
+  if (h <= 4) return 2;
+  if (h <= 8) return 3;
+  if (h <= 12) return 4;
+  return 5;
 }
+function totalPassiveDrain(hoursAwake: number): number {
+  let total = 0, h = 0;
+  while (h < hoursAwake) {
+    const slice = Math.min(1, hoursAwake - h);
+    total += passiveDrainRate(h) * slice;
+    h += slice;
+  }
+  return total;
+}
+function initialBatteryFromSleep(s: {
+  sleepScore: number | null; sleepHours: number | null; deepPct: number | null;
+  remPct?: number | null; hrv: number | null; hrvBaseline: number | null;
+  recentSleepAvgHours: number | null; baselineSleepAvgHours: number | null;
+}): number {
+  let charge = 30;
+  if (s.sleepHours != null) {
+    const h = s.sleepHours;
+    let dur: number;
+    if (h <= 0) dur = 0;
+    else if (h < 7) dur = (h / 7) * 35;
+    else if (h <= 9) dur = 35;
+    else if (h <= 10) dur = 35 - (h - 9) * 5;
+    else dur = Math.max(20, 30 - (h - 10) * 3);
+    charge += dur;
+  } else if (s.sleepScore != null) charge += (s.sleepScore / 100) * 30;
+  if (s.deepPct != null) {
+    const dp = s.deepPct;
+    charge += dp >= 15 ? 12 : dp >= 12 ? 9 : dp >= 10 ? 6 : dp >= 7 ? 3 : 0;
+  }
+  if (s.remPct != null) {
+    const rp = s.remPct;
+    charge += rp >= 20 ? 8 : rp >= 15 ? 5 : rp >= 10 ? 2 : 0;
+  } else if (s.deepPct == null && s.sleepScore != null) charge += (s.sleepScore / 100) * 10;
+  if (s.hrv != null && s.hrvBaseline != null && s.hrvBaseline > 0) {
+    const pct = ((s.hrv - s.hrvBaseline) / s.hrvBaseline) * 100;
+    charge += pct >= 10 ? 15 : pct >= 5 ? 10 : pct >= -5 ? 0 : pct >= -15 ? -8 : -15;
+  }
+  if (s.recentSleepAvgHours != null && s.baselineSleepAvgHours != null && s.baselineSleepAvgHours > 0) {
+    const debt = s.recentSleepAvgHours - s.baselineSleepAvgHours;
+    if (debt <= -1) charge -= 5;
+    else if (debt <= -0.3) charge -= 3;
+    else if (debt >= 0.5) charge += 3;
+  }
+  return Math.round(Math.max(10, Math.min(100, charge)));
+}
+function statusFor(p: number): string {
+  if (p >= 70) return "Charged"; if (p >= 40) return "Steady";
+  if (p >= 20) return "Low"; return "Drained";
+}
+function computeBodyBattery(d: ReadinessData) {
+  const now = Date.now();
+  const wakeMs = d.wakeTimeIso ? new Date(d.wakeTimeIso).getTime() : (() => { const t = new Date(); t.setHours(7, 0, 0, 0); return t.getTime(); })();
+  const hoursAwake = Math.max(0, Math.min(20, (now - wakeMs) / 3600000));
+  const startPercent = initialBatteryFromSleep({
+    sleepScore: d.sleepScore, sleepHours: d.sleepHours, deepPct: d.deepPct,
+    hrv: d.hrv, hrvBaseline: d.hrvBaseline,
+    recentSleepAvgHours: d.recentSleepAvgHours, baselineSleepAvgHours: d.baselineSleepAvgHours,
+  });
+  const passive = totalPassiveDrain(hoursAwake);
+  let active = 0;
+  for (const a of d.todayActivities) {
+    const aStart = new Date(a.startIso).getTime();
+    if (!isFinite(aStart) || aStart > now) continue;
+    active += Math.max(0, a.intensityLoad) * 0.05;
+  }
+  const percent = Math.round(Math.max(0, Math.min(100, startPercent - passive - active)));
+  return {
+    percent, startPercent,
+    drainAwake: Math.round(passive),
+    drainActive: Math.round(active),
+    hoursAwake: Math.round(hoursAwake * 10) / 10,
+    status: statusFor(percent),
+  };
+}
+
 
 function scoreLabel(s: number): string {
   if (s >= 90) return "Excellent"; if (s >= 80) return "Great"; if (s >= 70) return "Good";
@@ -197,19 +239,21 @@ function computeReadiness(d: ReadinessData, mode: "morning" | "eod") {
     modifiers.push({ label: "Today's Effort", adj: -Math.round(Math.min(12, (d.todayLoad / 60) * 8)), detail: `${Math.floor(d.todayLoad / 60)}:${String(Math.round(d.todayLoad % 60)).padStart(2, "0")} (intensity-weighted)` });
   }
 
-  const battery = bodyBatteryDrain(d);
-  let totalAdj = battery.drain;
+  const battery = computeBodyBattery(d);
+  const batteryPenalty = -Math.round(Math.min(25, (100 - battery.percent) * 0.25));
+  let totalAdj = batteryPenalty;
   for (const m of modifiers) totalAdj += m.adj;
   if (battery.hoursAwake > 0.5) {
-    const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore) + battery.passiveCharge;
-    const chargeNote = battery.passiveCharge > 0 ? ` (+${Math.round(battery.passiveCharge)} rest)` : "";
+    const status: "good" | "warning" | "poor" =
+      battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
+    const breakdown = `Started ${battery.startPercent}% · -${battery.drainAwake} awake${battery.drainActive > 0 ? ` · -${battery.drainActive} activity` : ""} (${battery.hoursAwake}h awake)`;
     factors.push({
       label: "Body Battery",
-      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged${chargeNote} · 🔋-${Math.round(drainTotal)} drained (${battery.hoursAwake.toFixed(1)}h awake)`,
+      status,
+      detail: `${battery.percent}% · ${battery.status} — ${breakdown}`,
     });
   }
+
   for (const m of modifiers) {
     if (Math.abs(m.adj) >= 3 || (m.label === "Recovery" && m.adj === 0)) {
       factors.push({ label: m.label, status: m.adj >= 0 ? "good" : m.adj >= -5 ? "warning" : "poor", detail: m.detail });

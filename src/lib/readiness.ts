@@ -1,4 +1,5 @@
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
+import { computeBodyBattery, type BodyBatteryResult } from "@/lib/body-battery";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -94,92 +95,8 @@ export function workoutIntensity(act: {
   return Math.min(100, Math.max(10, (mins / 90) * 60 + 20));
 }
 
-/** Body-battery drain & daytime charging.
- *  Passive drain ramps from 1 to 3 pts/hr based on hours awake only.
- *  When prior-2h activity load <5, the battery charges at 1-3 pts/hr
- *  (scaled by HRV vs baseline), capped at 15 pts/day. */
-function bodyBatteryDrain(d: ReadinessData): {
-  drain: number;
-  hoursAwake: number;
-  passiveDrain: number;
-  activeDrain: number;
-  passiveCharge: number;
-} {
-  const now = Date.now();
+// Battery math now lives in src/lib/body-battery.ts (shared with edge fn + 48h chart).
 
-  // Determine hours awake
-  let wakeMs: number;
-  if (d.wakeTimeIso) {
-    wakeMs = new Date(d.wakeTimeIso).getTime();
-  } else {
-    const today7am = new Date();
-    today7am.setHours(7, 0, 0, 0);
-    wakeMs = today7am.getTime();
-  }
-  let hoursAwake = Math.max(0, (now - wakeMs) / 3600000);
-  hoursAwake = Math.min(20, hoursAwake); // 20h cap unchanged
-
-  // ── Passive drain: hours-awake-only ramp from 1 → 3 pts/hr ──
-  // rate = min(3, 1 + hoursAwake/8) integrated hour-by-hour
-  let passiveDrain = 0;
-  for (let h = 0; h < hoursAwake; h++) {
-    const slice = Math.min(1, hoursAwake - h);
-    const rate = Math.min(3, 1 + h / 8);
-    passiveDrain += rate * slice;
-  }
-
-  // ── Active drain (unchanged) ──
-  let activeDrain = 0;
-  for (const act of d.todayActivities) {
-    activeDrain += act.intensityLoad * 0.1;
-  }
-  activeDrain = Math.min(10, activeDrain);
-
-  // ── Daytime charging ──
-  // For each hour-slice since wake, if prior-2h intensity load <5,
-  // charge at 1/2/3 pts based on HRV vs baseline. Cap total at 15 pts.
-  let passiveCharge = 0;
-  let chargeRate = 2; // at baseline
-  if (d.hrv != null && d.hrvBaseline != null && d.hrvBaseline > 0) {
-    if (d.hrv > d.hrvBaseline * 1.05) chargeRate = 3;
-    else if (d.hrv < d.hrvBaseline * 0.95) chargeRate = 1;
-  }
-
-  for (let h = 0; h < hoursAwake && passiveCharge < 15; h++) {
-    const sliceStart = wakeMs + h * 3600000;
-    const sliceEnd = Math.min(now, sliceStart + 3600000);
-    const sliceHours = (sliceEnd - sliceStart) / 3600000;
-    if (sliceHours <= 0) break;
-
-    // Intensity-weighted minutes in the prior 2h window
-    const windowStart = sliceStart - 2 * 3600000;
-    let recentLoad = 0;
-    for (const act of d.todayActivities) {
-      const aStart = new Date(act.startIso).getTime();
-      const aEnd = aStart + (act.durationSec || 0) * 1000;
-      if (aEnd < windowStart || aStart > sliceStart) continue;
-      const overlap = Math.max(0, Math.min(aEnd, sliceStart) - Math.max(aStart, windowStart));
-      const total = Math.max(1, aEnd - aStart);
-      recentLoad += act.intensityLoad * (overlap / total);
-    }
-
-    if (recentLoad < 5) {
-      passiveCharge = Math.min(15, passiveCharge + chargeRate * sliceHours);
-    }
-  }
-
-  const netDrain = passiveDrain + activeDrain - passiveCharge;
-  // Cap maximum net drain at 25 points so a hard day cannot single-handedly crush the score
-  const cappedDrain = Math.min(25, netDrain);
-
-  return {
-    drain: -cappedDrain,
-    hoursAwake: Math.round(hoursAwake * 10) / 10,
-    passiveDrain: Math.round(passiveDrain),
-    activeDrain: Math.round(activeDrain),
-    passiveCharge: Math.round(passiveCharge),
-  };
-}
 
 // ── Main scoring ───────────────────────────────────────────────────────
 
@@ -377,26 +294,38 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     });
   }
 
-  // Body battery drain (replaces old circadian modifier)
-  const battery = bodyBatteryDrain(d);
+  // Body battery (phone-style 0-100% reserve)
+  const battery = computeBodyBattery({
+    sleep: {
+      sleepScore: d.sleepScore,
+      sleepHours: d.sleepHours,
+      deepPct: d.deepPct,
+      remPct: d.remPct,
+      hrv: d.hrv,
+      hrvBaseline: d.hrvBaseline,
+      recentSleepAvgHours: d.recentSleepAvgHours,
+      baselineSleepAvgHours: d.baselineSleepAvgHours,
+    },
+    wakeTimeIso: d.wakeTimeIso,
+    todayActivities: d.todayActivities,
+  });
 
-  // Apply modifiers
-  let totalAdj = battery.drain;
-  for (const m of modifiers) {
-    totalAdj += m.adj;
-  }
+  // Readiness penalty derived from battery — fully drained shaves at most 25 pts.
+  const batteryPenalty = -Math.round(Math.min(25, ((100 - battery.percent) * 0.25)));
+  let totalAdj = batteryPenalty;
+  for (const m of modifiers) totalAdj += m.adj;
 
-  // Add body battery drain as a visible factor (Charged & Drained framing)
   if (battery.hoursAwake > 0.5) {
-    const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore) + battery.passiveCharge;
-    const chargeNote = battery.passiveCharge > 0 ? ` (+${battery.passiveCharge} rest)` : "";
+    const status: "good" | "warning" | "poor" =
+      battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
+    const breakdown = `Started ${battery.startPercent}% · -${battery.drainAwake} awake${battery.drainActive > 0 ? ` · -${battery.drainActive} activity` : ""} (${battery.hoursAwake}h awake)`;
     factors.push({
       label: "Body Battery",
-      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged${chargeNote} · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
+      status,
+      detail: `${battery.percent}% · ${battery.status} — ${breakdown}`,
     });
   }
+
 
   // Overdrawn state: floor at 5 — never fully zero
   const finalScore = Math.round(Math.max(5, Math.min(100, baseScore + totalAdj)));

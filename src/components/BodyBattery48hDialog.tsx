@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { passiveDrainRate, activityDrain, initialBatteryFromSleep } from "@/lib/body-battery";
 
 interface Props {
   open: boolean;
@@ -43,11 +44,7 @@ interface Totals {
 }
 
 function passiveDrainForHour(hoursAwake: number): number {
-  if (hoursAwake <= 4) return 1;
-  if (hoursAwake <= 8) return 1.5;
-  if (hoursAwake <= 12) return 2;
-  if (hoursAwake <= 16) return 2.5;
-  return 3;
+  return passiveDrainRate(hoursAwake);
 }
 
 const COLORS = {
@@ -113,7 +110,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
           load = mins * (0.25 + (a.training_effect / 5) * 1.75);
         else if (a.avg_heart_rate && a.avg_heart_rate > 0)
           load = mins * Math.max(0.5, Math.min(2.0, a.avg_heart_rate / 140));
-        const totalDrain = Math.min(40, load * 0.4);
+        const totalDrain = activityDrain(load);
         const hours = Math.max(0.1, a.duration_seconds / 3600);
         actIntervals.push({ start, end, drainPerHour: totalDrain / hours });
       }
