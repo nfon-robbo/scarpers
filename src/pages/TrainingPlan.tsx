@@ -1991,6 +1991,7 @@ const TrainingPlanPage = () => {
             raceDateIso={raceDate ? toLocalISODate(raceDate) : null}
           />
         )}
+        {content && !loading && <RaceTimePredictorWidget />}
         {content && !loading && (
           <div className="flex flex-wrap gap-2">
             {Object.keys(linkedActivities).length > 0 && (
