@@ -1466,7 +1466,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         </CardContent>
       </Card>
 
-      <BodyBattery48hDialog open={batteryDialogOpen} onOpenChange={setBatteryDialogOpen} />
+      <BodyBattery48hDialog open={batteryDialogOpen} onOpenChange={setBatteryDialogOpen} readinessData={data} />
       {factorDialog && (
         <FactorDetailDialog
           open={!!factorDialog}
