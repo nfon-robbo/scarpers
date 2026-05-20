@@ -13,11 +13,13 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { passiveDrainRate, activityDrain, initialBatteryFromSleep } from "@/lib/body-battery";
+import { passiveDrainRate, activityDrain, initialBatteryFromSleep, computeBodyBattery } from "@/lib/body-battery";
+import type { ReadinessData } from "@/lib/readiness";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  readinessData?: ReadinessData | null;
 }
 
 interface HourPoint {
