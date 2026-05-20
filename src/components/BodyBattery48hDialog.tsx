@@ -390,12 +390,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                       </span>
                       <span className="font-mono text-foreground">−{fmt(totals.drainActive)}%</span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-border/40">
-                      <span>Net</span>
-                      <span className="font-mono text-foreground">
-                        {totals.rechargeTotal - totals.drainAwake - totals.drainActive >= 0 ? "+" : ""}
-                        {fmt(totals.rechargeTotal - totals.drainAwake - totals.drainActive)}%
-                      </span>
+                    <div className="pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
+                      Since last wake ({totals.hoursSinceWake.toFixed(1)}h ago)
                     </div>
                   </div>
                 </div>
