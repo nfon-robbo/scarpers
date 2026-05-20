@@ -353,6 +353,7 @@ Deno.serve(async (req) => {
   const auth = req.headers.get("Authorization") ?? "";
   const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!provided || (provided !== SERVICE_KEY && provided !== ANON_KEY)) {
+    console.log("auth-reject", { providedLen: provided.length, serviceLen: SERVICE_KEY.length, anonLen: ANON_KEY.length, providedHead: provided.slice(0, 20), anonHead: ANON_KEY.slice(0, 20) });
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
