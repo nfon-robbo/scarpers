@@ -75,8 +75,9 @@ Rules:
     if (!response.ok) {
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Degrade gracefully — return empty insight so the UI doesn't crash.
+      return new Response(JSON.stringify({ insight: "", recommendation: "", fallback: true }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
