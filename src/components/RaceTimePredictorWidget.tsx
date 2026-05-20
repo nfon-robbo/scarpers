@@ -86,8 +86,8 @@ export function RaceTimePredictorWidget() {
   const goalAngle = goal != null ? toAngle(goal) : null;
   const targetAngle = target != null ? toAngle(target) : null;
 
-  // SVG geometry
-  const W = 320, H = 180, CX = W / 2, CY = H - 10, R = 130;
+  // SVG geometry (compact)
+  const W = 280, H = 150, CX = W / 2, CY = H - 10, R = 110;
   const polar = (deg: number) => {
     // 0 deg => left (180), 180 deg => right (0)
     const a = Math.PI - (deg * Math.PI) / 180;
