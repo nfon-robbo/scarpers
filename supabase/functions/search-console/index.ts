@@ -61,16 +61,41 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     }
 
+    const safeJson = async (r: Response) => {
+      const text = await r.text()
+      try { return JSON.parse(text) } catch { return { _raw: text } }
+    }
+
+    const fetchWithRetry = async (url: string, init: RequestInit, attempts = 3): Promise<Response> => {
+      let lastErr: any
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const r = await fetch(url, init)
+          // Retry on transient upstream errors
+          if ((r.status === 502 || r.status === 503 || r.status === 504) && i < attempts - 1) {
+            await r.body?.cancel()
+            await new Promise((res) => setTimeout(res, 300 * (i + 1)))
+            continue
+          }
+          return r
+        } catch (e) {
+          lastErr = e
+          await new Promise((res) => setTimeout(res, 300 * (i + 1)))
+        }
+      }
+      throw lastErr ?? new Error('fetch failed')
+    }
+
     const query = async (dimensions: string[], rowLimit = 100, filters?: any[]) => {
       const payload: any = { startDate: startD, endDate: end, dimensions, rowLimit }
       if (filters && filters.length) payload.dimensionFilterGroups = [{ filters }]
-      const r = await fetch(`${GATEWAY}/sites/${SITE_ENC}/searchAnalytics/query`, {
+      const r = await fetchWithRetry(`${GATEWAY}/sites/${SITE_ENC}/searchAnalytics/query`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
       })
-      const d = await r.json()
-      if (!r.ok) throw new Error(`GSC ${dimensions.join(',')} [${r.status}]: ${JSON.stringify(d)}`)
+      const d = await safeJson(r)
+      if (!r.ok) throw new Error(`GSC ${dimensions.join(',')} [${r.status}]: ${typeof d === 'string' ? d : JSON.stringify(d)}`)
       return d.rows ?? []
     }
 
