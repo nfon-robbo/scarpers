@@ -38,11 +38,12 @@ interface HourPoint {
 
 interface Totals {
   rechargeTotal: number;
-  drainAwake: number;
-  drainActive: number;
+  drainAwake: number;        // since last wake (today)
+  drainActive: number;       // since last wake (today)
   rechargeDeep: number;
   rechargeRem: number;
   rechargeLight: number;
+  hoursSinceWake: number;
 }
 
 function passiveDrainForHour(hoursAwake: number): number {
