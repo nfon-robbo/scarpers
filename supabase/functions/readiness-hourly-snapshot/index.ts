@@ -239,19 +239,21 @@ function computeReadiness(d: ReadinessData, mode: "morning" | "eod") {
     modifiers.push({ label: "Today's Effort", adj: -Math.round(Math.min(12, (d.todayLoad / 60) * 8)), detail: `${Math.floor(d.todayLoad / 60)}:${String(Math.round(d.todayLoad % 60)).padStart(2, "0")} (intensity-weighted)` });
   }
 
-  const battery = bodyBatteryDrain(d);
-  let totalAdj = battery.drain;
+  const battery = computeBodyBattery(d);
+  const batteryPenalty = -Math.round(Math.min(25, (100 - battery.percent) * 0.25));
+  let totalAdj = batteryPenalty;
   for (const m of modifiers) totalAdj += m.adj;
   if (battery.hoursAwake > 0.5) {
-    const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore) + battery.passiveCharge;
-    const chargeNote = battery.passiveCharge > 0 ? ` (+${Math.round(battery.passiveCharge)} rest)` : "";
+    const status: "good" | "warning" | "poor" =
+      battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
+    const breakdown = `Started ${battery.startPercent}% · -${battery.drainAwake} awake${battery.drainActive > 0 ? ` · -${battery.drainActive} activity` : ""} (${battery.hoursAwake}h awake)`;
     factors.push({
       label: "Body Battery",
-      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged${chargeNote} · 🔋-${Math.round(drainTotal)} drained (${battery.hoursAwake.toFixed(1)}h awake)`,
+      status,
+      detail: `${battery.percent}% · ${battery.status} — ${breakdown}`,
     });
   }
+
   for (const m of modifiers) {
     if (Math.abs(m.adj) >= 3 || (m.label === "Recovery" && m.adj === 0)) {
       factors.push({ label: m.label, status: m.adj >= 0 ? "good" : m.adj >= -5 ? "warning" : "poor", detail: m.detail });
