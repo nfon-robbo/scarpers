@@ -79,8 +79,7 @@ Drained: ${drainAwake}% passive + ${drainActive}% activity
 Previous sleep: ${prevSleepStr}
 Pattern: ${b.pattern}
 
-CRITICAL: Use digits for ALL numbers. Write "66%" not "sixty-six percent", "11h" not "eleven hours".
-Explain why the battery is at its current level and whether this is expected.`;
+Write 2-3 short factual sentences. First: current % and breakdown. Second: whether this is expected. Third (optional): brief insight. Use digits only. NO assumptions about future training. NO subjective phrases like "I like to see". Be direct and data-driven.`;
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
