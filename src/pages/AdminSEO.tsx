@@ -70,6 +70,23 @@ const AdminSEO = () => {
   const [gscDays, setGscDays] = useState<7 | 28 | 90>(28);
   type GscSortKey = "query" | "clicks" | "impressions" | "ctr" | "position";
   const [gscSort, setGscSort] = useState<{ key: GscSortKey; dir: "asc" | "desc" }>({ key: "impressions", dir: "desc" });
+  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [pageQueries, setPageQueries] = useState<Record<string, { loading: boolean; rows?: GscRow[]; error?: string }>>({});
+
+  const togglePageQueries = async (url: string) => {
+    if (expandedPage === url) { setExpandedPage(null); return; }
+    setExpandedPage(url);
+    if (pageQueries[url]?.rows || pageQueries[url]?.loading) return;
+    setPageQueries((prev) => ({ ...prev, [url]: { loading: true } }));
+    try {
+      const { data, error } = await supabase.functions.invoke("search-console", { body: { days: gscDays, page: url } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setPageQueries((prev) => ({ ...prev, [url]: { loading: false, rows: (data as any)?.byQuery ?? [] } }));
+    } catch (e: any) {
+      setPageQueries((prev) => ({ ...prev, [url]: { loading: false, error: e?.message ?? "Failed to load" } }));
+    }
+  };
 
   // GA4
   type Ga4Data = {
