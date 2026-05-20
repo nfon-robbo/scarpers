@@ -1264,6 +1264,7 @@ export type Database = {
       admin_dashboard_stats: { Args: never; Returns: Json }
       admin_feedback_stats: { Args: never; Returns: Json }
       admin_system_health_stats: { Args: never; Returns: Json }
+      cron_token_matches: { Args: { _token: string }; Returns: boolean }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
