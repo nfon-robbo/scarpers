@@ -1157,7 +1157,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                                 const d = payload?.[0]?.payload?.day;
                                 return d ? `Time: ${d}` : "";
                               }}
-                              formatter={() => ["Hidden", "Readiness"]}
+                              formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
                             />
                             <ReferenceLine
                               y={last.score}
@@ -1235,7 +1235,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <Tooltip
                         contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: "hsl(var(--foreground))" }}
-                        formatter={() => ["Hidden", "Readiness"]}
+                        formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
                       />
                       <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
                     </AreaChart>
