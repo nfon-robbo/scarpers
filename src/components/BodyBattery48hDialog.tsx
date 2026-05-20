@@ -193,6 +193,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
       for (let i = 0; i <= totalSteps; i++) {
         const t = startMs + i * stepMs;
+        if (t > nowMs) break;
         const sleep = sleepAt(t);
         const actDrain = activityAt(t);
 
