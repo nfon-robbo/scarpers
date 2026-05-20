@@ -56,7 +56,7 @@ const COLORS = {
   active: "hsl(0, 75%, 58%)",
 };
 
-const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
+const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<HourPoint[]>([]);
