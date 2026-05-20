@@ -110,7 +110,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
           load = mins * (0.25 + (a.training_effect / 5) * 1.75);
         else if (a.avg_heart_rate && a.avg_heart_rate > 0)
           load = mins * Math.max(0.5, Math.min(2.0, a.avg_heart_rate / 140));
-        const totalDrain = Math.min(40, load * 0.4);
+        const totalDrain = activityDrain(load);
         const hours = Math.max(0.1, a.duration_seconds / 3600);
         actIntervals.push({ start, end, drainPerHour: totalDrain / hours });
       }
