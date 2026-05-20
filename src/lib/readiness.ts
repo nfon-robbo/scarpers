@@ -294,26 +294,38 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     });
   }
 
-  // Body battery drain (replaces old circadian modifier)
-  const battery = bodyBatteryDrain(d);
+  // Body battery (phone-style 0-100% reserve)
+  const battery = computeBodyBattery({
+    sleep: {
+      sleepScore: d.sleepScore,
+      sleepHours: d.sleepHours,
+      deepPct: d.deepPct,
+      remPct: d.remPct,
+      hrv: d.hrv,
+      hrvBaseline: d.hrvBaseline,
+      recentSleepAvgHours: d.recentSleepAvgHours,
+      baselineSleepAvgHours: d.baselineSleepAvgHours,
+    },
+    wakeTimeIso: d.wakeTimeIso,
+    todayActivities: d.todayActivities,
+  });
 
-  // Apply modifiers
-  let totalAdj = battery.drain;
-  for (const m of modifiers) {
-    totalAdj += m.adj;
-  }
+  // Readiness penalty derived from battery — fully drained shaves at most 25 pts.
+  const batteryPenalty = -Math.round(Math.min(25, ((100 - battery.percent) * 0.25)));
+  let totalAdj = batteryPenalty;
+  for (const m of modifiers) totalAdj += m.adj;
 
-  // Add body battery drain as a visible factor (Charged & Drained framing)
   if (battery.hoursAwake > 0.5) {
-    const drainTotal = battery.passiveDrain + battery.activeDrain;
-    const charged = Math.round(baseScore) + battery.passiveCharge;
-    const chargeNote = battery.passiveCharge > 0 ? ` (+${battery.passiveCharge} rest)` : "";
+    const status: "good" | "warning" | "poor" =
+      battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
+    const breakdown = `Started ${battery.startPercent}% · -${battery.drainAwake} awake${battery.drainActive > 0 ? ` · -${battery.drainActive} activity` : ""} (${battery.hoursAwake}h awake)`;
     factors.push({
       label: "Body Battery",
-      status: drainTotal - battery.passiveCharge <= 15 ? "good" : drainTotal - battery.passiveCharge <= 30 ? "warning" : "poor",
-      detail: `⚡${charged} charged${chargeNote} · 🔋-${drainTotal} drained (${battery.hoursAwake}h awake)`,
+      status,
+      detail: `${battery.percent}% · ${battery.status} — ${breakdown}`,
     });
   }
+
 
   // Overdrawn state: floor at 5 — never fully zero
   const finalScore = Math.round(Math.max(5, Math.min(100, baseScore + totalAdj)));
