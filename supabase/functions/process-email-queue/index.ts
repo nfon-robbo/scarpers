@@ -99,12 +99,12 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Defense in depth: verify_jwt=true already requires a valid JWT at the
-  // gateway layer. This adds an explicit role check so only service-role
-  // callers can trigger queue processing.
+  // verify_jwt=true at the gateway already requires a valid JWT. Accept either
+  // service_role or anon (scheduler) — neither has DB access until the function
+  // creates a service-role client internally.
   const token = authHeader.slice('Bearer '.length).trim()
   const claims = parseJwtClaims(token)
-  if (claims?.role !== 'service_role') {
+  if (claims?.role !== 'service_role' && claims?.role !== 'anon') {
     return new Response(
       JSON.stringify({ error: 'Forbidden' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
