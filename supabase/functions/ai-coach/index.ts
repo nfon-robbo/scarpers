@@ -765,6 +765,52 @@ When the user asks about a future or past session (e.g. "next Friday", "this Wed
           : "";
 
         chatExtraContext = unitsBlock + profileBlock + readinessBlock + runningIqBlock + analysesBlock + uploadsBlock;
+
+        // ── Race Time Predictor — only when the latest user message asks for a prediction ──
+        try {
+          if (RACE_PREDICTION_INTENT.test(String(chatMessages || ""))) {
+            const { data: activePlanForPred } = await supabase
+              .from("training_plans")
+              .select("content, start_date, race_date, race_distance, goal_time, training_days")
+              .eq("user_id", user.id).eq("archived", false)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+            const raceDist = activePlanForPred?.race_distance || "10K";
+            const { data: cached } = await supabase
+              .from("race_time_predictions")
+              .select("*").eq("user_id", user.id).eq("race_distance", raceDist).maybeSingle();
+
+            const { data: newestActivity } = await supabase
+              .from("activities").select("created_at")
+              .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+            let predictionBlock: string | null = null;
+            const cacheAgeDays = cached
+              ? (Date.now() - new Date(cached.computed_at).getTime()) / 86400000 : Infinity;
+            const cacheStillValid = cached && cacheAgeDays < 7 &&
+              (!newestActivity || new Date(newestActivity.created_at) <= new Date(cached.computed_at));
+
+            if (cacheStillValid && cached.prediction?.block) {
+              predictionBlock = cached.prediction.block;
+            } else {
+              const result = buildPrediction({
+                activities: activities || [],
+                metrics: metrics || [],
+                plan: activePlanForPred,
+                readinessScores: (readinessRes.data || []).map((r: any) => Number(r.score)).filter((n: number) => isFinite(n)).slice(0, 7),
+                athleteContext: profile?.athlete_context || "",
+              });
+              predictionBlock = result.block;
+              await supabase.from("race_time_predictions").upsert({
+                user_id: user.id, race_distance: raceDist,
+                prediction: result, computed_at: new Date().toISOString(),
+              }, { onConflict: "user_id,race_distance" });
+            }
+            if (predictionBlock) chatExtraContext += `\n\n${predictionBlock}`;
+          }
+        } catch (e) {
+          console.error("race time predictor error:", e);
+        }
       } catch (e) {
         console.error("chat extra context fetch error:", e);
       }
