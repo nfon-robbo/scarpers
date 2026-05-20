@@ -1,61 +1,11 @@
-Goal
+Problem: The 48h chart includes a data point one hour in the future. At 21:19, the loop reaches now + 1h (22:00) and pushes a synthesised battery value there, so the line and x-axis extend past the current time.
 
-Make the 48h dialog show the same numbers as the dashboard tile (Now %, hours awake, Awake drain, Activity drain), and rebuild the body-battery-insight edge function with strict prompts and Zod validation.
+Root cause: In src/components/BodyBattery48hDialog.tsx, line 73-75 floors now to the current hour, then startMs = now - 47h. Line 168 calculates totalSteps = (48 * 60) / stepMin which creates 192 steps of 15min covering startMs through startMs + 48h = now + 1h. Line 243 pushes an hourly point whenever t % 3600_000 === 0, so 49 hourly points are emitted with the last one at now + 1h. The XAxis uses the categorical label field, so trimming the points array is sufficient, no axis domain change needed.
 
-1. Edge function — supabase/functions/body-battery-insight/index.ts (complete rewrite)
+Fix: In BodyBattery48hDialog.tsx, end the simulation at the current hour rather than one hour ahead. Change line 168 from const totalSteps = (48  *60) / stepMin; to const totalSteps = (47*  60) / stepMin; so the loop runs from now - 47h through now, producing exactly 48 hourly points with the final one at the current hour. As a safety guard, add a break condition in the loop body so any step where t > nowMs is skipped. Add const nowMs = now.getTime(); before the loop, then at the start of the for loop body add if (t > nowMs) break; right after const t = startMs + i * stepMs;.
 
-Replace current implementation with:
+No other changes needed. Chart anchoring that pins the last point to truth.percent continues to work because the final hourly entry is now the current-hour point. The Now label, drain cards, and AI insight already read from truth and remain untouched. XAxis is categorical so trimming the data array implicitly trims the axis.
 
-- CORS via import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+Files to edit: src/components/BodyBattery48hDialog.tsx (two line changes described above)
 
-- Auth: validate Bearer token via createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization } } }) + auth.getUser(). Return 401 if missing.
-
-- Body validation with Zod (npm:zod):
-
-  - percent, startPercent, hoursAwake, sleepHours, deepPct, remPct, drainAwake, drainActive → number
-
-  - status, hrvVsBaseline, pattern → string
-
-  - prevSleep → optional { hours: number, deepPct: number, remPct: number } or null
-
-  - Return 400 with { error: <flattened Zod errors> } on validation failure
-
-- AI call via AI SDK (use this approach, not the existing callAI helper):
-
-```typescript
-
-import { generateText } from "npm:ai";
-
-import { createOpenAICompatible } from "npm:@ai-sdk/openai-compatible";
-
-const provider = createOpenAICompatible({
-
-  name: "lovable",
-
-  baseURL: "[https://ai.gateway.lovable.dev/v1](https://ai.gateway.lovable.dev/v1)",
-
-  headers: {
-
-    "Lovable-API-Key": Deno.env.get("LOVABLE_API_KEY")!,
-
-    "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-
-  },
-
-});
-
-const { text } = await generateText({
-
-  model: provider("google/gemini-3-flash-preview"),
-
-  system: SYSTEM_PROMPT,
-
-  prompt: userPrompt,
-
-  maxTokens: 300,
-
-});
-
-```
-
-- System prompt (exact wording):
+Acceptance: At 21:19, the rightmost x-axis label is 21:00 not 22:00, and the line ends at the Now anchor. Now percentage continues to match the dashboard tile exactly. No other behaviour changes.
