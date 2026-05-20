@@ -1,66 +1,61 @@
-## Goal
+## 1. Initial charge — looser curve (`src/lib/body-battery.ts`)
 
-Replace the current "charged/drained" framing with a phone-battery model: a single 0–100% reserve that fills overnight and falls during the day. The number on the dashboard should match how the user actually feels.
+Rewrite `initialBatteryFromSleep` so a normal good night lands at 95–100%:
 
-## New model
+- Baseline: `30 → 45`.
+- Duration (up to **+40**, was +35):
+  - `h <= 0`: 0
+  - `h < 7`: `(h / 7) * 40`
+  - `7 ≤ h ≤ 9`: 40 (full plateau)
+  - `9 < h ≤ 10`: `40 - (h - 9) * 3` (gentle taper)
+  - `h > 10`: `max(25, 37 - (h - 10) * 2)`
+- Stage quality: unchanged (+20 cap: deep up to +12, REM up to +8).
+- HRV vs baseline: tighten to **±10**
+  - `≥ +10%` → +10, `≥ +5%` → +7, `±5%` → 0, `≥ −15%` → −6, else −10.
+- Sleep debt (3-night vs 30-day): keep at ±5.
+- Clamp: `Math.round(clamp(charge, 10, 100))`.
 
-**Initial charge (on wake)** — from last night's sleep, capped at 100%:
-- Start at 30% baseline
-- + Duration: up to +35 (linear 0→7h, plateau at 7–9h, gentle taper after 10h)
-- + Stage quality: up to +20 (deep% scaled, REM% scaled)
-- + HRV vs baseline: ±15 (>+10% = +15, ±5% band = 0, <−15% = −15)
-- + Sleep-debt bonus/penalty: ±5 (3-night avg vs 30-day)
-- Floor 10, cap 100
+Sanity table the new formula must satisfy:
 
-**Awake passive drain** — accelerating with hours awake:
-- 0–4h: 2/hr · 4–8h: 3/hr · 8–12h: 4/hr · 12h+: 5/hr
-- Applied continuously since `wakeTimeIso`
+| Sleep | Stages | HRV | Expected |
+|---|---|---|---|
+| 8h | 15% deep / 22% REM | +5% | ~100% |
+| 7.5h | 12% deep / 18% REM | baseline | 95–100% |
+| 6.5h | average | baseline | 80–90% |
+| 5.5h | fragmented | −10% | 60–75% |
+| 4.5h | poor | −20% | 40–55% |
 
-**Activity drain** — no cap (was capped at 10):
-- `intensityLoad × 0.05` per activity, distributed over the activity's duration
+No changes to passive drain, activity drain, or `computeBodyBattery` flow.
 
-**Display:**
-- Single number: `78%` with label (`Charged` / `Steady` / `Low` / `Drained`)
-- Color: green ≥70, amber 40–69, orange 20–39, red <20
-- Breakdown line: `Started 92% · −18 awake · −6 run · 12.3h on the go`
-- Contextual insight: "Long day on your feet — easy night recommended" / "Great reserve — green light for tonight's session"
+## 2. "Drained" card — today only (`src/components/BodyBattery48hDialog.tsx`)
 
-## Files to change
+The card currently sums passive + activity drain across the entire 48h window (multiple wake periods → values like −115%). Scope it to "since last wake":
 
-**Logic (single source of truth):**
-- `src/lib/readiness.ts` — replace `bodyBatteryDrain()` with `computeBodyBattery()` returning `{ percent, startPercent, drainAwake, drainActive, hoursAwake, status, insight }`. Drop `passiveCharge` (awake recharge) entirely. Update the `Body Battery` factor push to show `${percent}% · ${status}` + breakdown.
-- `src/lib/body-battery.ts` (new) — extract the pure battery math so it can be shared between client, edge function, and the 48h dialog without duplication. Exports `computeBodyBattery`, `initialBatteryFromSleep`, `passiveDrainRate(hoursAwake)`, `activityDrain(act)`.
+- During the existing per-step loop, also accumulate `todayDrainAwake` and `todayDrainActive` **only for steps whose timestamp is after the most recent `sleep → awake` transition** (i.e. the last wake of the window, falling back to the start of the awake series if no sleep was recorded in window).
+- Track `lastWakeMs`: every time `sleepAt(t)` returns non-null, reset it to `null`; the first step after a sleep block where `sleepAt(t)` is null sets `lastWakeMs = t`. Reset the today counters whenever `lastWakeMs` is re-assigned.
+- Render the Drained card from the today counters:
+  - Headline: `−{awake+active}%`
+  - Sub-rows: `Awake −{awake}%` and `Activity −{active}%`
+  - Drop the "Net" row (no longer meaningful when drain is today-scoped and recharge is 48h-scoped); replace with a small caption: `Since last wake ({hours}h ago)`.
+- Leave the Recharged card untouched (still 48h sleep total).
 
-**Edge function (kept in sync):**
-- `supabase/functions/readiness-hourly-snapshot/index.ts` — replace inlined `bodyBatteryDrain` with the new model (port the same math). Snapshot the new `Body Battery` factor with the new percent string. Future snapshots will all use the clean format; old rows are left as-is (already cleaned up earlier).
+## 3. Dashboard ↔ chart sync (`src/components/BodyBattery48hDialog.tsx`)
 
-**Dashboard tile:**
-- `src/components/FactorDetailDialog.tsx` (only if it references the old label string — quick scan and adjust) — no behavioural change.
-- `src/components/ReadinessWidget.tsx` (if it surfaces a battery snippet) — point at the new field shape.
+Today the chart simulates with `let battery = 60` and stage-weight gains, so its "Now" diverges from the dashboard tile (which uses `computeBodyBattery`). Fix by anchoring the chart's final point to the shared function:
 
-**48h dialog:**
-- `src/components/BodyBattery48hDialog.tsx` — switch to the shared `passiveDrainRate` + `activityDrain` from `body-battery.ts` so the chart matches the score. Keep the three-phase coloured area chart (sleep/awake/active) and the recharge/drain summary panels. Re-anchor initial battery to `initialBatteryFromSleep` instead of the hardcoded `60`.
-
-**Score integration:**
-- In `computeReadiness` (eod), the readiness penalty derived from the battery becomes `−round((100 − percent) × 0.25)` capped at −25, so a fully-drained battery still only shaves 25 pts (same ceiling as today). No other modifier changes.
-
-## What gets removed
-
-- The awake-hour HRV-driven recharge loop (the source of the `⚡ charged (+N rest)` string).
-- The hard cap of 10 on activity drain.
-- The mixed "charged + drained" detail string.
-- `Math.round(baseScore) + passiveCharge` arithmetic that produced the confusing number.
+- After the simulation loop, call `computeBodyBattery({ sleep, wakeTimeIso, todayActivities, now })` with the **same inputs** the dashboard uses. Fetch the same sleep summary row + today's activities used by readiness (already available via existing queries; reuse the sleep_stages aggregation to derive `sleepHours`, `deepPct`, `remPct`, plus the latest `daily_metrics` row for `hrv`, `hrvBaseline`, `recentSleepAvgHours`, `baselineSleepAvgHours`, `wakeTimeIso`).
+- Overwrite the last hourly point's `battery` with `result.percent` so the line ends exactly where the dashboard tile says.
+- Add a small "Now: X%" label inside the chart card driven by `result.percent` (not by the simulated value) so the two numbers can never disagree.
+- The intermediate hourly simulation is kept for the shape of the curve, but is **rescaled** by a constant offset so that its final value equals `result.percent` (subtract `simulatedNow - result.percent` from every point, then clamp to 0–100). This keeps the visual story consistent without rewriting the whole simulator.
 
 ## Out of scope
 
-- No DB schema changes. `readiness_snapshots.factors` is JSONB and just stores the new string.
-- No changes to AI coach prompts beyond the natural change in the "Body Battery" factor text they already receive.
-- No change to morning readiness — it remains a pure overnight snapshot.
+- Edge function `readiness-hourly-snapshot` (already uses shared logic; no behaviour change needed for these three fixes).
+- DB schema, AI prompts, morning readiness scoring weights.
+- Recharge math and colour bands.
 
 ## Acceptance
 
-- Dashboard "Body Battery" factor shows e.g. `74% · Steady` with subline `Started 92% · 8.4h awake · −12 passive · −6 run`.
-- Number drops monotonically through the day (no awake recharge spikes).
-- After a great night + no training, morning value is 85–100%.
-- After a 90-min hard session at hour 10, value drops by ~20–30 pts visibly.
-- 48h chart's "now" point equals the displayed % (within ±2 pts rounding).
+- Logged-in user with 7.5h sleep, decent stages, neutral HRV: dashboard tile and 48h "Now" both read 95–100% on wake.
+- 48h dialog Drained card shows e.g. `−62%` with `Awake −56% · Activity −6%` and never exceeds 100.
+- Dashboard tile percentage equals chart "Now: X%" to the integer at any refresh.

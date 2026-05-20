@@ -63,21 +63,21 @@ export function activityDrain(intensityLoad: number): number {
 
 /** Compute the starting battery on wake, based on last night's sleep. 10–100. */
 export function initialBatteryFromSleep(s: SleepInputs): number {
-  let charge = 30; // baseline
+  let charge = 45; // baseline
 
-  // Duration (up to +35)
+  // Duration (up to +40)
   if (s.sleepHours != null) {
     const h = s.sleepHours;
     let dur: number;
     if (h <= 0) dur = 0;
-    else if (h < 7) dur = (h / 7) * 35;
-    else if (h <= 9) dur = 35;
-    else if (h <= 10) dur = 35 - (h - 9) * 5;       // gentle taper
-    else dur = Math.max(20, 30 - (h - 10) * 3);     // too much sleep ≠ great
+    else if (h < 7) dur = (h / 7) * 40;
+    else if (h <= 9) dur = 40;                       // full plateau
+    else if (h <= 10) dur = 40 - (h - 9) * 3;        // gentle taper
+    else dur = Math.max(25, 37 - (h - 10) * 2);      // too much sleep ≠ great
     charge += dur;
   } else if (s.sleepScore != null) {
     // Fall back to sleep score if duration missing
-    charge += (s.sleepScore / 100) * 30;
+    charge += (s.sleepScore / 100) * 35;
   }
 
   // Stage quality (up to +20)
@@ -95,15 +95,15 @@ export function initialBatteryFromSleep(s: SleepInputs): number {
     charge += (s.sleepScore / 100) * 10;
   }
 
-  // HRV vs baseline (±15)
+  // HRV vs baseline (±10)
   if (s.hrv != null && s.hrvBaseline != null && s.hrvBaseline > 0) {
     const pct = ((s.hrv - s.hrvBaseline) / s.hrvBaseline) * 100;
     let hrvAdj: number;
-    if (pct >= 10) hrvAdj = 15;
-    else if (pct >= 5) hrvAdj = 10;
+    if (pct >= 10) hrvAdj = 10;
+    else if (pct >= 5) hrvAdj = 7;
     else if (pct >= -5) hrvAdj = 0;
-    else if (pct >= -15) hrvAdj = -8;
-    else hrvAdj = -15;
+    else if (pct >= -15) hrvAdj = -6;
+    else hrvAdj = -10;
     charge += hrvAdj;
   }
 
