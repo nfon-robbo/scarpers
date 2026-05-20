@@ -224,6 +224,9 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           const passiveD = (passive * stepMin) / 60;
           delta = -passiveD;
           if (lastWakeMs != null && t >= lastWakeMs) tot.drainAwake += passiveD;
+          const ambientD = (0.5 * stepMin) / 60;
+          delta -= ambientD;
+          if (lastWakeMs != null && t >= lastWakeMs) tot.drainActive += ambientD;
           if (actDrain > 0) {
             const actD = (actDrain * stepMin) / 60;
             delta -= actD;
