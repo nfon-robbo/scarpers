@@ -90,6 +90,33 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         .gte("start_time", startIso)
         .then(({ data }) => data || []),
     ]).then(([stages, acts]) => {
+      // Aggregate prev night sleep (most recent date with >=3h before today's wake date)
+      const todayWakeDate = readinessData?.wakeTimeIso
+        ? new Date(readinessData.wakeTimeIso).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+      const byDate: Record<string, { total: number; deep: number; rem: number }> = {};
+      for (const s of stages as any[]) {
+        if (!s.date || !s.duration_seconds) continue;
+        const d = byDate[s.date] || (byDate[s.date] = { total: 0, deep: 0, rem: 0 });
+        const stage = (s.stage || "").toLowerCase();
+        if (stage === "awake") continue;
+        d.total += s.duration_seconds;
+        if (stage === "deep") d.deep += s.duration_seconds;
+        else if (stage === "rem") d.rem += s.duration_seconds;
+      }
+      const prevDates = Object.keys(byDate)
+        .filter((d) => d < todayWakeDate && byDate[d].total >= 3 * 3600)
+        .sort();
+      const prevDate = prevDates[prevDates.length - 1];
+      const prevSleepAgg = prevDate
+        ? {
+            hours: byDate[prevDate].total / 3600,
+            deepPct: byDate[prevDate].total ? (byDate[prevDate].deep / byDate[prevDate].total) * 100 : 0,
+            remPct: byDate[prevDate].total ? (byDate[prevDate].rem / byDate[prevDate].total) * 100 : 0,
+          }
+        : null;
+      setPrevSleep(prevSleepAgg);
+
       const sleepIntervals: { start: number; end: number; weight: number; stage: "deep" | "rem" | "light" }[] = [];
       for (const s of stages as any[]) {
         if (!s.start_time || !s.end_time) continue;
