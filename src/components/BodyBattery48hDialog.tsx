@@ -482,23 +482,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                     <TrendingDown className="w-3.5 h-3.5" /> Drained
                   </div>
                   <div className="text-2xl font-bold text-foreground mt-0.5">
-                    −{fmt(totals.drainAwake + totals.drainActive)}%
+                    −{fmt((truth?.drainAwake ?? totals.drainAwake) + (truth?.drainActive ?? totals.drainActive))}%
                   </div>
                   <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
                     <div className="flex justify-between">
                       <span className="flex items-center gap-1">
                         <Sun className="w-3 h-3" /> Awake
                       </span>
-                      <span className="font-mono text-foreground">−{fmt(totals.drainAwake)}%</span>
+                      <span className="font-mono text-foreground">−{fmt(truth?.drainAwake ?? totals.drainAwake)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="flex items-center gap-1">
                         <Activity className="w-3 h-3" /> Activity
                       </span>
-                      <span className="font-mono text-foreground">−{fmt(totals.drainActive)}%</span>
+                      <span className="font-mono text-foreground">−{fmt(truth?.drainActive ?? totals.drainActive)}%</span>
                     </div>
                     <div className="pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
-                      Since last wake ({totals.hoursSinceWake.toFixed(1)}h ago)
+                      Since last wake ({(truth?.hoursAwake ?? totals.hoursSinceWake).toFixed(1)}h ago)
                     </div>
                   </div>
                 </div>
