@@ -71,17 +71,17 @@ function initialBatteryFromSleep(s: {
   remPct?: number | null; hrv: number | null; hrvBaseline: number | null;
   recentSleepAvgHours: number | null; baselineSleepAvgHours: number | null;
 }): number {
-  let charge = 30;
+  let charge = 45;
   if (s.sleepHours != null) {
     const h = s.sleepHours;
     let dur: number;
     if (h <= 0) dur = 0;
-    else if (h < 7) dur = (h / 7) * 35;
-    else if (h <= 9) dur = 35;
-    else if (h <= 10) dur = 35 - (h - 9) * 5;
-    else dur = Math.max(20, 30 - (h - 10) * 3);
+    else if (h < 7) dur = (h / 7) * 40;
+    else if (h <= 9) dur = 40;
+    else if (h <= 10) dur = 40 - (h - 9) * 3;
+    else dur = Math.max(25, 37 - (h - 10) * 2);
     charge += dur;
-  } else if (s.sleepScore != null) charge += (s.sleepScore / 100) * 30;
+  } else if (s.sleepScore != null) charge += (s.sleepScore / 100) * 35;
   if (s.deepPct != null) {
     const dp = s.deepPct;
     charge += dp >= 15 ? 12 : dp >= 12 ? 9 : dp >= 10 ? 6 : dp >= 7 ? 3 : 0;
@@ -92,7 +92,7 @@ function initialBatteryFromSleep(s: {
   } else if (s.deepPct == null && s.sleepScore != null) charge += (s.sleepScore / 100) * 10;
   if (s.hrv != null && s.hrvBaseline != null && s.hrvBaseline > 0) {
     const pct = ((s.hrv - s.hrvBaseline) / s.hrvBaseline) * 100;
-    charge += pct >= 10 ? 15 : pct >= 5 ? 10 : pct >= -5 ? 0 : pct >= -15 ? -8 : -15;
+    charge += pct >= 10 ? 10 : pct >= 5 ? 7 : pct >= -5 ? 0 : pct >= -15 ? -6 : -10;
   }
   if (s.recentSleepAvgHours != null && s.baselineSleepAvgHours != null && s.baselineSleepAvgHours > 0) {
     const debt = s.recentSleepAvgHours - s.baselineSleepAvgHours;

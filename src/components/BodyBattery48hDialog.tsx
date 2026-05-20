@@ -13,11 +13,13 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { passiveDrainRate, activityDrain, initialBatteryFromSleep } from "@/lib/body-battery";
+import { passiveDrainRate, activityDrain, initialBatteryFromSleep, computeBodyBattery } from "@/lib/body-battery";
+import type { ReadinessData } from "@/lib/readiness";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  readinessData?: ReadinessData | null;
 }
 
 interface HourPoint {
@@ -36,11 +38,12 @@ interface HourPoint {
 
 interface Totals {
   rechargeTotal: number;
-  drainAwake: number;
-  drainActive: number;
+  drainAwake: number;        // since last wake (today)
+  drainActive: number;       // since last wake (today)
   rechargeDeep: number;
   rechargeRem: number;
   rechargeLight: number;
+  hoursSinceWake: number;
 }
 
 function passiveDrainForHour(hoursAwake: number): number {
@@ -53,7 +56,7 @@ const COLORS = {
   active: "hsl(0, 75%, 58%)",
 };
 
-const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
+const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<HourPoint[]>([]);
@@ -149,7 +152,12 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
         rechargeDeep: 0,
         rechargeRem: 0,
         rechargeLight: 0,
+        hoursSinceWake: 0,
       };
+
+      // Track most recent sleep→awake transition for "today only" drain card.
+      let lastWakeMs: number | null = null;
+      let wasSleeping = true; // assume we start mid-sleep so first awake step sets lastWakeMs
 
       for (let i = 0; i <= totalSteps; i++) {
         const t = startMs + i * stepMs;
@@ -169,16 +177,24 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
           else tot.rechargeLight += gain;
           hourStageWeights[sleep.stage] = (hourStageWeights[sleep.stage] || 0) + gain;
           hoursAwake = 0;
+          wasSleeping = true;
         } else {
           hoursAwake += stepMin / 60;
+          // sleep → awake transition
+          if (wasSleeping) {
+            lastWakeMs = t;
+            tot.drainAwake = 0;
+            tot.drainActive = 0;
+            wasSleeping = false;
+          }
           const passive = passiveDrainForHour(hoursAwake);
           const passiveD = (passive * stepMin) / 60;
           delta = -passiveD;
-          tot.drainAwake += passiveD;
+          if (lastWakeMs != null && t >= lastWakeMs) tot.drainAwake += passiveD;
           if (actDrain > 0) {
             const actD = (actDrain * stepMin) / 60;
             delta -= actD;
-            tot.drainActive += actD;
+            if (lastWakeMs != null && t >= lastWakeMs) tot.drainActive += actD;
             stepState = "active";
           } else {
             stepState = "awake";
@@ -189,7 +205,6 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
         battery = Math.max(5, Math.min(100, battery));
 
         hourDelta += delta;
-        // priority: active > sleep > awake for hour label
         if (stepState === "active") hourState = "active";
         else if (stepState === "sleep" && hourState !== "active") hourState = "sleep";
         else if (hourState !== "active" && hourState !== "sleep") hourState = "awake";
@@ -221,8 +236,45 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
         }
       }
 
+      tot.hoursSinceWake = lastWakeMs != null
+        ? Math.max(0, (Date.now() - lastWakeMs) / 3600_000)
+        : hoursAwake;
+
+      // ── Anchor "Now" to the same computeBodyBattery() the dashboard uses ──
+      if (readinessData && hourly.length > 0) {
+        const truth = computeBodyBattery({
+          sleep: {
+            sleepScore: readinessData.sleepScore,
+            sleepHours: readinessData.sleepHours,
+            deepPct: readinessData.deepPct,
+            remPct: readinessData.remPct,
+            hrv: readinessData.hrv,
+            hrvBaseline: readinessData.hrvBaseline,
+            recentSleepAvgHours: readinessData.recentSleepAvgHours,
+            baselineSleepAvgHours: readinessData.baselineSleepAvgHours,
+          },
+          wakeTimeIso: readinessData.wakeTimeIso,
+          todayActivities: readinessData.todayActivities,
+        });
+        const last = hourly[hourly.length - 1];
+        const offset = truth.percent - last.battery;
+        if (offset !== 0) {
+          for (const p of hourly) {
+            const newVal = Math.max(0, Math.min(100, p.battery + offset));
+            p.battery = newVal;
+            if (p.sleepBand != null) p.sleepBand = newVal;
+            if (p.awakeBand != null) p.awakeBand = newVal;
+            if (p.activeBand != null) p.activeBand = newVal;
+          }
+        }
+        // Force exact match on the last point
+        last.battery = truth.percent;
+        if (last.awakeBand != null) last.awakeBand = truth.percent;
+        if (last.activeBand != null) last.activeBand = truth.percent;
+        if (last.sleepBand != null) last.sleepBand = truth.percent;
+      }
+
       // Bridge nulls between phases so segments visually connect.
-      // For each band, fill a value at boundary points where the *next or previous* point is in that band.
       const bands: ("sleepBand" | "awakeBand" | "activeBand")[] = ["sleepBand", "awakeBand", "activeBand"];
       for (const b of bands) {
         for (let i = 0; i < hourly.length; i++) {
@@ -240,7 +292,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
       setTotals(tot);
       setLoading(false);
     });
-  }, [open, user]);
+  }, [open, user, readinessData]);
 
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.label);
 
@@ -338,12 +390,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange }: Props) => {
                       </span>
                       <span className="font-mono text-foreground">−{fmt(totals.drainActive)}%</span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-border/40">
-                      <span>Net</span>
-                      <span className="font-mono text-foreground">
-                        {totals.rechargeTotal - totals.drainAwake - totals.drainActive >= 0 ? "+" : ""}
-                        {fmt(totals.rechargeTotal - totals.drainAwake - totals.drainActive)}%
-                      </span>
+                    <div className="pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
+                      Since last wake ({totals.hoursSinceWake.toFixed(1)}h ago)
                     </div>
                   </div>
                 </div>
