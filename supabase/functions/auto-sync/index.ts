@@ -237,11 +237,12 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-  // Require service-role bearer token — this endpoint is for the cron scheduler only.
+  // Cron-only — accept service role or anon key bearer.
   const authHeader = req.headers.get("Authorization") ?? "";
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!provided || provided !== SUPABASE_SERVICE_ROLE_KEY) {
+  if (!provided || (provided !== SUPABASE_SERVICE_ROLE_KEY && provided !== ANON_KEY)) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
