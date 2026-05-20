@@ -447,18 +447,38 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Build events with the description in Intervals.icu's native
-    // workout-builder syntax. Intervals.icu parses this server-side and
-    // populates `workout_doc` itself — that parsed doc is what gets exported
-    // to Garmin. Sending our own `workout_doc` produces malformed output
-    // (e.g. "Duration Type cannot be null") because the schema is private and
-    // version-coupled to their parser.
+    // Validate + log every workout before constructing the payload so any
+    // date/title/duration mismatch is visible in the edge function logs.
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    const seenDates = new Set<string>();
+    const validationIssues: string[] = [];
+    for (const w of workouts) {
+      if (!ISO_DATE.test(w.date)) {
+        validationIssues.push(`Invalid date "${w.date}" for "${w.name}"`);
+      }
+      if (seenDates.has(w.date)) {
+        validationIssues.push(`Duplicate date ${w.date} — second occurrence: "${w.name}"`);
+      }
+      seenDates.add(w.date);
+      const segSecs = w.steps.reduce((sum, s) => sum + s.duration, 0);
+      const titleMin = Number(w.name.match(/\((?:Total:\s*)?(\d+)\s*min\)/i)?.[1] ?? NaN);
+      if (Number.isFinite(titleMin) && Math.abs(titleMin - Math.round(segSecs / 60)) > 2) {
+        validationIssues.push(
+          `Duration mismatch on ${w.date} "${w.name}": title=${titleMin}min vs segments=${Math.round(segSecs/60)}min`,
+        );
+      }
+      console.log(`[intervals-sync] IN  ${w.date} | ${w.name} | ${Math.round(segSecs/60)}min | ${w.steps.length} steps`);
+    }
+    if (validationIssues.length) {
+      console.warn("[intervals-sync] validation issues:", validationIssues);
+    }
+
     const eventsToSync = workouts.map((workout, idx) => {
       const fullDescription = formatWorkoutDescription(workout);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
 
-      return {
+      const event = {
         category: "WORKOUT",
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
@@ -471,6 +491,8 @@ serve(async (req) => {
         description: fullDescription,
         external_id: `lovable-${workout.date}-${idx}`,
       };
+      console.log(`[intervals-sync] OUT ${event.start_date_local} | ${event.name} | ${Math.round(totalDuration/60)}min`);
+      return event;
     });
 
     console.log(`Syncing ${eventsToSync.length} workouts via Intervals.icu bulk planned-workout endpoint`);
