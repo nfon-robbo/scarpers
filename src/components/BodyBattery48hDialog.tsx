@@ -550,7 +550,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            </div>
+
+
 
             {/* AI insight */}
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
