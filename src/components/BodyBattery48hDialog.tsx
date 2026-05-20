@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import {
   ComposedChart,
   Area,
@@ -61,6 +61,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<HourPoint[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
 
   useEffect(() => {
     if (!open || !user) return;
