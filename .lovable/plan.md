@@ -1,41 +1,14 @@
-## Finding: -3% activity drain is mathematically correct for today's data
+Background: Everything still exists, just hidden. ReadinessWidget.tsx already builds the score, the CircularGauge, the status label, the sub-message, the trend chart, and the tappable factor breakdown. The dashboard Card was deliberately stripped down: the gauge column was wrapped in hidden flex-col at line 927 with another hidden on the inner gauge div at line 933, and the "AI Insight" and "Wake Readiness Score + Zone Bar" cards below got className="hidden" at lines 1402 and 1454. The right-column metrics list including Body Battery row was kept visible. So this is a re-enable plus small thresholds and copy update, not a rebuild.
 
-I queried today's activities and verified the math through `activityIntensityLoad()` → `activityDrain()`. The -3% is the right answer given what's in the database — there's no missing-data bug.
+What to change in src/components/ReadinessWidget.tsx:
 
-## Today's activities (UTC)
+1. Unhide the score gauge column (lines 925-953). Remove the outer hidden from the left column wrapper so it renders on md screens. Add a mobile-visible variant by stacking the gauge above the metrics list on small screens. Delete the inner commented-out duplicate CircularGauge block and the second hidden wrapper around the real gauge. Keep the existing "Waiting for data" overlay logic, but since score must always be visible switch the suppress treatment from opacity-25 blur to a small inline "syncing" badge sitting under the gauge so the number itself stays sharp and legible.
+2. Update status label and color buckets to the requested scheme. In the statusLabel ternary at line 885, change to: score >= 85 = "Excellent", >= 70 = "Good", >= 55 = "Moderate", >= 40 = "Fair", below 40 = "Poor". In CircularGauge at lines 103-104, expand the color ramp to match: >=70 emerald hsl(142, 70%, 50%), 55-69 amber hsl(45, 95%, 55%), 40-54 orange hsl(25, 90%, 55%), below 40 red hsl(0, 75%, 55%). The number, status label, and drop-shadow already inherit from this color so this single change tints the whole gauge correctly.
+3. Add a primary-driver subtitle. Derive a one-line "why" from displayResult.factors. If score >= 70 pick the highest-scoring factor and show "Strong recovery — HRV +12%" or "Sleep quality on point". If score below 70 pick the worst factor (status "poor" first, else "warning") and surface it as "Sleep quality low", "HRV suppressed", "Yesterday's load heavy", "Resting HR elevated", "Deep sleep critically low". This becomes the small grey line under the status label. The existing subNode slot already exists, just upgrade its content from the workout-context message to a driver plus workout-context two-liner, both inside subNode.
+4. Keep the existing tap-for-detail behavior. The factor rows in the right column already open FactorDetailDialog. Body Battery row continues to open BodyBattery48hDialog. Nothing to do there.
+5. Position relative to Body Battery. The Body Battery is a row in the metrics list inside the same card. The unhidden gauge sits to the left of the metrics list on md+ screens and above it on mobile. Both visible at a glance, same card, no layout reshuffle needed.
+6. Leave the two hidden cards (AI Insight at line 1402, Wake Readiness Zone Bar at line 1454) hidden. Both are explicitly out of scope for this request. The user asked for the score display plus Body Battery coexistence, not the AI advice card or the redundant zone bar.
 
-| Time | Type | Duration | HR | training_load | training_effect |
-|---|---|---|---|---|---|
-| 13:58 | walking | 44.5 min | 107.8 | — | — |
-| 08:48 | running | 15.0 min | 96 | — | 0.8 |
-| 07:26 | walking | 32.1 min | 93.4 | — | — |
+Files: src/components/ReadinessWidget.tsx only (lines around 103-104 gauge color ramp, 885 status labels, 909-922 subNode upgrade, 925-953 unhide left column and drop blur). No other files affected. No data-layer or scoring changes since computeReadiness already returns the score and factors.
 
-No `training_load` on any of them; the run has `training_effect = 0.8` (very easy); HR averages are 93–108 (walking pace).
-
-## Load → drain math (`src/lib/readiness.ts` + `src/lib/body-battery.ts`)
-
-`activityIntensityLoad()` falls back to HR multiplier `clamp(0.5, 2.0, hr/140)` × minutes, or training_effect: `minutes × (0.25 + te/5 × 1.75)`.
-
-- Walking 44.5min × clamp(0.5, 107.8/140) = 44.5 × 0.77 ≈ **34.3**
-- Running 15min × (0.25 + 0.8/5 × 1.75) = 15 × 0.53 ≈ **8.0**
-- Walking 32.1min × clamp(0.5, 93.4/140) = 32.1 × 0.667 ≈ **21.4**
-- **Total load ≈ 63.7** → `activityDrain = 63.7 × 0.05 ≈ 3.2%` → rounds to **3%** ✅
-
-## Conclusion
-
-- The activities ARE being picked up (3 of them, today's UTC date).
-- The fallback estimation IS working (HR + training_effect branches both fire).
-- There simply isn't a "60 min moderate run" or "hard 90 min session" today — just a 15-min very-easy jog and two walks at ~95–108 bpm.
-
-The expected drain stated in the request ("10-20% for a 45-60 min moderate run") would require a 200–400 load activity. The user did not do one today.
-
-## Recommendation
-
-**No code change required.** The model is behaving as designed. If you still want to dial up walking/easy-running contribution, the dial is `activityDrain`'s `× 0.05` constant in `src/lib/body-battery.ts:61` — but that affects every activity, not just light ones, and would inflate drain on every prior day too.
-
-If you'd like, I can:
-1. Leave it as-is (recommended — the math matches reality).
-2. Raise the HR-fallback floor (e.g., bump the `0.5` minimum to `0.7`) so easy walks count a bit more.
-3. Change the constant `0.05` (e.g., to `0.07`) to make all activity drains ~40% higher.
-
-Pick one and I'll implement, or confirm "no change".
+Acceptance: Gauge with big numeric score is visible on the dashboard card, beside the Body Battery row on desktop and stacked above it on mobile. Color is emerald >=70, amber 55-69, orange 40-54, red below 40. Status text matches the requested 5-tier labels. Subtitle shows the dominant factor driving the score regardless of whether it's good or bad. Score is always rendered, even at 35% it shows "35 · Poor" in red with the dominant-issue subtitle with no blur and no hiding. Tapping any factor in the right-column list still opens its detail dialog and tapping Body Battery still opens the 48h chart.

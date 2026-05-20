@@ -101,7 +101,10 @@ function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: num
   const innerR = outerR - 14;
 
   const color =
-    score >= 80 ? "hsl(142, 70%, 50%)" : score > 30 ? "hsl(180, 80%, 55%)" : "hsl(0, 75%, 55%)";
+    score >= 70 ? "hsl(142, 70%, 50%)" :
+    score >= 55 ? "hsl(45, 95%, 55%)" :
+    score >= 40 ? "hsl(25, 90%, 55%)" :
+    "hsl(0, 75%, 55%)";
 
   const tickEls = [];
   for (let i = 0; i < ticks; i++) {
