@@ -336,8 +336,13 @@ const Landing = () => {
       "AI running coach, adaptive running plan, Garmin running coach, personalised marathon training plan, Strava training plan, 10K plan, ultra marathon training",
     );
 
+    // Remove any pre-existing FAQ JSON-LD blocks (defensive against StrictMode
+    // double-invoke or stray crawler-injected duplicates) before appending.
+    document.querySelectorAll('script[data-ld="faq"]').forEach((n) => n.remove());
+
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
+    ld.setAttribute("data-ld", "faq");
     ld.text = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "FAQPage",
@@ -348,6 +353,7 @@ const Landing = () => {
       })),
     });
     document.head.appendChild(ld);
+
 
     // SoftwareApplication JSON-LD lives in index.html — do not duplicate here.
 
