@@ -52,22 +52,22 @@ export function RaceTimePredictorWidget() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setLoading(false); return; }
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/race-predict`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ race_distance: distance }),
-      });
-      const json = await resp.json().catch(() => ({ error: "Failed" }));
-      if (!cancelled) {
-        setData(json);
-        setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setLoading(false); return; }
+        const { data: json, error } = await supabase.functions.invoke("race-predict", {
+          body: { race_distance: distance },
+        });
+        if (cancelled) return;
+        if (error) {
+          setData({ error: error.message } as any);
+        } else {
+          setData(json as PredictionResponse);
+        }
+      } catch (e: any) {
+        if (!cancelled) setData({ error: e?.message || "Failed" } as any);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
