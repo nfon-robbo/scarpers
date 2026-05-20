@@ -61,7 +61,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState<HourPoint[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [truth, setTruth] = useState<BodyBatteryResult | null>(null);
+  const [prevSleep, setPrevSleep] = useState<{ hours: number; deepPct: number; remPct: number } | null>(null);
   const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
+  const insightKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open || !user) return;
