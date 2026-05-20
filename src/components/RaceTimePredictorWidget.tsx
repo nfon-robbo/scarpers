@@ -52,22 +52,22 @@ export function RaceTimePredictorWidget() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setLoading(false); return; }
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/race-predict`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ race_distance: distance }),
-      });
-      const json = await resp.json().catch(() => ({ error: "Failed" }));
-      if (!cancelled) {
-        setData(json);
-        setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setLoading(false); return; }
+        const { data: json, error } = await supabase.functions.invoke("race-predict", {
+          body: { race_distance: distance },
+        });
+        if (cancelled) return;
+        if (error) {
+          setData({ error: error.message } as any);
+        } else {
+          setData(json as PredictionResponse);
+        }
+      } catch (e: any) {
+        if (!cancelled) setData({ error: e?.message || "Failed" } as any);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -86,8 +86,8 @@ export function RaceTimePredictorWidget() {
   const goalAngle = goal != null ? toAngle(goal) : null;
   const targetAngle = target != null ? toAngle(target) : null;
 
-  // SVG geometry
-  const W = 320, H = 180, CX = W / 2, CY = H - 10, R = 130;
+  // SVG geometry (compact)
+  const W = 280, H = 150, CX = W / 2, CY = H - 10, R = 110;
   const polar = (deg: number) => {
     // 0 deg => left (180), 180 deg => right (0)
     const a = Math.PI - (deg * Math.PI) / 180;
@@ -121,21 +121,21 @@ export function RaceTimePredictorWidget() {
   }, [targetAngle]);
 
   return (
-    <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-5 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-3 space-y-2 max-w-xl mx-auto">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-primary/10 border border-primary/20 p-1.5">
-            <Target className="w-4 h-4 text-primary" />
+          <div className="rounded-md bg-primary/10 border border-primary/20 p-1">
+            <Target className="w-3.5 h-3.5 text-primary" />
           </div>
-          <h3 className="font-display tracking-wide text-sm uppercase">Estimated {distance} Time</h3>
+          <h3 className="font-display tracking-wide text-xs uppercase">Estimated {distance} Time</h3>
         </div>
-        <div className="flex gap-1 rounded-lg bg-muted/40 p-1">
+        <div className="flex gap-0.5 rounded-md bg-muted/40 p-0.5">
           {DISTANCES.map((d) => (
             <button
               key={d}
               onClick={() => setDistance(d)}
               className={cn(
-                "text-xs px-2.5 py-1 rounded-md transition-colors",
+                "text-[11px] px-2 py-0.5 rounded transition-colors",
                 distance === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -146,18 +146,18 @@ export function RaceTimePredictorWidget() {
       </div>
 
       <div className="relative flex justify-center">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-sm h-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[260px] h-auto">
           {/* Background track */}
-          <path d={arcPath(0, 180)} stroke="hsl(var(--muted))" strokeOpacity="0.25" strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={arcPath(0, 180)} stroke="hsl(var(--muted))" strokeOpacity="0.25" strokeWidth="16" fill="none" strokeLinecap="round" />
           {/* Green band (best) */}
-          <path d={arcPath(0, greenEnd)} stroke="hsl(142 70% 40%)" strokeWidth="22" fill="none" strokeLinecap="round" />
+          <path d={arcPath(0, greenEnd)} stroke="hsl(142 70% 40%)" strokeWidth="16" fill="none" strokeLinecap="round" />
           {/* Amber band (target zone) */}
           {amberEnd > greenEnd && (
-            <path d={arcPath(greenEnd, amberEnd)} stroke="hsl(38 80% 45%)" strokeWidth="22" fill="none" />
+            <path d={arcPath(greenEnd, amberEnd)} stroke="hsl(38 80% 45%)" strokeWidth="16" fill="none" />
           )}
           {/* Red band (worst) */}
           {amberEnd < 180 && (
-            <path d={arcPath(amberEnd, 180)} stroke="hsl(0 65% 40%)" strokeWidth="22" fill="none" strokeLinecap="round" />
+            <path d={arcPath(amberEnd, 180)} stroke="hsl(0 65% 40%)" strokeWidth="16" fill="none" strokeLinecap="round" />
           )}
 
           {/* Goal marker */}
@@ -196,7 +196,7 @@ export function RaceTimePredictorWidget() {
             </text>
           ) : target != null ? (
             <g>
-              <text x={CX} y={CY - 60} fill="hsl(var(--foreground))" fontSize="26" fontWeight="700" textAnchor="middle">
+              <text x={CX} y={CY - 60} fill="hsl(var(--foreground))" fontSize="22" fontWeight="700" textAnchor="middle">
                 {fmt(target)}
               </text>
               <text x={CX} y={CY - 42} fill="hsl(var(--muted-foreground))" fontSize="11" textAnchor="middle">
