@@ -330,20 +330,12 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     });
   }, [open, user, readinessData]);
 
-  // Reset insight & ref when dialog reopens
-  useEffect(() => {
-    if (!open) {
-      insightKeyRef.current = null;
-      setInsight({ loading: false, text: null });
-    }
-  }, [open]);
-
-  // Fetch AI insight once truth + points + readinessData are ready (single call per open).
+  // Fetch AI insight when truth data changes (cached across reopens by data values).
   useEffect(() => {
     if (!open || !user || !truth || points.length === 0 || !readinessData) return;
-    const key = `${open}|${readinessData?.wakeTimeIso ?? "no-wake"}|${truth.percent}`;
+    const key = `${truth.percent}|${truth.hoursAwake.toFixed(1)}|${truth.drainAwake}|${truth.drainActive}|${truth.startPercent}`;
     if (insightKeyRef.current === key) return;
-    insightKeyRef.current = key;
+
 
     // Pattern detection from chart points
     const q = Math.max(1, Math.floor(points.length / 4));
@@ -397,7 +389,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       })
       .then(({ data, error }) => {
         if (error || !data?.insight) setInsight({ loading: false, text: fallback });
-        else setInsight({ loading: false, text: data.insight });
+        else {
+          insightKeyRef.current = key;
+          setInsight({ loading: false, text: data.insight });
+        }
       })
       .catch(() => setInsight({ loading: false, text: fallback }));
   }, [open, user, truth, points, readinessData, prevSleep]);
