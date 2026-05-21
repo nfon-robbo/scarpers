@@ -2601,6 +2601,17 @@ const TrainingPlanPage = () => {
               raceDistance={raceDistance}
               goalTime={goalTime}
             />
+            <RacePredictionGraph
+              raceDistance={raceDistance}
+              goalSeconds={(() => {
+                const g = (goalTime || "").trim();
+                const m = g.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+                if (!m) return null;
+                const a = +m[1], b = +m[2], c = m[3] ? +m[3] : null;
+                return c != null ? a*3600 + b*60 + c : a*60 + b;
+              })()}
+              refreshKey={racePredictRefresh}
+            />
             <PlanDayList
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
