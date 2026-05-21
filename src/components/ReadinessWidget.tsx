@@ -150,7 +150,7 @@ function CircularGauge({
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;
-  const innerR = outerR - 18;
+  const innerR = outerR - 24;
 
   const tickEls: React.ReactNode[] = [];
   for (let i = 0; i < ticks; i++) {
@@ -170,7 +170,7 @@ function CircularGauge({
         x2={x2}
         y2={y2}
         stroke={active ? color : "hsl(var(--muted-foreground) / 0.15)"}
-        strokeWidth={active ? 3 : 2}
+        strokeWidth={active ? 4 : 2.5}
         strokeLinecap="round"
       />,
     );
@@ -208,14 +208,14 @@ function CircularGauge({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <span
-          className="text-6xl font-black tracking-tighter leading-none text-foreground"
-          style={{ textShadow: "0 2px 16px hsl(var(--foreground) / 0.15)" }}
+          className="text-8xl font-black tracking-tighter leading-none text-foreground"
+          style={{ textShadow: "0 2px 20px hsl(var(--foreground) / 0.18)" }}
         >
           {score}
         </span>
-        <div className="mt-2 flex items-center justify-center gap-2">
+        <div className="mt-3 flex items-center justify-center gap-2">
           <span
-            className="text-[11px] font-semibold uppercase tracking-wider"
+            className="text-xs font-semibold uppercase tracking-wider"
             style={{ color }}
           >
             {statusLabel}
@@ -1072,10 +1072,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   <div className="relative flex flex-col items-center justify-center">
                     <CircularGauge
                       score={score}
-                      size={210}
+                      size={300}
                       statusLabel={statusLabel}
                       trendDelta={trendDelta}
                     />
+
                     {suppressScore && (
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
