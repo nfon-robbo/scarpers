@@ -504,6 +504,17 @@ Total length: 150 words max. Do not include the original next-session table agai
             )}
           </div>
         )}
+
+        {/* Coach error + Retry — surfaces gateway timeouts inline */}
+        {!coachLoading && coachError && (
+          <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+            <p className="text-sm">{coachError}</p>
+            <Button size="sm" onClick={() => coachRetryRef.current?.()}>
+              <Loader2 className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
