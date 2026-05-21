@@ -351,3 +351,64 @@ Deno.test("isExtremeAccumulatedVolume: 14km/85min is NOT extreme", () => {
     false,
   );
 });
+
+// ── Short-workout match floor (improvement #2) ───────────────────────────────
+
+Deno.test("matchScheduledWorkout: short — 3km planned vs 2.5km activity → no match (Δ0.5km exceeds 0.75km floor? no, but) — actually Δ0.5km is within floor", () => {
+  // 3km planned vs 2.5km activity: Δ=0.5km, floor=0.75km, so passes the floor.
+  // (Distance signal alone — discipline matches, no other signals.)
+  const signals = extractWorkoutSignals("Easy 3km shake-out");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 2500 },
+    signals,
+  );
+  assertEquals(r.matched, true);
+});
+
+Deno.test("matchScheduledWorkout: short — 3km planned vs 2.0km activity → no match (Δ1.0km exceeds 0.75km floor)", () => {
+  const signals = extractWorkoutSignals("Easy 3km shake-out");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 2000 },
+    signals,
+  );
+  assertEquals(r.matched, false);
+  assert(r.reason.includes("floor"));
+});
+
+Deno.test("matchScheduledWorkout: short — 3km planned vs 2.9km → match (Δ0.1km)", () => {
+  const signals = extractWorkoutSignals("Easy 3km shake-out");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 2900 },
+    signals,
+  );
+  assertEquals(r.matched, true);
+});
+
+Deno.test("matchScheduledWorkout: long — 20km planned vs 17km → match (±15%, floor not applied)", () => {
+  const signals = extractWorkoutSignals("Long run 20km easy");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 17000 },
+    signals,
+  );
+  assertEquals(r.matched, true);
+});
+
+Deno.test("matchScheduledWorkout: short duration — 30min planned vs 22min → no match (Δ8min > 5min floor)", () => {
+  const signals = extractWorkoutSignals("Recovery jog (Total: 30min)");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", duration_seconds: 22 * 60 },
+    signals,
+  );
+  assertEquals(r.matched, false);
+  assert(r.reason.includes("floor"));
+});
+
+Deno.test("matchScheduledWorkout: long duration — 90min planned vs 78min → match (±13%)", () => {
+  const signals = extractWorkoutSignals("Long run (Total: 90min)");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", duration_seconds: 78 * 60 },
+    signals,
+  );
+  assertEquals(r.matched, true);
+});
+
