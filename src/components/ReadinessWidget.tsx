@@ -1066,6 +1066,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             }
 
             return (
+                <div className="flex flex-col gap-5">
                 <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + (optional) readiness trend */}
                 <div className="flex flex-col items-stretch shrink-0 md:w-[300px] gap-3">
