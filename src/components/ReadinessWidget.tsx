@@ -1034,13 +1034,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
 
             const insightIcon =
               driverLabel === "Sleep Quality" || driverLabel === "Deep Sleep" || driverLabel === "Sleep Debt" ? (
-                <Moon className="h-3 w-3" />
+                <Moon className="h-4 w-4" />
               ) : driverLabel === "HRV" || driverLabel === "Resting HR" ? (
-                <Heart className="h-3 w-3" />
+                <Heart className="h-4 w-4" />
               ) : driverLabel === "Yesterday's Load" || driverLabel === "Today's Effort" || driverLabel === "Body Battery" ? (
-                <Activity className="h-3 w-3" />
+                <Activity className="h-4 w-4" />
               ) : score >= 70 ? (
-                <Sparkles className="h-3 w-3" />
+                <Sparkles className="h-4 w-4" />
               ) : null;
 
             let message = "";
