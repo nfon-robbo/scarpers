@@ -1042,6 +1042,7 @@ const TrainingPlanPage = () => {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
+  const [dayAdjustCompletedActivityId, setDayAdjustCompletedActivityId] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
   const [dayAdjustTargetDate, setDayAdjustTargetDate] = useState<Date>(new Date());
   const [dayAdjustMode, setDayAdjustMode] = useState<"today" | "next">("today");
