@@ -301,6 +301,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           },
           wakeTimeIso: readinessData.wakeTimeIso,
           todayActivities: readinessData.todayActivities,
+          now: Date.now(),
         });
         if (hourly.length > 0) {
           const last = hourly[hourly.length - 1];
