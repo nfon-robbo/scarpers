@@ -129,6 +129,14 @@ export function shouldForceAdjustedByLoadVelocity(input: {
 
 export const EXTREME_DAY_VOLUME = { minutes: 90, km: 15 } as const;
 
+/**
+ * Absolute-tolerance floor for short planned workouts. Short workouts must
+ * match within these absolute deltas regardless of percentage — prevents a
+ * warm-up or shake-out from being misidentified as the planned session.
+ */
+export const MATCH_FLOOR = { distanceKm: 0.75, durationMin: 5 } as const;
+export const SHORT_THRESHOLD = { distanceKm: 7.5, durationMin: 50 } as const;
+
 export type Discipline = "run" | "bike" | "swim" | "other";
 
 export interface WorkoutSignals {
