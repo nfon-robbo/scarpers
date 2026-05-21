@@ -1982,17 +1982,34 @@ ${upcoming.join("\n")}
 
     // Non-full-plan types: zero-buffer pass-through (latency-sensitive).
     if (!needsRaceDateContinuation) {
-      const { readable, writable } = new TransformStream();
-      // If we have a preamble (e.g. day-adjust detected-activity marker), emit
-      // it as the first SSE chunk before piping the LLM stream.
-      if (streamPreamble) {
-        const encoder = new TextEncoder();
-        const writer = writable.getWriter();
-        const chunk = { choices: [{ delta: { content: streamPreamble } }] };
-        await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
-        writer.releaseLock();
+      // IMPORTANT: do not await a TransformStream write before returning the
+      // Response. With no browser reader attached yet, that write can backpressure
+      // forever, which made Day Ahead time out whenever streamPreamble was set.
+      if (!streamPreamble) {
+        return new Response(response.body, { headers: sseHeaders });
       }
-      response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
+
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          try {
+            const chunk = { choices: [{ delta: { content: streamPreamble } }] };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+
+            const reader = response.body!.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } catch (e) {
+            console.error("stream preamble pipe error:", e);
+            controller.error(e);
+            return;
+          }
+          controller.close();
+        },
+      });
       return new Response(readable, { headers: sseHeaders });
     }
 
