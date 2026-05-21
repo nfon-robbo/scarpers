@@ -456,6 +456,9 @@ ${sleepContext}`;
 
     let systemPrompt = "";
     let userPrompt = "";
+    // Optional preamble streamed to the client BEFORE LLM tokens (e.g. a hidden
+    // marker the UI parses for the "Detected activity" chip).
+    let streamPreamble = "";
 
     const isPlanAdjust = type === "plan-adjust";
 
