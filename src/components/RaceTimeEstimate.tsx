@@ -137,7 +137,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
   const [extractedFromCount, setExtractedFromCount] = useState(0);
-  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string }[]; successes: { title: string; pace: number; minutes: number }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
+  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string; date: Date }[]; successes: { title: string; pace: number; minutes: number; date: Date }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
 
   useEffect(() => {
     let cancelled = false;
