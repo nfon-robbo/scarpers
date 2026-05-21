@@ -47,6 +47,36 @@ import { logPlanEdit } from "@/lib/plan-edit-log";
 import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 
+// ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
+// Skip re-running the LLM when the user re-clicks within 30 min and no new
+// activity has appeared on the target date. Key includes activity count so a
+// freshly-synced run invalidates the entry automatically.
+type DayAdjustCacheEntry = {
+  result: string;
+  detected: { label: string; startedAt: string; count: number } | null;
+  completedActivityId: string | null;
+  isModified: boolean;
+  at: number;
+};
+const DAY_ADJUST_CACHE = new Map<string, DayAdjustCacheEntry>();
+const DAY_ADJUST_CACHE_TTL_MS = 30 * 60 * 1000;
+const dayAdjustCacheKey = (userId: string, targetDateStr: string, activityCount: number) =>
+  `${userId}|${targetDateStr}|${activityCount}`;
+
+const parseDayAdjustDetected = (text: string): { label: string; startedAt: string; count: number } | null => {
+  const m = text.match(/<!--\s*DAY_ADJUST_DETECTED:\s*name="([^"]*)"\s+started="([^"]*)"\s+count=(\d+)/i);
+  if (!m) return null;
+  const count = parseInt(m[3], 10);
+  return { label: m[1], startedAt: m[2], count: Number.isFinite(count) ? count : 1 };
+};
+
+const stripDayAdjustMarkers = (text: string): string =>
+  text
+    .replace(/<!--\s*DAY_ADJUST_STATUS:[^>]*-->/g, "")
+    .replace(/<!--\s*DAY_ADJUST_DETECTED:[^>]*-->/g, "")
+    .trim();
+
+
 interface ApiStep {
   duration: number;
   hrLow: number;
