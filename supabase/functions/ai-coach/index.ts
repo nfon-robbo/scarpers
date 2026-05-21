@@ -1959,6 +1959,15 @@ ${upcoming.join("\n")}
     // Non-full-plan types: zero-buffer pass-through (latency-sensitive).
     if (!needsRaceDateContinuation) {
       const { readable, writable } = new TransformStream();
+      // If we have a preamble (e.g. day-adjust detected-activity marker), emit
+      // it as the first SSE chunk before piping the LLM stream.
+      if (streamPreamble) {
+        const encoder = new TextEncoder();
+        const writer = writable.getWriter();
+        const chunk = { choices: [{ delta: { content: streamPreamble } }] };
+        await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        writer.releaseLock();
+      }
       response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
       return new Response(readable, { headers: sseHeaders });
     }
