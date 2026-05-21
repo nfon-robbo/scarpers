@@ -222,6 +222,22 @@ export function matchScheduledWorkout(
     return { matched: false, reason: `discipline mismatch (${activity.activity_type} vs ${signals.discipline})` };
   }
 
+  // Hard-session guard: if the plan calls for a hard session, the activity
+  // must mention a matching keyword in its name — otherwise an easy run of
+  // similar distance would be falsely matched as "completed".
+  const HARD_KEYWORDS = ["tempo", "interval", "intervals", "threshold", "vo2", "hill", "hill repeats", "fartlek", "race pace"];
+  const plannedHard = signals.keywords.some((k) => HARD_KEYWORDS.includes(k));
+  const activityName = String(
+    activity.name
+      || (activity.raw_data && (activity.raw_data as any).name)
+      || (activity.raw_data && (activity.raw_data as any).title)
+      || (activity.raw_data && (activity.raw_data as any).activity_name)
+      || "",
+  ).toLowerCase();
+  if (plannedHard && !HARD_KEYWORDS.some((kw) => activityName.includes(kw))) {
+    return { matched: false, reason: "planned hard session but activity name has no matching keyword" };
+  }
+
   const checks: string[] = [];
   let signalCount = 0;
   let okCount = 0;
