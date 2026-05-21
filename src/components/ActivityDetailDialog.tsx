@@ -461,17 +461,20 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                           <Stat label="Max Power" value={data.max_power ? `${Math.round(data.max_power)} W` : null} icon={Zap} />
                           <Stat label="Total Steps" value={(() => {
                             if (data.total_steps) return `${data.total_steps.toLocaleString()}`;
-                            const stepLen = data.raw_data?.avg_step_length;
-                            if (stepLen && data.distance_meters) return `${Math.round(data.distance_meters / (stepLen / 1000)).toLocaleString()}`;
+                            const rawLen = data.raw_data?.avg_step_length;
+                            const stepMeters = rawLen ? (rawLen > 10 ? rawLen / 1000 : rawLen) : null;
+                            if (stepMeters && data.distance_meters) return `${Math.round(data.distance_meters / stepMeters).toLocaleString()}`;
                             if (data.avg_cadence && data.duration_seconds) return `${Math.round(data.avg_cadence * (data.duration_seconds / 60)).toLocaleString()}`;
                             return null;
                           })()} icon={Footprints} />
                           <Stat label="Avg Step Length" value={(() => {
                             const v = data.raw_data?.avg_step_length;
                             if (!v) return null;
-                            const meters = v > 10 ? v / 1000 : v; // FIT stores in mm
-                            return `${meters.toFixed(2)} m`;
-                          })()} icon={Ruler} />
+                            // FIT stores avg_step_length in mm (e.g. 795.30 mm). Some sources may store in m.
+                            const meters = v > 10 ? v / 1000 : v;
+                            return `${(meters * 100).toFixed(1)} cm`;
+                          })()} icon={Ruler} />},
+                          
                         </div>
                       </CardContent>
                     </Card>
