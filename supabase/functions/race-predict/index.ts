@@ -181,6 +181,39 @@ serve(async (req) => {
     if (vo2Num) basis.push(`VO2max ${Math.round(vo2Num)}`);
     if (easyPace) basis.push(`easy ${Math.floor(easyPace/60)}:${String(Math.round(easyPace%60)).padStart(2,"0")}/km`);
 
+    // ── History write: dedupe near-duplicates within 6h ──
+    let previous_sec: number | null = null;
+    try {
+      const { data: lastRow } = await supabase
+        .from("race_prediction_history")
+        .select("predicted_seconds, calculated_at")
+        .eq("user_id", user.id)
+        .eq("distance", raceDistance)
+        .order("calculated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      previous_sec = lastRow?.predicted_seconds ?? null;
+      const targetSecRounded = Math.round(T);
+      const isDup =
+        lastRow &&
+        lastRow.predicted_seconds === targetSecRounded &&
+        Date.now() - new Date(lastRow.calculated_at).getTime() < 6 * 3600_000;
+      if (!isDup) {
+        const triggered_by = ["plan_start","activity_synced","manual","scheduled"].includes(body.triggered_by)
+          ? body.triggered_by : "manual";
+        await supabase.from("race_prediction_history").insert({
+          user_id: user.id,
+          distance: raceDistance,
+          predicted_seconds: targetSecRounded,
+          predicted_pace_per_km: Math.round(paceSecPerKm),
+          vo2_max: vo2Num,
+          data_sources: { basis, confidence, runs_in_last_21d: last21.length, adherence },
+          triggered_by,
+          activity_id: body.activity_id || null,
+        });
+      }
+    } catch (_e) { /* non-fatal */ }
+
     return new Response(JSON.stringify({
       insufficient: false,
       race_distance: raceDistance, distance_km: dKm,
@@ -192,6 +225,7 @@ serve(async (req) => {
       runs_in_last_21d: last21.length,
       weeks_completed: Math.round(weeksCompleted),
       adherence,
+      previous_sec,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message || "predict failed" }),
