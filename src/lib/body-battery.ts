@@ -174,7 +174,7 @@ export function computeBodyBattery(opts: {
   const drainAwake = Math.round(passive);
   const drainActive = Math.round(active);
 
-  if (import.meta.env?.DEV) {
+  {
     const s = opts.sleep;
     // eslint-disable-next-line no-console
     console.debug("[BodyBattery] inputs:", {
