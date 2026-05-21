@@ -712,20 +712,28 @@ BREVITY RULES:
 
 ${athleteContext}`;
 
-      userPrompt = `Date: ${targetDateStr}
+      const targetIsNotTodayLine = target_is_not_today
+        ? `\nTARGET IS NOT TODAY: true\ntoday_date_uk: ${today_date_uk || "today"}\ntarget_date_uk: (format ${targetDateStr} in UK long form, e.g. "Tuesday 22 May 2026")\n`
+        : "";
 
+      userPrompt = `Date: ${targetDateStr}
+${targetIsNotTodayLine}
 LAST NIGHT'S SLEEP DATA:
 ${sleepContext || "No sleep data available for last night."}
 
 ${metricsToday}
 ${trendContext}
+${escalationContext}
+${intensityContext}
 ${yesterdayContext}
 ${cadenceContext}
 
 PLANNED WORKOUT FOR ${targetDateStr}:
 ${today_workout || "No workout found for the target date."}
 
-Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Apply the gating rules strictly (KEEP AS-IS / SOFT ADJUSTED / ADJUSTED). Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+
+
 
     } else if (type === "chat") {
       // Fetch the user's active training plan so chat answers reference real scheduled sessions
