@@ -1550,7 +1550,102 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   </div>
                 );
               })()}
+              {(() => {
+                // ── Recovery Priorities — actionable recs from problem factors ──
+                const RECS: Record<string, { title: string; tryLine?: string; avoidLine?: string }> = {
+                  "Deep Sleep": {
+                    title: "Deep sleep optimisation",
+                    tryLine: "Cooler room (16–19°C), earlier bedtime, magnesium with dinner",
+                    avoidLine: "Screens & bright light 1h before sleep",
+                  },
+                  "Sleep Quality": {
+                    title: "Sleep environment",
+                    tryLine: "Check room temp, noise & light; consistent wind-down routine",
+                    avoidLine: "Late caffeine, alcohol, heavy meals before bed",
+                  },
+                  "Sleep Debt": {
+                    title: "Bank some sleep",
+                    tryLine: "Aim for +1h tonight; protect your wind-down window",
+                    avoidLine: "Late-night training or screen scrolling",
+                  },
+                  HRV: {
+                    title: "Stress management",
+                    tryLine: "10 min slow breathing, walk outside, hydrate",
+                    avoidLine: "Extra caffeine and high-intensity sessions today",
+                  },
+                  "Resting HR": {
+                    title: "Watch for illness or overload",
+                    tryLine: "Easy day, extra fluids, monitor symptoms",
+                    avoidLine: "Hard intervals — back off until RHR settles",
+                  },
+                  "Yesterday's Load": {
+                    title: "Active recovery today",
+                    tryLine: "Easy 20–30 min run, mobility, light stretching",
+                    avoidLine: "Intervals, tempo, or long efforts",
+                  },
+                  "Today's Effort": {
+                    title: "Refuel & wind down",
+                    tryLine: "Carbs + protein within 1h, walk, early bed",
+                    avoidLine: "A second session or late-night training",
+                  },
+                  "Body Battery": {
+                    title: "Top up reserves",
+                    tryLine: "Short nap, low-stimulation downtime, hydrate",
+                    avoidLine: "Stacking more effort on top of a depleted battery",
+                  },
+                };
+
+                const order: Record<string, number> = { poor: 0, warning: 1, good: 2 };
+                const issues = displayResult.factors
+                  .filter((f) => f.status !== "good" && RECS[f.label])
+                  .sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9))
+                  .slice(0, 3);
+
+                if (issues.length === 0 || suppressScore) return null;
+
+                return (
+                  <div className="px-3 py-3 border-t border-border/40 bg-[#0d1525]/60">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300">
+                        Recovery priorities
+                      </h4>
+                    </div>
+                    <ol className="space-y-2.5">
+                      {issues.map((f, i) => {
+                        const rec = RECS[f.label];
+                        const dotColor =
+                          f.status === "poor" ? "bg-destructive" : "bg-yellow-500";
+                        return (
+                          <li key={f.label} className="flex gap-2.5 text-xs leading-snug">
+                            <span className="flex items-center justify-center shrink-0 w-5 h-5 rounded-full bg-white/5 text-[10px] font-bold text-foreground/80 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                                <span className="font-semibold text-foreground">{rec.title}</span>
+                              </div>
+                              {rec.tryLine && (
+                                <p className="mt-0.5 text-muted-foreground">
+                                  <span className="text-emerald-400 font-medium">Try:</span> {rec.tryLine}
+                                </p>
+                              )}
+                              {rec.avoidLine && (
+                                <p className="text-muted-foreground">
+                                  <span className="text-rose-400 font-medium">Avoid:</span> {rec.avoidLine}
+                                </p>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                );
+              })()}
             </div>
+
           </div>
             );
           })()}
