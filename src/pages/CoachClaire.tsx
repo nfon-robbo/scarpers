@@ -8,7 +8,7 @@ const CoachClaire = () => (
   <MarketingPageLayout
     title="Coach Claire Rayners — Scarpers' AI Running Coach"
     description="Meet Coach Claire Rayners: the system-built, programmable elite running coach behind every Scarpers plan, day-ahead briefing and post-run review."
-    canonicalPath="/coach"
+    canonicalPath="/coach/claire-rayners"
   >
     <article className="prose prose-invert max-w-none">
       <div className="not-prose flex flex-col sm:flex-row sm:items-center gap-5 mb-6">

@@ -47,7 +47,20 @@
     <meta name="author" content="Scarpers" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="googlebot" content="index, follow" />
-    <!-- Canonical is set per-route by page components (MarketingPageLayout / page-level meta) -->
+    <!-- Sitewide default canonical; per-route pages (MarketingPageLayout) override this client-side. -->
+    <link rel="canonical" href="https://www.scarpers.co.uk/" />
+    <!-- Apex/lovable-app → www redirect (belt-and-braces; real 301 should be at edge/Cloudflare). -->
+    <script>
+      (function () {
+        try {
+          var h = location.hostname;
+          if (h === 'scarpers.co.uk' || h === 'scarpers.lovable.app') {
+            location.replace('https://www.scarpers.co.uk' + location.pathname + location.search + location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <link rel="icon" href="/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
