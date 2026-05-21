@@ -512,6 +512,71 @@ const TrainingPlanPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-recalc race prediction when a new activity gets linked to a plan day.
+  // Debounced 2s; uses linked-activity count as the change signal so any new
+  // workout completion triggers a fresh prediction + history row.
+  useEffect(() => {
+    if (!user || !raceDistance) return;
+    const count = Object.keys(linkedActivities).length;
+    const prev = linkedActivityCountRef.current;
+    linkedActivityCountRef.current = count;
+
+    // Seed once on first render if we have a plan but no history yet
+    if (prev === -1) {
+      if (!racePredictSeededRef.current && raceDistance) {
+        racePredictSeededRef.current = true;
+        (async () => {
+          try {
+            const { data: existing } = await supabase
+              .from("race_prediction_history")
+              .select("id")
+              .eq("user_id", user.id)
+              .limit(1);
+            if (!existing || existing.length === 0) {
+              await supabase.functions.invoke("race-predict", {
+                body: { race_distance: raceDistance, triggered_by: "plan_start" },
+              });
+              setRacePredictRefresh((n) => n + 1);
+            }
+          } catch { /* non-fatal */ }
+        })();
+      }
+      return;
+    }
+
+    if (count <= prev) return; // only recalc when count grows
+
+    if (racePredictDebounceRef.current) clearTimeout(racePredictDebounceRef.current);
+    racePredictDebounceRef.current = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("race-predict", {
+          body: { race_distance: raceDistance, triggered_by: "activity_synced" },
+        });
+        if (!error && data && !data.insufficient && data.target_sec) {
+          const prevSec = data.previous_sec as number | null;
+          const newSec = Math.round(data.target_sec);
+          if (prevSec && Math.abs(prevSec - newSec) >= 30) {
+            const diff = prevSec - newSec;
+            const sign = diff > 0 ? "faster" : "slower";
+            const mm = Math.floor(Math.abs(diff) / 60);
+            const ss = String(Math.abs(diff) % 60).padStart(2, "0");
+            const fmt = (s: number) => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+            toast({
+              title: "🎯 Race estimate updated",
+              description: `${fmt(prevSec)} → ${fmt(newSec)} (${mm}:${ss} ${sign}!)`,
+            });
+          }
+          setRacePredictRefresh((n) => n + 1);
+        }
+      } catch { /* non-fatal */ }
+    }, 2000);
+    return () => {
+      if (racePredictDebounceRef.current) clearTimeout(racePredictDebounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedActivities, raceDistance, user]);
+
+
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
     if (!user) { setInitialLoading(false); return; }
