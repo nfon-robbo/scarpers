@@ -1436,6 +1436,10 @@ const TrainingPlanPage = () => {
       toast({ title: "No active plan", description: "There's no plan to adjust.", variant: "destructive" });
       return;
     }
+    if (dayAdjusting) {
+      toast({ title: "Assessment already in progress", description: "Please wait for the current assessment to finish." });
+      return;
+    }
     const workouts = parseWorkoutsFromPlan(content);
     const todayStr = format(new Date(), "yyyy-MM-dd");
     const next = workouts
