@@ -593,6 +593,14 @@ ${sleepContext}`;
         .order("start_time", { ascending: false })
         .limit(20);
 
+      const CADENCE_CUES = [
+        "Try a 170 BPM metronome playlist today (search 'running 170 bpm' on Spotify).",
+        "Focus on quicker foot turnover — imagine running on hot coals.",
+        "Shorten your stride 10% while maintaining the same speed — your feet should feel lighter.",
+        "Count three footfalls per second out loud for the first kilometre to lock in the rhythm.",
+        "Cue 'quick, light feet' — land softly directly under your hips, not out in front.",
+        "Run alongside a song at 170 BPM (e.g. 'Stayin' Alive') for the warm-up to set the pace.",
+      ];
       let cadenceContext = "";
       if (recentRuns && recentRuns.length > 0) {
         const cadences = recentRuns.map(r => r.avg_cadence!);
@@ -601,7 +609,10 @@ ${sleepContext}`;
         const trend = cadences.length >= 3 
           ? (cadences[0] > cadences[cadences.length - 1] ? "improving" : cadences[0] < cadences[cadences.length - 1] ? "declining" : "stable")
           : "insufficient data";
-        cadenceContext = `\nCADENCE DATA (last ${recentRuns.length} runs):\nAverage cadence: ${avgCadence} spm\nMost recent: ${latestCadence} spm\nTrend: ${trend}\nTarget range: 170-180 spm for joint protection\n${avgCadence < 160 ? "⚠️ Cadence is LOW — prioritize quick, light steps to reduce impact on knee/ankle.\n" : avgCadence >= 170 ? "✅ Cadence is in target range — great for joint health.\n" : "Cadence improving but still below target — continue cueing 'quick feet'.\n"}`;
+        const cueLine = avgCadence < 160
+          ? `\nCADENCE CUE FOR TODAY (use this exact cue verbatim in the Coach's Note): "${CADENCE_CUES[Math.floor(Math.random() * CADENCE_CUES.length)]}"\n`
+          : "";
+        cadenceContext = `\nCADENCE DATA (last ${recentRuns.length} runs):\nAverage cadence: ${avgCadence} spm\nMost recent: ${latestCadence} spm\nTrend: ${trend}\nTarget range: 170-180 spm for joint protection\n${avgCadence < 160 ? "⚠️ Cadence is LOW — prioritize quick, light steps to reduce impact on knee/ankle.\n" : avgCadence >= 170 ? "✅ Cadence is in target range — great for joint health.\n" : "Cadence improving but still below target — continue cueing 'quick feet'.\n"}${cueLine}`;
       }
 
       systemPrompt = `You are an elite endurance coach making a real-time daily adjustment decision for an athlete's workout.
