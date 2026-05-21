@@ -657,7 +657,7 @@ Choose **ADJUSTED** when ANY of these triggers fires:
 
 Choose **SOFT ADJUSTED** when:
   - Exactly 1 poor night ending today AND (HRV is 10–15% below median baseline OR RHR is +2 bpm above median baseline).
-  - Keep the workout STRUCTURE and title. Either reduce target pace by 10–15 sec/km, OR add an extra 5 min warm-up with a "scale back if it doesn't ease" note. Output exactly: `## ✅ Decision: SOFT ADJUSTED — one suboptimal night with slightly elevated fatigue markers`.
+  - Keep the workout STRUCTURE and title. Either reduce target pace by 10–15 sec/km, OR add an extra 5 min warm-up with a "scale back if it doesn't ease" note. Output exactly: "## ✅ Decision: SOFT ADJUSTED — one suboptimal night with slightly elevated fatigue markers".
 
 Otherwise choose **KEEP AS-IS**.
 
