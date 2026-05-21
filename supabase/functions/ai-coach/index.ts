@@ -353,13 +353,23 @@ serve(async (req) => {
     }
 
     // Fetch Google Fit sleep stages and compute sleep scores
+    // PERF: bound to last 60 days to avoid full-table scans for users with
+    // months/years of stage history. Previous unbounded query was the prime
+    // suspect for the 140s gateway timeout on Day Ahead.
     let sleepContext = "";
+    const _sleepStart = performance.now();
+    const sleepSince = new Date();
+    sleepSince.setDate(sleepSince.getDate() - 60);
+    const sleepSinceStr = sleepSince.toISOString().split("T")[0];
     const { data: sleepStages } = await supabase
       .from("sleep_stages")
       .select("date, stage, duration_seconds, start_time, end_time")
       .eq("user_id", user.id)
+      .gte("date", sleepSinceStr)
       .order("date", { ascending: false })
       .limit(500);
+    console.log(`[PERF] sleep_stages query: ${(performance.now() - _sleepStart).toFixed(0)}ms (${sleepStages?.length ?? 0} rows)`);
+
 
     if (sleepStages && sleepStages.length > 0) {
       // Aggregate by date
@@ -471,12 +481,14 @@ ${sleepContext}`;
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split("T")[0];
       
+      const _yStart = performance.now();
       const { data: yesterdayActivities } = await supabase
         .from("activities")
         .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, training_load")
         .eq("user_id", user.id)
         .gte("start_time", yesterdayStr + "T00:00:00")
         .lt("start_time", targetDateStr + "T00:00:00");
+      console.log(`[PERF] yesterday_activities query: ${(performance.now() - _yStart).toFixed(0)}ms (${yesterdayActivities?.length ?? 0} rows)`);
 
       // Explicit "hard"/"long" classification of yesterday's session
       let yesterdayLoad = { hard: false, long: false, reason: "" as string };
@@ -505,6 +517,7 @@ ${sleepContext}`;
       const targetNext = new Date(targetDateStr);
       targetNext.setDate(targetNext.getDate() + 1);
       const targetNextStr = targetNext.toISOString().split("T")[0];
+      const _tStart = performance.now();
       const { data: todayActivitiesRaw } = await supabase
         .from("activities")
         .select("id, activity_type, distance_meters, duration_seconds, avg_heart_rate, start_time, raw_data")
@@ -515,6 +528,8 @@ ${sleepContext}`;
         .gte("duration_seconds", 60)
         .order("start_time", { ascending: false })
         .limit(5);
+      console.log(`[PERF] today_activities query: ${(performance.now() - _tStart).toFixed(0)}ms (${todayActivitiesRaw?.length ?? 0} rows)`);
+
 
       const todayActivities: TodayActivityInput[] = (todayActivitiesRaw || []).map((a: any) => ({
         id: a.id,
@@ -632,12 +647,15 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       }
 
 
+      const _tmStart = performance.now();
       const { data: todayMetrics } = await supabase
         .from("daily_metrics")
         .select("resting_heart_rate, hrv, stress_score, steps")
         .eq("user_id", user.id)
         .eq("date", targetDateStr)
         .maybeSingle();
+      console.log(`[PERF] today_metrics query: ${(performance.now() - _tmStart).toFixed(0)}ms`);
+
 
       let metricsToday = "";
       if (todayMetrics) {
@@ -651,6 +669,7 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       const trendStart = new Date(targetDateStr);
       trendStart.setDate(trendStart.getDate() - 14);
       const trendStartStr = trendStart.toISOString().split("T")[0];
+      const _trStart = performance.now();
       const { data: trendMetrics } = await supabase
         .from("daily_metrics")
         .select("date, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, awake_during_night_minutes, hrv, resting_heart_rate")
@@ -658,6 +677,8 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
         .gte("date", trendStartStr)
         .lte("date", targetDateStr)
         .order("date", { ascending: false });
+      console.log(`[PERF] trend_metrics query: ${(performance.now() - _trStart).toFixed(0)}ms (${trendMetrics?.length ?? 0} rows)`);
+
 
       let trendContext = "";
       let consecutivePoorOut = 0;
@@ -724,6 +745,7 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
       cadenceSince.setDate(cadenceSince.getDate() - 30);
+      const _cStart = performance.now();
       const { data: recentRuns } = await supabase
         .from("activities")
         .select("start_time, avg_cadence, avg_speed, distance_meters, duration_seconds")
@@ -732,6 +754,8 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
         .not("avg_cadence", "is", null)
         .order("start_time", { ascending: false })
         .limit(20);
+      console.log(`[PERF] cadence query: ${(performance.now() - _cStart).toFixed(0)}ms (${recentRuns?.length ?? 0} rows)`);
+
 
       const CADENCE_CUES = [
         "Try a 170 BPM metronome playlist today (search 'running 170 bpm' on Spotify).",
