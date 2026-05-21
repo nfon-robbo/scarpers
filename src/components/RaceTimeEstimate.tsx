@@ -257,8 +257,22 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       }
       cleanRuns.push({ date: w.dateObj, pace, title });
     }
-    // Fold in extracted run segments from walk/run sessions
-    const allClean = [...cleanRuns, ...extractedRuns];
+    // Fold in extracted run segments from walk/run sessions.
+    // When we have extracted run-only segments, prefer them over "clean" continuous runs that
+    // are clearly contaminated (much slower than extracted pace, or wildly slower than VO2 fitness).
+    let usedClean = cleanRuns.slice();
+    let droppedContaminated = 0;
+    if (extractedRuns.length > 0) {
+      const fastestExtracted = Math.min(...extractedRuns.map((r) => r.pace));
+      const vo2Pace = vo2Max != null ? vo2maxTo5kSeconds(vo2Max) / 5 : null; // sec/km @ 5k
+      usedClean = cleanRuns.filter((r) => {
+        if (r.pace > fastestExtracted + 45) return false; // >45s/km slower than extracted = contaminated
+        if (vo2Pace != null && r.pace > vo2Pace + 90) return false; // wildly slower than VO2 fitness
+        return true;
+      });
+      droppedContaminated = cleanRuns.length - usedClean.length;
+    }
+    const allClean = [...usedClean, ...extractedRuns];
     allClean.sort((a, b) => b.date.getTime() - a.date.getTime());
     const recentClean = allClean.slice(0, 6);
     // Anything we successfully extracted shouldn't still count as "excluded"
@@ -285,9 +299,12 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     let estFinish: number | null = null;
     let warning: string | null = null;
 
-    const cleanLabel = extractedFromCount > 0 && cleanRuns.length === 0
+    const cleanLabel = extractedFromCount > 0 && usedClean.length === 0
       ? `${extractedFromCount} extracted run segment${extractedFromCount === 1 ? "" : "s"}`
-      : `${recentClean.length} clean run${recentClean.length === 1 ? "" : "s"}`;
+      : extractedFromCount > 0
+        ? `${usedClean.length} clean + ${extractedFromCount} extracted`
+        : `${recentClean.length} clean run${recentClean.length === 1 ? "" : "s"}`;
+
 
     // Walk/run phase detection: many sessions excluded, very few clean runs, no
     // successful extraction. In that case, training pace is unreliable — lean
