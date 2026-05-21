@@ -507,11 +507,11 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
               variant="ghost"
               size="sm"
               onClick={handleRecompute}
-              disabled={loading}
+              disabled={loading || refreshing}
               className="shrink-0 h-8 px-2 text-xs gap-1.5"
               title="Recompute now"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading || refreshing ? "animate-spin" : ""}`} />
               {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Recompute"}
             </Button>
           </div>
@@ -579,7 +579,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
               </div>
             )}
 
-            <div className="h-72 w-full">
+            <div className={`h-72 w-full transition-opacity ${refreshing ? "opacity-80" : "opacity-100"}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                   <defs>
