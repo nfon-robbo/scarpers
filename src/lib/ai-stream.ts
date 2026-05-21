@@ -1,5 +1,12 @@
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-coach`;
 
+// Client-side watchdog. The edge function + upstream LLM gateway can hang for
+// >150s during Gemini overloads, leaving the UI spinning forever. We give the
+// stream 140s end-to-end; if nothing finishes by then, we abort the fetch and
+// surface a friendly retryable error to the caller.
+const STREAM_TIMEOUT_MS = 140_000;
+const TIMEOUT_MESSAGE = "AI gateway timed out. This usually resolves quickly.";
+
 export async function streamAICoach({
   type,
   token,
@@ -21,6 +28,7 @@ export async function streamAICoach({
   planStartFromDate,
   todayDateUk,
   targetIsNotToday,
+  featureName,
   onDelta,
   onDone,
   onError,
@@ -45,10 +53,38 @@ export async function streamAICoach({
   planStartFromDate?: string;
   todayDateUk?: string;
   targetIsNotToday?: boolean;
+  /** Optional label for telemetry (e.g. "day-adjust", "chat"). */
+  featureName?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }) {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  let settled = false;
+
+  const settle = () => {
+    if (settled) return false;
+    settled = true;
+    clearTimeout(timer);
+    return true;
+  };
+
+  const safeDone = () => { if (settle()) onDone(); };
+  const safeError = (msg: string) => { if (settle()) onError(msg); };
+
+  const timer = setTimeout(() => {
+    if (settled) return;
+    console.warn("[AI_TIMEOUT]", {
+      feature: featureName || "unknown",
+      duration: Date.now() - startedAt,
+      timestamp: Date.now(),
+    });
+    settled = true;
+    try { controller.abort(); } catch { /* noop */ }
+    onError(TIMEOUT_MESSAGE);
+  }, STREAM_TIMEOUT_MS);
+
   try {
     const body: Record<string, unknown> = { type };
     if (raceDistance) body.race_distance = raceDistance;
@@ -78,16 +114,21 @@ export async function streamAICoach({
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
     if (!resp.ok) {
+      if (resp.status === 504 || resp.status === 408) {
+        safeError(TIMEOUT_MESSAGE);
+        return;
+      }
       const err = await resp.json().catch(() => ({ error: "Request failed" }));
-      onError(err.error || `Error ${resp.status}`);
+      safeError(err.error || `Error ${resp.status}`);
       return;
     }
 
     if (!resp.body) {
-      onError("No response body");
+      safeError("No response body");
       return;
     }
 
@@ -96,6 +137,7 @@ export async function streamAICoach({
     let buffer = "";
 
     while (true) {
+      if (settled) return; // timeout fired while we were reading
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -111,14 +153,14 @@ export async function streamAICoach({
 
         const jsonStr = line.slice(6).trim();
         if (jsonStr === "[DONE]") {
-          onDone();
+          safeDone();
           return;
         }
 
         try {
           const parsed = JSON.parse(jsonStr);
           const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) onDelta(content);
+          if (content && !settled) onDelta(content);
         } catch {
           buffer = line + "\n" + buffer;
           break;
@@ -138,13 +180,16 @@ export async function streamAICoach({
         try {
           const parsed = JSON.parse(jsonStr);
           const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) onDelta(content);
+          if (content && !settled) onDelta(content);
         } catch { /* ignore */ }
       }
     }
 
-    onDone();
+    safeDone();
   } catch (e: any) {
-    onError(e.message || "Stream failed");
+    // The timeout watchdog aborts the fetch — its onError has already fired,
+    // so swallow the resulting AbortError instead of toasting "Stream failed".
+    if (e?.name === "AbortError" || settled) return;
+    safeError(e?.message || "Stream failed");
   }
 }
