@@ -99,7 +99,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const sinceIso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+        const sinceIso = new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10);
         const { data } = await supabase
           .from("daily_metrics")
           .select("vo2_max,date")
