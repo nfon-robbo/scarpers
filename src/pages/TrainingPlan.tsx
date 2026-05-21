@@ -1559,7 +1559,14 @@ const TrainingPlanPage = () => {
     });
     setDayAdjustIsModified(false);
     setDayAdjustResult(null);
+    setDayAdjustDetected(null);
     setDayAdjustDialogOpen(false);
+    // Plan changed — invalidate any cached assessment for this user/date.
+    if (user) {
+      for (const k of Array.from(DAY_ADJUST_CACHE.keys())) {
+        if (k.startsWith(`${user.id}|${todayStr}|`)) DAY_ADJUST_CACHE.delete(k);
+      }
+    }
     toastPlanChange("Workout updated!", "Syncing adjusted workout to Intervals.icu...", savedPlanId);
 
     // Auto-sync to Intervals.icu after applying adjustment
@@ -1570,6 +1577,7 @@ const TrainingPlanPage = () => {
 
   const dismissDayAdjust = () => {
     setDayAdjustResult(null);
+    setDayAdjustDetected(null);
     setDayAdjustIsModified(false);
     setDayAdjustDialogOpen(false);
     setDayAdjustConflict(null);
