@@ -852,6 +852,8 @@ ${trendContext}
 ${escalationContext}
 ${intensityContext}
 ${yesterdayContext}
+${todayActivityContext}
+${todayActivityRules}
 ${cadenceContext}
 
 PLANNED WORKOUT FOR ${targetDateStr}:
