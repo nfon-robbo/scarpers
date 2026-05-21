@@ -1,52 +1,44 @@
-# Fix Readiness gauge: invisible score + overflowing caption
+## Restructure Readiness widget layout
 
-Two bugs from the recent visual refresh, both in `src/components/ReadinessWidget.tsx`.
+Single file: `src/components/ReadinessWidget.tsx`.
 
-## Bug 1 — Score number invisible
-The gradient text trick (`bg-clip-text text-transparent` + inline `backgroundImage`) is rendering the "32" as near-invisible.
+### 1. Convert outer wrapper to a vertical stack
 
-**Fix:** drop the gradient. Render the score with a solid `text-foreground` and a soft drop-shadow for depth:
-```tsx
-<span className="text-6xl font-black tracking-tighter leading-none text-foreground"
-      style={{ textShadow: "0 2px 16px hsl(var(--foreground) / 0.15)" }}>
-  {score}
-</span>
+Line 1069 currently opens `<div className="flex flex-col md:flex-row gap-5">` directly around the two columns. Wrap it in an outer vertical container:
+
 ```
-Also drop one size step (text-7xl → text-6xl) so the number sits comfortably inside the 210px gauge with the status pill underneath.
-
-## Bug 2 — Caption text overlapping the tick arc
-The gauge centre is currently stacking: score → status+trend → insight icon → driver text → message text → optional review link. That's 5–6 rows inside a ~150px circle, so the bottom lines render over the ticks.
-
-**Fix:** keep only score + status + trend INSIDE the gauge. Move the driver line, message line, and review-plan button OUT to a caption block rendered immediately BELOW the gauge in the existing left column. The insight icon moves down with the driver text (inline beside it, e.g. `🌙 Deep sleep low`).
-
-### New `CircularGauge` content
-```
-[score]                ← solid foreground, text-6xl
-STATUS  ↗ +3           ← status uppercase in band colour, trend chip
-```
-No more `subNode` / `insightIcon` props rendered inside the circle.
-
-### New caption block (sibling under the gauge)
-```tsx
-<div className="mt-1 flex flex-col items-center gap-1 text-center px-4">
-  {driver && (
-    <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/85">
-      {insightIcon}
-      <span>{driver}</span>
-    </div>
-  )}
-  <p className="text-[11px] text-muted-foreground leading-snug max-w-[240px]">{message}</p>
-  {showReview && onReviewPlan && (
-    <button …>Review today's plan →</button>
-  )}
+<div className="flex flex-col gap-5">
+  <div className="flex flex-col md:flex-row gap-5"> ← top row (gauge + factors)
+    ...
+  </div>
+  ← trend chart goes here, full width
 </div>
 ```
 
-This gives the caption proper breathing room and zero overlap with the tick arc, while keeping the visual hierarchy from the previous redesign (number → status → trend → key insight → coaching line).
+### 2. Move the Readiness Trend block
 
-## Out of scope
-- No changes to scoring, palette tokens, band logic, sparklines, ZoneBar, factor list, hourly trend chart, or the rest of the widget.
-- `subNode` prop on `CircularGauge` becomes unused — remove it from the type and the call site.
+The trend block lives inside the left column at lines ~1114–1386 (the big IIFE that renders `<div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">` with the End of day / Morning / Today tabs and chart).
 
-## Files
-- `src/components/ReadinessWidget.tsx` — edit `CircularGauge` (drop gradient text, drop `subNode`/`insightIcon` rendering inside), and edit the parent IIFE where the gauge is rendered to add the new caption block as a sibling below the gauge.
+- Cut that entire IIFE out of the left column.
+- Paste it as a sibling **below** the two-column row, inside the new outer wrapper.
+- Keep the `(hasTrend || trendMode === "today")` guard intact.
+- No prop or state changes — `trendMode`, `visibleTrend`, `wakeHour`, etc. are already component-level.
+
+### 3. Let the Today chart breathe
+
+Inside the Today branch, the `ResponsiveContainer` is set to `height={160}`. Since it now spans the full card width, bump the height so the 30+ hourly snapshots are readable — `height={220}` and keep `width="100%"`. No other chart math changes; x/y domains already scale.
+
+### 4. Remove "Recovery Focus today"
+
+Delete the IIFE at lines ~1553–1620 (the block starting `// ── Recovery Focus — top 1-2 marching orders ──` and ending with its closing `})()}`), plus the `ORDERS` map inside it. No other references — `Sparkles` is still used by the key-insight row at line 1043, so keep the import.
+
+### 5. Let the factors column flex naturally
+
+Right column currently uses `flex-1 min-w-0` (line 1388) — no change needed; with the trend gone from the left side and the gauge column fixed at `md:w-[300px]`, the factors list takes the rest of the row and stacks cleanly on mobile.
+
+### Result
+
+- Top row: gauge + caption (left, 300px) · factors list (right, fills).
+- Bottom: full-width Readiness Trend card with tabs and a taller Today chart.
+- Recovery Focus removed (key insight under the gauge already covers it).
+- Mobile: stacks gauge → factors → trend (same `flex-col` behaviour at < md).
