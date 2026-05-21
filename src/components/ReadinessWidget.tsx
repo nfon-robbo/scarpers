@@ -993,19 +993,30 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           {(() => {
             // Compute dynamic status label + sub-message
             const score = displayResult.score;
-            const statusLabel =
-              score >= 85 ? "Excellent" :
-              score >= 70 ? "Good" :
-              score >= 55 ? "Moderate" :
-              score >= 40 ? "Fair" : "Poor";
+            const band = readinessBand(score);
+            const statusLabel = bandLabel(band);
+
+            // Trend delta vs previous snapshot of same kind
+            let trendDelta: number | null = null;
+            if (trendSnapshots && trendSnapshots.length >= 2) {
+              const sorted = [...trendSnapshots].sort(
+                (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
+              );
+              const prev = sorted[1];
+              if (prev && typeof prev.score === "number") {
+                trendDelta = score - prev.score;
+              }
+            }
 
             // Primary driver — pick worst factor when score is low, best when high.
             const factors = displayResult.factors || [];
             let driver = "";
+            let driverLabel = "";
             if (score >= 70) {
               const goods = factors.filter((f) => f.status === "good");
               const pick = goods[0] ?? factors[0];
               if (pick) {
+                driverLabel = pick.label;
                 if (pick.label === "HRV") driver = "HRV strong";
                 else if (pick.label === "Sleep Quality") driver = "Sleep quality on point";
                 else if (pick.label === "Deep Sleep") driver = "Deep sleep healthy";
@@ -1016,6 +1027,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             } else {
               const worst = factors.find((f) => f.status === "poor") ?? factors.find((f) => f.status === "warning");
               if (worst) {
+                driverLabel = worst.label;
                 if (worst.label === "Sleep Quality") driver = "Sleep quality low";
                 else if (worst.label === "HRV") driver = "HRV suppressed";
                 else if (worst.label === "Deep Sleep") driver = "Deep sleep low";
@@ -1027,6 +1039,17 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 else driver = `${worst.label} flagged`;
               }
             }
+
+            const insightIcon =
+              driverLabel === "Sleep Quality" || driverLabel === "Deep Sleep" || driverLabel === "Sleep Debt" ? (
+                <Moon className="h-3 w-3" />
+              ) : driverLabel === "HRV" || driverLabel === "Resting HR" ? (
+                <Heart className="h-3 w-3" />
+              ) : driverLabel === "Yesterday's Load" || driverLabel === "Today's Effort" || driverLabel === "Body Battery" ? (
+                <Activity className="h-3 w-3" />
+              ) : score >= 70 ? (
+                <Sparkles className="h-3 w-3" />
+              ) : null;
 
             let message = "";
             let showReview = false;
@@ -1042,23 +1065,23 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               else if (ctx && !ctx.isRestDay) message = "Cleared for today's session";
               else message = "Easy session OK (≤45 min)";
             } else if (score > 30) {
-              if (ctx?.completedToday) message = "Prioritise recovery now";
-              else if (ctx && !ctx.isRestDay) { message = "Today may be tough"; showReview = true; }
+              if (ctx?.completedToday) message = "Focus on recovery today";
+              else if (ctx && !ctx.isRestDay) { message = "Easy day recommended"; showReview = true; }
               else message = "Active recovery only";
             } else {
-              message = "You may be struggling today";
+              message = "Your body needs rest today";
               showReview = true;
             }
 
             const subNode = (
-              <div className="flex flex-col items-center gap-1">
-                {driver && <span className="text-slate-300 text-[11px] font-medium leading-snug">{driver}</span>}
-                <span className="text-slate-400 text-[11px] leading-snug">{message}</span>
+              <div className="flex flex-col items-center gap-0.5">
+                {driver && <span className="text-foreground/80 text-[11px] font-medium leading-snug">{driver}</span>}
+                <span className="text-muted-foreground text-[11px] leading-snug">{message}</span>
                 {showReview && onReviewPlan && (
                   <button
                     type="button"
                     onClick={onReviewPlan}
-                    className="text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                    className="mt-0.5 text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
                   >
                     Review today's plan →
                   </button>
@@ -1072,7 +1095,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 {/* Left column: gauge + (optional) readiness trend */}
                 <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   <div className="relative flex items-center justify-center">
-                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                    <CircularGauge
+                      score={score}
+                      size={210}
+                      statusLabel={statusLabel}
+                      subNode={subNode}
+                      trendDelta={trendDelta}
+                      insightIcon={insightIcon}
+                    />
                     {suppressScore && (
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
