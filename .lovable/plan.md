@@ -1,111 +1,74 @@
-Fix: AI Gateway Timeout Handling
+```
+Goal
+Stop the race-time predictor producing absurdly slow times (e.g. 47:27 5K at VO2 max 42) caused by walk/run interval sessions contaminating the tempo and easy pace baselines.
+All changes are confined to `supabase/functions/race-predict/index.ts` plus a small UI tweak in `src/components/RaceTimeEstimate.tsx` to surface the new estimator breakdown.
 
-Problem
+Changes
 
-When the AI gateway hangs (Gemini overload, edge function 150s timeout), streamAICoach never resolves — the UI spins forever with no way to recover. Just broke during the live demo.
+1. Filter contaminated activities (new helper `isCleanContinuousRun`)
+Reject an activity from tempo/easy pools if ANY of:
 
-Solution — Two Layers
+* Title/name regex matches `/walk|w\/r|w\+r|run\/walk|interval|fartlek|rep(s|eats)?/i` (use `raw_data.name` if present, else fall back to `activity_type`).
+* Average pace slower than 8:30/km (running pace ceiling — slower means it's a walk-heavy session).
+* HR-based walk share: if `raw_data.hr_samples` / lap data available, drop when >10% of samples are <100 bpm. If hr_samples is missing, SKIP this check (don't reject) — the activity can still pass via the other 3 filters. This prevents rejecting activities from older Garmin models that don't record second-by-second HR.
+* Lap variance: if `raw_data.laps` exists with ≥3 laps, compute coefficient of variation on lap pace; reject when CV > 0.30 (alternating run/walk).
 
-Layer 1: Library timeout in src/lib/ai-stream.ts
+Keep the existing min-distance (>800 m) and min-duration (>300 s) gates.
 
-Add a 140-second client-side watchdog inside streamAICoach:
+2. Warm-up/cool-down trim
+For tempo candidates only: if `raw_data.laps` is present, drop the first and last lap when either is >2:00/km slower than the median of the middle laps, then recompute pace from remaining laps. If no lap data, fall back to the current single average pace.
 
-- Start a setTimeout(140_000) immediately when the function is invoked.
+3. Walk/run-phase fallback
+After filtering, if `cleanContinuousRuns.length === 0` in last 14 days:
 
-- On fire: abort the fetch via AbortController, call onError("AI gateway timed out. This usually resolves quickly — tap Retry."), and mark a settled flag so the normal stream loop becomes a no-op if bytes arrive late.
+* Set tempo weight 0.
+* Use VO2 max at 70%, easy pace at 30% (only if easy pool survived filtering, else VO2 max 100%).
+* Return `basis_note: "Prediction based primarily on VO2 max — tempo data will improve as continuous running develops."`
 
-- Clear the timer in every exit path: successful onDone (both [DONE] and end-of-stream), onError, and the outer catch.
+If no VO2 max data exists at all:
+* Use tempo (if clean data exists) + easy pace weights only
+* Set confidence = "LOW"
+* Add warning: "No VO2 max data available — prediction based on pace data alone. Sync a fitness tracker for more accurate estimates."
 
-- Use the existing AbortController plumbing — pass signal into fetch; on AbortError, suppress the generic "Stream failed" toast (we already called onError with the timeout message).
+4. Rebalance default weights
+When clean tempo data exists:
 
-- Also detect explicit upstream timeout: if resp.status === 504 or 408, surface the same friendly timeout message instead of Error 504.
+* VO2 max: 0.60 (was 0.30)
+* Tempo: 0.30 (was 0.50)
+* Easy: 0.10 (was 0.20)
 
-No signature changes except one new optional parameter: accept featureName?: string for telemetry (see below). All four call sites continue to work unchanged (featureName defaults to undefined). The 140s value lives as a module constant STREAM_TIMEOUT_MS for easy tuning.
+5. VO2-max sanity cap
+After computing `T`, derive a VO2-only baseline `T_vo2` via `vo2to5k` + Riegel for the chosen distance. If `T > T_vo2 * 1.40`, replace `T` with `T_vo2`, set `confidence = "LOW"`, and attach:
+```
 
-Telemetry for timeout tracking:
+warning: "Prediction looked unusually slow for VO2 max {n} — likely walk/run training data. Falling back to VO2-max-only estimate."
 
-When a timeout occurs, log to console:
+```
 
-console.warn('[AI_TIMEOUT]', { feature: featureName || 'unknown', duration: elapsed, timestamp: [Date.now](http://Date.now)() })
+6. Estimator breakdown in response
+Extend the JSON response with a `breakdown` array, e.g.:
+```
 
-This helps identify:
+[ { src: "tempo", pace: "9:05/km", note: "from walk/run sessions — excluded" }, { src: "vo2max", value: 42, predicted_5k_sec: 1770, weight: 0.7 }, { src: "easy", note: "contaminated by walk breaks — excluded" } ]
 
-- Which features timeout most often
+```
 
-- Whether 140s is the right threshold
+Each estimator records whether it contributed, was excluded, and why.
 
-- If timeouts cluster at certain times (Gemini overload patterns)
+7. UI surface
+In `RaceTimeEstimate.tsx`, render `breakdown` as a small "How we calculated this" disclosure under the predicted times, plus a yellow warning banner when `warning` is set. No layout changes.
 
-Console only for now - can ship to PostHog/Sentry later without touching call sites again.
+Technical notes
 
-Layer 2: Retry UX per call site
-
-The library guarantees onError always fires. Each surface needs a Retry affordance instead of leaving a dead spinner.
-
-src/pages/TrainingPlan.tsx (Day Ahead + Adjust Next Workout)
-
-- Add dayAdjustError: string | null and lastDayAdjustArgs ref (snapshot of the args passed to streamAICoach).
-
-- In the existing onError handlers for assessDayAhead and adjustNextWorkout: clear dayAdjusting, set dayAdjustError, fire toast.error(err), keep the dialog open.
-
-- In the dialog body, when dayAdjustError is set and not streaming, render a centred error card with the message + a Retry button that re-invokes the same handler using the cached args. Do not auto-close.
-
-- Clear dayAdjustError when a new assessment starts or the dialog closes.
-
-- Pass featureName to streamAICoach: "day-adjust" for assessDayAhead, "adjust-next" for adjustNextWorkout.
-
-src/components/WorkoutReviewDialog.tsx (review + coach)
-
-- Replace the current "Unable to generate…" placeholder text with an inline error block containing the message and a Retry button bound to a retryReview() / retryCoach() helper that re-runs the original streamAICoach call. Track reviewError / coachError state.
-
-- Pass featureName to streamAICoach: "review" for workout review, "coach" for coach's note.
-
-src/components/AIChatbot.tsx
-
-- The two streaming calls already append an error message to the chat. Augment the assistant error bubble with an inline Retry button (small ghost button under the ⚠️ … line) that re-sends the last user prompt. Track lastChatRequest in state for retry.
-
-- Pass featureName to streamAICoach: "chat".
-
-src/components/insights/AnalysisTab.tsx
-
-- Add analysisError state. On onError, stop the spinner, show the error text + Retry button that re-calls the same streamAICoach.
-
-- Pass featureName to streamAICoach: "analysis".
-
-Toast copy
-
-Single source of truth in ai-stream.ts:
-
-"AI gateway timed out. This usually resolves quickly."
-
-Each call site fires toast.error(err) from its existing onError path — no new toast logic in the surfaces.
+* `vo2to5k` table already exists; reuse it for both the VO2 estimator and the sanity cap.
+* Riegel exponent 1.06 already used; keep it.
+* Adherence, readiness and maturity multipliers stay unchanged.
+* Cache key (7-day per distance) unchanged — predictions will refresh naturally as users re-run.
+* No DB schema changes.
+* Chatbot intent trigger and `race_time_predictions` cache flow unchanged.
 
 Out of scope
 
-- No changes to the edge function itself (timeouts there are a separate ticket).
-
-- No cache changes — the existing 30-min Day-Ahead cache already only writes on onDone, so timeouts correctly leave the cache empty for a clean retry.
-
-- No changes to LLM prompts, decision codes, or HRV scoring (Batch 2 remains deferred).
-
-Verification
-
-- Manual: temporarily set STREAM_TIMEOUT_MS = 2000, trigger each surface (Day Ahead, Adjust Next, Workout Review, Coach's Note, AI Chat, Analysis tab) and confirm: spinner stops, toast appears, Retry button shown, Retry re-runs the call. Revert constant.
-
-- Confirm successful completions still call onDone exactly once and the timer is cleared (no late onError after success).
-
-- Check console logs show [AI_TIMEOUT] entries with correct feature names during the 2s timeout test.
-
-- Existing edge-function test suite is unaffected — no server changes.
-
-Files to edit
-
-- src/lib/ai-stream.ts — timeout + AbortController + 504/408 mapping + telemetry logging + optional featureName param
-
-- src/pages/TrainingPlan.tsx — error state + Retry for Day Ahead and Adjust Next Workout + pass featureName
-
-- src/components/WorkoutReviewDialog.tsx — error state + Retry for review and coach + pass featureName
-
-- src/components/AIChatbot.tsx — inline Retry on error bubbles + pass featureName
-
-- src/components/insights/AnalysisTab.tsx — error state + Retry + pass featureName
+* No changes to plan generation, chatbot prompt, or workout titles.
+* No new tables or migrations.
+```
