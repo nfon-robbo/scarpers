@@ -473,10 +473,10 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                     <li className="text-[10px] text-muted-foreground pt-1 border-t border-border/30 mt-1">
                       <span className="font-medium">Debug:</span> extraction attempted on {extractionDebug.attempted}, succeeded {extractionDebug.succeeded}, failed {extractionDebug.failures.length}
                       {extractionDebug.successes.map((s, i) => (
-                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
+                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {format(s.date, "dd/MM")} — {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
                       ))}
                       {extractionDebug.failures.map((f, i) => (
-                        <div key={`f${i}`} className="ml-2">✗ {f.title}: {f.reason}</div>
+                        <div key={`f${i}`} className="ml-2">✗ {format(f.date, "dd/MM")} — {f.title}: {f.reason}</div>
                       ))}
                     </li>
                   )}
