@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Target } from "lucide-react";
+import { Target, AlertTriangle, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import type { ParsedWorkout } from "@/lib/plan-export";
 
 interface Props {
@@ -11,19 +12,31 @@ interface Props {
   goalTime?: string;
 }
 
-type SessionType = "easy" | "tempo" | "race";
+// ── Helpers (mirrored from supabase/functions/race-predict + ai-coach) ──
+function vo2maxTo5kSeconds(vo2: number): number {
+  const anchors: Array<[number, number]> = [
+    [30, 45 * 60], [35, 37 * 60], [42, 29 * 60 + 30],
+    [50, 23 * 60 + 30], [55, 21 * 60], [60, 19 * 60],
+  ];
+  if (vo2 <= anchors[0][0]) return anchors[0][1];
+  if (vo2 >= anchors[anchors.length - 1][0]) return anchors[anchors.length - 1][1];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [v1, t1] = anchors[i];
+    const [v2, t2] = anchors[i + 1];
+    if (vo2 >= v1 && vo2 <= v2) return t1 + ((vo2 - v1) / (v2 - v1)) * (t2 - t1);
+  }
+  return 30 * 60;
+}
+function riegel(t1Sec: number, d1Km: number, d2Km: number): number {
+  return t1Sec * Math.pow(d2Km / d1Km, 1.06);
+}
 
-function classify(title: string): SessionType | null {
-  const t = title.toLowerCase();
-  // Exclude only pure rest days or walk-only sessions (not walk/run)
-  if (/\brest\b/.test(t)) return null;
-  if (/\bwalk\b/.test(t) && !/run|jog/.test(t)) return null;
-  // Walk/run intervals are easy aerobic sessions, not race-pace work
-  if (/walk\/?run|run\/?walk/i.test(title)) return "easy";
-  if (/race[\s-]?pace|\bintervals?\b|repeats?|vo2|track|400m|800m|1k repeats/i.test(title)) return "race";
-  if (/tempo|threshold|lactate|\blt\b|cruise/i.test(title)) return "tempo";
-  if (/easy|recovery|long\s+run|long\s+slow|steady|aerobic|base/i.test(title)) return "easy";
-  return "easy";
+const CONTAMINATION_RE = /walk|w\/r|w\+r|run\/walk|run-walk|interval|fartlek|rep(s|eats)?/i;
+
+function isCleanContinuousRun(title: string, paceSecPerKm: number): boolean {
+  if (CONTAMINATION_RE.test(title)) return false;
+  if (paceSecPerKm > 8 * 60 + 30) return false; // slower than 8:30/km
+  return true;
 }
 
 function distanceKm(raceDistance?: string): number | null {
@@ -35,7 +48,6 @@ function distanceKm(raceDistance?: string): number | null {
     default: return null;
   }
 }
-
 function distanceLabel(raceDistance?: string): string {
   switch ((raceDistance || "").toLowerCase()) {
     case "5k": return "5K";
@@ -45,8 +57,6 @@ function distanceLabel(raceDistance?: string): string {
     default: return raceDistance || "race";
   }
 }
-
-/** Parse "MM:SS" or "H:MM:SS" or "30 min" → seconds. */
 function parseGoalSeconds(goal?: string): number | null {
   if (!goal) return null;
   const g = goal.trim();
@@ -63,7 +73,6 @@ function parseGoalSeconds(goal?: string): number | null {
   if (hOnly) return Math.round(parseFloat(hOnly[1]) * 3600);
   return null;
 }
-
 function fmtTime(sec: number): string {
   if (!isFinite(sec) || sec <= 0) return "—";
   const total = Math.round(sec);
@@ -73,7 +82,6 @@ function fmtTime(sec: number): string {
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
-
 function fmtPace(secPerKm: number): string {
   if (!isFinite(secPerKm) || secPerKm <= 0) return "—";
   const m = Math.floor(secPerKm / 60);
@@ -82,178 +90,118 @@ function fmtPace(secPerKm: number): string {
 }
 
 export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime }: Props) {
-  const data = useMemo(() => {
+  const [vo2Max, setVo2Max] = useState<number | null>(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const sinceIso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+        const { data } = await supabase
+          .from("daily_metrics")
+          .select("vo2_max,date")
+          .eq("user_id", user.id)
+          .not("vo2_max", "is", null)
+          .gte("date", sinceIso)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!cancelled && data?.vo2_max) setVo2Max(Number(data.vo2_max));
+      } catch (e) {
+        // non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const computed = useMemo(() => {
     const km = distanceKm(raceDistance);
     const goalSec = parseGoalSeconds(goalTime);
     if (!km || !goalSec) return null;
 
-    // Helpers to extract target pace (sec/km) from a "M:SS/km" string
-    const paceFromTarget = (s: string): number | null => {
-      if (!s) return null;
-      const m = s.match(/(\d{1,2}):(\d{2})\s*\/?\s*km/i);
-      if (!m) return null;
-      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-    };
-    // For walk/run interval sessions, prefer the run segment's planned target pace
-    const runIntervalTargetPace = (w: ParsedWorkout): number | null => {
-      if (!/walk\/?run|run\/?walk|run\s*\/\s*walk/i.test(w.title)) return null;
-      // Find a segment whose name/notes mention "run" (and not "walk only")
-      const runSeg = w.segments.find(s => {
-        const label = `${s.segment} ${s.notes || ""}`.toLowerCase();
-        return /\brun\b/.test(label) && !/walk\s+only/.test(label);
-      });
-      if (runSeg) {
-        const p = paceFromTarget(runSeg.target);
-        if (p) return p;
+    // Collect linked activities tied to planned workouts, with clean-filter
+    const cleanRuns: { date: Date; pace: number; title: string }[] = [];
+    let excludedCount = 0;
+    for (const w of workouts) {
+      if (!w.dateObj) continue;
+      const key = format(w.dateObj, "yyyy-MM-dd");
+      const act = linkedActivities[key];
+      if (!act) continue;
+      const dist = Number(act.distance_meters || 0);
+      const dur = Number(act.duration_seconds || 0);
+      if (dist < 800 || dur < 300) continue;
+      const pace = dur / (dist / 1000);
+      if (pace < 150 || pace > 900) continue;
+      const title = `${w.title} ${act.name || ""}`.trim();
+      if (!isCleanContinuousRun(title, pace)) {
+        excludedCount++;
+        continue;
       }
-      // Fall back: scan raw text for "run ... M:SS/km" near the word run
-      const m = w.rawText.match(/run[^|\n]{0,40}?(\d{1,2}:\d{2})\s*\/?\s*km/i);
-      if (m) {
-        const [mm, ss] = m[1].split(":").map(Number);
-        return mm * 60 + ss;
+      cleanRuns.push({ date: w.dateObj, pace, title });
+    }
+    cleanRuns.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const recentClean = cleanRuns.slice(0, 6);
+
+    // VO2-derived target time (primary)
+    let tVo2: number | null = null;
+    if (vo2Max != null) {
+      const t5 = vo2maxTo5kSeconds(vo2Max);
+      tVo2 = km === 5 ? t5 : riegel(t5, 5, km);
+    }
+
+    // Clean-run derived target (median pace * km)
+    let tClean: number | null = null;
+    if (recentClean.length >= 2) {
+      const paces = [...recentClean.map((r) => r.pace)].sort((a, b) => a - b);
+      const median = paces[Math.floor(paces.length / 2)];
+      // Subtract ~15 s/km to approximate race pace from training pace
+      tClean = Math.max(60, (median - 15)) * km;
+    }
+
+    const basis: string[] = [];
+    const breakdown: { src: string; included: boolean; note: string }[] = [];
+    let estFinish: number | null = null;
+    let warning: string | null = null;
+
+    if (tVo2 != null && tClean != null) {
+      estFinish = tVo2 * 0.7 + tClean * 0.3;
+      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, `${recentClean.length} clean continuous runs`);
+      breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (70%)` });
+      breakdown.push({ src: "Clean continuous runs", included: true, note: `${fmtTime(tClean)} (30%)` });
+    } else if (tVo2 != null) {
+      estFinish = tVo2;
+      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`);
+      breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (100%)` });
+      if (excludedCount > 0) {
+        breakdown.push({ src: "Tempo / easy pace", included: false, note: `excluded (${excludedCount} walk/run or interval session${excludedCount === 1 ? "" : "s"})` });
       }
-      return null;
-    };
-
-    const completed = workouts
-      .filter(w => w.dateObj)
-      .map(w => {
-        const key = format(w.dateObj as Date, "yyyy-MM-dd");
-        const act = linkedActivities[key];
-        if (!act) return null;
-        const dist = Number(act.distance_meters || 0);
-        const dur = Number(act.duration_seconds || 0);
-        if (dist < 500 || dur < 60) return null;
-        const type = classify(w.title);
-        if (!type) return null;
-        const isWalkRun = /walk\/?run|run\/?walk/i.test(w.title);
-        let pace: number;
-        if (isWalkRun) {
-          // Use run-only pace from the plan; fall back skipped if unavailable
-          const target = runIntervalTargetPace(w);
-          if (!target) return null;
-          pace = target;
-        } else {
-          pace = dur / (dist / 1000);
-        }
-        if (pace < 150 || pace > 900) return null;
-        // HR efficiency: avg / max heart rate (lower = fitter at same pace)
-        const avgHr = Number(act.avg_heart_rate || 0);
-        const maxHr = Number(act.max_heart_rate || 0);
-        const hrEff = avgHr > 0 && maxHr > 0 ? avgHr / maxHr : null;
-        // Cadence (steps per minute). Try several common fields.
-        const cadRaw = Number(
-          act.avg_cadence ?? act.average_cadence ?? act.avg_running_cadence ?? act.cadence ?? 0
-        );
-        const cadence = cadRaw > 100 && cadRaw < 240 ? cadRaw : null;
-        return { date: w.dateObj as Date, type, pace, title: w.title, hrEff, cadence };
-      })
-      .filter(Boolean) as { date: Date; type: SessionType; pace: number; title: string; hrEff: number | null; cadence: number | null }[];
-
-    completed.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-    return { km, goalSec, completed };
-  }, [workouts, linkedActivities, raceDistance, goalTime]);
-
-  if (!data) return null;
-  const { km, goalSec, completed } = data;
-
-  // Require at least 5 completed planned sessions before unlocking the gauge
-  const MIN_SESSIONS = 5;
-  const recent = completed.slice(0, MIN_SESSIONS);
-  const ready = completed.length >= MIN_SESSIONS;
-
-  // Average up to the last 3 sessions of each type so a single slow recovery
-  // run doesn't dominate the easy bucket over faster walk/run target paces.
-  const avgOf = (t: SessionType) => {
-    const arr = completed.filter(c => c.type === t).slice(0, 3).map(c => c.pace);
-    return arr.length ? arr.reduce((a, n) => a + n, 0) / arr.length : null;
-  };
-  const easyPace = avgOf("easy");
-  const tempoPace = avgOf("tempo");
-  const racePace = avgOf("race");
-
-  // Derived race-pace contributions
-  const easyContrib = easyPace; // 100% of easy pace
-  // Tempo is faster than race pace, so add 30 s/km to derive race pace
-  const tempoContrib = tempoPace != null ? tempoPace + 30 : null;
-  const raceContrib = racePace; // direct
-
-  // Blend with weighting; if a category is missing, redistribute its weight proportionally
-  const parts: { weight: number; pace: number }[] = [];
-  if (easyContrib != null) parts.push({ weight: 0.2, pace: easyContrib });
-  if (tempoContrib != null) parts.push({ weight: 0.4, pace: tempoContrib });
-  if (raceContrib != null) parts.push({ weight: 0.4, pace: raceContrib });
-
-  let estPace: number | null = null;
-  if (parts.length > 0 && ready) {
-    const totalW = parts.reduce((a, p) => a + p.weight, 0);
-    estPace = parts.reduce((a, p) => a + p.pace * (p.weight / totalW), 0);
-  }
-
-  // ── HR efficiency trend → pace improvement ──
-  // Group HR-efficient sessions by ISO week, average eff per week, count
-  // consecutive weeks of week-over-week improvement (lower eff at similar effort).
-  let hrAdjustSec = 0;
-  let weeksImproving = 0;
-  if (estPace != null) {
-    const withHr = completed.filter(c => c.hrEff != null) as { date: Date; hrEff: number }[];
-    const weekKey = (d: Date) => {
-      const t = new Date(d);
-      t.setHours(0, 0, 0, 0);
-      const day = (t.getDay() + 6) % 7; // Mon=0
-      t.setDate(t.getDate() - day);
-      return t.toISOString().slice(0, 10);
-    };
-    const weekly = new Map<string, number[]>();
-    for (const c of withHr) {
-      const k = weekKey(c.date);
-      if (!weekly.has(k)) weekly.set(k, []);
-      weekly.get(k)!.push(c.hrEff);
+    } else if (tClean != null) {
+      estFinish = tClean;
+      basis.push(`${recentClean.length} clean continuous runs`);
+      breakdown.push({ src: "Clean continuous runs", included: true, note: `${fmtTime(tClean)} (100%)` });
+      breakdown.push({ src: "VO2 max", included: false, note: "not available in last 30 days" });
     }
-    const weekAvgs = [...weekly.entries()]
-      .map(([k, arr]) => ({ k, avg: arr.reduce((a, n) => a + n, 0) / arr.length }))
-      .sort((a, b) => a.k.localeCompare(b.k)); // oldest → newest
-    // Count trailing weeks where avg dropped vs prior week
-    for (let i = weekAvgs.length - 1; i > 0; i--) {
-      if (weekAvgs[i].avg < weekAvgs[i - 1].avg - 0.005) weeksImproving++;
-      else break;
-    }
-    if (weeksImproving > 0) {
-      // Improvement size scales with magnitude of latest drop (2-5 s/km/week)
-      const lastDrop = weekAvgs.length >= 2
-        ? Math.max(0, weekAvgs[weekAvgs.length - 2].avg - weekAvgs[weekAvgs.length - 1].avg)
-        : 0;
-      const perWeek = Math.max(2, Math.min(5, 2 + lastDrop * 60));
-      hrAdjustSec = -weeksImproving * perWeek;
-      estPace = estPace + hrAdjustSec;
-    }
-  }
 
-  // ── Cadence improvement → running economy gain ──
-  // Compare each session's cadence to the earliest recorded session's cadence.
-  // 1% improvement above baseline → 1 s/km off the blended pace, capped at 10 s/km total.
-  let cadenceAdjustSec = 0;
-  let cadenceImprovementPct = 0;
-  if (estPace != null) {
-    const withCad = completed
-      .filter(c => c.cadence != null)
-      .sort((a, b) => a.date.getTime() - b.date.getTime()) as { date: Date; cadence: number }[];
-    if (withCad.length >= 2) {
-      const baseline = withCad[0].cadence;
-      // Average % improvement across the most recent up-to-3 sessions vs baseline
-      const recentCad = withCad.slice(-3);
-      const pcts = recentCad.map(c => ((c.cadence - baseline) / baseline) * 100);
-      const avgPct = pcts.reduce((a, n) => a + n, 0) / pcts.length;
-      if (avgPct > 0) {
-        cadenceImprovementPct = avgPct;
-        cadenceAdjustSec = -Math.min(10, avgPct); // 1s/km per 1%, cap at 10
-        estPace = estPace + cadenceAdjustSec;
-      }
+    // Sanity cap: if clean-run estimate is wildly slower than VO2-based fitness, snap to VO2
+    if (estFinish != null && tVo2 != null && estFinish > tVo2 * 1.4) {
+      estFinish = tVo2;
+      warning = "Estimate snapped to VO2 max — recent training includes walk/run or interval sessions that don't reflect race fitness.";
+    } else if (excludedCount > 0 && tClean == null && tVo2 != null) {
+      warning = "Recent walk/run or interval sessions excluded — estimate based on VO2 max only. It will sharpen as continuous running develops.";
     }
-  }
 
-  const estFinish = estPace != null ? estPace * km : null;
+    const estPace = estFinish != null ? estFinish / km : null;
+
+    return { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount, recentClean };
+  }, [workouts, linkedActivities, raceDistance, goalTime, vo2Max]);
+
+  if (!computed) return null;
+  const { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount, recentClean } = computed;
+
+  const ready = estFinish != null;
 
   // Gauge bounds (relative to goal)
   const slowSec = goalSec * 1.5;
@@ -261,35 +209,25 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const redToAmber = goalSec * (35 / 30);
   const amberToGreen = goalSec * (31 / 30);
 
-  // Map seconds → angle along semicircle (180° = slow on left, 0° = fast on right)
   const toAngle = (sec: number) => {
     const clamped = Math.max(fastSec, Math.min(slowSec, sec));
-    const t = (slowSec - clamped) / (slowSec - fastSec); // 0 slow → 1 fast
-    return 180 - t * 180; // degrees from positive x-axis (SVG)
+    const t = (slowSec - clamped) / (slowSec - fastSec);
+    return 180 - t * 180;
   };
 
-  // SVG geometry
-  const W = 320;
-  const H = 180;
-  const cx = W / 2;
-  const cy = 160;
-  const r = 130;
-  const rInner = 100;
-
+  const W = 320, H = 180, cx = W / 2, cy = 160, r = 130, rInner = 100;
   const arcPoint = (angleDeg: number, radius: number) => {
     const rad = (Math.PI * angleDeg) / 180;
     return { x: cx - radius * Math.cos(rad), y: cy - radius * Math.sin(rad) };
   };
-
-  // Build coloured arc segment paths
-  const arcPath = (fromAngle: number, toAngle: number) => {
+  const arcPath = (fromAngle: number, toA: number) => {
     const start = arcPoint(fromAngle, r);
-    const end = arcPoint(toAngle, r);
-    const startInner = arcPoint(toAngle, rInner);
+    const end = arcPoint(toA, r);
+    const startInner = arcPoint(toA, rInner);
     const endInner = arcPoint(fromAngle, rInner);
-    const largeArc = Math.abs(fromAngle - toAngle) > 180 ? 1 : 0;
-    const sweepOuter = fromAngle > toAngle ? 0 : 1;
-    const sweepInner = fromAngle > toAngle ? 1 : 0;
+    const largeArc = Math.abs(fromAngle - toA) > 180 ? 1 : 0;
+    const sweepOuter = fromAngle > toA ? 0 : 1;
+    const sweepInner = fromAngle > toA ? 1 : 0;
     return [
       `M ${start.x} ${start.y}`,
       `A ${r} ${r} 0 ${largeArc} ${sweepOuter} ${end.x} ${end.y}`,
@@ -299,21 +237,17 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     ].join(" ");
   };
 
-  const angleSlow = toAngle(slowSec);            // 180°
+  const angleSlow = toAngle(slowSec);
   const angleRedAmber = toAngle(redToAmber);
   const angleAmberGreen = toAngle(amberToGreen);
-  const angleFast = toAngle(fastSec);             // 0°
+  const angleFast = toAngle(fastSec);
   const angleGoal = toAngle(goalSec);
 
-  // Needle
   const needleAngle = estFinish != null ? toAngle(estFinish) : 90;
   const needleEnd = arcPoint(needleAngle, r - 10);
-
-  // Goal notch
   const goalOuter = arcPoint(angleGoal, r + 8);
   const goalInner = arcPoint(angleGoal, rInner - 6);
 
-  // Distance to goal line
   let deltaText = "";
   if (estFinish != null) {
     const diff = estFinish - goalSec;
@@ -332,52 +266,82 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
 
         <div className="flex flex-col items-center">
           <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className={ready ? "" : "opacity-40"}>
-            {/* Coloured arc zones */}
             <path d={arcPath(angleSlow, angleRedAmber)} fill="hsl(var(--destructive) / 0.85)" />
             <path d={arcPath(angleRedAmber, angleAmberGreen)} fill="hsl(38 92% 55% / 0.9)" />
             <path d={arcPath(angleAmberGreen, angleFast)} fill="hsl(142 70% 45% / 0.9)" />
-
-            {/* End-tick labels */}
             <text x={arcPoint(angleSlow, r + 14).x} y={arcPoint(angleSlow, r + 14).y} fontSize="10" fill="hsl(var(--muted-foreground))" textAnchor="middle">{fmtTime(slowSec)}</text>
             <text x={arcPoint(angleFast, r + 14).x} y={arcPoint(angleFast, r + 14).y} fontSize="10" fill="hsl(var(--muted-foreground))" textAnchor="middle">{fmtTime(fastSec)}</text>
-
-            {/* Goal notch */}
             <line x1={goalOuter.x} y1={goalOuter.y} x2={goalInner.x} y2={goalInner.y} stroke="hsl(var(--foreground))" strokeWidth="2.5" />
             <text x={goalOuter.x} y={goalOuter.y - 4} fontSize="10" fill="hsl(var(--foreground))" textAnchor="middle" fontWeight="600">Goal {fmtTime(goalSec)}</text>
-
-            {/* Needle */}
             {ready && (
               <>
                 <line x1={cx} y1={cy} x2={needleEnd.x} y2={needleEnd.y} stroke="hsl(var(--foreground))" strokeWidth="3" strokeLinecap="round" />
                 <circle cx={cx} cy={cy} r={6} fill="hsl(var(--foreground))" />
               </>
             )}
-
-            {/* Centre message when not ready */}
             {!ready && (
               <text x={cx} y={cy - 30} fontSize="11" fill="hsl(var(--muted-foreground))" textAnchor="middle">
-                <tspan x={cx} dy="0">Complete more sessions</tspan>
-                <tspan x={cx} dy="14">to unlock your estimate</tspan>
+                <tspan x={cx} dy="0">Insufficient data</tspan>
+                <tspan x={cx} dy="14">add VO2 max or clean runs</tspan>
               </text>
             )}
           </svg>
 
           {ready && estPace != null && estFinish != null ? (
-            <div className="text-center space-y-1 mt-2">
-              <p className="text-xs text-muted-foreground">Estimated pace · <span className="text-foreground font-medium">{fmtPace(estPace)}</span></p>
+            <div className="text-center space-y-1 mt-2 w-full max-w-sm">
+              <p className="text-xs text-muted-foreground">
+                Estimated pace · <span className="text-foreground font-medium">{fmtPace(estPace)}</span>
+              </p>
               <p className="text-base font-bold tracking-tight">{fmtTime(estFinish)}</p>
               <p className={`text-xs ${estFinish <= goalSec + 5 ? "text-green-400" : estFinish <= redToAmber ? "text-amber-400" : "text-red-400"}`}>{deltaText}</p>
-              {hrAdjustSec < 0 && (
-                <p className="text-[10px] text-emerald-400/80">HR efficiency improving · {Math.round(-hrAdjustSec)}s/km gain ({weeksImproving}w)</p>
+              {basis.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">Based on {basis.join(" + ")}</p>
               )}
-              {cadenceAdjustSec < 0 && (
-                <p className="text-[10px] text-emerald-400/80">Cadence improving · {Math.round(-cadenceAdjustSec)}s/km gain ({cadenceImprovementPct.toFixed(1)}%)</p>
+              {warning && (
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 text-left">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-amber-200/90 leading-snug">{warning}</p>
+                </div>
+              )}
+              {breakdown.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowBreakdown((v) => !v)}
+                  className="mt-2 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  How we calculated this
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showBreakdown ? "rotate-180" : ""}`} />
+                </button>
+              )}
+              {showBreakdown && (
+                <ul className="mt-1 space-y-0.5 text-left">
+                  {breakdown.map((b, i) => (
+                    <li key={i} className={`text-[10px] ${b.included ? "text-foreground/80" : "text-muted-foreground line-through decoration-muted-foreground/50"}`}>
+                      <span className="font-medium">{b.src}:</span> {b.note}
+                    </li>
+                  ))}
+                  {excludedCount > 0 && (
+                    <li className="text-[10px] text-muted-foreground">
+                      {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded
+                    </li>
+                  )}
+                </ul>
               )}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              {Math.min(completed.length, MIN_SESSIONS)} / {MIN_SESSIONS} planned sessions completed
-            </p>
+            <div className="text-center mt-2 space-y-1">
+              <p className="text-xs text-muted-foreground">
+                No VO2 max in the last 30 days and no clean continuous runs yet.
+              </p>
+              {excludedCount > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded from estimate.
+                </p>
+              )}
+              {recentClean.length === 1 && (
+                <p className="text-[10px] text-muted-foreground">1 clean run logged — need at least 2.</p>
+              )}
+            </div>
           )}
         </div>
       </CardContent>
