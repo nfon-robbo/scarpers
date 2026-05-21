@@ -1068,11 +1068,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             return (
                 <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + (optional) readiness trend */}
-                <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
+                <div className="flex flex-col items-stretch shrink-0 md:w-[300px] gap-3">
                   <div className="relative flex flex-col items-center justify-center">
                     <CircularGauge
                       score={score}
-                      size={300}
+                      size={240}
                       statusLabel={statusLabel}
                       trendDelta={trendDelta}
                     />
@@ -1083,26 +1083,27 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         Syncing {awaiting.join(", ")}
                       </div>
                     )}
-                    {/* Caption block — sits below the gauge so text never overlaps the arc */}
-                    <div className="mt-3 flex flex-col items-center gap-1 text-center px-4">
+                    {/* Caption block — coach voice, sits below the gauge */}
+                    <div className="mt-4 flex flex-col items-center gap-1.5 text-center px-2">
                       {driver && (
-                        <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/85 leading-snug">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground leading-snug">
                           {insightIcon}
                           <span>{driver}</span>
                         </div>
                       )}
-                      <p className="text-[11px] text-muted-foreground leading-snug max-w-[260px]">{message}</p>
+                      <p className="text-sm text-muted-foreground leading-snug max-w-[260px]">{message}</p>
                       {showReview && onReviewPlan && (
                         <button
                           type="button"
                           onClick={onReviewPlan}
-                          className="mt-0.5 text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                          className="mt-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
                         >
                           Review today's plan →
                         </button>
                       )}
                     </div>
                   </div>
+
 
                   {isFallback && !suppressScore && (
                     <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
