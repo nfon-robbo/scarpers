@@ -169,11 +169,24 @@ export function computeBodyBattery(opts: {
     active += activityDrain(a.intensityLoad);
   }
 
-  const ambient = hoursAwake * 0.5;
-  const rawPercent = startPercent - passive - active - ambient;
+  const rawPercent = startPercent - passive - active;
   const percent = Math.round(Math.max(5, Math.min(100, rawPercent)));
   const drainAwake = Math.round(passive);
-  const drainActive = Math.round(active + ambient);
+  const drainActive = Math.round(active);
+
+  if (import.meta.env?.DEV) {
+    const s = opts.sleep;
+    // eslint-disable-next-line no-console
+    console.debug("[BodyBattery] inputs:", {
+      sleepHours: s.sleepHours, deepPct: s.deepPct, remPct: s.remPct,
+      hrv: s.hrv, hrvBaseline: s.hrvBaseline,
+      recentSleepAvgHours: s.recentSleepAvgHours,
+      baselineSleepAvgHours: s.baselineSleepAvgHours,
+      sleepScore: s.sleepScore,
+    });
+    // eslint-disable-next-line no-console
+    console.debug(`[BodyBattery] start=${startPercent}  passive=${passive.toFixed(1)} (${hoursAwake.toFixed(1)}h)  active=${active.toFixed(1)}  => ${percent}%`);
+  }
 
   return {
     percent,
