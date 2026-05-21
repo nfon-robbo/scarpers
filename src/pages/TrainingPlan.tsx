@@ -2727,6 +2727,17 @@ const TrainingPlanPage = () => {
                       </Button>
                     </>
                   )
+                ) : dayAdjustCompletedActivityId !== null ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => { dismissDayAdjust(); navigate("/activities"); }}>
+                      <Search className="w-4 h-4 mr-2" />
+                      View activity
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Got it, let's go!
+                    </Button>
+                  </>
                 ) : (
                   <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
                     <Check className="w-4 h-4 mr-2" />
