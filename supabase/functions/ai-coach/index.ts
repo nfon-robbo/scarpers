@@ -745,6 +745,7 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
       cadenceSince.setDate(cadenceSince.getDate() - 30);
+      const _cStart = performance.now();
       const { data: recentRuns } = await supabase
         .from("activities")
         .select("start_time, avg_cadence, avg_speed, distance_meters, duration_seconds")
@@ -753,6 +754,8 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
         .not("avg_cadence", "is", null)
         .order("start_time", { ascending: false })
         .limit(20);
+      console.log(`[PERF] cadence query: ${(performance.now() - _cStart).toFixed(0)}ms (${recentRuns?.length ?? 0} rows)`);
+
 
       const CADENCE_CUES = [
         "Try a 170 BPM metronome playlist today (search 'running 170 bpm' on Spotify).",
