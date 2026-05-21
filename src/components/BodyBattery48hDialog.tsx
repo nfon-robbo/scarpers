@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles, RefreshCw, BatteryLow } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   ComposedChart,
   Area,
@@ -65,6 +66,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [prevSleep, setPrevSleep] = useState<{ hours: number; deepPct: number; remPct: number } | null>(null);
   const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
   const insightKeyRef = useRef<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -298,7 +301,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           const offset = truthResult.percent - last.battery;
           if (offset !== 0) {
             for (const p of hourly) {
-              const newVal = Math.max(0, Math.min(100, p.battery + offset));
+              const newVal = Math.max(5, Math.min(100, p.battery + offset));
               p.battery = newVal;
               if (p.sleepBand != null) p.sleepBand = newVal;
               if (p.awakeBand != null) p.awakeBand = newVal;
@@ -309,8 +312,29 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           if (last.awakeBand != null) last.awakeBand = truthResult.percent;
           if (last.activeBand != null) last.activeBand = truthResult.percent;
           if (last.sleepBand != null) last.sleepBand = truthResult.percent;
+
+          // Append a "now" point so the line visibly reaches the current minute,
+          // not just the last whole-hour bucket.
+          const nowMs2 = Date.now();
+          if (nowMs2 - last.ts >= 60_000) {
+            const nowD = new Date(nowMs2);
+            const nowState = last.state === "sleep" ? "sleep" : last.state;
+            hourly.push({
+              ts: nowMs2,
+              label: nowD.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }),
+              hour: nowD.getHours(),
+              battery: truthResult.percent,
+              delta: 0,
+              state: nowState,
+              dominantStage: last.dominantStage,
+              sleepBand: nowState === "sleep" ? truthResult.percent : null,
+              awakeBand: nowState === "awake" ? truthResult.percent : null,
+              activeBand: nowState === "active" ? truthResult.percent : null,
+            });
+          }
         }
       }
+
 
       // Bridge nulls between phases so segments visually connect.
       const bands: ("sleepBand" | "awakeBand" | "activeBand")[] = ["sleepBand", "awakeBand", "activeBand"];
@@ -329,9 +353,19 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       setPoints(hourly);
       setTotals(tot);
       setTruth(truthResult);
+      setLastUpdated(Date.now());
       setLoading(false);
     });
-  }, [open, user, readinessData]);
+  }, [open, user, readinessData, refreshTick]);
+
+  // Auto-refresh every 5 minutes while dialog is open so the value visibly ticks.
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setRefreshTick((t) => t + 1), 5 * 60_000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  const handleRecompute = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   // Fetch AI insight when truth data changes (cached across reopens by data values).
   useEffect(() => {
@@ -438,11 +472,27 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Body Battery — Past 48 hours</DialogTitle>
-          <DialogDescription>
-            Hourly charge level. Colours show phase: green = sleep recharge, amber = awake drain, red = activity drain.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <DialogTitle>Body Battery — Past 48 hours</DialogTitle>
+              <DialogDescription>
+                Modelled from your sleep, time awake and today's activity. Not a live watch reading — refreshes every few minutes from your data.
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRecompute}
+              disabled={loading}
+              className="shrink-0 h-8 px-2 text-xs gap-1.5"
+              title="Recompute now"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Recompute"}
+            </Button>
+          </div>
         </DialogHeader>
+
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -598,6 +648,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                 <p className="mt-1.5 text-sm leading-relaxed text-foreground/90">{insight.text}</p>
               )}
             </div>
+
+            {(() => {
+              // Reserve-mode badge: last 2+ hourly buckets all <25 with no activity.
+              const tail = points.slice(-3);
+              const reserve =
+                tail.length >= 2 &&
+                tail.every((p) => p.battery < 25 && p.state !== "active");
+              if (!reserve) return null;
+              return (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-400">
+                  <BatteryLow className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Reserve mode — drain has slowed. Your reserves are low, so the curve flattens until you sleep or refuel.
+                  </span>
+                </div>
+              );
+            })()}
 
             <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">

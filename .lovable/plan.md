@@ -1,83 +1,56 @@
+## What's actually happening
 
-# Race prediction history + progress graph
+**Body Battery is NOT synced from Garmin or Intervals.icu.** It's a Scarpers-only metric computed locally in `src/lib/body-battery.ts` from:
+- Last night's sleep (hours, deep %, REM %, HRV vs baseline) → starting charge on wake
+- Hours since wake × accelerating passive drain rate (3 → 6 pts/hr)
+- Today's activities × intensity load → activity drain
+- Constant ambient drain (0.5/hr)
 
-Add a persistent history table for race-time predictions, auto-recalculate after every completed workout, and surface a progress graph on the Training Plan page so users can see their estimate improve over the course of the plan.
+There is no `body_battery` column in `daily_metrics`. `intervals-wellness` syncs sleep, HRV, RHR, steps, weight — never Body Battery. So "Garmin sync" can't be the cause.
 
-## 1. Database — new `race_prediction_history` table
+### Why it looks "stuck at 31%"
 
-Migration creates an append-only history table (one row per recalculation).
+I confirmed in the DB that `readiness_snapshots` IS still updating — your user has 15+ snapshots between 17:00 and 19:12 UTC today, score bouncing 28–35. The number is moving, just very slowly because:
 
-Columns:
-- `id`, `user_id`, `created_at`, `calculated_at`
-- `distance` (text, e.g. `5K`, `10K`)
-- `predicted_seconds` (int) — main estimate
-- `predicted_pace_per_km` (int)
-- `vo2_max` (numeric, nullable)
-- `data_sources` (jsonb) — breakdown weights & counts at time of calc
-- `triggered_by` (text) — `plan_start` | `activity_synced` | `manual` | `scheduled`
-- `activity_id` (uuid, nullable — no FK, since `activities.id` is not a unique constraint target in this schema)
+1. At hour-awake > 12, passive drain is only ~5/hr; add 0.5 ambient.
+2. The value is clamped to a floor of 5 in the 48h chart and 0 in the live calc — once you're low and not exercising, the curve visually flattens.
+3. The 48h dialog only emits one point per whole hour (`t % 3600_000 === 0`), so the "now" tail appears as a flat horizontal segment until the next hour bucket lands.
+4. The tooltip "At 15:00 → 31% → −5 drained this hour" is the value at the hovered hour, not the live value. The legend "Now: 31%" is the truth value from `computeBodyBattery()` and matches.
 
-Indexes:
-- `(user_id, distance, calculated_at DESC)` for graph queries
-- `(user_id, created_at DESC)` for recent lookups
+So nothing is broken in the data pipeline. What's wrong is the **UX makes a slowly-moving, model-driven value look frozen**, and the messaging implies it's a live Garmin reading.
 
-RLS: users can `SELECT` / `INSERT` their own rows. No update/delete (audit trail). Service role full access for edge function writes.
+## Plan
 
-## 2. Edge function — `race-predict` updates
+### 1. Make the live value visibly tick
+`src/components/BodyBattery48hDialog.tsx`
+- After the hourly loop, append an extra `HourPoint` at "now" using `truthResult.percent` (currently the truth value is only stamped onto the last whole-hour bucket, which is why the line appears to end at xx:00 and flatline).
+- Add the actual current clock label (e.g. `19:42`) as that final point so the tooltip and right edge of the chart match "Now: X%".
 
-In `supabase/functions/race-predict/index.ts`:
+### 2. Show last-computed timestamp + recompute control
+`src/components/BodyBattery48hDialog.tsx` (header area, near "WHAT'S HAPPENING")
+- Add a small "Updated HH:mm" line driven by `Date.now()` at compute time.
+- Add a "Recompute" icon button that re-runs the effect (currently only runs on `open` / `readinessData` change). Useful when the user has been on the page for hours.
 
-- **Cache key** changes from `${userId}|${distance}` to `${userId}|${distance}|${activityCount28d}|${latestVo2Date}` so cache auto-invalidates when new activities arrive or VO2 max changes. Accept a `force: true` body flag to bypass cache for manual recalc.
-- **History write**: after a successful calculation, insert a row into `race_prediction_history` with `predicted_seconds = target_sec`, the basis array as `data_sources`, and `triggered_by` from the request body (defaults to `'manual'`). Skip the write if the latest row for `(user_id, distance)` has the same `predicted_seconds` AND was written <6h ago (dedupe near-duplicates).
-- Return the previous prediction alongside the new one so the client can show a delta toast.
+### 3. Auto-refresh on a timer while dialog is open
+`src/components/BodyBattery48hDialog.tsx`
+- Add a `setInterval` (5 min) while `open` is true to re-run the compute effect, so leaving the dialog open shows the value drifting downward instead of frozen.
 
-## 3. Auto-recalc trigger — client side
+### 4. Clarify the metric source
+`src/components/BodyBattery48hDialog.tsx` (subtitle, and `ReadinessWidget` battery card tooltip)
+- Reword the subtitle from the current hourly-phase description to something like:
+  > Modelled from your sleep, time awake and today's activity. Not a live Garmin reading — refreshes hourly from your data.
+- Prevents the exact confusion in this ticket (user expects a live watch metric).
 
-In `src/pages/TrainingPlan.tsx`:
+### 5. Floor + colour at very low values
+`src/lib/body-battery.ts` (and dialog floor)
+- Current floor in the dialog is 5%, live model floors at 0. Align both to 5 so the chart never visually "bottoms out below the line".
+- In the dialog, when the latest bucket is < 25 for > 2 consecutive hours and no activity has happened, show a "Reserve mode — drain has slowed" badge so the flat tail is explained.
 
-- When a workout becomes "completed" (new linked activity appears for a plan day that didn't have one on previous render), debounce 2s then call `race-predict` with `{ triggered_by: 'activity_synced', force: true }`.
-- On plan creation/activation (detect first mount with a plan and zero history rows for this distance), call once with `{ triggered_by: 'plan_start' }` to seed a baseline data point.
-- Show a sonner toast on significant change (>30s improvement or regression): `🎯 Race estimate updated: 35:26 → 32:57 (2:29 faster!)`.
+### Out of scope
+- Pulling a real Garmin Body Battery via Intervals.icu (Intervals' wellness API does not expose it; would require Garmin Connect IQ / Health API, which the project explicitly avoids — see core memory "No direct Garmin API").
+- Changing the underlying readiness algorithm.
 
-Background/async — do not block UI.
-
-## 4. `RaceTimeEstimate.tsx` — last-updated + trend arrow
-
-- Add "Last updated 2h ago" line under the estimate.
-- Add small trend arrow vs previous history row: ↓ green (faster), ↑ amber (slower), → muted (steady ±10s).
-- Add a "Recalculate" button that calls the edge function with `force: true`.
-
-## 5. New component — `src/components/RacePredictionGraph.tsx`
-
-- Fetches all rows from `race_prediction_history` for the current user + plan's distance, ordered by `calculated_at`.
-- Renders a Recharts `LineChart` (already in deps) with:
-  - X axis: date (DD/MM/YYYY, UK format per project rule)
-  - Y axis: predicted time in MM:SS, inverted so "down" = faster
-  - Reference line at `goal_time` (dashed)
-  - Tooltip showing date, time, trigger reason, VO2 max
-- Empty state: "Your race estimate will appear here once your first workout is recorded."
-- Mounted on Training Plan page, just below the existing `RaceTimeEstimate` card.
-
-## 6. Out of scope (per spec)
-
-- Algorithm changes (already correct)
-- Real-time mid-workout updates
-- Push notifications
-- Multi-distance comparison on one graph
-- Graph image export
-
-## Files to change
-
-- `supabase/migrations/<ts>_race_prediction_history.sql` — new table + RLS
-- `supabase/functions/race-predict/index.ts` — cache key, history insert, force flag, previous-value return
-- `src/pages/TrainingPlan.tsx` — auto-recalc on workout completion, seed on plan start, toast on delta, mount graph
-- `src/components/RaceTimeEstimate.tsx` — last-updated, trend arrow, recalc button
-- `src/components/RacePredictionGraph.tsx` — new Recharts component
-- `src/integrations/supabase/types.ts` — auto-regenerated after migration
-
-## Technical notes
-
-- History writes are dedup'd in the edge function so accidental double-syncs don't pollute the graph.
-- Toast threshold (30s) avoids notification spam from minor noise.
-- No FK on `activity_id` (matches existing pattern — `activities.id` isn't a unique constraint target across the codebase).
-- Cache key change is backward-compatible (old cache entries simply miss and recompute once).
+### Technical notes
+- The hourly cron `readiness-hourly-snapshot` is healthy (rows landing every hour for both users) — no edge-function fix needed.
+- `daily_metrics` has no Body Battery column and shouldn't — keep it derived.
+- `BodyBattery48hDialog` already calls `computeBodyBattery()` as the single source of truth (line 282); we're just surfacing that value more honestly.
