@@ -150,7 +150,7 @@ function CircularGauge({
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;
-  const innerR = outerR - 18;
+  const innerR = outerR - 24;
 
   const tickEls: React.ReactNode[] = [];
   for (let i = 0; i < ticks; i++) {
