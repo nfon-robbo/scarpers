@@ -1,74 +1,52 @@
-# Readiness Widget Visual Refresh
+# Fix Readiness gauge: invisible score + overflowing caption
 
-Purely a presentation refresh for `src/components/ReadinessWidget.tsx`. No changes to scoring, data fetching, AI calls, or persistence — only the gauge, header area, colour palette, and microcopy.
+Two bugs from the recent visual refresh, both in `src/components/ReadinessWidget.tsx`.
 
-## What changes
+## Bug 1 — Score number invisible
+The gradient text trick (`bg-clip-text text-transparent` + inline `backgroundImage`) is rendering the "32" as near-invisible.
 
-### 1. Softer status palette
-Replace the harsh red/amber/yellow/green scale used by `CircularGauge` (and the small status pill underneath) with a less alarming, contextual palette:
-
-| Band | Label | Colour (HSL) |
-|------|-------|--------------|
-| 0–40 | Poor | amber `38 92% 55%` |
-| 40–60 | Low | warm yellow-orange `45 95% 58%` |
-| 60–75 | Medium | amber→green blend `75 70% 50%` |
-| 75–85 | Good | green `142 65% 48%` |
-| 85+ | Excellent | bright green `142 75% 52%` |
-
-Tokens added to `src/index.css` as `--readiness-poor / low / medium / good / excellent` (HSL triplets) and consumed via inline `hsl(var(--...))` in the SVG so we keep our design-system rule of no raw hex in components.
-
-### 2. Gauge redesign (`CircularGauge`)
-- Thicker tick strokes (3px), longer active ticks for emphasis.
-- Smooth `<linearGradient>` arc behind the ticks for the active portion (start→end of the current band) instead of a flat colour.
-- Subtle outer glow (`drop-shadow`) using the active band colour at ~25% alpha.
-- Faint reference dots at 25 / 50 / 75 positions.
-- Animate the filled tick count from previous → current score on update (simple `requestAnimationFrame` tween over ~600ms, no new dependency).
-- `aria-label` set to `"Readiness ${score} out of 100, ${statusLabel}"`.
-
-### 3. Visual hierarchy in centre stack
+**Fix:** drop the gradient. Render the score with a solid `text-foreground` and a soft drop-shadow for depth:
+```tsx
+<span className="text-6xl font-black tracking-tighter leading-none text-foreground"
+      style={{ textShadow: "0 2px 16px hsl(var(--foreground) / 0.15)" }}>
+  {score}
+</span>
 ```
-   88                ← text-7xl, font-black, tracking-tighter, gradient text
-   Medium  ↗ +3      ← text-xs uppercase, band colour at 90%, trend chip beside
-   🌙 Deep sleep low ← text-[11px] muted, icon from lucide (Moon/Heart/Activity)
-   Focus on recovery today  ← text-[11px] muted-foreground
+Also drop one size step (text-7xl → text-6xl) so the number sits comfortably inside the 210px gauge with the status pill underneath.
+
+## Bug 2 — Caption text overlapping the tick arc
+The gauge centre is currently stacking: score → status+trend → insight icon → driver text → message text → optional review link. That's 5–6 rows inside a ~150px circle, so the bottom lines render over the ticks.
+
+**Fix:** keep only score + status + trend INSIDE the gauge. Move the driver line, message line, and review-plan button OUT to a caption block rendered immediately BELOW the gauge in the existing left column. The insight icon moves down with the driver text (inline beside it, e.g. `🌙 Deep sleep low`).
+
+### New `CircularGauge` content
 ```
-- Score uses `bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent`.
-- Trend arrow derived from existing `trendSnapshots` — compare current score to the previous snapshot of the same kind: `↗` (+3 or more), `→` (within ±2), `↘` (−3 or more). Already-loaded data, no new query.
-- Key-insight icon picked from the top non-good factor: Sleep Quality/Deep Sleep → `Moon`, HRV/Resting HR → `Heart`, Today's Effort/Yesterday's Load → `Activity`, fallback → `Sparkles`.
+[score]                ← solid foreground, text-6xl
+STATUS  ↗ +3           ← status uppercase in band colour, trend chip
+```
+No more `subNode` / `insightIcon` props rendered inside the circle.
 
-### 4. Friendlier messaging
-Rewrite the band copy currently rendered under the gauge (`subNode`) so it reads like a coach, not an alarm:
+### New caption block (sibling under the gauge)
+```tsx
+<div className="mt-1 flex flex-col items-center gap-1 text-center px-4">
+  {driver && (
+    <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/85">
+      {insightIcon}
+      <span>{driver}</span>
+    </div>
+  )}
+  <p className="text-[11px] text-muted-foreground leading-snug max-w-[240px]">{message}</p>
+  {showReview && onReviewPlan && (
+    <button …>Review today's plan →</button>
+  )}
+</div>
+```
 
-| Band | Old | New |
-|------|-----|-----|
-| Poor | "Prioritise recovery now" | "Focus on recovery today" |
-| Low | "Take it easy" | "Easy day recommended" |
-| Medium | "Moderate effort OK" | "Moderate session is fine" |
-| Good | "Ready to train" | "Good to go" |
-| Excellent | "Peak readiness" | "Peak day — push if you want" |
+This gives the caption proper breathing room and zero overlap with the tick arc, while keeping the visual hierarchy from the previous redesign (number → status → trend → key insight → coaching line).
 
-Microcopy lives in a small `bandCopy(score)` helper at the top of the file.
-
-### 5. Layout & spacing
-- Increase vertical gap between the score, status pill, and insight line (`mt-3` → `mt-4`, etc.) so the number breathes.
-- Centre-align the score; left-align the insight + message block at ~60% width under the gauge for the "left-of-centre" feel from the brief.
-- Responsive: gauge size driven by container — `size = 200` on `<sm`, `220` on ≥`sm`. Uses a `useMediaQuery`-style check on mount (no new dep — inline `matchMedia`).
-
-### 6. Accessibility
-- Gauge gets `role="img"` + `aria-label`.
-- Trend chip gets `aria-label="Trend: improving by 3 points"` etc.
-- Insight icon `aria-hidden`, text carries the meaning.
-
-## What does NOT change
-- `computeReadiness` logic, scoring weights, factor calculations.
-- Data fetching, caching, AI insight calls, sparklines, ZoneBar, factor list, body battery dialog, hourly trend chart.
-- Public component props.
+## Out of scope
+- No changes to scoring, palette tokens, band logic, sparklines, ZoneBar, factor list, hourly trend chart, or the rest of the widget.
+- `subNode` prop on `CircularGauge` becomes unused — remove it from the type and the call site.
 
 ## Files
-- `src/components/ReadinessWidget.tsx` — replace `CircularGauge`, tweak the parent render block that supplies `statusLabel` / `subNode`, add `bandCopy` and `bandColor` helpers, add trend arrow + insight icon picker.
-- `src/index.css` — add 5 readiness band tokens.
-
-## Out of scope (called out so we don't silently expand)
-- Hover-to-reveal factor breakdown panel — listed as "optional" in the brief; skipped unless you want it.
-- 7-day sparkline under the score — we already render full trend charts lower in the widget, adding another would duplicate.
-- "Best this week" badge — needs a separate query; skipping unless requested.
+- `src/components/ReadinessWidget.tsx` — edit `CircularGauge` (drop gradient text, drop `subNode`/`insightIcon` rendering inside), and edit the parent IIFE where the gauge is rendered to add the new caption block as a sibling below the gauge.
