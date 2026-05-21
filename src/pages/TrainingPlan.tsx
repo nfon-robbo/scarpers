@@ -1599,6 +1599,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustDialogOpen(false);
     setDayAdjustConflict(null);
+    setDayAdjustError(null);
   };
 
   // Helpers for the Day Ahead "Move it" path. Mirrors AIChatbot.applyDayAction
