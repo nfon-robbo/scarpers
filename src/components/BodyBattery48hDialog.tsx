@@ -66,12 +66,17 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [prevSleep, setPrevSleep] = useState<{ hours: number; deepPct: number; remPct: number } | null>(null);
   const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
   const insightKeyRef = useRef<string | null>(null);
+  const hasChartDataRef = useRef(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!open || !user) return;
-    setLoading(true);
+    const showFullLoader = !hasChartDataRef.current;
+    setLoading(showFullLoader);
+    setRefreshing(!showFullLoader);
+    let cancelled = false;
 
     const now = new Date();
     now.setMinutes(0, 0, 0);
@@ -93,6 +98,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         .gte("start_time", startIso)
         .then(({ data }) => data || []),
     ]).then(([stages, acts]) => {
+      if (cancelled) return;
       // Aggregate prev night sleep (most recent date with >=3h before today's wake date)
       const todayWakeDate = readinessData?.wakeTimeIso
         ? new Date(readinessData.wakeTimeIso).toISOString().split("T")[0]
@@ -282,32 +288,41 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       // ── Single source of truth: computeBodyBattery() with the same inputs as the dashboard ──
       let truthResult: BodyBatteryResult | null = null;
       if (readinessData) {
+        const sleepInputs = {
+          sleepScore: readinessData.sleepScore,
+          sleepHours: readinessData.sleepHours,
+          deepPct: readinessData.deepPct,
+          remPct: readinessData.remPct,
+          hrv: readinessData.hrv,
+          hrvBaseline: readinessData.hrvBaseline,
+          recentSleepAvgHours: readinessData.recentSleepAvgHours,
+          baselineSleepAvgHours: readinessData.baselineSleepAvgHours,
+        };
         truthResult = computeBodyBattery({
-          sleep: {
-            sleepScore: readinessData.sleepScore,
-            sleepHours: readinessData.sleepHours,
-            deepPct: readinessData.deepPct,
-            remPct: readinessData.remPct,
-            hrv: readinessData.hrv,
-            hrvBaseline: readinessData.hrvBaseline,
-            recentSleepAvgHours: readinessData.recentSleepAvgHours,
-            baselineSleepAvgHours: readinessData.baselineSleepAvgHours,
-          },
+          sleep: sleepInputs,
           wakeTimeIso: readinessData.wakeTimeIso,
           todayActivities: readinessData.todayActivities,
+          now: Date.now(),
         });
         if (hourly.length > 0) {
-          const last = hourly[hourly.length - 1];
-          const offset = truthResult.percent - last.battery;
-          if (offset !== 0) {
+          const wakeMs = readinessData.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
+          if (wakeMs != null && Number.isFinite(wakeMs)) {
             for (const p of hourly) {
-              const newVal = Math.max(5, Math.min(100, p.battery + offset));
+              if (p.ts < wakeMs) continue;
+              const modelAtPoint = computeBodyBattery({
+                sleep: sleepInputs,
+                wakeTimeIso: readinessData.wakeTimeIso,
+                todayActivities: readinessData.todayActivities,
+                now: p.ts,
+              });
+              const newVal = modelAtPoint.percent;
               p.battery = newVal;
               if (p.sleepBand != null) p.sleepBand = newVal;
               if (p.awakeBand != null) p.awakeBand = newVal;
               if (p.activeBand != null) p.activeBand = newVal;
             }
           }
+          const last = hourly[hourly.length - 1];
           last.battery = truthResult.percent;
           if (last.awakeBand != null) last.awakeBand = truthResult.percent;
           if (last.activeBand != null) last.activeBand = truthResult.percent;
@@ -354,8 +369,18 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       setTotals(tot);
       setTruth(truthResult);
       setLastUpdated(Date.now());
+      hasChartDataRef.current = true;
       setLoading(false);
+      setRefreshing(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setLoading(false);
+      setRefreshing(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, user, readinessData, refreshTick]);
 
   // Auto-refresh every 5 minutes while dialog is open so the value visibly ticks.
@@ -363,6 +388,13 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     if (!open) return;
     const id = setInterval(() => setRefreshTick((t) => t + 1), 5 * 60_000);
     return () => clearInterval(id);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      hasChartDataRef.current = false;
+      setRefreshing(false);
+    }
   }, [open]);
 
   const handleRecompute = useCallback(() => setRefreshTick((t) => t + 1), []);
@@ -435,7 +467,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   }, [open, user, truth, points, readinessData, prevSleep]);
 
 
-  const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.label);
+  const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.ts);
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -483,11 +515,11 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
               variant="ghost"
               size="sm"
               onClick={handleRecompute}
-              disabled={loading}
+              disabled={loading || refreshing}
               className="shrink-0 h-8 px-2 text-xs gap-1.5"
               title="Recompute now"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading || refreshing ? "animate-spin" : ""}`} />
               {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Recompute"}
             </Button>
           </div>
@@ -555,7 +587,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
               </div>
             )}
 
-            <div className="h-72 w-full">
+            <div className={`h-72 w-full transition-opacity ${refreshing ? "opacity-80" : "opacity-100"}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={points} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                   <defs>
@@ -574,7 +606,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                   </defs>
                   <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.3} vertical={false} />
                   <XAxis
-                    dataKey="label"
+                    dataKey="ts"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tickFormatter={(value) => new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
                     tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                     interval={5}
                     axisLine={false}
