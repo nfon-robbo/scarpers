@@ -2740,10 +2740,21 @@ const TrainingPlanPage = () => {
               </div>
             )}
 
+            {/* Detected-activity chip (improvement #4) */}
+            {dayAdjustDetected && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground self-start">
+                <Activity className="w-3 h-3" />
+                <span>
+                  Detected: {dayAdjustDetected.label} at {dayAdjustDetected.startedAt}
+                  {dayAdjustDetected.count > 1 ? ` (+${dayAdjustDetected.count - 1} more)` : ""}
+                </span>
+              </div>
+            )}
+
             {/* AI Result */}
             {dayAdjustResult && (
               <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
-                <MarkdownRenderer content={dayAdjustResult.replace(/<!--\s*DAY_ADJUST_STATUS:[^>]*-->/g, "").trim()} />
+                <MarkdownRenderer content={stripDayAdjustMarkers(dayAdjustResult)} />
               </div>
             )}
 
