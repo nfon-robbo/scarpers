@@ -115,16 +115,12 @@ function CircularGauge({
   score,
   size = 220,
   statusLabel,
-  subNode,
   trendDelta,
-  insightIcon,
 }: {
   score: number;
   size?: number;
   statusLabel: string;
-  subNode: React.ReactNode;
   trendDelta?: number | null;
-  insightIcon?: React.ReactNode;
 }) {
   // Animate from previous score → current score
   const [animated, setAnimated] = useState(score);
@@ -155,7 +151,6 @@ function CircularGauge({
   const cy = size / 2;
   const outerR = size / 2 - 4;
   const innerR = outerR - 18;
-  
 
   const tickEls: React.ReactNode[] = [];
   for (let i = 0; i < ticks; i++) {
@@ -213,12 +208,12 @@ function CircularGauge({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <span
-          className="text-7xl font-black tracking-tighter leading-none bg-clip-text text-transparent"
-          style={{ backgroundImage: "linear-gradient(180deg, hsl(var(--foreground)) 0%, hsl(var(--foreground) / 0.7) 100%)" }}
+          className="text-6xl font-black tracking-tighter leading-none text-foreground"
+          style={{ textShadow: "0 2px 16px hsl(var(--foreground) / 0.15)" }}
         >
           {score}
         </span>
-        <div className="mt-3 flex items-center justify-center gap-2">
+        <div className="mt-2 flex items-center justify-center gap-2">
           <span
             className="text-[11px] font-semibold uppercase tracking-wider"
             style={{ color }}
@@ -238,14 +233,11 @@ function CircularGauge({
             </span>
           )}
         </div>
-        <div className="mt-2 flex flex-col items-center gap-1 text-[11px] leading-snug text-muted-foreground">
-          {insightIcon && <span className="opacity-80" aria-hidden>{insightIcon}</span>}
-          {subNode}
-        </div>
       </div>
     </div>
   );
 }
+
 
 // ── Zone Bar (0-30 red, 31-79 yellow, 80-100 green) ──
 function ZoneBar({ score }: { score: number }) {
