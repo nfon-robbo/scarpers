@@ -281,35 +281,45 @@ Format your response as markdown:
 
 Total length: 150 words max. Do not include the original next-session table again — it is shown to the user separately.`;
 
-    let accumulated = "";
-    streamAICoach({
-      type: "workout-review",
-      token: session.access_token,
-      activitySummary,
-      plannedWorkout,
-      onDelta: (text) => { accumulated += text; setCoachContent(accumulated); },
-      onDone: async () => {
-        setCoachLoading(false);
-        setCoachDone(true);
-        // Embed the snapshot of the next planned session at the top of the saved
-        // recommendation so it is always visible when re-opened later.
-        const nextBlock = nextWk
-          ? `> **Next planned session — ${nextWk.date}: ${nextWk.title}**\n` +
-            (nextWk.segments || []).map(s => `> - ${s.segment}: ${s.duration} — ${s.target} (${s.hrZone})`).join("\n") +
-            `\n> Readiness at time of recommendation: ${readiness != null ? `${readiness}/100` : "n/a"}\n\n`
-          : "";
-        const toSave = nextBlock + accumulated;
-        try {
-          await supabase.from("workout_reviews").upsert({
-            user_id: userId,
-            activity_id: activity.id,
-            difficulty, pace, feel, injury,
-            coach_recommendation: toSave,
-          } as any, { onConflict: "activity_id" });
-        } catch (e) { console.error("[review] failed to save coach recommendation", e); }
-      },
-      onError: () => { setCoachLoading(false); setCoachContent("Unable to generate recommendation. Please try again."); },
-    });
+    const runCoach = () => {
+      setCoachError(null);
+      setCoachLoading(true);
+      let accumulated = "";
+      streamAICoach({
+        type: "workout-review",
+        token: session.access_token,
+        featureName: "coach",
+        activitySummary,
+        plannedWorkout,
+        onDelta: (text) => { accumulated += text; setCoachContent(accumulated); },
+        onDone: async () => {
+          setCoachLoading(false);
+          setCoachDone(true);
+          // Embed the snapshot of the next planned session at the top of the saved
+          // recommendation so it is always visible when re-opened later.
+          const nextBlock = nextWk
+            ? `> **Next planned session — ${nextWk.date}: ${nextWk.title}**\n` +
+              (nextWk.segments || []).map(s => `> - ${s.segment}: ${s.duration} — ${s.target} (${s.hrZone})`).join("\n") +
+              `\n> Readiness at time of recommendation: ${readiness != null ? `${readiness}/100` : "n/a"}\n\n`
+            : "";
+          const toSave = nextBlock + accumulated;
+          try {
+            await supabase.from("workout_reviews").upsert({
+              user_id: userId,
+              activity_id: activity.id,
+              difficulty, pace, feel, injury,
+              coach_recommendation: toSave,
+            } as any, { onConflict: "activity_id" });
+          } catch (e) { console.error("[review] failed to save coach recommendation", e); }
+        },
+        onError: (err) => {
+          setCoachLoading(false);
+          setCoachError(err);
+        },
+      });
+    };
+    coachRetryRef.current = runCoach;
+    runCoach();
   };
 
   return (
