@@ -1300,6 +1300,11 @@ const TrainingPlanPage = () => {
   // push later sessions past race day. Mirrors the chatbot's race-conflict UI.
   const [dayAdjustConflict, setDayAdjustConflict] = useState<{ dateUk: string; shiftedRaceLabel: string; daysToRace: number } | null>(null);
   const [dayAdjustActioning, setDayAdjustActioning] = useState(false);
+  // Error + retry plumbing for the streaming assessment. When the AI gateway
+  // times out we keep the dialog open and show a Retry button instead of
+  // silently dismissing it.
+  const [dayAdjustError, setDayAdjustError] = useState<string | null>(null);
+  const dayAdjustRetryRef = useRef<(() => void) | null>(null);
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
@@ -1316,6 +1321,9 @@ const TrainingPlanPage = () => {
     const todayWorkout = workoutToText(picked.workout);
     const targetDateStr = format(picked.dateObj, "yyyy-MM-dd");
 
+    // Snapshot args so the Retry button can re-run with the same intent.
+    dayAdjustRetryRef.current = () => { void assessDayAhead(); };
+
     // Open dialog immediately with progress
     setDayAdjustDialogOpen(true);
     setDayAdjusting(true);
@@ -1323,6 +1331,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustCompletedActivityId(null);
     setDayAdjustDetected(null);
+    setDayAdjustError(null);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
@@ -1376,6 +1385,7 @@ const TrainingPlanPage = () => {
       streamAICoach({
         type: "day-adjust",
         token: session.access_token,
+        featureName: "day-adjust",
         targetDate: targetDateStr,
         todayWorkout,
         todayDateUk: format(new Date(), "EEEE d MMMM yyyy"),
@@ -1416,15 +1426,18 @@ const TrainingPlanPage = () => {
           });
         },
         onError: (err) => {
+          // Keep the dialog open with an inline Retry. Toast for visibility.
           toast({ title: "Day assessment failed", description: err, variant: "destructive" });
           setDayAdjusting(false);
-          setDayAdjustDialogOpen(false);
+          setDayAdjustPhase("done");
+          setDayAdjustError(err);
         },
       });
     } catch (e) {
       console.error("day-adjust: unexpected stream error", e);
       setDayAdjusting(false);
-      setDayAdjustDialogOpen(false);
+      setDayAdjustPhase("done");
+      setDayAdjustError(String(e));
       toast({ title: "Day assessment failed", description: String(e), variant: "destructive" });
     }
   };
@@ -1460,10 +1473,13 @@ const TrainingPlanPage = () => {
 
     const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${format(next.dateObj, "yyyy-MM-dd")}):\n${workoutText}`;
 
+    dayAdjustRetryRef.current = () => { void adjustNextWorkout(recommendation); };
+
     setDayAdjustDialogOpen(true);
     setDayAdjusting(true);
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustError(null);
     setDayAdjustPhase("analyzing");
     setDayAdjustTargetDate(next.dateObj);
     setDayAdjustMode("next");
@@ -1480,6 +1496,7 @@ const TrainingPlanPage = () => {
     streamAICoach({
       type: "day-adjust",
       token: session.access_token,
+      featureName: "adjust-next",
       targetDate: format(next.dateObj, "yyyy-MM-dd"),
       todayWorkout: injected,
       onDelta: (text) => {
@@ -1494,7 +1511,8 @@ const TrainingPlanPage = () => {
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
         setDayAdjusting(false);
-        setDayAdjustDialogOpen(false);
+        setDayAdjustPhase("done");
+        setDayAdjustError(err);
       },
     });
   }, [user, content, toast, dayAdjusting]);
@@ -1581,6 +1599,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustDialogOpen(false);
     setDayAdjustConflict(null);
+    setDayAdjustError(null);
   };
 
   // Helpers for the Day Ahead "Move it" path. Mirrors AIChatbot.applyDayAction
@@ -2755,6 +2774,22 @@ const TrainingPlanPage = () => {
             {dayAdjustResult && (
               <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
                 <MarkdownRenderer content={stripDayAdjustMarkers(dayAdjustResult)} />
+              </div>
+            )}
+
+            {/* Stream error with Retry — keeps the dialog open instead of vanishing */}
+            {!dayAdjusting && dayAdjustError && (
+              <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+                <p className="text-sm font-medium text-foreground">{dayAdjustError}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { setDayAdjustError(null); dayAdjustRetryRef.current?.(); }}>
+                    <Loader2 className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissDayAdjust}>
+                    Close
+                  </Button>
+                </div>
               </div>
             )}
 

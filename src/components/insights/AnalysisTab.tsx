@@ -38,6 +38,7 @@ const AnalysisTab = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "detail" | "generating">("list");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const loadAnalyses = useCallback(async () => {
     if (!user) return;
@@ -56,6 +57,7 @@ const AnalysisTab = () => {
     if (!user) return;
     setLoading(true);
     setContent("");
+    setAnalysisError(null);
     setView("generating");
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -70,6 +72,7 @@ const AnalysisTab = () => {
     streamAICoach({
       type: "analysis",
       token: session.access_token,
+      featureName: "analysis",
       onDelta: (text) => {
         accumulated += text;
         setContent(accumulated);
@@ -91,7 +94,8 @@ const AnalysisTab = () => {
       onError: (err) => {
         toast({ title: "Analysis failed", description: err, variant: "destructive" });
         setLoading(false);
-        setView("list");
+        setAnalysisError(err);
+        // Keep the user on the generating view so the Retry button is visible.
       },
     });
   };
@@ -187,16 +191,30 @@ const AnalysisTab = () => {
           <CardContent className="p-4 sm:p-6">
             {content ? (
               <MarkdownRenderer content={content} />
-            ) : (
+            ) : !analysisError ? (
               <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Analyzing your training data across multiple domains...</span>
               </div>
-            )}
+            ) : null}
             {loading && content && (
               <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 <span>Still generating...</span>
+              </div>
+            )}
+            {!loading && analysisError && (
+              <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+                <p className="text-sm">{analysisError}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={runAnalysis}>
+                    <Loader2 className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setAnalysisError(null); setView("list"); }}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

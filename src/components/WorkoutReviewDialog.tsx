@@ -65,6 +65,14 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [nextSession, setNextSession] = useState<ParsedWorkout | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
 
+  // Error + retry plumbing. The streaming library will fire onError with a
+  // friendly timeout message if the AI gateway hangs; we surface it inline
+  // with a Retry button instead of leaving the user with broken text.
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const reviewRetryRef = useRef<(() => void) | null>(null);
+  const coachRetryRef = useRef<(() => void) | null>(null);
+
   // Track whether we already loaded an existing saved review for this activity
   const hydratedRef = useRef<string | null>(null);
 
@@ -72,6 +80,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     if (!open) return;
     setReviewContent("");
     setReviewLoading(true);
+    setReviewError(null);
+    setCoachError(null);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
     setNextSession(null); setReadinessScore(null);
@@ -125,27 +135,38 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
         plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
       }
 
-      let accumulated = "";
-      streamAICoach({
-        type: "workout-review",
-        token: session.access_token,
-        activitySummary,
-        plannedWorkout,
-        onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
-        onDone: async () => {
-          if (cancelled) return;
-          setReviewLoading(false);
-          // Cache the AI summary so we don't regenerate next time
-          try {
-            await supabase.from("workout_reviews").upsert({
-              user_id: session.user.id,
-              activity_id: activity.id,
-              ai_summary: accumulated,
-            } as any, { onConflict: "activity_id" });
-          } catch (e) { console.error("[review] failed to cache ai_summary", e); }
-        },
-        onError: () => { if (!cancelled) { setReviewLoading(false); setReviewContent("Unable to generate review. Please try again."); } },
-      });
+      const runReview = () => {
+        setReviewError(null);
+        setReviewLoading(true);
+        let accumulated = "";
+        streamAICoach({
+          type: "workout-review",
+          token: session.access_token,
+          featureName: "review",
+          activitySummary,
+          plannedWorkout,
+          onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
+          onDone: async () => {
+            if (cancelled) return;
+            setReviewLoading(false);
+            // Cache the AI summary so we don't regenerate next time
+            try {
+              await supabase.from("workout_reviews").upsert({
+                user_id: session.user.id,
+                activity_id: activity.id,
+                ai_summary: accumulated,
+              } as any, { onConflict: "activity_id" });
+            } catch (e) { console.error("[review] failed to cache ai_summary", e); }
+          },
+          onError: (err) => {
+            if (cancelled) return;
+            setReviewLoading(false);
+            setReviewError(err);
+          },
+        });
+      };
+      reviewRetryRef.current = runReview;
+      runReview();
     })();
     return () => { cancelled = true; };
   }, [open, workout, activity]);
@@ -260,35 +281,45 @@ Format your response as markdown:
 
 Total length: 150 words max. Do not include the original next-session table again — it is shown to the user separately.`;
 
-    let accumulated = "";
-    streamAICoach({
-      type: "workout-review",
-      token: session.access_token,
-      activitySummary,
-      plannedWorkout,
-      onDelta: (text) => { accumulated += text; setCoachContent(accumulated); },
-      onDone: async () => {
-        setCoachLoading(false);
-        setCoachDone(true);
-        // Embed the snapshot of the next planned session at the top of the saved
-        // recommendation so it is always visible when re-opened later.
-        const nextBlock = nextWk
-          ? `> **Next planned session — ${nextWk.date}: ${nextWk.title}**\n` +
-            (nextWk.segments || []).map(s => `> - ${s.segment}: ${s.duration} — ${s.target} (${s.hrZone})`).join("\n") +
-            `\n> Readiness at time of recommendation: ${readiness != null ? `${readiness}/100` : "n/a"}\n\n`
-          : "";
-        const toSave = nextBlock + accumulated;
-        try {
-          await supabase.from("workout_reviews").upsert({
-            user_id: userId,
-            activity_id: activity.id,
-            difficulty, pace, feel, injury,
-            coach_recommendation: toSave,
-          } as any, { onConflict: "activity_id" });
-        } catch (e) { console.error("[review] failed to save coach recommendation", e); }
-      },
-      onError: () => { setCoachLoading(false); setCoachContent("Unable to generate recommendation. Please try again."); },
-    });
+    const runCoach = () => {
+      setCoachError(null);
+      setCoachLoading(true);
+      let accumulated = "";
+      streamAICoach({
+        type: "workout-review",
+        token: session.access_token,
+        featureName: "coach",
+        activitySummary,
+        plannedWorkout,
+        onDelta: (text) => { accumulated += text; setCoachContent(accumulated); },
+        onDone: async () => {
+          setCoachLoading(false);
+          setCoachDone(true);
+          // Embed the snapshot of the next planned session at the top of the saved
+          // recommendation so it is always visible when re-opened later.
+          const nextBlock = nextWk
+            ? `> **Next planned session — ${nextWk.date}: ${nextWk.title}**\n` +
+              (nextWk.segments || []).map(s => `> - ${s.segment}: ${s.duration} — ${s.target} (${s.hrZone})`).join("\n") +
+              `\n> Readiness at time of recommendation: ${readiness != null ? `${readiness}/100` : "n/a"}\n\n`
+            : "";
+          const toSave = nextBlock + accumulated;
+          try {
+            await supabase.from("workout_reviews").upsert({
+              user_id: userId,
+              activity_id: activity.id,
+              difficulty, pace, feel, injury,
+              coach_recommendation: toSave,
+            } as any, { onConflict: "activity_id" });
+          } catch (e) { console.error("[review] failed to save coach recommendation", e); }
+        },
+        onError: (err) => {
+          setCoachLoading(false);
+          setCoachError(err);
+        },
+      });
+    };
+    coachRetryRef.current = runCoach;
+    runCoach();
   };
 
   return (
@@ -377,6 +408,15 @@ Total length: 150 words max. Do not include the original next-session table agai
               <span>Still writing...</span>
             </div>
           )}
+          {!reviewLoading && reviewError && (
+            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+              <p className="text-sm">{reviewError}</p>
+              <Button size="sm" onClick={() => reviewRetryRef.current?.()}>
+                <Loader2 className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Athlete feedback questionnaire */}
@@ -462,6 +502,17 @@ Total length: 150 words max. Do not include the original next-session table agai
                 </Button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Coach error + Retry — surfaces gateway timeouts inline */}
+        {!coachLoading && coachError && (
+          <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+            <p className="text-sm">{coachError}</p>
+            <Button size="sm" onClick={() => coachRetryRef.current?.()}>
+              <Loader2 className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
           </div>
         )}
       </DialogContent>

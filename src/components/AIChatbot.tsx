@@ -279,6 +279,7 @@ const AIChatbot = () => {
       streamAICoach({
         type: "day-adjust",
         token: session.access_token,
+        featureName: "chat-day-adjust",
         targetDate: isoDate,
         todayWorkout: todayWorkoutBlock,
         onDelta: (t) => { dayResp += t; },
@@ -344,6 +345,7 @@ const AIChatbot = () => {
     streamAICoach({
       type: "plan-adjust",
       token: session.access_token,
+      featureName: "chat-plan-adjust",
       raceDistance: plan.race_distance || undefined,
       goalTime: plan.goal_time || undefined,
       trainingDays: (plan.training_days as string[] | null) || undefined,
