@@ -150,3 +150,49 @@ Expected:
 ### 8d. No activities today → regression guard
 
 Expected: response identical in shape to baseline (no today-activity context, no extra warning).
+
+---
+
+## 9. Short-workout match floor (improvement #2)
+
+Verifies that the absolute-tolerance floor prevents short warm-ups / shake-outs
+from being misidentified as the planned session.
+
+### 9a. Planned 3km, completed 2.0km easy → should NOT short-circuit
+Expected: assessment proceeds normally (EXTRA_ACTIVITY or NONE), NOT
+`✅ Today's workout already completed`. Reason should contain "exceeds floor".
+
+### 9b. Planned 3km, completed 2.9km → SHOULD short-circuit
+Expected: `WORKOUT_ALREADY_COMPLETED` trailer, single fixed message.
+
+### 9c. Planned 90min, completed 78min → SHOULD short-circuit (±13%, floor not applied for long).
+
+## 10. Detected-activity chip (improvement #4)
+
+Trigger: complete an unplanned 5km run, then click Assess Day Ahead.
+
+Expected:
+- First SSE chunk contains `<!-- DAY_ADJUST_DETECTED: name="5.0km run (...min)" started="HH:MM" count=1 ... -->`.
+- Dialog renders a chip "Detected: 5.0km run (...min) at HH:MM" above the streaming Markdown.
+- Marker is stripped from the rendered output.
+
+## 11. 30-minute assessment cache (improvement #1)
+
+Trigger: click Assess Day Ahead, wait for result, close dialog, click again
+within 30 min with no new activity synced.
+
+Expected:
+- Second click skips the LLM (no `ai-coach:day-adjust` log entry within ~200 ms).
+- Dialog opens at phase `done` and shows the cached result + chip instantly.
+- After applying an adjustment OR syncing a new activity, the next click
+  re-runs the LLM (cache invalidated by Apply / new activity count).
+
+## 12. Assessment lock
+
+Trigger: click Assess Day Ahead twice in quick succession (or trigger
+`adjustNextWorkout` while an assessment is mid-stream).
+
+Expected:
+- Second invocation shows toast "Assessment already in progress" and does not
+  start a parallel LLM stream.
+- Lock auto-clears on `onDone`, `onError`, cache hit, or unexpected throw.
