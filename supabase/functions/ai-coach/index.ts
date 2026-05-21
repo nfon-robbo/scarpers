@@ -598,6 +598,17 @@ Great work — no adjustment needed. See you tomorrow.
         const totDist = todayClassification.totals.totalDistanceKm.toFixed(1);
         const totMin = Math.round(todayClassification.totals.totalDurationMin);
 
+        // Emit detected-activity marker BEFORE LLM tokens so the UI chip can
+        // render immediately (improvement #4). Quotes escaped for HTML-comment safety.
+        const lead = todayActivities[0];
+        if (lead) {
+          const leadDist = (Number(lead.distance_meters || 0) / 1000).toFixed(1);
+          const leadMin = Math.round(Number(lead.duration_seconds || 0) / 60);
+          const safeType = String(lead.activity_type || "run").replace(/[<>"\n\r]/g, "");
+          const label = `${leadDist}km ${safeType} (${leadMin}min)`;
+          streamPreamble = `<!-- DAY_ADJUST_DETECTED: name="${label}" started="${fmtHHMM(lead.start_time)}" count=${todayClassification.totals.count} totalKm=${totDist} totalMin=${totMin} -->\n`;
+        }
+
         todayActivityContext = `\nTODAY'S TRAINING (already completed before this assessment):
 ${lines}
 - Totals: ${todayClassification.totals.count} activit${todayClassification.totals.count === 1 ? "y" : "ies"}, ${totDist}km / ${totMin}min
