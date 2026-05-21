@@ -338,8 +338,8 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                   {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded from estimate.
                 </p>
               )}
-              {recentClean.length === 1 && (
-                <p className="text-[10px] text-muted-foreground">1 clean run logged — need at least 2.</p>
+              {recentClean.length === 0 && excludedCount === 0 && (
+                <p className="text-[10px] text-muted-foreground">No clean continuous runs logged yet.</p>
               )}
             </div>
           )}
