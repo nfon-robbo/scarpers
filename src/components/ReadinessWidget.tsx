@@ -170,7 +170,7 @@ function CircularGauge({
         x2={x2}
         y2={y2}
         stroke={active ? color : "hsl(var(--muted-foreground) / 0.15)"}
-        strokeWidth={active ? 3 : 2}
+        strokeWidth={active ? 4 : 2.5}
         strokeLinecap="round"
       />,
     );
