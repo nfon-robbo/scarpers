@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle, Moon, Heart, Activity, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceArea } from "recharts";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
