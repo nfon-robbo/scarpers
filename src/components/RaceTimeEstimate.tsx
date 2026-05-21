@@ -89,31 +89,47 @@ function fmtPace(secPerKm: number): string {
   return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 
-// Extract running-only stats from per-point GPS track (speed in m/s).
-// Treats a point as "running" if its instantaneous speed >= 2.0 m/s (~8:20/km).
-// Returns null if extraction yields too little usable data.
-function extractRunFromGps(gps: any[]): { durationSec: number; distanceM: number; paceSecPerKm: number } | null {
-  if (!Array.isArray(gps) || gps.length < 20) return null;
+// Extract running-only stats from per-point GPS track.
+// Garmin `gps_track` points store speed in km/h (not m/s) and a cumulative
+// `distance_meters` value. A point counts as "running" if instantaneous
+// speed >= 7.0 km/h (~8:34/km pace ceiling for a single sample).
+type ExtractionOutcome =
+  | { ok: true; durationSec: number; distanceM: number; paceSecPerKm: number }
+  | { ok: false; reason: string; runSec?: number; runDistM?: number; pace?: number };
+
+function extractRunFromGps(gps: any[]): ExtractionOutcome {
+  if (!Array.isArray(gps) || gps.length < 20) {
+    return { ok: false, reason: "no gps_track data" };
+  }
   let runDur = 0;
   let runDist = 0;
   for (let i = 0; i < gps.length - 1; i++) {
     const p = gps[i], q = gps[i + 1];
-    const speed = Number(p?.speed);
-    if (!isFinite(speed) || speed < 2.0) continue; // walking / paused
+    const speed = Number(p?.speed); // km/h
+    if (!isFinite(speed) || speed < 7.0) continue; // walking / paused
     const t0 = Number(p?.elapsed_time);
     const t1 = Number(q?.elapsed_time);
     const dt = isFinite(t0) && isFinite(t1) ? Math.max(0, t1 - t0) : 1;
     if (dt <= 0 || dt > 30) continue; // skip large gaps
     const d0 = Number(p?.distance_meters);
     const d1 = Number(q?.distance_meters);
-    const dd = isFinite(d0) && isFinite(d1) && d1 > d0 ? d1 - d0 : speed * dt;
+    const dd = isFinite(d0) && isFinite(d1) && d1 > d0
+      ? d1 - d0
+      : (speed / 3.6) * dt; // fall back to speed-derived distance
     runDur += dt;
     runDist += dd;
   }
-  if (runDur < 600 || runDist < 1500) return null; // need >=10 min and >=1.5 km of running
+  if (runDur < 480) {
+    return { ok: false, reason: `run segments too short (${Math.round(runDur/60)}min, need ≥8min)`, runSec: runDur, runDistM: runDist };
+  }
+  if (runDist < 1000) {
+    return { ok: false, reason: `run distance too short (${(runDist/1000).toFixed(2)}km, need ≥1km)`, runSec: runDur, runDistM: runDist };
+  }
   const pace = runDur / (runDist / 1000);
-  if (pace < 180 || pace > 7.5 * 60) return null; // sanity + cap at 7:30/km
-  return { durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
+  if (pace < 180 || pace > 8.5 * 60) {
+    return { ok: false, reason: `extracted pace outside range (${Math.floor(pace/60)}:${String(Math.round(pace%60)).padStart(2,"0")}/km)`, pace, runSec: runDur, runDistM: runDist };
+  }
+  return { ok: true, durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
 }
 
 export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime }: Props) {
@@ -121,6 +137,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
   const [extractedFromCount, setExtractedFromCount] = useState(0);
+  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string }[]; successes: { title: string; pace: number; minutes: number }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -169,7 +186,11 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       candidates.sort((a, b) => b.date.getTime() - a.date.getTime());
       const recent = candidates.slice(0, 6);
       if (recent.length === 0) {
-        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+        if (!cancelled) {
+          setExtractedRuns([]);
+          setExtractedFromCount(0);
+          setExtractionDebug({ attempted: 0, succeeded: 0, failures: [], successes: [] });
+        }
         return;
       }
       try {
@@ -181,21 +202,35 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const byId = new Map<string, any>();
         for (const row of data || []) byId.set(String(row.id), row.raw_data);
         const out: { date: Date; pace: number; title: string }[] = [];
+        const failures: { title: string; reason: string }[] = [];
+        const successes: { title: string; pace: number; minutes: number }[] = [];
         for (const c of recent) {
           const gps = byId.get(c.actId)?.gps_track;
           const ext = extractRunFromGps(gps);
-          if (ext) out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
+          const shortTitle = c.title.length > 38 ? c.title.slice(0, 36) + "…" : c.title;
+          if (ext.ok === true) {
+            out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
+            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60 });
+          } else {
+            failures.push({ title: shortTitle, reason: ext.reason });
+          }
         }
         if (!cancelled) {
           setExtractedRuns(out);
           setExtractedFromCount(out.length);
+          setExtractionDebug({ attempted: recent.length, succeeded: out.length, failures, successes });
         }
       } catch {
-        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+        if (!cancelled) {
+          setExtractedRuns([]);
+          setExtractedFromCount(0);
+          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed" })), successes: [] });
+        }
       }
     })();
     return () => { cancelled = true; };
   }, [workouts, linkedActivities]);
+
 
   const computed = useMemo(() => {
     const km = distanceKm(raceDistance);
@@ -254,7 +289,18 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       ? `${extractedFromCount} extracted run segment${extractedFromCount === 1 ? "" : "s"}`
       : `${recentClean.length} clean run${recentClean.length === 1 ? "" : "s"}`;
 
-    if (tVo2 != null && tClean != null) {
+    // Walk/run phase detection: many sessions excluded, very few clean runs, no
+    // successful extraction. In that case, training pace is unreliable — lean
+    // 100% on VO2 max if we have it.
+    const walkRunPhase = excludedCount >= 3 && cleanRuns.length <= 1 && extractedFromCount === 0;
+
+    if (walkRunPhase && tVo2 != null) {
+      estFinish = tVo2;
+      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`);
+      breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (100%)` });
+      breakdown.push({ src: "Training pace", included: false, note: `excluded — walk/run phase, run segment extraction not yet reliable` });
+      warning = `Based on VO2 max ${vo2Max!.toFixed(0)} only — run segment extraction in development.`;
+    } else if (tVo2 != null && tClean != null) {
       estFinish = tVo2 * 0.7 + tClean * 0.3;
       basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, cleanLabel);
       breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (70%)` });
@@ -285,7 +331,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     if (estFinish != null && tVo2 != null && estFinish > tVo2 * 1.4) {
       estFinish = tVo2;
       warning = "Estimate snapped to VO2 max — recent training pace too slow to reflect race fitness.";
-    } else if (netExcluded > 0 && tClean == null && tVo2 != null) {
+    } else if (!walkRunPhase && netExcluded > 0 && tClean == null && tVo2 != null) {
       warning = "Some walk/run sessions excluded — estimate based on VO2 max only. It will sharpen as continuous running develops.";
     }
 
@@ -421,6 +467,17 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                   {excludedCount > 0 && (
                     <li className="text-[10px] text-muted-foreground">
                       {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded
+                    </li>
+                  )}
+                  {extractionDebug.attempted > 0 && (
+                    <li className="text-[10px] text-muted-foreground pt-1 border-t border-border/30 mt-1">
+                      <span className="font-medium">Debug:</span> extraction attempted on {extractionDebug.attempted}, succeeded {extractionDebug.succeeded}, failed {extractionDebug.failures.length}
+                      {extractionDebug.successes.map((s, i) => (
+                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
+                      ))}
+                      {extractionDebug.failures.map((f, i) => (
+                        <div key={`f${i}`} className="ml-2">✗ {f.title}: {f.reason}</div>
+                      ))}
                     </li>
                   )}
                 </ul>
