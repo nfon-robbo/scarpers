@@ -469,6 +469,18 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                       {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded
                     </li>
                   )}
+                  {extractionDebug.attempted > 0 && (
+                    <li className="text-[10px] text-muted-foreground pt-1 border-t border-border/30 mt-1">
+                      <span className="font-medium">Debug:</span> extraction attempted on {extractionDebug.attempted}, succeeded {extractionDebug.succeeded}, failed {extractionDebug.failures.length}
+                      {extractionDebug.successes.map((s, i) => (
+                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
+                      ))}
+                      {extractionDebug.failures.map((f, i) => (
+                        <div key={`f${i}`} className="ml-2">✗ {f.title}: {f.reason}</div>
+                      ))}
+                    </li>
+                  )}
+                  )}
                 </ul>
               )}
             </div>
