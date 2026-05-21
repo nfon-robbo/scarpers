@@ -669,6 +669,7 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       const trendStart = new Date(targetDateStr);
       trendStart.setDate(trendStart.getDate() - 14);
       const trendStartStr = trendStart.toISOString().split("T")[0];
+      const _trStart = performance.now();
       const { data: trendMetrics } = await supabase
         .from("daily_metrics")
         .select("date, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, awake_during_night_minutes, hrv, resting_heart_rate")
@@ -676,6 +677,8 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
         .gte("date", trendStartStr)
         .lte("date", targetDateStr)
         .order("date", { ascending: false });
+      console.log(`[PERF] trend_metrics query: ${(performance.now() - _trStart).toFixed(0)}ms (${trendMetrics?.length ?? 0} rows)`);
+
 
       let trendContext = "";
       let consecutivePoorOut = 0;
