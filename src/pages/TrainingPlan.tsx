@@ -24,6 +24,7 @@ import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 
 import RaceTimeEstimate from "@/components/RaceTimeEstimate";
+import RacePredictionGraph from "@/components/RacePredictionGraph";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
