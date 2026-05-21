@@ -1,163 +1,111 @@
-Batch 1 + Assessment Lock — Assess Day Ahead
+Fix: AI Gateway Timeout Handling
 
-Scope: implement improvements #1, #2, #4 plus the assessment lock. Defer #3 and #5. Skip #6. All changes are additive — no change to gating logic, escalation, LLM prompt, or yesterday handling.
+Problem
 
-1. Tighten short-workout matching (improvement #2)
+When the AI gateway hangs (Gemini overload, edge function 150s timeout), streamAICoach never resolves — the UI spins forever with no way to recover. Just broke during the live demo.
 
-File: supabase/functions/ai-coach/day-adjust-logic.ts
+Solution — Two Layers
 
-In matchScheduledWorkout, add an absolute floor on top of the existing ±20% relative check so a 3 km shakeout no longer false-matches a 2.5 km warm-up.
+Layer 1: Library timeout in src/lib/ai-stream.ts
 
-Constants: 
+Add a 140-second client-side watchdog inside streamAICoach:
 
-MATCH_FLOOR = { distanceKm: 0.75, durationMin: 5 }
+- Start a setTimeout(140_000) immediately when the function is invoked.
 
-SHORT_THRESHOLD = { distanceKm: 7.5, durationMin: 50 }
+- On fire: abort the fetch via AbortController, call onError("AI gateway timed out. This usually resolves quickly — tap Retry."), and mark a settled flag so the normal stream loop becomes a no-op if bytes arrive late.
 
-Logic for each signal:
+- Clear the timer in every exit path: successful onDone (both [DONE] and end-of-stream), onError, and the outer catch.
 
-For distance:
+- Use the existing AbortController plumbing — pass signal into fetch; on AbortError, suppress the generic "Stream failed" toast (we already called onError with the timeout message).
 
-- If signals.distanceKm >= SHORT_THRESHOLD.distanceKm:
+- Also detect explicit upstream timeout: if resp.status === 504 or 408, surface the same friendly timeout message instead of Error 504.
 
-  Pass if |activity.distanceKm - signals.distanceKm| <= signals.distanceKm * 0.20
+No signature changes except one new optional parameter: accept featureName?: string for telemetry (see below). All four call sites continue to work unchanged (featureName defaults to undefined). The 140s value lives as a module constant STREAM_TIMEOUT_MS for easy tuning.
 
-- If signals.distanceKm < SHORT_THRESHOLD.distanceKm (short workout):
+Telemetry for timeout tracking:
 
-  Pass if |Δ| <= MATCH_FLOOR.distanceKm (must be within 0.75km regardless of percentage)
+When a timeout occurs, log to console:
 
-For duration (same pattern):
+console.warn('[AI_TIMEOUT]', { feature: featureName || 'unknown', duration: elapsed, timestamp: [Date.now](http://Date.now)() })
 
-- If signals.durationMin >= SHORT_THRESHOLD.durationMin:
+This helps identify:
 
-  Pass if |activity.durationMin - signals.durationMin| <= signals.durationMin * 0.20
+- Which features timeout most often
 
-- If signals.durationMin < SHORT_THRESHOLD.durationMin (short workout):
+- Whether 140s is the right threshold
 
-  Pass if |Δ| <= MATCH_FLOOR.durationMin (must be within 5min regardless of percentage)
+- If timeouts cluster at certain times (Gemini overload patterns)
 
-Rationale: 
+Console only for now - can ship to PostHog/Sentry later without touching call sites again.
 
-- Long workouts (>7.5km or >50min): ±20% is reasonable (e.g., 20km ±4km = 16-24km range)
+Layer 2: Retry UX per call site
 
-- Short workouts (<7.5km or <50min): absolute tolerance prevents false matches (e.g., 3km must be 2.25-3.75km, not 2.4-3.6km which would be ±20%)
+The library guarantees onError always fires. Each surface needs a Retry affordance instead of leaving a dead spinner.
 
-Update reason strings to indicate which rule failed ("distance delta 0.8km exceeds floor for short workout" vs "distance delta 4.5km exceeds 20% for planned 20km").
+src/pages/TrainingPlan.tsx (Day Ahead + Adjust Next Workout)
 
-Add unit tests in day-adjust.test.ts:
+- Add dayAdjustError: string | null and lastDayAdjustArgs ref (snapshot of the args passed to streamAICoach).
 
-- 3 km planned vs 2.5 km activity → no match (delta 0.5km but 2.5/3 = 83%, would pass ±20% but fails floor)
+- In the existing onError handlers for assessDayAhead and adjustNextWorkout: clear dayAdjusting, set dayAdjustError, fire toast.error(err), keep the dialog open.
 
-- 3 km planned vs 2.9 km activity → match (delta 0.1km, within floor)
+- In the dialog body, when dayAdjustError is set and not streaming, render a centred error card with the message + a Retry button that re-invokes the same handler using the cached args. Do not auto-close.
 
-- 20 km planned vs 17 km activity → match (delta 3km = 15%, passes ±20%, floor doesn't apply)
+- Clear dayAdjustError when a new assessment starts or the dialog closes.
 
-- 30 min planned vs 22 min activity → no match (delta 8min exceeds 5min floor)
+- Pass featureName to streamAICoach: "day-adjust" for assessDayAhead, "adjust-next" for adjustNextWorkout.
 
-- 90 min planned vs 78 min activity → match (delta 12min = 13%, passes ±20%, floor doesn't apply)
+src/components/WorkoutReviewDialog.tsx (review + coach)
 
-2. Detected-activity chip (improvement #4)
+- Replace the current "Unable to generate…" placeholder text with an inline error block containing the message and a Retry button bound to a retryReview() / retryCoach() helper that re-runs the original streamAICoach call. Track reviewError / coachError state.
 
-Goal: before the LLM streams, show a small chip in the dialog naming the activity the edge function detected, so the recommendation feels grounded.
+- Pass featureName to streamAICoach: "review" for workout review, "coach" for coach's note.
 
-Edge function (supabase/functions/ai-coach/index.ts):
+src/components/AIChatbot.tsx
 
-When today's activities exist and status is EXTRA_ACTIVITY (chip is redundant for WORKOUT_ALREADY_COMPLETED since the full message names the activity, and unnecessary for NONE), prepend a hidden SSE trailer before any other content:
+- The two streaming calls already append an error message to the chat. Augment the assistant error bubble with an inline Retry button (small ghost button under the ⚠️ … line) that re-sends the last user prompt. Track lastChatRequest in state for retry.
 
-<!-- DAY_ADJUST_DETECTED: name="10.2 km easy run" started="07:14" count=1 totalKm=10.2 totalMin=58 -->
+- Pass featureName to streamAICoach: "chat".
 
-Emit it as the first streamed chunk so the client sees it before LLM tokens.
+src/components/insights/AnalysisTab.tsx
 
-Client (src/pages/TrainingPlan.tsx):
+- Add analysisError state. On onError, stop the spinner, show the error text + Retry button that re-calls the same streamAICoach.
 
-- New state dayAdjustDetected: { label: string; startedAt: string; count: number } | null.
+- Pass featureName to streamAICoach: "analysis".
 
-- In assessDayAhead.onDelta, parse the trailer once (before stripping it for rendering), set state, and continue.
+Toast copy
 
-- In the dialog body (above the streaming Markdown, line ~2638), render a compact chip when set:
+Single source of truth in ai-stream.ts:
 
-  * "Detected: {label} at {startedAt}" with a small Activity icon.
+"AI gateway timed out. This usually resolves quickly."
 
-  * Themed with existing tokens (bg-muted/40 text-muted-foreground border border-border rounded-full px-3 py-1 text-xs).
-
-  * Reset chip state on each new assessment and on dialog close.
-
-  * Strip DAY_ADJUST_DETECTED from displayed Markdown the same way DAY_ADJUST_STATUS is stripped.
-
-3. 30-minute assessment cache (improvement #1)
-
-Client only. Avoids re-running the LLM when the user re-clicks within 30 min and nothing material changed.
-
-File: src/pages/TrainingPlan.tsx
-
-- Module-level Map<string, { result: string; detected: ... | null; completedActivityId: string | null; at: number }> keyed by ${[user.id](http://user.id)}|${targetDateStr}|${todayActivityCount}.
-
-- Activity count source: read activities row count for the target ISO day via a lightweight Supabase query (select id count with head: true) inside assessDayAhead before the LLM call. Cheap, single round-trip.
-
-- TTL: 30 min. On cache hit, skip streamAICoach entirely: set dayAdjustResult, dayAdjustDetected, dayAdjustCompletedActivityId, jump phase to done, and open the dialog.
-
-- Cache write happens in onDone.
-
-- Invalidate the cache entry when the user clicks Apply (since the plan changed) and on tab focus only if a new activity appeared (cheap re-count vs cached count).
-
-4. Assessment lock (additional fix)
-
-Client only. Prevents two simultaneous assessments.
-
-File: src/pages/TrainingPlan.tsx
-
-- Reuse the existing dayAdjusting state as the lock — it's already set true at the start of assessDayAhead and reset in onDone/onError/cache hits.
-
-- At the very top of assessDayAhead:
-
-if (dayAdjusting) {
-
-  toast({ title: "Assessment already in progress", description: "Please wait for the current assessment to finish." });
-
-  return;
-
-}
-
-- Guarantee the flag clears in all exit paths:
-
-  * existing onDone ✓
-
-  * existing onError ✓
-
-  * early return when no upcoming workout (already returns before setting true ✓)
-
-  * early return when session expired (already clears ✓)
-
-  * new: wrap the streamAICoach call so an unexpected throw also resets dayAdjusting and closes the dialog (try/catch around the call).
-
-  * Also gate adjustNextWorkout the same way (it shares the same dialog and dayAdjusting state).
-
-The existing button disabled={...|| dayAdjusting} already prevents double-click from the UI; the toast guard catches programmatic / nav-state triggers (adjustNextWorkout auto-apply via location state).
-
-Files touched
-
-- supabase/functions/ai-coach/day-adjust-logic.ts — match-floor logic
-
-- supabase/functions/ai-coach/day-adjust.test.ts — new tests for the floor
-
-- supabase/functions/ai-coach/index.ts — emit DAY_ADJUST_DETECTED trailer for EXTRA_ACTIVITY
-
-- src/pages/TrainingPlan.tsx — detected chip, cache, lock guard
-
-- supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md) — add 3 scenarios (short-workout false-positive avoided; chip appears for extra activity; cache hit skips LLM within 30 min)
+Each call site fires toast.error(err) from its existing onError path — no new toast logic in the surfaces.
 
 Out of scope
 
-- Decision codes in trailer (#3) — defer.
+- No changes to the edge function itself (timeouts there are a separate ticket).
 
-- HRV z-score (#5) — defer.
+- No cache changes — the existing 30-min Day-Ahead cache already only writes on onDone, so timeouts correctly leave the cache empty for a clean retry.
 
-- Emoji consistency (#6) — skipped.
-
-- No DB migrations, no LLM prompt changes, no changes to escalation/gating, no Apply/Sync flow changes.
+- No changes to LLM prompts, decision codes, or HRV scoring (Batch 2 remains deferred).
 
 Verification
 
-- Run supabase--test_edge_functions after edits — all existing tests must still pass plus new short-workout tests.
+- Manual: temporarily set STREAM_TIMEOUT_MS = 2000, trigger each surface (Day Ahead, Adjust Next, Workout Review, Coach's Note, AI Chat, Analysis tab) and confirm: spinner stops, toast appears, Retry button shown, Retry re-runs the call. Revert constant.
 
-- Manual: in preview, click Assess Day Ahead twice rapidly → second click shows lock toast. Re-click within 30 min → instant result (cache). Add an unplanned morning run via Strava sync → detected chip appears.
+- Confirm successful completions still call onDone exactly once and the timer is cleared (no late onError after success).
+
+- Check console logs show [AI_TIMEOUT] entries with correct feature names during the 2s timeout test.
+
+- Existing edge-function test suite is unaffected — no server changes.
+
+Files to edit
+
+- src/lib/ai-stream.ts — timeout + AbortController + 504/408 mapping + telemetry logging + optional featureName param
+
+- src/pages/TrainingPlan.tsx — error state + Retry for Day Ahead and Adjust Next Workout + pass featureName
+
+- src/components/WorkoutReviewDialog.tsx — error state + Retry for review and coach + pass featureName
+
+- src/components/AIChatbot.tsx — inline Retry on error bubbles + pass featureName
+
+- src/components/insights/AnalysisTab.tsx — error state + Retry + pass featureName
