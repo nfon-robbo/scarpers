@@ -222,27 +222,28 @@ function CircularGauge({
             {statusLabel}
           </span>
           {TrendIcon && (
-            <UITooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="inline-flex items-center gap-0.5 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground cursor-help"
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-0.5 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-white/10 transition-colors cursor-pointer"
                   aria-label={trendLabel}
                 >
                   <TrendIcon className="h-2.5 w-2.5" />
                   {trendDelta !== 0 && trendDelta != null && (
                     <span>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</span>
                   )}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[240px] text-xs">
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" className="max-w-[240px] text-xs p-3">
                 <p className="font-semibold mb-1.5">Readiness vs yesterday</p>
                 <ul className="space-y-1 text-muted-foreground">
                   <li className="flex items-center gap-1.5"><TrendingUp className="h-3 w-3 text-emerald-400" /> <span><span className="text-foreground font-medium">Up</span> — improved by 3+ points</span></li>
                   <li className="flex items-center gap-1.5"><Minus className="h-3 w-3 text-slate-300" /> <span><span className="text-foreground font-medium">Stable</span> — within 2 points</span></li>
                   <li className="flex items-center gap-1.5"><TrendingDown className="h-3 w-3 text-red-400" /> <span><span className="text-foreground font-medium">Down</span> — dropped 3+ points</span></li>
                 </ul>
-              </TooltipContent>
-            </UITooltip>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       </div>
