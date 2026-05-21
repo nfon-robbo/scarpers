@@ -1300,6 +1300,11 @@ const TrainingPlanPage = () => {
   // push later sessions past race day. Mirrors the chatbot's race-conflict UI.
   const [dayAdjustConflict, setDayAdjustConflict] = useState<{ dateUk: string; shiftedRaceLabel: string; daysToRace: number } | null>(null);
   const [dayAdjustActioning, setDayAdjustActioning] = useState(false);
+  // Error + retry plumbing for the streaming assessment. When the AI gateway
+  // times out we keep the dialog open and show a Retry button instead of
+  // silently dismissing it.
+  const [dayAdjustError, setDayAdjustError] = useState<string | null>(null);
+  const dayAdjustRetryRef = useRef<(() => void) | null>(null);
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
