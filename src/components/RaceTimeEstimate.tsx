@@ -99,7 +99,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const sinceIso = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+        const sinceIso = new Date(Date.now() - 180 * 86400000).toISOString().slice(0, 10);
         const { data } = await supabase
           .from("daily_metrics")
           .select("vo2_max,date")
@@ -331,7 +331,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
           ) : (
             <div className="text-center mt-2 space-y-1">
               <p className="text-xs text-muted-foreground">
-                No VO2 max in the last 30 days and no clean continuous runs yet.
+                No VO2 max on file and no clean continuous runs yet.
               </p>
               {excludedCount > 0 && (
                 <p className="text-[10px] text-muted-foreground">
