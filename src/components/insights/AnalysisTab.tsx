@@ -57,6 +57,7 @@ const AnalysisTab = () => {
     if (!user) return;
     setLoading(true);
     setContent("");
+    setAnalysisError(null);
     setView("generating");
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -71,6 +72,7 @@ const AnalysisTab = () => {
     streamAICoach({
       type: "analysis",
       token: session.access_token,
+      featureName: "analysis",
       onDelta: (text) => {
         accumulated += text;
         setContent(accumulated);
@@ -92,7 +94,8 @@ const AnalysisTab = () => {
       onError: (err) => {
         toast({ title: "Analysis failed", description: err, variant: "destructive" });
         setLoading(false);
-        setView("list");
+        setAnalysisError(err);
+        // Keep the user on the generating view so the Retry button is visible.
       },
     });
   };
