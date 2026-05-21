@@ -499,6 +499,10 @@ const TrainingPlanPage = () => {
   const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
+  const [racePredictRefresh, setRacePredictRefresh] = useState(0);
+  const linkedActivityCountRef = useRef<number>(-1);
+  const racePredictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const racePredictSeededRef = useRef(false);
   const [editingWorkout, setEditingWorkout] = useState<ParsedWorkout | null>(null);
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
