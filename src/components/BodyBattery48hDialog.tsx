@@ -353,9 +353,19 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       setPoints(hourly);
       setTotals(tot);
       setTruth(truthResult);
+      setLastUpdated(Date.now());
       setLoading(false);
     });
-  }, [open, user, readinessData]);
+  }, [open, user, readinessData, refreshTick]);
+
+  // Auto-refresh every 5 minutes while dialog is open so the value visibly ticks.
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setRefreshTick((t) => t + 1), 5 * 60_000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  const handleRecompute = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   // Fetch AI insight when truth data changes (cached across reopens by data values).
   useEffect(() => {
