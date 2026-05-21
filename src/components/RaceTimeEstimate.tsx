@@ -89,31 +89,47 @@ function fmtPace(secPerKm: number): string {
   return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 
-// Extract running-only stats from per-point GPS track (speed in m/s).
-// Treats a point as "running" if its instantaneous speed >= 2.0 m/s (~8:20/km).
-// Returns null if extraction yields too little usable data.
-function extractRunFromGps(gps: any[]): { durationSec: number; distanceM: number; paceSecPerKm: number } | null {
-  if (!Array.isArray(gps) || gps.length < 20) return null;
+// Extract running-only stats from per-point GPS track.
+// Garmin `gps_track` points store speed in km/h (not m/s) and a cumulative
+// `distance_meters` value. A point counts as "running" if instantaneous
+// speed >= 7.0 km/h (~8:34/km pace ceiling for a single sample).
+type ExtractionOutcome =
+  | { ok: true; durationSec: number; distanceM: number; paceSecPerKm: number }
+  | { ok: false; reason: string; runSec?: number; runDistM?: number; pace?: number };
+
+function extractRunFromGps(gps: any[]): ExtractionOutcome {
+  if (!Array.isArray(gps) || gps.length < 20) {
+    return { ok: false, reason: "no gps_track data" };
+  }
   let runDur = 0;
   let runDist = 0;
   for (let i = 0; i < gps.length - 1; i++) {
     const p = gps[i], q = gps[i + 1];
-    const speed = Number(p?.speed);
-    if (!isFinite(speed) || speed < 2.0) continue; // walking / paused
+    const speed = Number(p?.speed); // km/h
+    if (!isFinite(speed) || speed < 7.0) continue; // walking / paused
     const t0 = Number(p?.elapsed_time);
     const t1 = Number(q?.elapsed_time);
     const dt = isFinite(t0) && isFinite(t1) ? Math.max(0, t1 - t0) : 1;
     if (dt <= 0 || dt > 30) continue; // skip large gaps
     const d0 = Number(p?.distance_meters);
     const d1 = Number(q?.distance_meters);
-    const dd = isFinite(d0) && isFinite(d1) && d1 > d0 ? d1 - d0 : speed * dt;
+    const dd = isFinite(d0) && isFinite(d1) && d1 > d0
+      ? d1 - d0
+      : (speed / 3.6) * dt; // fall back to speed-derived distance
     runDur += dt;
     runDist += dd;
   }
-  if (runDur < 600 || runDist < 1500) return null; // need >=10 min and >=1.5 km of running
+  if (runDur < 480) {
+    return { ok: false, reason: `run segments too short (${Math.round(runDur/60)}min, need ≥8min)`, runSec: runDur, runDistM: runDist };
+  }
+  if (runDist < 1000) {
+    return { ok: false, reason: `run distance too short (${(runDist/1000).toFixed(2)}km, need ≥1km)`, runSec: runDur, runDistM: runDist };
+  }
   const pace = runDur / (runDist / 1000);
-  if (pace < 180 || pace > 7.5 * 60) return null; // sanity + cap at 7:30/km
-  return { durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
+  if (pace < 180 || pace > 8.5 * 60) {
+    return { ok: false, reason: `extracted pace outside range (${Math.floor(pace/60)}:${String(Math.round(pace%60)).padStart(2,"0")}/km)`, pace, runSec: runDur, runDistM: runDist };
+  }
+  return { ok: true, durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
 }
 
 export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime }: Props) {
