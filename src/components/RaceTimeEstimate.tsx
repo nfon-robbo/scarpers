@@ -263,15 +263,17 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     let usedClean = cleanRuns.slice();
     let droppedContaminated = 0;
     if (extractedRuns.length > 0) {
-      const fastestExtracted = Math.min(...extractedRuns.map((r) => r.pace));
-      const vo2Pace = vo2Max != null ? vo2maxTo5kSeconds(vo2Max) / 5 : null; // sec/km @ 5k
+      const extPacesSorted = [...extractedRuns.map((r) => r.pace)].sort((a, b) => a - b);
+      const extMedian = extPacesSorted[Math.floor(extPacesSorted.length / 2)];
+      const vo2Pace = vo2Max != null ? vo2maxTo5kSeconds(vo2Max) / 5 : null;
       usedClean = cleanRuns.filter((r) => {
-        if (r.pace > fastestExtracted + 45) return false; // >45s/km slower than extracted = contaminated
-        if (vo2Pace != null && r.pace > vo2Pace + 90) return false; // wildly slower than VO2 fitness
+        if (r.pace > extMedian + 20) return false; // >20s/km slower than extracted run pace = contaminated
+        if (vo2Pace != null && r.pace > vo2Pace + 60) return false; // >60s/km slower than VO2 race pace
         return true;
       });
       droppedContaminated = cleanRuns.length - usedClean.length;
     }
+
     const allClean = [...usedClean, ...extractedRuns];
     allClean.sort((a, b) => b.date.getTime() - a.date.getTime());
     const recentClean = allClean.slice(0, 6);
