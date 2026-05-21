@@ -481,12 +481,14 @@ ${sleepContext}`;
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split("T")[0];
       
+      const _yStart = performance.now();
       const { data: yesterdayActivities } = await supabase
         .from("activities")
         .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, training_load")
         .eq("user_id", user.id)
         .gte("start_time", yesterdayStr + "T00:00:00")
         .lt("start_time", targetDateStr + "T00:00:00");
+      console.log(`[PERF] yesterday_activities query: ${(performance.now() - _yStart).toFixed(0)}ms (${yesterdayActivities?.length ?? 0} rows)`);
 
       // Explicit "hard"/"long" classification of yesterday's session
       let yesterdayLoad = { hard: false, long: false, reason: "" as string };
@@ -515,6 +517,7 @@ ${sleepContext}`;
       const targetNext = new Date(targetDateStr);
       targetNext.setDate(targetNext.getDate() + 1);
       const targetNextStr = targetNext.toISOString().split("T")[0];
+      const _tStart = performance.now();
       const { data: todayActivitiesRaw } = await supabase
         .from("activities")
         .select("id, activity_type, distance_meters, duration_seconds, avg_heart_rate, start_time, raw_data")
@@ -525,6 +528,8 @@ ${sleepContext}`;
         .gte("duration_seconds", 60)
         .order("start_time", { ascending: false })
         .limit(5);
+      console.log(`[PERF] today_activities query: ${(performance.now() - _tStart).toFixed(0)}ms (${todayActivitiesRaw?.length ?? 0} rows)`);
+
 
       const todayActivities: TodayActivityInput[] = (todayActivitiesRaw || []).map((a: any) => ({
         id: a.id,
