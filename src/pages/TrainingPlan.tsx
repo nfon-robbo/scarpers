@@ -1473,10 +1473,13 @@ const TrainingPlanPage = () => {
 
     const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${format(next.dateObj, "yyyy-MM-dd")}):\n${workoutText}`;
 
+    dayAdjustRetryRef.current = () => { void adjustNextWorkout(recommendation); };
+
     setDayAdjustDialogOpen(true);
     setDayAdjusting(true);
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustError(null);
     setDayAdjustPhase("analyzing");
     setDayAdjustTargetDate(next.dateObj);
     setDayAdjustMode("next");
@@ -1493,6 +1496,7 @@ const TrainingPlanPage = () => {
     streamAICoach({
       type: "day-adjust",
       token: session.access_token,
+      featureName: "adjust-next",
       targetDate: format(next.dateObj, "yyyy-MM-dd"),
       todayWorkout: injected,
       onDelta: (text) => {
@@ -1507,7 +1511,8 @@ const TrainingPlanPage = () => {
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
         setDayAdjusting(false);
-        setDayAdjustDialogOpen(false);
+        setDayAdjustPhase("done");
+        setDayAdjustError(err);
       },
     });
   }, [user, content, toast, dayAdjusting]);
