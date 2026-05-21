@@ -649,6 +649,23 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
               )}
             </div>
 
+            {(() => {
+              // Reserve-mode badge: last 2+ hourly buckets all <25 with no activity.
+              const tail = points.slice(-3);
+              const reserve =
+                tail.length >= 2 &&
+                tail.every((p) => p.battery < 25 && p.state !== "active");
+              if (!reserve) return null;
+              return (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-400">
+                  <BatteryLow className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Reserve mode — drain has slowed. Your reserves are low, so the curve flattens until you sleep or refuel.
+                  </span>
+                </div>
+              );
+            })()}
+
             <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS.sleep }} /> Recharging (sleep)
