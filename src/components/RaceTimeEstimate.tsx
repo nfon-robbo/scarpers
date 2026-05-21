@@ -152,9 +152,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       tVo2 = km === 5 ? t5 : riegel(t5, 5, km);
     }
 
-    // Clean-run derived target (median pace * km)
+    // Clean-run derived target (median pace * km). One clean run is enough to seed an estimate.
     let tClean: number | null = null;
-    if (recentClean.length >= 2) {
+    if (recentClean.length >= 1) {
       const paces = [...recentClean.map((r) => r.pace)].sort((a, b) => a - b);
       const median = paces[Math.floor(paces.length / 2)];
       // Subtract ~15 s/km to approximate race pace from training pace
@@ -338,8 +338,8 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                   {excludedCount} walk/run or interval session{excludedCount === 1 ? "" : "s"} excluded from estimate.
                 </p>
               )}
-              {recentClean.length === 1 && (
-                <p className="text-[10px] text-muted-foreground">1 clean run logged — need at least 2.</p>
+              {recentClean.length === 0 && excludedCount === 0 && (
+                <p className="text-[10px] text-muted-foreground">No clean continuous runs logged yet.</p>
               )}
             </div>
           )}
