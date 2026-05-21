@@ -1065,35 +1065,16 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               showReview = true;
             }
 
-            const subNode = (
-              <div className="flex flex-col items-center gap-0.5">
-                {driver && <span className="text-foreground/80 text-[11px] font-medium leading-snug">{driver}</span>}
-                <span className="text-muted-foreground text-[11px] leading-snug">{message}</span>
-                {showReview && onReviewPlan && (
-                  <button
-                    type="button"
-                    onClick={onReviewPlan}
-                    className="mt-0.5 text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
-                  >
-                    Review today's plan →
-                  </button>
-                )}
-              </div>
-            );
-
-
             return (
                 <div className="flex flex-col md:flex-row gap-5">
                 {/* Left column: gauge + (optional) readiness trend */}
                 <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative flex flex-col items-center justify-center">
                     <CircularGauge
                       score={score}
                       size={210}
                       statusLabel={statusLabel}
-                      subNode={subNode}
                       trendDelta={trendDelta}
-                      insightIcon={insightIcon}
                     />
                     {suppressScore && (
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
@@ -1101,7 +1082,27 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         Syncing {awaiting.join(", ")}
                       </div>
                     )}
+                    {/* Caption block — sits below the gauge so text never overlaps the arc */}
+                    <div className="mt-3 flex flex-col items-center gap-1 text-center px-4">
+                      {driver && (
+                        <div className="flex items-center gap-1.5 text-[12px] font-medium text-foreground/85 leading-snug">
+                          {insightIcon}
+                          <span>{driver}</span>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-muted-foreground leading-snug max-w-[260px]">{message}</p>
+                      {showReview && onReviewPlan && (
+                        <button
+                          type="button"
+                          onClick={onReviewPlan}
+                          className="mt-0.5 text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                        >
+                          Review today's plan →
+                        </button>
+                      )}
+                    </div>
                   </div>
+
                   {isFallback && !suppressScore && (
                     <p className="flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
