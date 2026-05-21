@@ -337,12 +337,22 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     }
 
     if (extractedFromCount > 0) {
+      const extPaces = extractedRuns.map((r) => r.pace).sort((a, b) => a - b);
+      const extMedian = extPaces[Math.floor(extPaces.length / 2)];
       breakdown.push({
         src: "Run intervals extracted",
         included: true,
-        note: `${extractedFromCount} walk/run session${extractedFromCount === 1 ? "" : "s"} → run-only pace recovered from GPS`,
+        note: `${extractedFromCount} walk/run session${extractedFromCount === 1 ? "" : "s"} → run-only pace ${fmtPace(extMedian)} (used in estimate)`,
       });
     }
+    if (droppedContaminated > 0) {
+      breakdown.push({
+        src: "Contaminated continuous runs",
+        included: false,
+        note: `${droppedContaminated} excluded — pace too slow vs extracted run segments`,
+      });
+    }
+
 
     // Sanity cap: if clean-run estimate is wildly slower than VO2-based fitness, snap to VO2
     if (estFinish != null && tVo2 != null && estFinish > tVo2 * 1.4) {
