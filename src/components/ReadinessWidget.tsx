@@ -211,6 +211,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [coachInsight, setCoachInsight] = useState<{ insight: string; recommendation: string } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [trendRefreshNonce, setTrendRefreshNonce] = useState(0);
   const [cacheChecked, setCacheChecked] = useState(false);
   const [batteryDialogOpen, setBatteryDialogOpen] = useState(false);
   const [factorDialog, setFactorDialog] = useState<{ label: string; status: "good" | "warning" | "poor"; detail: string } | null>(null);
@@ -295,7 +296,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       }
       setCacheChecked(true);
     })();
-  }, [user, refreshNonce]);
+  }, [user, refreshNonce, trendRefreshNonce]);
 
   useEffect(() => {
     if (!user || !cacheChecked) return;
@@ -578,7 +579,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   // Do not force a full readiness recompute here: switching to screenshot/camera apps
   // can briefly unmount chart dimensions and make the Body Battery graph disappear.
   useEffect(() => {
-    const reload = () => fetchTrendSnapshots();
+    const reload = () => setTrendRefreshNonce((n) => n + 1);
     const onVisibility = () => { if (document.visibilityState === "visible") reload(); };
     window.addEventListener("focus", reload);
     document.addEventListener("visibilitychange", onVisibility);
