@@ -19,6 +19,8 @@ export async function streamAICoach({
   plannedWorkout,
   preservePast,
   planStartFromDate,
+  todayDateUk,
+  targetIsNotToday,
   onDelta,
   onDone,
   onError,
@@ -41,6 +43,8 @@ export async function streamAICoach({
   plannedWorkout?: string;
   preservePast?: boolean;
   planStartFromDate?: string;
+  todayDateUk?: string;
+  targetIsNotToday?: boolean;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
