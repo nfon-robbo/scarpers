@@ -1321,6 +1321,9 @@ const TrainingPlanPage = () => {
     const todayWorkout = workoutToText(picked.workout);
     const targetDateStr = format(picked.dateObj, "yyyy-MM-dd");
 
+    // Snapshot args so the Retry button can re-run with the same intent.
+    dayAdjustRetryRef.current = () => { void assessDayAhead(); };
+
     // Open dialog immediately with progress
     setDayAdjustDialogOpen(true);
     setDayAdjusting(true);
@@ -1328,6 +1331,7 @@ const TrainingPlanPage = () => {
     setDayAdjustIsModified(false);
     setDayAdjustCompletedActivityId(null);
     setDayAdjustDetected(null);
+    setDayAdjustError(null);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
