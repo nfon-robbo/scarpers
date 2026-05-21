@@ -1383,7 +1383,7 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setDayAdjusting(false);
         setDayAdjustPhase("done");
-        setDayAdjustIsModified(/Decision:\s*ADJUSTED/i.test(accumulated));
+        setDayAdjustIsModified(/Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated));
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });
