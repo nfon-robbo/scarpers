@@ -137,6 +137,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
   const [extractedFromCount, setExtractedFromCount] = useState(0);
+  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string }[]; successes: { title: string; pace: number; minutes: number }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -185,7 +186,11 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       candidates.sort((a, b) => b.date.getTime() - a.date.getTime());
       const recent = candidates.slice(0, 6);
       if (recent.length === 0) {
-        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+        if (!cancelled) {
+          setExtractedRuns([]);
+          setExtractedFromCount(0);
+          setExtractionDebug({ attempted: 0, succeeded: 0, failures: [], successes: [] });
+        }
         return;
       }
       try {
@@ -197,21 +202,35 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const byId = new Map<string, any>();
         for (const row of data || []) byId.set(String(row.id), row.raw_data);
         const out: { date: Date; pace: number; title: string }[] = [];
+        const failures: { title: string; reason: string }[] = [];
+        const successes: { title: string; pace: number; minutes: number }[] = [];
         for (const c of recent) {
           const gps = byId.get(c.actId)?.gps_track;
           const ext = extractRunFromGps(gps);
-          if (ext) out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
+          const shortTitle = c.title.length > 38 ? c.title.slice(0, 36) + "…" : c.title;
+          if (ext.ok) {
+            out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
+            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60 });
+          } else {
+            failures.push({ title: shortTitle, reason: ext.reason });
+          }
         }
         if (!cancelled) {
           setExtractedRuns(out);
           setExtractedFromCount(out.length);
+          setExtractionDebug({ attempted: recent.length, succeeded: out.length, failures, successes });
         }
       } catch {
-        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+        if (!cancelled) {
+          setExtractedRuns([]);
+          setExtractedFromCount(0);
+          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed" })), successes: [] });
+        }
       }
     })();
     return () => { cancelled = true; };
   }, [workouts, linkedActivities]);
+
 
   const computed = useMemo(() => {
     const km = distanceKm(raceDistance);
