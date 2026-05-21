@@ -647,12 +647,15 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       }
 
 
+      const _tmStart = performance.now();
       const { data: todayMetrics } = await supabase
         .from("daily_metrics")
         .select("resting_heart_rate, hrv, stress_score, steps")
         .eq("user_id", user.id)
         .eq("date", targetDateStr)
         .maybeSingle();
+      console.log(`[PERF] today_metrics query: ${(performance.now() - _tmStart).toFixed(0)}ms`);
+
 
       let metricsToday = "";
       if (todayMetrics) {
