@@ -1,181 +1,163 @@
-Add Today's Activity Check to Assess Day Ahead
+Batch 1 + Assessment Lock — Assess Day Ahead
 
-Closes the blind spot where Assess Day Ahead ignores activities already logged on the target date (morning runs, completed scheduled workouts, double-days).
+Scope: implement improvements #1, #2, #4 plus the assessment lock. Defer #3 and #5. Skip #6. All changes are additive — no change to gating logic, escalation, LLM prompt, or yesterday handling.
 
-1. Edge function — fetch + classify today's activities
-
-File: supabase/functions/ai-coach/index.ts (day-adjust branch, after the existing yesterday block ~line 489)
-
-After targetDateStr is computed, also query activities for the target date (not always "today" — respects the rest-day walk-forward):
-
-SELECT activity_id, activity_type, distance_meters, duration_seconds,
-
-       avg_heart_rate, max_heart_rate, training_load, start_time, raw_data
-
-FROM activities
-
-WHERE user_id = <auth uid from JWT>
-
-  AND start_time >= <targetDateStr>T00:00:00+00
-
-  AND start_time <  <targetDateStr+1>T00:00:00+00
-
-  AND distance_meters >= 500
-
-  AND duration_seconds >= 60
-
-ORDER BY start_time DESC
-
-LIMIT 5
-
-(Uses the existing service-role supabase client + [user.id](http://user.id); timezone window kept as ISO day — matches how yesterday is queried today. UK-DST drift is acceptable; documented in code comment.)
-
-Pull activity name from raw_[data.name](http://data.name) / raw_data.title / raw_data.activity_name (fallback to activity_type).
-
-Classification (per activity, in order)
-
-For each row, call a new helper matchScheduledWorkout(activity, plannedWorkoutText) (see §2):
-
-a. SCHEDULED_WORKOUT_COMPLETED — distance within ±20% AND duration within ±20% AND activity_type compatible with the planned discipline, OR fuzzy name match against title keywords in today_workout.
-
-b. Else EXTRA_ACTIVITY.
-
-Aggregate across the day:
-
-totalDistanceKm, totalDurationMin, count, scheduledMatched: boolean.
-
-2. Pure helpers
+1. Tighten short-workout matching (improvement #2)
 
 File: supabase/functions/ai-coach/day-adjust-logic.ts
 
-Add:
+In matchScheduledWorkout, add an absolute floor on top of the existing ±20% relative check so a 3 km shakeout no longer false-matches a 2.5 km warm-up.
 
-- extractWorkoutSignals(plannedWorkoutText) → { distanceKm?: number, durationMin?: number, keywords: string[], discipline: 'run'|'bike'|'swim'|'other' }. Regex-based, mirrors the existing intensity detector.
+Constants: 
 
-- matchScheduledWorkout(activity, signals) → { matched: boolean, reason: string }. Within ±20% on each present signal; keyword overlap counts as a soft match.
+MATCH_FLOOR = { distanceKm: 0.75, durationMin: 5 }
 
-- classifyTodayActivities(activities, plannedWorkoutText) → { status: 'SCHEDULED_WORKOUT_COMPLETED'|'EXTRA_ACTIVITY'|'NONE', totals, matchedActivity?, others[] }.
+SHORT_THRESHOLD = { distanceKm: 7.5, durationMin: 50 }
 
-- Constant EXTREME_DAY_VOLUME = { minutes: 90, km: 15 } and isExtremeAccumulatedVolume(totals).
+Logic for each signal:
 
-3. Branch the edge function response
+For distance:
 
-After classification:
+- If signals.distanceKm >= SHORT_THRESHOLD.distanceKm:
 
-SCHEDULED_WORKOUT_COMPLETED → short-circuit before calling the LLM. Stream a fixed Markdown block as if it were the LLM output (so existing SSE client code works unchanged):
+  Pass if |activity.distanceKm - signals.distanceKm| <= signals.distanceKm * 0.20
 
-✅ Today's workout already completed
+- If signals.distanceKm < SHORT_THRESHOLD.distanceKm (short workout):
 
-You completed **{name}** at {HH:mm}:
+  Pass if |Δ| <= MATCH_FLOOR.distanceKm (must be within 0.75km regardless of percentage)
 
-- Distance: {x.x} km
+For duration (same pattern):
 
-- Duration: {mm:ss}
+- If signals.durationMin >= SHORT_THRESHOLD.durationMin:
 
-- Avg HR: {bpm} bpm
+  Pass if |activity.durationMin - signals.durationMin| <= signals.durationMin * 0.20
 
-Great work — no adjustment needed. See you tomorrow for {next workout title}.
+- If signals.durationMin < SHORT_THRESHOLD.durationMin (short workout):
 
-Include a machine-readable trailer line so the client can detect it deterministically:
+  Pass if |Δ| <= MATCH_FLOOR.durationMin (must be within 5min regardless of percentage)
 
-<!-- DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED activity_id={uuid} -->
+Rationale: 
 
-"Next workout" is looked up from current_plan if available; otherwise omit that line.
+- Long workouts (>7.5km or >50min): ±20% is reasonable (e.g., 20km ±4km = 16-24km range)
 
-EXTRA_ACTIVITY (single) → append a new section to the user prompt (after YESTERDAY context):
+- Short workouts (<7.5km or <50min): absolute tolerance prevents false matches (e.g., 3km must be 2.25-3.75km, not 2.4-3.6km which would be ±20%)
 
-TODAY'S TRAINING (already completed before this assessment):
+Update reason strings to indicate which rule failed ("distance delta 0.8km exceeds floor for short workout" vs "distance delta 4.5km exceeds 20% for planned 20km").
 
-- 1 activity: {type} {x.x}km / {mm}min @ {bpm}bpm (started {HH:mm})
+Add unit tests in day-adjust.test.ts:
 
-- Status: EXTRA_ACTIVITY (not the scheduled workout)
+- 3 km planned vs 2.5 km activity → no match (delta 0.5km but 2.5/3 = 83%, would pass ±20% but fails floor)
 
-And append a mandatory system-prompt rule:
+- 3 km planned vs 2.9 km activity → match (delta 0.1km, within floor)
 
-You MUST include this warning verbatim in Coach's Note: "⚠️ You've already run {x.x}km today. If tonight's session feels too hard, skip it — you've already done significant training."
+- 20 km planned vs 17 km activity → match (delta 3km = 15%, passes ±20%, floor doesn't apply)
 
-EXTRA_ACTIVITY (multiple) / accumulated:
+- 30 min planned vs 22 min activity → no match (delta 8min exceeds 5min floor)
 
-- Prompt context lists all activities + totals.
+- 90 min planned vs 78 min activity → match (delta 12min = 13%, passes ±20%, floor doesn't apply)
 
-- If isExtremeAccumulatedVolume(totals) → set a flag forceRestDay = true and inject a system rule:
+2. Detected-activity chip (improvement #4)
 
-Decision MUST be ADJUSTED. Replace the recommended workout with a Rest Day table. Coach's Note must include: "⚠️ OVERRIDE: You've already trained {x}km / {y}min today. Replacing tonight's workout with Rest Day to prevent overtraining."
+Goal: before the LLM streams, show a small chip in the dialog naming the activity the edge function detected, so the recommendation feels grounded.
 
-NONE → no change to current behaviour.
+Edge function (supabase/functions/ai-coach/index.ts):
 
-4. Client handling
+When today's activities exist and status is EXTRA_ACTIVITY (chip is redundant for WORKOUT_ALREADY_COMPLETED since the full message names the activity, and unnecessary for NONE), prepend a hidden SSE trailer before any other content:
 
-File: src/pages/TrainingPlan.tsx (around assessDayAhead, ~line 1320 in onDone)
+<!-- DAY_ADJUST_DETECTED: name="10.2 km easy run" started="07:14" count=1 totalKm=10.2 totalMin=58 -->
 
-- In onDelta, additionally test for the trailer DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED and capture activity_id.
+Emit it as the first streamed chunk so the client sees it before LLM tokens.
 
-- New state: dayAdjustCompletedActivityId: string | null.
+Client (src/pages/TrainingPlan.tsx):
 
-- In the dialog rendering (existing day-adjust dialog component):
+- New state dayAdjustDetected: { label: string; startedAt: string; count: number } | null.
 
-  * When status = completed: hide "Apply Changes" and "Sync to Garmin" buttons; show a "View Activity" button that routes to /activities (or the existing activity detail dialog, matching how completed-workout cards already navigate).
+- In assessDayAhead.onDelta, parse the trailer once (before stripping it for rendering), set state, and continue.
 
-  * setDayAdjustIsModified(false) remains, so no plan diff is attempted.
+- In the dialog body (above the streaming Markdown, line ~2638), render a compact chip when set:
 
-5. Tests
+  * "Detected: {label} at {startedAt}" with a small Activity icon.
 
-File: supabase/functions/ai-coach/day-adjust.test.ts
+  * Themed with existing tokens (bg-muted/40 text-muted-foreground border border-border rounded-full px-3 py-1 text-xs).
 
-Add unit tests for the new helpers:
+  * Reset chip state on each new assessment and on dialog close.
 
-- extractWorkoutSignals("Tempo 8km @ 4:30/km") → distance 8, discipline 'run', keywords include 'tempo'.
+  * Strip DAY_ADJUST_DETECTED from displayed Markdown the same way DAY_ADJUST_STATUS is stripped.
 
-- matchScheduledWorkout: 8.4km/35min vs planned 8km/34min → matched. 5km easy vs planned 5×800m tempo → not matched.
+3. 30-minute assessment cache (improvement #1)
 
-- classifyTodayActivities with no rows → NONE; with one matched → SCHEDULED_WORKOUT_COMPLETED; with one unmatched 5km → EXTRA_ACTIVITY; with 10km + 8km → EXTRA_ACTIVITY + isExtremeAccumulatedVolume === true.
+Client only. Avoids re-running the LLM when the user re-clicks within 30 min and nothing material changed.
 
-File: supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md)
+File: src/pages/TrainingPlan.tsx
 
-Add 4 scenarios:
+- Module-level Map<string, { result: string; detected: ... | null; completedActivityId: string | null; at: number }> keyed by ${[user.id](http://user.id)}|${targetDateStr}|${todayActivityCount}.
 
-- Completed scheduled workout at 07:00, assess 14:00 → "already completed" block + trailer.
+- Activity count source: read activities row count for the target ISO day via a lightweight Supabase query (select id count with head: true) inside assessDayAhead before the LLM call. Cheap, single round-trip.
 
-- Unplanned 5km easy at 07:00, assess scheduled tempo → warning verbatim in Coach's Note.
+- TTL: 30 min. On cache hit, skip streamAICoach entirely: set dayAdjustResult, dayAdjustDetected, dayAdjustCompletedActivityId, jump phase to done, and open the dialog.
 
-- 10km morning + 8km lunch, assess intervals → forced ADJUSTED with Rest Day override.
+- Cache write happens in onDone.
 
-- No activities today → identical output to current behaviour (regression guard).
+- Invalidate the cache entry when the user clicks Apply (since the plan changed) and on tab focus only if a new activity appeared (cheap re-count vs cached count).
 
-CRITICAL EDGE CASE HANDLING:
+4. Assessment lock (additional fix)
 
-When fetching today's activities, the query uses start_time for the date boundary. This means:
+Client only. Prevents two simultaneous assessments.
 
-- An activity that started yesterday at 23:50 and ended today at 00:10 will NOT appear in today's results (correct - it's yesterday's training)
+File: src/pages/TrainingPlan.tsx
 
-- An activity that started today at 23:50 and ends tomorrow at 00:10 WILL appear in today's results (correct - it's today's training)
+- Reuse the existing dayAdjusting state as the lock — it's already set true at the start of assessDayAhead and reset in onDone/onError/cache hits.
 
-This start_time-based logic matches how activities are normally bucketed by day in the app and prevents double-counting overnight activities.
+- At the very top of assessDayAhead:
 
-EXTREME_DAY_VOLUME thresholds rationale:
+if (dayAdjusting) {
 
-- 90 minutes total = ~12-15km for most runners = approaching half-marathon training volume in one day
+  toast({ title: "Assessment already in progress", description: "Please wait for the current assessment to finish." });
 
-- 15km total = regardless of pace, this is significant accumulated distance
+  return;
 
-Either threshold alone triggers the override because both indicate high training stress that makes an additional evening workout unsafe.
+}
 
-Out of scope
+- Guarantee the flag clears in all exit paths:
 
-- No DB migrations (uses existing activities columns).
+  * existing onDone ✓
 
-- No changes to yesterday's logic, gating thresholds, or escalation tiers.
+  * existing onError ✓
 
-- No changes to adjustNextWorkout flow (that already targets a future date with no completed activities possible).
+  * early return when no upcoming workout (already returns before setting true ✓)
+
+  * early return when session expired (already clears ✓)
+
+  * new: wrap the streamAICoach call so an unexpected throw also resets dayAdjusting and closes the dialog (try/catch around the call).
+
+  * Also gate adjustNextWorkout the same way (it shares the same dialog and dayAdjusting state).
+
+The existing button disabled={...|| dayAdjusting} already prevents double-click from the UI; the toast guard catches programmatic / nav-state triggers (adjustNextWorkout auto-apply via location state).
 
 Files touched
 
-- supabase/functions/ai-coach/index.ts
+- supabase/functions/ai-coach/day-adjust-logic.ts — match-floor logic
 
-- supabase/functions/ai-coach/day-adjust-logic.ts
+- supabase/functions/ai-coach/day-adjust.test.ts — new tests for the floor
 
-- supabase/functions/ai-coach/day-adjust.test.ts
+- supabase/functions/ai-coach/index.ts — emit DAY_ADJUST_DETECTED trailer for EXTRA_ACTIVITY
 
-- supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md)
+- src/pages/TrainingPlan.tsx — detected chip, cache, lock guard
 
-- src/pages/TrainingPlan.tsx
+- supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md) — add 3 scenarios (short-workout false-positive avoided; chip appears for extra activity; cache hit skips LLM within 30 min)
+
+Out of scope
+
+- Decision codes in trailer (#3) — defer.
+
+- HRV z-score (#5) — defer.
+
+- Emoji consistency (#6) — skipped.
+
+- No DB migrations, no LLM prompt changes, no changes to escalation/gating, no Apply/Sync flow changes.
+
+Verification
+
+- Run supabase--test_edge_functions after edits — all existing tests must still pass plus new short-workout tests.
+
+- Manual: in preview, click Assess Day Ahead twice rapidly → second click shows lock toast. Re-click within 30 min → instant result (cache). Add an unplanned morning run via Strava sync → detected chip appears.

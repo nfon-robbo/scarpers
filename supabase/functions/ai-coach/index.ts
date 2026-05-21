@@ -456,6 +456,9 @@ ${sleepContext}`;
 
     let systemPrompt = "";
     let userPrompt = "";
+    // Optional preamble streamed to the client BEFORE LLM tokens (e.g. a hidden
+    // marker the UI parses for the "Detected activity" chip).
+    let streamPreamble = "";
 
     const isPlanAdjust = type === "plan-adjust";
 
@@ -594,6 +597,17 @@ Great work — no adjustment needed. See you tomorrow.
         }).join("\n");
         const totDist = todayClassification.totals.totalDistanceKm.toFixed(1);
         const totMin = Math.round(todayClassification.totals.totalDurationMin);
+
+        // Emit detected-activity marker BEFORE LLM tokens so the UI chip can
+        // render immediately (improvement #4). Quotes escaped for HTML-comment safety.
+        const lead = todayActivities[0];
+        if (lead) {
+          const leadDist = (Number(lead.distance_meters || 0) / 1000).toFixed(1);
+          const leadMin = Math.round(Number(lead.duration_seconds || 0) / 60);
+          const safeType = String(lead.activity_type || "run").replace(/[<>"\n\r]/g, "");
+          const label = `${leadDist}km ${safeType} (${leadMin}min)`;
+          streamPreamble = `<!-- DAY_ADJUST_DETECTED: name="${label}" started="${fmtHHMM(lead.start_time)}" count=${todayClassification.totals.count} totalKm=${totDist} totalMin=${totMin} -->\n`;
+        }
 
         todayActivityContext = `\nTODAY'S TRAINING (already completed before this assessment):
 ${lines}
@@ -1945,6 +1959,15 @@ ${upcoming.join("\n")}
     // Non-full-plan types: zero-buffer pass-through (latency-sensitive).
     if (!needsRaceDateContinuation) {
       const { readable, writable } = new TransformStream();
+      // If we have a preamble (e.g. day-adjust detected-activity marker), emit
+      // it as the first SSE chunk before piping the LLM stream.
+      if (streamPreamble) {
+        const encoder = new TextEncoder();
+        const writer = writable.getWriter();
+        const chunk = { choices: [{ delta: { content: streamPreamble } }] };
+        await writer.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        writer.releaseLock();
+      }
       response.body!.pipeTo(writable).catch((e) => console.error("stream pipe error:", e));
       return new Response(readable, { headers: sseHeaders });
     }

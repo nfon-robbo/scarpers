@@ -129,6 +129,14 @@ export function shouldForceAdjustedByLoadVelocity(input: {
 
 export const EXTREME_DAY_VOLUME = { minutes: 90, km: 15 } as const;
 
+/**
+ * Absolute-tolerance floor for short planned workouts. Short workouts must
+ * match within these absolute deltas regardless of percentage — prevents a
+ * warm-up or shake-out from being misidentified as the planned session.
+ */
+export const MATCH_FLOOR = { distanceKm: 0.75, durationMin: 5 } as const;
+export const SHORT_THRESHOLD = { distanceKm: 7.5, durationMin: 50 } as const;
+
 export type Discipline = "run" | "bike" | "swim" | "other";
 
 export interface WorkoutSignals {
@@ -244,15 +252,25 @@ export function matchScheduledWorkout(
 
   if (signals.distanceKm != null && distKm != null) {
     signalCount++;
-    const d = pctDiff(distKm, signals.distanceKm);
-    if (d <= 0.20) { okCount++; checks.push(`distance ✓ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, ${(d*100).toFixed(0)}%)`); }
-    else checks.push(`distance ✗ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, ${(d*100).toFixed(0)}%)`);
+    const absDelta = Math.abs(distKm - signals.distanceKm);
+    const pct = pctDiff(distKm, signals.distanceKm);
+    const isShort = signals.distanceKm < SHORT_THRESHOLD.distanceKm;
+    const pass = isShort
+      ? absDelta <= MATCH_FLOOR.distanceKm
+      : pct <= 0.20;
+    if (pass) { okCount++; checks.push(`distance ✓ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, Δ${absDelta.toFixed(2)}km, ${(pct*100).toFixed(0)}%)`); }
+    else checks.push(`distance ✗ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, Δ${absDelta.toFixed(2)}km${isShort ? ` exceeds floor ${MATCH_FLOOR.distanceKm}km for short workout` : `, ${(pct*100).toFixed(0)}% exceeds 20%`})`);
   }
   if (signals.durationMin != null && durMin != null) {
     signalCount++;
-    const d = pctDiff(durMin, signals.durationMin);
-    if (d <= 0.20) { okCount++; checks.push(`duration ✓ (${durMin.toFixed(0)}/${signals.durationMin}min, ${(d*100).toFixed(0)}%)`); }
-    else checks.push(`duration ✗ (${durMin.toFixed(0)}/${signals.durationMin}min, ${(d*100).toFixed(0)}%)`);
+    const absDelta = Math.abs(durMin - signals.durationMin);
+    const pct = pctDiff(durMin, signals.durationMin);
+    const isShort = signals.durationMin < SHORT_THRESHOLD.durationMin;
+    const pass = isShort
+      ? absDelta <= MATCH_FLOOR.durationMin
+      : pct <= 0.20;
+    if (pass) { okCount++; checks.push(`duration ✓ (${durMin.toFixed(0)}/${signals.durationMin}min, Δ${absDelta.toFixed(0)}min, ${(pct*100).toFixed(0)}%)`); }
+    else checks.push(`duration ✗ (${durMin.toFixed(0)}/${signals.durationMin}min, Δ${absDelta.toFixed(0)}min${isShort ? ` exceeds floor ${MATCH_FLOOR.durationMin}min for short workout` : `, ${(pct*100).toFixed(0)}% exceeds 20%`})`);
   }
 
   // Fuzzy name match (soft): if any planned keyword appears in activity name/raw title.
