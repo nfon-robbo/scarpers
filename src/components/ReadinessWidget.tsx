@@ -296,7 +296,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       }
       setCacheChecked(true);
     })();
-  }, [user, refreshNonce, trendRefreshNonce]);
+  }, [user, refreshNonce]);
 
   useEffect(() => {
     if (!user || !cacheChecked) return;
@@ -573,7 +573,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         return { recorded_at: s.recorded_at, score: s.score, kind: (s.kind === "morning" ? "morning" : "eod") as "morning" | "eod", isBackfilled: !!s.is_backfilled, ...validity };
       }));
     });
-  }, [user, refreshNonce]);
+  }, [user, refreshNonce, trendRefreshNonce]);
 
   // Auto-reload trend snapshots only when the page becomes visible or regains focus.
   // Do not force a full readiness recompute here: switching to screenshot/camera apps
