@@ -1,0 +1,1 @@
+DELETE FROM public.race_time_predictions;
