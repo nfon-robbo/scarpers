@@ -2777,6 +2777,22 @@ const TrainingPlanPage = () => {
               </div>
             )}
 
+            {/* Stream error with Retry — keeps the dialog open instead of vanishing */}
+            {!dayAdjusting && dayAdjustError && (
+              <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+                <p className="text-sm font-medium text-foreground">{dayAdjustError}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => { setDayAdjustError(null); dayAdjustRetryRef.current?.(); }}>
+                    <Loader2 className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissDayAdjust}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             {!dayAdjusting && dayAdjustResult && (
               <div className="flex flex-wrap gap-2 pt-3 border-t">
