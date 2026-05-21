@@ -80,6 +80,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     if (!open) return;
     setReviewContent("");
     setReviewLoading(true);
+    setReviewError(null);
+    setCoachError(null);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
     setNextSession(null); setReadinessScore(null);
@@ -133,27 +135,38 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
         plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
       }
 
-      let accumulated = "";
-      streamAICoach({
-        type: "workout-review",
-        token: session.access_token,
-        activitySummary,
-        plannedWorkout,
-        onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
-        onDone: async () => {
-          if (cancelled) return;
-          setReviewLoading(false);
-          // Cache the AI summary so we don't regenerate next time
-          try {
-            await supabase.from("workout_reviews").upsert({
-              user_id: session.user.id,
-              activity_id: activity.id,
-              ai_summary: accumulated,
-            } as any, { onConflict: "activity_id" });
-          } catch (e) { console.error("[review] failed to cache ai_summary", e); }
-        },
-        onError: () => { if (!cancelled) { setReviewLoading(false); setReviewContent("Unable to generate review. Please try again."); } },
-      });
+      const runReview = () => {
+        setReviewError(null);
+        setReviewLoading(true);
+        let accumulated = "";
+        streamAICoach({
+          type: "workout-review",
+          token: session.access_token,
+          featureName: "review",
+          activitySummary,
+          plannedWorkout,
+          onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
+          onDone: async () => {
+            if (cancelled) return;
+            setReviewLoading(false);
+            // Cache the AI summary so we don't regenerate next time
+            try {
+              await supabase.from("workout_reviews").upsert({
+                user_id: session.user.id,
+                activity_id: activity.id,
+                ai_summary: accumulated,
+              } as any, { onConflict: "activity_id" });
+            } catch (e) { console.error("[review] failed to cache ai_summary", e); }
+          },
+          onError: (err) => {
+            if (cancelled) return;
+            setReviewLoading(false);
+            setReviewError(err);
+          },
+        });
+      };
+      reviewRetryRef.current = runReview;
+      runReview();
     })();
     return () => { cancelled = true; };
   }, [open, workout, activity]);
