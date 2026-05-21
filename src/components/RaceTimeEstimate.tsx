@@ -99,7 +99,7 @@ type ExtractionOutcome =
 
 function extractRunFromGps(gps: any[]): ExtractionOutcome {
   if (!Array.isArray(gps) || gps.length < 20) {
-    return { ok: false, reason: "no gps_track data" };
+    return { ok: false, reason: "no GPS recorded (indoor / treadmill / manual entry)" };
   }
   let runDur = 0;
   let runDist = 0;
@@ -174,6 +174,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const key = format(w.dateObj, "yyyy-MM-dd");
         const act = linkedActivities[key];
         if (!act?.id) continue;
+        // Skip walking / treadmill activities — they shouldn't influence run pace predictions
+        const at = String(act.activity_type || "").toLowerCase();
+        if (at === "walking" || at === "walk") continue;
         const dist = Number(act.distance_meters || 0);
         const dur = Number(act.duration_seconds || 0);
         if (dist < 800 || dur < 300) continue;
@@ -282,17 +285,43 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
 
     // VO2-derived target time (primary)
     let tVo2: number | null = null;
+    let vo2RacePace: number | null = null;
     if (vo2Max != null) {
       const t5 = vo2maxTo5kSeconds(vo2Max);
       tVo2 = km === 5 ? t5 : riegel(t5, 5, km);
+      vo2RacePace = t5 / 5;
     }
 
-    // Clean-run derived target (median pace * km). One clean run is enough to seed an estimate.
+    // Floor cap so extracted/easy-derived race pace can't go faster than VO2 fitness − 20s/km
+    const paceFloor = vo2RacePace != null ? vo2RacePace - 20 : 180;
+
+    // Extracted tempo: median pace of extracted run-only segments, converted to race pace (−65 s/km)
+    let tExtracted: number | null = null;
+    let extractedRacePace: number | null = null;
+    if (extractedRuns.length >= 1) {
+      const extPaces = [...extractedRuns.map((r) => r.pace)].sort((a, b) => a - b);
+      const extMedian = extPaces[Math.floor(extPaces.length / 2)];
+      const raceP = Math.max(paceFloor, extMedian - 65);
+      extractedRacePace = raceP;
+      tExtracted = raceP * km;
+    }
+
+    // Easy pace: from usedClean (continuous runs that survived contamination filter)
+    let tEasy: number | null = null;
+    let easyRacePace: number | null = null;
+    if (usedClean.length >= 1) {
+      const paces = [...usedClean.map((r) => r.pace)].sort((a, b) => a - b);
+      const median = paces[Math.floor(paces.length / 2)];
+      const raceP = Math.max(paceFloor, median - 60);
+      easyRacePace = raceP;
+      tEasy = raceP * km;
+    }
+
+    // Legacy clean-run derived target (used only when no extraction available)
     let tClean: number | null = null;
     if (recentClean.length >= 1) {
       const paces = [...recentClean.map((r) => r.pace)].sort((a, b) => a - b);
       const median = paces[Math.floor(paces.length / 2)];
-      // Subtract ~15 s/km to approximate race pace from training pace
       tClean = Math.max(60, (median - 15)) * km;
     }
 
@@ -319,6 +348,22 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (100%)` });
       breakdown.push({ src: "Training pace", included: false, note: `excluded — walk/run phase, run segment extraction not yet reliable` });
       warning = `Based on VO2 max ${vo2Max!.toFixed(0)} only — run segment extraction in development.`;
+    } else if (tVo2 != null && tExtracted != null) {
+      // 60/30/10 split when we have extracted segments
+      // If we also have easy-pace data → 60/30/10; else fold the 10% into extracted (60/40)
+      if (tEasy != null) {
+        estFinish = tVo2 * 0.6 + tExtracted * 0.3 + tEasy * 0.1;
+        basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, "extracted tempo", "easy pace");
+        breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (60%)` });
+        breakdown.push({ src: `Extracted tempo (${extractedFromCount} session${extractedFromCount === 1 ? "" : "s"})`, included: true, note: `${fmtTime(tExtracted)} @ ${fmtPace(extractedRacePace!)} race pace (30%)` });
+        breakdown.push({ src: `Easy pace (${usedClean.length} run${usedClean.length === 1 ? "" : "s"})`, included: true, note: `${fmtTime(tEasy)} @ ${fmtPace(easyRacePace!)} race pace (10%)` });
+      } else {
+        estFinish = tVo2 * 0.6 + tExtracted * 0.4;
+        basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, "extracted tempo");
+        breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (60%)` });
+        breakdown.push({ src: `Extracted tempo (${extractedFromCount} session${extractedFromCount === 1 ? "" : "s"})`, included: true, note: `${fmtTime(tExtracted)} @ ${fmtPace(extractedRacePace!)} race pace (40%)` });
+        breakdown.push({ src: "Easy pace", included: false, note: "no clean continuous easy runs available" });
+      }
     } else if (tVo2 != null && tClean != null) {
       estFinish = tVo2 * 0.7 + tClean * 0.3;
       basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, cleanLabel);
@@ -338,15 +383,6 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       breakdown.push({ src: "VO2 max", included: false, note: "not available" });
     }
 
-    if (extractedFromCount > 0) {
-      const extPaces = extractedRuns.map((r) => r.pace).sort((a, b) => a - b);
-      const extMedian = extPaces[Math.floor(extPaces.length / 2)];
-      breakdown.push({
-        src: "Run intervals extracted",
-        included: true,
-        note: `${extractedFromCount} walk/run session${extractedFromCount === 1 ? "" : "s"} → run-only pace ${fmtPace(extMedian)} (used in estimate)`,
-      });
-    }
     if (droppedContaminated > 0) {
       breakdown.push({
         src: "Contaminated continuous runs",
