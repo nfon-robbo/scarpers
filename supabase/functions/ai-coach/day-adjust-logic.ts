@@ -124,3 +124,190 @@ export function shouldForceAdjustedByLoadVelocity(input: {
 }): boolean {
   return input.yesterdayHard && input.todayIntensity === "hard" && input.lastNightPoor;
 }
+
+// ── Today's-activity awareness ───────────────────────────────────────────────
+
+export const EXTREME_DAY_VOLUME = { minutes: 90, km: 15 } as const;
+
+export type Discipline = "run" | "bike" | "swim" | "other";
+
+export interface WorkoutSignals {
+  distanceKm: number | null;
+  durationMin: number | null;
+  discipline: Discipline;
+  keywords: string[];
+}
+
+/** Extract distance, duration, discipline & keywords from a planned-workout markdown blob. */
+export function extractWorkoutSignals(plannedWorkoutText: string | null | undefined): WorkoutSignals {
+  const text = String(plannedWorkoutText || "");
+  const lower = text.toLowerCase();
+
+  // Distance (first km / mile mention). Convert miles → km.
+  let distanceKm: number | null = null;
+  const kmMatch = lower.match(/(\d+(?:\.\d+)?)\s*k(?:m|ilometre|ilometer)?s?\b/);
+  const miMatch = lower.match(/(\d+(?:\.\d+)?)\s*mi(?:les?|\b)/);
+  if (kmMatch) distanceKm = parseFloat(kmMatch[1]);
+  else if (miMatch) distanceKm = parseFloat(miMatch[1]) * 1.60934;
+
+  // Duration: prefer "Total: Xmin" or "X min/minutes/hr".
+  let durationMin: number | null = null;
+  const totalMatch = lower.match(/total[^0-9]*(\d+)\s*(?:min|m)\b/);
+  const hrMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour|hours|h)\b/);
+  const minMatch = lower.match(/(\d+)\s*(?:min|minute|minutes)\b/);
+  if (totalMatch) durationMin = parseInt(totalMatch[1], 10);
+  else if (hrMatch) durationMin = Math.round(parseFloat(hrMatch[1]) * 60);
+  else if (minMatch) durationMin = parseInt(minMatch[1], 10);
+
+  // Discipline
+  let discipline: Discipline = "run";
+  if (/\b(cycle|cycling|bike|ride|spin)\b/.test(lower)) discipline = "bike";
+  else if (/\b(swim|swimming|pool)\b/.test(lower)) discipline = "swim";
+  else if (!/\b(run|jog|tempo|interval|threshold|easy|long|recovery|race|hill|fartlek|track)\b/.test(lower)
+           && !/^run|\brun\b/.test(lower)) {
+    discipline = "other";
+  }
+
+  // Keywords (intensity / session-type words)
+  const keywordList = [
+    "tempo", "interval", "intervals", "threshold", "race pace", "vo2", "hill",
+    "hill repeats", "fartlek", "easy", "recovery", "long", "progression",
+    "track", "strides", "warm-up", "cool-down",
+  ];
+  const keywords = keywordList.filter((kw) => lower.includes(kw));
+
+  return { distanceKm, durationMin, discipline, keywords };
+}
+
+export interface TodayActivityInput {
+  id?: string | null;
+  activity_id?: string | null;
+  activity_type?: string | null;
+  distance_meters?: number | null;
+  duration_seconds?: number | null;
+  avg_heart_rate?: number | null;
+  start_time?: string | null;
+  name?: string | null;
+  raw_data?: Record<string, unknown> | null;
+}
+
+function pctDiff(a: number, b: number): number {
+  if (b === 0) return Infinity;
+  return Math.abs(a - b) / b;
+}
+
+function disciplineMatches(activityType: string | null | undefined, signal: Discipline): boolean {
+  const t = String(activityType || "").toLowerCase();
+  if (!t) return signal === "run" || signal === "other";
+  if (signal === "run") return /run|jog|treadmill/.test(t);
+  if (signal === "bike") return /bike|cycl|ride/.test(t);
+  if (signal === "swim") return /swim/.test(t);
+  return true;
+}
+
+export interface MatchResult {
+  matched: boolean;
+  reason: string;
+}
+
+/** Match an activity against the planned-workout signals (±20% on each present signal). */
+export function matchScheduledWorkout(
+  activity: TodayActivityInput,
+  signals: WorkoutSignals,
+): MatchResult {
+  const distKm = activity.distance_meters != null ? Number(activity.distance_meters) / 1000 : null;
+  const durMin = activity.duration_seconds != null ? Number(activity.duration_seconds) / 60 : null;
+
+  if (!disciplineMatches(activity.activity_type, signals.discipline)) {
+    return { matched: false, reason: `discipline mismatch (${activity.activity_type} vs ${signals.discipline})` };
+  }
+
+  const checks: string[] = [];
+  let signalCount = 0;
+  let okCount = 0;
+
+  if (signals.distanceKm != null && distKm != null) {
+    signalCount++;
+    const d = pctDiff(distKm, signals.distanceKm);
+    if (d <= 0.20) { okCount++; checks.push(`distance ✓ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, ${(d*100).toFixed(0)}%)`); }
+    else checks.push(`distance ✗ (${distKm.toFixed(1)}/${signals.distanceKm.toFixed(1)}km, ${(d*100).toFixed(0)}%)`);
+  }
+  if (signals.durationMin != null && durMin != null) {
+    signalCount++;
+    const d = pctDiff(durMin, signals.durationMin);
+    if (d <= 0.20) { okCount++; checks.push(`duration ✓ (${durMin.toFixed(0)}/${signals.durationMin}min, ${(d*100).toFixed(0)}%)`); }
+    else checks.push(`duration ✗ (${durMin.toFixed(0)}/${signals.durationMin}min, ${(d*100).toFixed(0)}%)`);
+  }
+
+  // Fuzzy name match (soft): if any planned keyword appears in activity name/raw title.
+  const name = String(
+    activity.name
+      || (activity.raw_data && (activity.raw_data as any).name)
+      || (activity.raw_data && (activity.raw_data as any).title)
+      || (activity.raw_data && (activity.raw_data as any).activity_name)
+      || "",
+  ).toLowerCase();
+  const nameKeywordHit = signals.keywords.find((kw) => name.includes(kw));
+
+  // Decision: every present signal must pass ±20%. Soft override: if no
+  // distance/duration signals but name keyword hits, accept.
+  if (signalCount === 0) {
+    if (nameKeywordHit) return { matched: true, reason: `name keyword "${nameKeywordHit}" matched` };
+    return { matched: false, reason: "no signals to match" };
+  }
+  const matched = okCount === signalCount;
+  if (matched) return { matched: true, reason: checks.join("; ") };
+  if (nameKeywordHit && okCount >= 1) {
+    return { matched: true, reason: `${checks.join("; ")}; name keyword "${nameKeywordHit}"` };
+  }
+  return { matched: false, reason: checks.join("; ") };
+}
+
+export type TodayStatus = "SCHEDULED_WORKOUT_COMPLETED" | "EXTRA_ACTIVITY" | "NONE";
+
+export interface TodayTotals {
+  count: number;
+  totalDistanceKm: number;
+  totalDurationMin: number;
+}
+
+export interface TodayClassification {
+  status: TodayStatus;
+  totals: TodayTotals;
+  matchedActivity: TodayActivityInput | null;
+  others: TodayActivityInput[];
+}
+
+export function classifyTodayActivities(
+  activities: ReadonlyArray<TodayActivityInput>,
+  plannedWorkoutText: string | null | undefined,
+): TodayClassification {
+  const totals: TodayTotals = { count: 0, totalDistanceKm: 0, totalDurationMin: 0 };
+  for (const a of activities) {
+    totals.count++;
+    totals.totalDistanceKm += Number(a.distance_meters || 0) / 1000;
+    totals.totalDurationMin += Number(a.duration_seconds || 0) / 60;
+  }
+
+  if (activities.length === 0) {
+    return { status: "NONE", totals, matchedActivity: null, others: [] };
+  }
+
+  const signals = extractWorkoutSignals(plannedWorkoutText);
+  let matched: TodayActivityInput | null = null;
+  const others: TodayActivityInput[] = [];
+  for (const a of activities) {
+    if (!matched && matchScheduledWorkout(a, signals).matched) matched = a;
+    else others.push(a);
+  }
+
+  if (matched) {
+    return { status: "SCHEDULED_WORKOUT_COMPLETED", totals, matchedActivity: matched, others };
+  }
+  return { status: "EXTRA_ACTIVITY", totals, matchedActivity: null, others: [...activities] };
+}
+
+export function isExtremeAccumulatedVolume(totals: TodayTotals): boolean {
+  return totals.totalDurationMin > EXTREME_DAY_VOLUME.minutes
+    || totals.totalDistanceKm > EXTREME_DAY_VOLUME.km;
+}
