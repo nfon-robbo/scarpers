@@ -23,8 +23,7 @@ import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 
-import RaceTimeEstimate from "@/components/RaceTimeEstimate";
-import RacePredictionGraph from "@/components/RacePredictionGraph";
+import RaceEstimateTabs from "@/components/RaceEstimateTabs";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
@@ -2595,14 +2594,11 @@ const TrainingPlanPage = () => {
                 </Popover>
               }
             />
-            <RaceTimeEstimate
+            <RaceEstimateTabs
               workouts={parseWorkoutsFromPlan(content)}
               linkedActivities={linkedActivities}
               raceDistance={raceDistance}
               goalTime={goalTime}
-            />
-            <RacePredictionGraph
-              raceDistance={raceDistance}
               goalSeconds={(() => {
                 const g = (goalTime || "").trim();
                 const m = g.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
