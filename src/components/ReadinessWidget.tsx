@@ -1072,10 +1072,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   <div className="relative flex flex-col items-center justify-center">
                     <CircularGauge
                       score={score}
-                      size={210}
+                      size={300}
                       statusLabel={statusLabel}
                       trendDelta={trendDelta}
                     />
+
                     {suppressScore && (
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
