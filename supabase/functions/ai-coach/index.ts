@@ -520,6 +520,9 @@ ${sleepContext}`;
         .order("date", { ascending: false });
 
       let trendContext = "";
+      let consecutivePoorOut = 0;
+      let hrvDeltaPctOut: number | null = null;
+      let rhrDeltaOut: number | null = null;
       if (trendMetrics && trendMetrics.length > 0) {
         const nights = trendMetrics.slice(0, 7);
         const nightsLine = nights.map((n: any) => {
@@ -528,24 +531,55 @@ ${sleepContext}`;
           return `${n.date}: score ${score ?? "n/a"}, ${hrs}`;
         }).join(" | ");
 
+        const median = (arr: number[]): number | null => {
+          if (!arr.length) return null;
+          const s = [...arr].sort((a, b) => a - b);
+          const m = Math.floor(s.length / 2);
+          return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+        };
         const hrvValues = trendMetrics.map((m: any) => m.hrv).filter((v: any) => v != null && Number.isFinite(v));
         const rhrValues = trendMetrics.map((m: any) => m.resting_heart_rate).filter((v: any) => v != null && Number.isFinite(v));
-        const baselineHrv = hrvValues.length ? Math.round(hrvValues.reduce((a: number, b: number) => a + b, 0) / hrvValues.length) : null;
-        const baselineRhr = rhrValues.length ? Math.round(rhrValues.reduce((a: number, b: number) => a + b, 0) / rhrValues.length) : null;
+        const baselineHrv = hrvValues.length ? Math.round(median(hrvValues)!) : null;
+        const baselineRhr = rhrValues.length ? Math.round(median(rhrValues)!) : null;
 
-        const POOR = (n: any) =>
-          (n.sleep_score != null && n.sleep_score < 60) ||
-          (n.sleep_duration_seconds != null && n.sleep_duration_seconds < 6 * 3600);
+        // Refined POOR: (score<60 AND <7h) OR score<50
+        const POOR = (n: any) => {
+          const score = n.sleep_score;
+          const hours = n.sleep_duration_seconds ? n.sleep_duration_seconds / 3600 : null;
+          if (score != null && score < 50) return true;
+          if (score != null && score < 60 && hours != null && hours < 7) return true;
+          return false;
+        };
         let consecutivePoor = 0;
         for (const n of nights) { if (POOR(n)) consecutivePoor++; else break; }
+        consecutivePoorOut = consecutivePoor;
 
         const todayHrv = todayMetrics?.hrv ?? null;
         const todayRhr = todayMetrics?.resting_heart_rate ?? null;
         const hrvDeltaPct = (todayHrv != null && baselineHrv) ? ((todayHrv - baselineHrv) / baselineHrv * 100) : null;
         const rhrDelta = (todayRhr != null && baselineRhr != null) ? (todayRhr - baselineRhr) : null;
+        hrvDeltaPctOut = hrvDeltaPct;
+        rhrDeltaOut = rhrDelta;
 
-        trendContext = `\nSLEEP TREND (last ${nights.length} nights, most recent first):\n${nightsLine}\nConsecutive poor nights (score<60 or <6h) ending today: ${consecutivePoor}\n\nBASELINES (last 14d avg):\nHRV: ${baselineHrv ?? "n/a"} ms (today ${todayHrv != null ? Math.round(todayHrv) + " ms" : "n/a"}${hrvDeltaPct != null ? `, ${hrvDeltaPct >= 0 ? "+" : ""}${hrvDeltaPct.toFixed(0)}% vs baseline` : ""})\nResting HR: ${baselineRhr ?? "n/a"} bpm (today ${todayRhr != null ? Math.round(todayRhr) + " bpm" : "n/a"}${rhrDelta != null ? `, ${rhrDelta >= 0 ? "+" : ""}${rhrDelta.toFixed(0)} bpm vs baseline` : ""})\n`;
+        trendContext = `\nSLEEP TREND (last ${nights.length} nights, most recent first):\n${nightsLine}\nConsecutive poor nights ((score<60 & <7h) or score<50) ending today: ${consecutivePoor}\n\nBASELINES (last 14d median):\nHRV: ${baselineHrv ?? "n/a"} ms (today ${todayHrv != null ? Math.round(todayHrv) + " ms" : "n/a"}${hrvDeltaPct != null ? `, ${hrvDeltaPct >= 0 ? "+" : ""}${hrvDeltaPct.toFixed(0)}% vs baseline` : ""})\nResting HR: ${baselineRhr ?? "n/a"} bpm (today ${todayRhr != null ? Math.round(todayRhr) + " bpm" : "n/a"}${rhrDelta != null ? `, ${rhrDelta >= 0 ? "+" : ""}${rhrDelta.toFixed(0)} bpm vs baseline` : ""})\n`;
       }
+
+      // Escalation message based on chronic poor sleep
+      let escalationContext = "";
+      if (consecutivePoorOut >= 7) {
+        escalationContext = `\nESCALATION: ⚠️ MANDATORY REST — seven consecutive poor nights indicates you need medical attention, not training.\n`;
+      } else if (consecutivePoorOut >= 5) {
+        escalationContext = `\nESCALATION: ⚠️ Sleep has been poor for 5+ nights. Prioritise rest and recovery — training is secondary right now. Consider consulting a doctor if this continues.\n`;
+      } else if (consecutivePoorOut >= 3) {
+        escalationContext = `\nESCALATION: Third poor night in a row — identify what's disrupting your sleep (stress, caffeine, screen time).\n`;
+      }
+
+      // Detect today's planned intensity from the workout markdown
+      const todayWorkoutText = (today_workout || "").toLowerCase();
+      let plannedIntensity: "hard" | "easy" | "rest" = "easy";
+      if (!todayWorkoutText.trim() || /\brest\b/.test(todayWorkoutText)) plannedIntensity = "rest";
+      else if (/tempo|interval|threshold|race pace|vo2|hill repeat|hill repeats/.test(todayWorkoutText)) plannedIntensity = "hard";
+      const intensityContext = `\nTODAY PLANNED INTENSITY: ${plannedIntensity}\n`;
 
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
