@@ -353,13 +353,23 @@ serve(async (req) => {
     }
 
     // Fetch Google Fit sleep stages and compute sleep scores
+    // PERF: bound to last 60 days to avoid full-table scans for users with
+    // months/years of stage history. Previous unbounded query was the prime
+    // suspect for the 140s gateway timeout on Day Ahead.
     let sleepContext = "";
+    const _sleepStart = performance.now();
+    const sleepSince = new Date();
+    sleepSince.setDate(sleepSince.getDate() - 60);
+    const sleepSinceStr = sleepSince.toISOString().split("T")[0];
     const { data: sleepStages } = await supabase
       .from("sleep_stages")
       .select("date, stage, duration_seconds, start_time, end_time")
       .eq("user_id", user.id)
+      .gte("date", sleepSinceStr)
       .order("date", { ascending: false })
       .limit(500);
+    console.log(`[PERF] sleep_stages query: ${(performance.now() - _sleepStart).toFixed(0)}ms (${sleepStages?.length ?? 0} rows)`);
+
 
     if (sleepStages && sleepStages.length > 0) {
       // Aggregate by date
