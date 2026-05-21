@@ -466,7 +466,12 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                             if (data.avg_cadence && data.duration_seconds) return `${Math.round(data.avg_cadence * (data.duration_seconds / 60)).toLocaleString()}`;
                             return null;
                           })()} icon={Footprints} />
-                          <Stat label="Avg Step Length" value={data.raw_data?.avg_step_length ? `${(data.raw_data.avg_step_length).toFixed(2)} m` : null} icon={Ruler} />
+                          <Stat label="Avg Step Length" value={(() => {
+                            const v = data.raw_data?.avg_step_length;
+                            if (!v) return null;
+                            const meters = v > 10 ? v / 1000 : v; // FIT stores in mm
+                            return `${meters.toFixed(2)} m`;
+                          })()} icon={Ruler} />
                         </div>
                       </CardContent>
                     </Card>
