@@ -2637,7 +2637,7 @@ const TrainingPlanPage = () => {
             {/* AI Result */}
             {dayAdjustResult && (
               <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
-                <MarkdownRenderer content={dayAdjustResult} />
+                <MarkdownRenderer content={dayAdjustResult.replace(/<!--\s*DAY_ADJUST_STATUS:[^>]*-->/g, "").trim()} />
               </div>
             )}
 
