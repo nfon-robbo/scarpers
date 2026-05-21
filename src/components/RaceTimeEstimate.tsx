@@ -137,7 +137,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
   const [extractedFromCount, setExtractedFromCount] = useState(0);
-  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string }[]; successes: { title: string; pace: number; minutes: number }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
+  const [extractionDebug, setExtractionDebug] = useState<{ attempted: number; succeeded: number; failures: { title: string; reason: string; date: Date }[]; successes: { title: string; pace: number; minutes: number; date: Date }[] }>({ attempted: 0, succeeded: 0, failures: [], successes: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -202,17 +202,17 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const byId = new Map<string, any>();
         for (const row of data || []) byId.set(String(row.id), row.raw_data);
         const out: { date: Date; pace: number; title: string }[] = [];
-        const failures: { title: string; reason: string }[] = [];
-        const successes: { title: string; pace: number; minutes: number }[] = [];
+        const failures: { title: string; reason: string; date: Date }[] = [];
+        const successes: { title: string; pace: number; minutes: number; date: Date }[] = [];
         for (const c of recent) {
           const gps = byId.get(c.actId)?.gps_track;
           const ext = extractRunFromGps(gps);
           const shortTitle = c.title.length > 38 ? c.title.slice(0, 36) + "…" : c.title;
           if (ext.ok === true) {
             out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
-            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60 });
+            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60, date: c.date });
           } else {
-            failures.push({ title: shortTitle, reason: ext.reason });
+            failures.push({ title: shortTitle, reason: ext.reason, date: c.date });
           }
         }
         if (!cancelled) {
@@ -224,7 +224,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         if (!cancelled) {
           setExtractedRuns([]);
           setExtractedFromCount(0);
-          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed" })), successes: [] });
+          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed", date: c.date })), successes: [] });
         }
       }
     })();
@@ -473,10 +473,10 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                     <li className="text-[10px] text-muted-foreground pt-1 border-t border-border/30 mt-1">
                       <span className="font-medium">Debug:</span> extraction attempted on {extractionDebug.attempted}, succeeded {extractionDebug.succeeded}, failed {extractionDebug.failures.length}
                       {extractionDebug.successes.map((s, i) => (
-                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
+                        <div key={`s${i}`} className="ml-2 text-foreground/70">✓ {format(s.date, "dd/MM")} — {s.title}: {Math.round(s.minutes)}min @ {fmtPace(s.pace)}</div>
                       ))}
                       {extractionDebug.failures.map((f, i) => (
-                        <div key={`f${i}`} className="ml-2">✗ {f.title}: {f.reason}</div>
+                        <div key={`f${i}`} className="ml-2">✗ {format(f.date, "dd/MM")} — {f.title}: {f.reason}</div>
                       ))}
                     </li>
                   )}
