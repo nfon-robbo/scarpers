@@ -42,7 +42,73 @@ function fmtPace(secPerKm: number): string {
   const s = Math.round(secPerKm % 60);
   return `${m}:${String(s).padStart(2, "0")}/km`;
 }
-// VO2max -> 5K time (seconds), linearly interpolated from anchor points
+// ── Walk/run & contamination filtering helpers ──
+const WALK_RUN_TITLE_RE = /walk|w\/r|w\+r|run\/walk|run-walk|interval|fartlek|rep(?:s|eats)?/i;
+
+function activityName(a: any): string {
+  return String(a?.raw_data?.name || a?.raw_data?.workout_name || a?.activity_type || "");
+}
+
+function hrSamplesWalkShare(a: any): number | null {
+  const samples: number[] | undefined =
+    a?.raw_data?.hr_samples || a?.raw_data?.heart_rate_samples || a?.raw_data?.hrSeries;
+  if (!Array.isArray(samples) || samples.length < 20) return null;
+  const lo = samples.filter((s) => Number(s) > 0 && Number(s) < 100).length;
+  return lo / samples.length;
+}
+
+function lapPaceCV(a: any): number | null {
+  const laps: any[] | undefined = a?.raw_data?.laps;
+  if (!Array.isArray(laps) || laps.length < 3) return null;
+  const paces = laps
+    .map((l) => {
+      const d = Number(l?.distance_meters ?? l?.distance ?? 0);
+      const t = Number(l?.duration_seconds ?? l?.moving_time ?? l?.elapsed_time ?? 0);
+      return d > 50 && t > 10 ? t / (d / 1000) : null;
+    })
+    .filter((p): p is number => p != null && isFinite(p) && p > 120 && p < 1200);
+  if (paces.length < 3) return null;
+  const mean = paces.reduce((s, n) => s + n, 0) / paces.length;
+  const variance = paces.reduce((s, n) => s + (n - mean) ** 2, 0) / paces.length;
+  return Math.sqrt(variance) / mean;
+}
+
+function isCleanContinuousRun(a: any): { ok: boolean; reason?: string } {
+  if (WALK_RUN_TITLE_RE.test(activityName(a))) return { ok: false, reason: "walk/run title" };
+  const d = Number(a.distance_meters || 0), t = Number(a.duration_seconds || 0);
+  if (d < 800 || t < 300) return { ok: false, reason: "too short" };
+  const pace = t / (d / 1000);
+  if (pace > 510) return { ok: false, reason: "avg pace >8:30/km (walk-heavy)" };
+  const walkShare = hrSamplesWalkShare(a);
+  if (walkShare != null && walkShare > 0.10) return { ok: false, reason: ">10% HR <100bpm" };
+  const cv = lapPaceCV(a);
+  if (cv != null && cv > 0.30) return { ok: false, reason: "lap pace variance >30%" };
+  return { ok: true };
+}
+
+function tempoPaceFromActivity(a: any): number {
+  const laps: any[] | undefined = a?.raw_data?.laps;
+  if (Array.isArray(laps) && laps.length >= 3) {
+    const lapPaces = laps.map((l) => {
+      const d = Number(l?.distance_meters ?? l?.distance ?? 0);
+      const t = Number(l?.duration_seconds ?? l?.moving_time ?? l?.elapsed_time ?? 0);
+      return d > 50 && t > 10 ? { pace: t / (d / 1000), d, t } : null;
+    }).filter((x): x is { pace: number; d: number; t: number } => !!x);
+    if (lapPaces.length >= 3) {
+      const middle = lapPaces.slice(1, -1).map((l) => l.pace).sort((a, b) => a - b);
+      const median = middle[Math.floor(middle.length / 2)];
+      const trimmed = lapPaces.filter((l, i) => {
+        if (i === 0 || i === lapPaces.length - 1) return l.pace - median < 120;
+        return true;
+      });
+      const td = trimmed.reduce((s, l) => s + l.d, 0);
+      const tt = trimmed.reduce((s, l) => s + l.t, 0);
+      if (td > 800 && tt > 300) return tt / (td / 1000);
+    }
+  }
+  return Number(a.duration_seconds) / (Number(a.distance_meters) / 1000);
+}
+
 function vo2maxTo5kSeconds(vo2: number): number {
   const anchors: Array<[number, number]> = [
     [30, 45 * 60], [35, 37 * 60], [42, 29 * 60 + 30],
@@ -68,6 +134,8 @@ interface PredictionResult {
   confidence: "HIGH" | "MEDIUM" | "LOW";
   basis: string[];
   caveats: string[];
+  breakdown: Array<{ src: string; included: boolean; note: string }>;
+  warning?: string;
   validationDate?: string;
   block: string;
 }
@@ -88,89 +156,134 @@ function buildPrediction(opts: {
   const within = (a: any, days: number) =>
     a.start_time && now - new Date(a.start_time).getTime() <= days * 86400000;
 
-  const runs = (activities || []).filter((a) =>
+  const allRuns = (activities || []).filter((a) =>
     /run/i.test(a.activity_type || "") && Number(a.distance_meters || 0) > 800 && Number(a.duration_seconds || 0) > 300
   );
-  const last21 = runs.filter((a) => within(a, 21));
+  const last21 = allRuns.filter((a) => within(a, 21));
 
-  // Insufficient data
   if (last21.length < 3) {
     return {
-      insufficient: true,
-      raceDistance,
-      goalTime,
+      insufficient: true, raceDistance, goalTime,
       block:
         `RACE_TIME_PREDICTION (insufficient data):\n` +
         `The user has only ${last21.length} completed run(s) in the last 21 days. ` +
         `Tell them: "I need at least 2-3 completed workouts to give you a reliable estimate. ` +
-        `Your plan targets ${goalTime || "a ${raceDistance} finish"} — let's see how the first few sessions feel."`,
+        `Your plan targets ${goalTime || `a ${raceDistance} finish`} — let's see how the first few sessions feel."`,
     };
   }
 
-  // Easy pace: runs with HR <= 145 OR slowest 50% by pace
-  const paceOf = (a: any) => Number(a.duration_seconds) / (Number(a.distance_meters) / 1000); // sec/km
-  const easyCandidates = last21
+  // Partition into clean continuous runs vs contaminated (walk/run, intervals, etc.)
+  const cleanLast21 = last21.filter((a) => isCleanContinuousRun(a).ok);
+  const cleanLast14 = cleanLast21.filter((a) => within(a, 14));
+
+  const paceOf = (a: any) => Number(a.duration_seconds) / (Number(a.distance_meters) / 1000);
+  const easyCandidates = cleanLast21
     .filter((a) => !a.avg_heart_rate || Number(a.avg_heart_rate) <= 150)
-    .map(paceOf).filter((p) => isFinite(p) && p > 240 && p < 900)
+    .map(paceOf).filter((p) => isFinite(p) && p > 240 && p < 510)
     .sort((a, b) => a - b);
   const easyPace = easyCandidates.length
-    ? easyCandidates[Math.floor(easyCandidates.length / 2)]
-    : null;
+    ? easyCandidates[Math.floor(easyCandidates.length / 2)] : null;
 
-  // Tempo / race-pace: fastest sustained run >= 15 min in last 14 days
-  const tempoCandidates = runs
-    .filter((a) => within(a, 14) && Number(a.duration_seconds) >= 900)
-    .map(paceOf).filter((p) => isFinite(p) && p > 180 && p < 600)
+  const tempoCandidates = cleanLast14
+    .filter((a) => Number(a.duration_seconds) >= 900)
+    .map(tempoPaceFromActivity)
+    .filter((p) => isFinite(p) && p > 180 && p < 510)
     .sort((a, b) => a - b);
   const tempoPace = tempoCandidates.length ? tempoCandidates[0] : null;
 
-  // VO2max
   const vo2 = (metrics || []).find((m) => m.vo2_max != null)?.vo2_max;
   const vo2Num = vo2 != null ? Number(vo2) : null;
 
-  // Build estimates (sec)
+  const breakdown: Array<{ src: string; included: boolean; note: string }> = [];
+  const excludedCount = last21.length - cleanLast21.length;
+  if (excludedCount > 0) {
+    breakdown.push({
+      src: "filter", included: false,
+      note: `${excludedCount}/${last21.length} runs excluded as walk/run or interval sessions`,
+    });
+  }
+
+  const hasCleanTempo = tempoPace != null;
+  const walkRunPhase = cleanLast14.length === 0;
+  let wTempo = 0, wVo2 = 0, wEasy = 0;
+  if (walkRunPhase && vo2Num) {
+    wVo2 = easyPace != null ? 0.7 : 1.0;
+    wEasy = easyPace != null ? 0.3 : 0;
+  } else if (hasCleanTempo && vo2Num) {
+    wVo2 = 0.6; wTempo = 0.3; wEasy = easyPace != null ? 0.1 : 0;
+  } else if (vo2Num) {
+    wVo2 = 1.0;
+  } else {
+    if (hasCleanTempo) wTempo = 0.7;
+    if (easyPace != null) wEasy = hasCleanTempo ? 0.3 : 1.0;
+  }
+
   const estimates: Array<{ src: string; time: number; weight: number }> = [];
-  if (tempoPace) {
+  if (wTempo > 0 && tempoPace) {
     const offsets: Record<string, number> = { "5K": -15, "10K": -8, "Half Marathon": 5, "Marathon": 20 };
-    const offset = offsets[raceDistance] ?? 0;
-    estimates.push({ src: "tempo", time: (tempoPace + offset) * dKm, weight: 0.5 });
+    const off = offsets[raceDistance] ?? 0;
+    estimates.push({ src: "tempo", time: (tempoPace + off) * dKm, weight: wTempo });
+    breakdown.push({ src: "tempo", included: true, note: `${fmtPace(tempoPace)} (weight ${Math.round(wTempo*100)}%)` });
+  } else if (tempoPace) {
+    breakdown.push({ src: "tempo", included: false, note: `${fmtPace(tempoPace)} — excluded (walk/run phase or low weight)` });
+  } else {
+    breakdown.push({ src: "tempo", included: false, note: "no clean tempo run in last 14d" });
   }
-  if (vo2Num) {
+  if (wVo2 > 0 && vo2Num) {
     const t5k = vo2maxTo5kSeconds(vo2Num);
-    estimates.push({ src: "vo2max", time: dKm === 5 ? t5k : riegel(t5k, 5, dKm), weight: 0.3 });
+    const tDist = dKm === 5 ? t5k : riegel(t5k, 5, dKm);
+    estimates.push({ src: "vo2max", time: tDist, weight: wVo2 });
+    breakdown.push({ src: "vo2max", included: true, note: `VO2max ${Math.round(vo2Num)} → ${fmtTime(tDist)} (weight ${Math.round(wVo2*100)}%)` });
+  } else if (!vo2Num) {
+    breakdown.push({ src: "vo2max", included: false, note: "no VO2max data" });
   }
-  if (easyPace) {
+  if (wEasy > 0 && easyPace) {
     const offsets: Record<string, number> = { "5K": -75, "10K": -75, "Half Marathon": -90, "Marathon": -90 };
-    const offset = offsets[raceDistance] ?? -75;
-    estimates.push({ src: "easy", time: (easyPace + offset) * dKm, weight: 0.2 });
+    const off = offsets[raceDistance] ?? -75;
+    estimates.push({ src: "easy", time: (easyPace + off) * dKm, weight: wEasy });
+    breakdown.push({ src: "easy", included: true, note: `${fmtPace(easyPace)} (weight ${Math.round(wEasy*100)}%)` });
+  } else if (easyPace) {
+    breakdown.push({ src: "easy", included: false, note: `${fmtPace(easyPace)} — excluded` });
+  } else {
+    breakdown.push({ src: "easy", included: false, note: "no clean easy pace data" });
   }
+
   if (estimates.length === 0) {
     return {
       insufficient: true, raceDistance, goalTime,
-      block: `RACE_TIME_PREDICTION (insufficient data): No usable pace or VO2max data. Goal: ${goalTime || "n/a"}.`,
+      block: `RACE_TIME_PREDICTION (insufficient data): No usable clean pace or VO2max data. Goal: ${goalTime || "n/a"}.`,
     };
   }
 
   const totalWeight = estimates.reduce((s, e) => s + e.weight, 0);
   let T = estimates.reduce((s, e) => s + e.time * e.weight, 0) / totalWeight;
 
-  // Plan progression bonus
+  // VO2-max sanity cap — fall back to VO2-only if blended estimate is >40% slower
+  let warning: string | undefined;
+  if (vo2Num) {
+    const t5k = vo2maxTo5kSeconds(vo2Num);
+    const tVo2 = dKm === 5 ? t5k : riegel(t5k, 5, dKm);
+    if (T > tVo2 * 1.40) {
+      warning = `Prediction looked unusually slow for VO2max ${Math.round(vo2Num)} — likely walk/run training data. Falling back to VO2-max-only estimate.`;
+      T = tVo2;
+      breakdown.push({ src: "sanity-cap", included: true, note: warning });
+    }
+  }
+
   let weeksCompleted = 0;
   if (plan?.start_date) {
     weeksCompleted = Math.max(0, (Date.now() - new Date(plan.start_date).getTime()) / (7 * 86400000));
     T *= 1 - Math.min(weeksCompleted * 0.0125, 0.08);
   }
 
-  // Adherence penalty (rough: completed/expected scheduled days assuming training_days frequency)
   let adherence = 1;
   if (plan?.training_days && Array.isArray(plan.training_days) && weeksCompleted > 0) {
     const expected = Math.max(1, Math.round(weeksCompleted) * plan.training_days.length);
-    const completed = runs.filter((a) => plan.start_date && new Date(a.start_time) >= new Date(plan.start_date)).length;
+    const completed = allRuns.filter((a) => plan.start_date && new Date(a.start_time) >= new Date(plan.start_date)).length;
     adherence = Math.min(1, completed / expected);
     if (adherence < 0.7) T *= 1 + (0.7 - adherence) * 0.33;
   }
 
-  // Readiness modifier
   const meanReadiness = readinessScores.length
     ? readinessScores.reduce((s, n) => s + n, 0) / readinessScores.length : null;
   if (meanReadiness != null) {
@@ -182,15 +295,13 @@ function buildPrediction(opts: {
   const stretch = T * 0.97;
   const paceSecPerKm = T / dKm;
 
-  // Confidence
-  const hasIntensitySession = tempoCandidates.length > 0 && runs.some((a) => within(a, 14) && Number(a.avg_heart_rate || 0) >= 160);
-  const completedLast21 = last21.length;
+  const hasIntensitySession = tempoCandidates.length > 0 && cleanLast14.some((a) => Number(a.avg_heart_rate || 0) >= 160);
   let confidence: "HIGH" | "MEDIUM" | "LOW" = "LOW";
-  if (hasIntensitySession && completedLast21 >= 6) confidence = "HIGH";
-  else if (completedLast21 >= 4 || vo2Num) confidence = "MEDIUM";
+  if (hasIntensitySession && cleanLast21.length >= 6) confidence = "HIGH";
+  else if (cleanLast21.length >= 4 || vo2Num) confidence = "MEDIUM";
   if (weeksCompleted < 3 && !vo2Num) confidence = "LOW";
+  if (warning) confidence = "LOW";
 
-  // Validation date: next intensity session in plan content
   let validationDate: string | undefined;
   if (plan?.content) {
     const re = /^#{2,4}\s+.*?\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/gm;
@@ -210,23 +321,29 @@ function buildPrediction(opts: {
   }
 
   const basis: string[] = [];
-  if (tempoPace) basis.push(`tempo pace ${fmtPace(tempoPace)}`);
+  if (estimates.find((e) => e.src === "tempo")) basis.push(`tempo pace ${fmtPace(tempoPace!)}`);
   if (vo2Num) basis.push(`VO2max ${Math.round(vo2Num)}`);
-  if (easyPace) basis.push(`easy pace ${fmtPace(easyPace)}`);
+  if (estimates.find((e) => e.src === "easy")) basis.push(`easy pace ${fmtPace(easyPace!)}`);
   if (weeksCompleted >= 1) basis.push(`week ${Math.round(weeksCompleted)} of plan`);
   if (adherence < 1) basis.push(`${Math.round(adherence * 100)}% adherence`);
+  if (walkRunPhase) basis.push("walk/run phase — VO2max-led estimate");
 
   const caveats: string[] = [];
+  if (warning) caveats.push(warning);
+  if (walkRunPhase) caveats.push("No continuous tempo runs in last 14 days — estimate will sharpen as continuous running develops");
   if (meanReadiness != null && meanReadiness < 50) caveats.push("recent readiness is low — assumes healthy race-day execution");
   if (/injur|pain|sore/i.test(athleteContext || "")) caveats.push("injury flagged in profile — prediction assumes healthy execution");
 
+  const breakdownLines = breakdown.map((b) => `  • ${b.src}: ${b.note}`).join("\n");
   const block =
     `RACE_TIME_PREDICTION (use this VERBATIM if the user asked about race time / predicted finish / "on track for"; lead the reply with this block, then ONE short coaching sentence):\n` +
+    (warning ? `⚠️ ${warning}\n` : "") +
     `🎯 Target: ${fmtTime(T)} (${fmtPace(paceSecPerKm)})\n` +
     `💪 Stretch: ${fmtTime(stretch)} (if everything clicks${validationDate ? ` — validate on ${validationDate}` : ""})\n` +
     `✅ Conservative: ${fmtTime(conservative)} (safe finish)\n\n` +
     `Based on: ${basis.join(" · ") || "limited data"}\n` +
     `Confidence: ${confidence}${confidence === "LOW" ? " — limited data" : confidence === "MEDIUM" ? " — need more intensity data" : ""}\n` +
+    `How we calculated this:\n${breakdownLines}\n` +
     (validationDate ? `Key validation: planned intensity session on ${validationDate}\n` : "") +
     (caveats.length ? `⚠️ ${caveats.join("; ")}\n` : "") +
     (goalTime ? `Plan goal: ${goalTime}\n` : "");
@@ -234,7 +351,7 @@ function buildPrediction(opts: {
   return {
     raceDistance, distanceKm: dKm,
     conservative, target: T, stretch, paceSecPerKm,
-    confidence, basis, caveats, validationDate, block,
+    confidence, basis, caveats, breakdown, warning, validationDate, block,
   };
 }
 
