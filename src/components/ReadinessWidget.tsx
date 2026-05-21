@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle, Moon, Heart, Activity, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceArea } from "recharts";
 
 // ── Inline Sparkline (7-day mini trend) ──
@@ -91,29 +91,82 @@ import { AUTO_SYNC_STARTED, AUTO_SYNC_DONE, isAutoSyncDoneThisSession } from "@/
 import BodyBattery48hDialog from "./BodyBattery48hDialog";
 import FactorDetailDialog from "./FactorDetailDialog";
 
-// ── Tick-mark Circular Gauge ──
-function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: number; size?: number; statusLabel: string; subNode: React.ReactNode }) {
+// ── Readiness band helpers ──
+type ReadinessBand = "poor" | "low" | "medium" | "good" | "excellent";
+
+function readinessBand(score: number): ReadinessBand {
+  if (score >= 85) return "excellent";
+  if (score >= 75) return "good";
+  if (score >= 60) return "medium";
+  if (score >= 40) return "low";
+  return "poor";
+}
+
+function bandColorVar(band: ReadinessBand): string {
+  return `hsl(var(--readiness-${band}))`;
+}
+
+function bandLabel(band: ReadinessBand): string {
+  return band === "excellent" ? "Excellent" : band === "good" ? "Good" : band === "medium" ? "Medium" : band === "low" ? "Low" : "Poor";
+}
+
+// ── Animated tick + gradient arc gauge ──
+function CircularGauge({
+  score,
+  size = 220,
+  statusLabel,
+  subNode,
+  trendDelta,
+  insightIcon,
+}: {
+  score: number;
+  size?: number;
+  statusLabel: string;
+  subNode: React.ReactNode;
+  trendDelta?: number | null;
+  insightIcon?: React.ReactNode;
+}) {
+  // Animate from previous score → current score
+  const [animated, setAnimated] = useState(score);
+  useEffect(() => {
+    const start = animated;
+    const end = score;
+    if (start === end) return;
+    const startTs = performance.now();
+    const duration = 600;
+    let raf = 0;
+    const step = (ts: number) => {
+      const t = Math.min(1, (ts - startTs) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setAnimated(Math.round(start + (end - start) * eased));
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score]);
+
+  const band = readinessBand(score);
+  const color = bandColorVar(band);
+
   const ticks = 60;
-  const filled = Math.max(0, Math.min(ticks, Math.round((score / 100) * ticks)));
+  const filled = Math.max(0, Math.min(ticks, Math.round((animated / 100) * ticks)));
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size / 2 - 4;
-  const innerR = outerR - 14;
+  const innerR = outerR - 18;
+  
 
-  const color =
-    score >= 70 ? "hsl(142, 70%, 50%)" :
-    score >= 55 ? "hsl(45, 95%, 55%)" :
-    score >= 40 ? "hsl(25, 90%, 55%)" :
-    "hsl(0, 75%, 55%)";
-
-  const tickEls = [];
+  const tickEls: React.ReactNode[] = [];
   for (let i = 0; i < ticks; i++) {
     const angle = (-225 + (i / (ticks - 1)) * 270) * (Math.PI / 180);
-    const x1 = cx + Math.cos(angle) * innerR;
-    const y1 = cy + Math.sin(angle) * innerR;
-    const x2 = cx + Math.cos(angle) * outerR;
-    const y2 = cy + Math.sin(angle) * outerR;
     const active = i < filled;
+    const r1 = active ? innerR - 1 : innerR + 2;
+    const r2 = outerR;
+    const x1 = cx + Math.cos(angle) * r1;
+    const y1 = cy + Math.sin(angle) * r1;
+    const x2 = cx + Math.cos(angle) * r2;
+    const y2 = cy + Math.sin(angle) * r2;
     tickEls.push(
       <line
         key={i}
@@ -121,22 +174,74 @@ function CircularGauge({ score, size = 220, statusLabel, subNode }: { score: num
         y1={y1}
         x2={x2}
         y2={y2}
-        stroke={active ? color : "hsl(var(--muted-foreground) / 0.18)"}
-        strokeWidth={2}
+        stroke={active ? color : "hsl(var(--muted-foreground) / 0.15)"}
+        strokeWidth={active ? 3 : 2}
         strokeLinecap="round"
-      />
+      />,
     );
   }
 
+  // Reference dots at 25/50/75
+  const refDots = [25, 50, 75].map((pct) => {
+    const idx = (pct / 100) * (ticks - 1);
+    const angle = (-225 + (idx / (ticks - 1)) * 270) * (Math.PI / 180);
+    const x = cx + Math.cos(angle) * (outerR + 6);
+    const y = cy + Math.sin(angle) * (outerR + 6);
+    return <circle key={pct} cx={x} cy={y} r={1.2} fill="hsl(var(--muted-foreground) / 0.5)" />;
+  });
+
+  const TrendIcon = trendDelta == null ? null : trendDelta >= 3 ? TrendingUp : trendDelta <= -3 ? TrendingDown : Minus;
+  const trendLabel =
+    trendDelta == null
+      ? ""
+      : trendDelta >= 3
+      ? `Trend: improving by ${trendDelta} points`
+      : trendDelta <= -3
+      ? `Trend: declining by ${Math.abs(trendDelta)} points`
+      : "Trend: steady";
+
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 16px ${color}33)` }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={`Readiness ${score} out of 100, ${statusLabel}`}
+    >
+      <svg width={size} height={size} style={{ filter: `drop-shadow(0 0 18px ${color.replace(")", " / 0.35)")})` }}>
+        {refDots}
         {tickEls}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-        <span className="text-6xl font-black tracking-tight text-foreground leading-none">{score}</span>
-        <span className="text-sm font-semibold mt-2" style={{ color }}>{statusLabel}</span>
-        <div className="mt-1 text-[11px] text-slate-400 leading-snug">{subNode}</div>
+        <span
+          className="text-7xl font-black tracking-tighter leading-none bg-clip-text text-transparent"
+          style={{ backgroundImage: "linear-gradient(180deg, hsl(var(--foreground)) 0%, hsl(var(--foreground) / 0.7) 100%)" }}
+        >
+          {score}
+        </span>
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <span
+            className="text-[11px] font-semibold uppercase tracking-wider"
+            style={{ color }}
+          >
+            {statusLabel}
+          </span>
+          {TrendIcon && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+              aria-label={trendLabel}
+              title={trendLabel}
+            >
+              <TrendIcon className="h-2.5 w-2.5" />
+              {trendDelta !== 0 && trendDelta != null && (
+                <span>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</span>
+              )}
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-col items-center gap-1 text-[11px] leading-snug text-muted-foreground">
+          {insightIcon && <span className="opacity-80" aria-hidden>{insightIcon}</span>}
+          {subNode}
+        </div>
       </div>
     </div>
   );
@@ -888,19 +993,30 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           {(() => {
             // Compute dynamic status label + sub-message
             const score = displayResult.score;
-            const statusLabel =
-              score >= 85 ? "Excellent" :
-              score >= 70 ? "Good" :
-              score >= 55 ? "Moderate" :
-              score >= 40 ? "Fair" : "Poor";
+            const band = readinessBand(score);
+            const statusLabel = bandLabel(band);
+
+            // Trend delta vs previous snapshot of same kind
+            let trendDelta: number | null = null;
+            if (trendSnapshots && trendSnapshots.length >= 2) {
+              const sorted = [...trendSnapshots].sort(
+                (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
+              );
+              const prev = sorted[1];
+              if (prev && typeof prev.score === "number") {
+                trendDelta = score - prev.score;
+              }
+            }
 
             // Primary driver — pick worst factor when score is low, best when high.
             const factors = displayResult.factors || [];
             let driver = "";
+            let driverLabel = "";
             if (score >= 70) {
               const goods = factors.filter((f) => f.status === "good");
               const pick = goods[0] ?? factors[0];
               if (pick) {
+                driverLabel = pick.label;
                 if (pick.label === "HRV") driver = "HRV strong";
                 else if (pick.label === "Sleep Quality") driver = "Sleep quality on point";
                 else if (pick.label === "Deep Sleep") driver = "Deep sleep healthy";
@@ -911,6 +1027,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             } else {
               const worst = factors.find((f) => f.status === "poor") ?? factors.find((f) => f.status === "warning");
               if (worst) {
+                driverLabel = worst.label;
                 if (worst.label === "Sleep Quality") driver = "Sleep quality low";
                 else if (worst.label === "HRV") driver = "HRV suppressed";
                 else if (worst.label === "Deep Sleep") driver = "Deep sleep low";
@@ -922,6 +1039,17 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 else driver = `${worst.label} flagged`;
               }
             }
+
+            const insightIcon =
+              driverLabel === "Sleep Quality" || driverLabel === "Deep Sleep" || driverLabel === "Sleep Debt" ? (
+                <Moon className="h-3 w-3" />
+              ) : driverLabel === "HRV" || driverLabel === "Resting HR" ? (
+                <Heart className="h-3 w-3" />
+              ) : driverLabel === "Yesterday's Load" || driverLabel === "Today's Effort" || driverLabel === "Body Battery" ? (
+                <Activity className="h-3 w-3" />
+              ) : score >= 70 ? (
+                <Sparkles className="h-3 w-3" />
+              ) : null;
 
             let message = "";
             let showReview = false;
@@ -937,23 +1065,23 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               else if (ctx && !ctx.isRestDay) message = "Cleared for today's session";
               else message = "Easy session OK (≤45 min)";
             } else if (score > 30) {
-              if (ctx?.completedToday) message = "Prioritise recovery now";
-              else if (ctx && !ctx.isRestDay) { message = "Today may be tough"; showReview = true; }
+              if (ctx?.completedToday) message = "Focus on recovery today";
+              else if (ctx && !ctx.isRestDay) { message = "Easy day recommended"; showReview = true; }
               else message = "Active recovery only";
             } else {
-              message = "You may be struggling today";
+              message = "Your body needs rest today";
               showReview = true;
             }
 
             const subNode = (
-              <div className="flex flex-col items-center gap-1">
-                {driver && <span className="text-slate-300 text-[11px] font-medium leading-snug">{driver}</span>}
-                <span className="text-slate-400 text-[11px] leading-snug">{message}</span>
+              <div className="flex flex-col items-center gap-0.5">
+                {driver && <span className="text-foreground/80 text-[11px] font-medium leading-snug">{driver}</span>}
+                <span className="text-muted-foreground text-[11px] leading-snug">{message}</span>
                 {showReview && onReviewPlan && (
                   <button
                     type="button"
                     onClick={onReviewPlan}
-                    className="text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                    className="mt-0.5 text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
                   >
                     Review today's plan →
                   </button>
@@ -967,7 +1095,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                 {/* Left column: gauge + (optional) readiness trend */}
                 <div className="flex flex-col items-stretch shrink-0 md:w-[360px] gap-4">
                   <div className="relative flex items-center justify-center">
-                    <CircularGauge score={score} size={200} statusLabel={statusLabel} subNode={subNode} />
+                    <CircularGauge
+                      score={score}
+                      size={210}
+                      statusLabel={statusLabel}
+                      subNode={subNode}
+                      trendDelta={trendDelta}
+                      insightIcon={insightIcon}
+                    />
                     {suppressScore && (
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />

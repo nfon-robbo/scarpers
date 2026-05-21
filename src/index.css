@@ -47,6 +47,12 @@
     --gradient-start: 262 83% 58%;
     --gradient-end: 330 81% 60%;
 
+    --readiness-poor: 38 92% 55%;
+    --readiness-low: 45 95% 58%;
+    --readiness-medium: 75 70% 50%;
+    --readiness-good: 142 65% 48%;
+    --readiness-excellent: 142 75% 52%;
+
     --sidebar-background: 240 12% 97%;
     --sidebar-foreground: 240 20% 8%;
     --sidebar-primary: 262 83% 58%;
