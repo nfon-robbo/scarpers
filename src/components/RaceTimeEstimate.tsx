@@ -89,9 +89,38 @@ function fmtPace(secPerKm: number): string {
   return `${m}:${String(s).padStart(2, "0")} /km`;
 }
 
+// Extract running-only stats from per-point GPS track (speed in m/s).
+// Treats a point as "running" if its instantaneous speed >= 2.0 m/s (~8:20/km).
+// Returns null if extraction yields too little usable data.
+function extractRunFromGps(gps: any[]): { durationSec: number; distanceM: number; paceSecPerKm: number } | null {
+  if (!Array.isArray(gps) || gps.length < 20) return null;
+  let runDur = 0;
+  let runDist = 0;
+  for (let i = 0; i < gps.length - 1; i++) {
+    const p = gps[i], q = gps[i + 1];
+    const speed = Number(p?.speed);
+    if (!isFinite(speed) || speed < 2.0) continue; // walking / paused
+    const t0 = Number(p?.elapsed_time);
+    const t1 = Number(q?.elapsed_time);
+    const dt = isFinite(t0) && isFinite(t1) ? Math.max(0, t1 - t0) : 1;
+    if (dt <= 0 || dt > 30) continue; // skip large gaps
+    const d0 = Number(p?.distance_meters);
+    const d1 = Number(q?.distance_meters);
+    const dd = isFinite(d0) && isFinite(d1) && d1 > d0 ? d1 - d0 : speed * dt;
+    runDur += dt;
+    runDist += dd;
+  }
+  if (runDur < 600 || runDist < 1500) return null; // need >=10 min and >=1.5 km of running
+  const pace = runDur / (runDist / 1000);
+  if (pace < 180 || pace > 7.5 * 60) return null; // sanity + cap at 7:30/km
+  return { durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
+}
+
 export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime }: Props) {
   const [vo2Max, setVo2Max] = useState<number | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
+  const [extractedFromCount, setExtractedFromCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +145,57 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Identify walk/run-rejected linked activities and try to extract running segments
+  // from their gps_track. Bounded to the 6 most-recent candidates to keep payload small.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const candidates: { date: Date; actId: string; title: string }[] = [];
+      for (const w of workouts) {
+        if (!w.dateObj) continue;
+        const key = format(w.dateObj, "yyyy-MM-dd");
+        const act = linkedActivities[key];
+        if (!act?.id) continue;
+        const dist = Number(act.distance_meters || 0);
+        const dur = Number(act.duration_seconds || 0);
+        if (dist < 800 || dur < 300) continue;
+        const pace = dur / (dist / 1000);
+        const title = `${w.title} ${act.name || ""}`.trim();
+        // Only candidates that would have been REJECTED by the clean-run filter
+        if (isCleanContinuousRun(title, pace)) continue;
+        candidates.push({ date: w.dateObj, actId: String(act.id), title });
+      }
+      candidates.sort((a, b) => b.date.getTime() - a.date.getTime());
+      const recent = candidates.slice(0, 6);
+      if (recent.length === 0) {
+        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from("activities")
+          .select("id,raw_data")
+          .in("id", recent.map((c) => c.actId));
+        if (cancelled) return;
+        const byId = new Map<string, any>();
+        for (const row of data || []) byId.set(String(row.id), row.raw_data);
+        const out: { date: Date; pace: number; title: string }[] = [];
+        for (const c of recent) {
+          const gps = byId.get(c.actId)?.gps_track;
+          const ext = extractRunFromGps(gps);
+          if (ext) out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
+        }
+        if (!cancelled) {
+          setExtractedRuns(out);
+          setExtractedFromCount(out.length);
+        }
+      } catch {
+        if (!cancelled) { setExtractedRuns([]); setExtractedFromCount(0); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [workouts, linkedActivities]);
 
   const computed = useMemo(() => {
     const km = distanceKm(raceDistance);
@@ -142,8 +222,12 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       }
       cleanRuns.push({ date: w.dateObj, pace, title });
     }
-    cleanRuns.sort((a, b) => b.date.getTime() - a.date.getTime());
-    const recentClean = cleanRuns.slice(0, 6);
+    // Fold in extracted run segments from walk/run sessions
+    const allClean = [...cleanRuns, ...extractedRuns];
+    allClean.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const recentClean = allClean.slice(0, 6);
+    // Anything we successfully extracted shouldn't still count as "excluded"
+    const netExcluded = Math.max(0, excludedCount - extractedFromCount);
 
     // VO2-derived target time (primary)
     let tVo2: number | null = null;
@@ -166,37 +250,51 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     let estFinish: number | null = null;
     let warning: string | null = null;
 
+    const cleanLabel = extractedFromCount > 0 && cleanRuns.length === 0
+      ? `${extractedFromCount} extracted run segment${extractedFromCount === 1 ? "" : "s"}`
+      : `${recentClean.length} clean run${recentClean.length === 1 ? "" : "s"}`;
+
     if (tVo2 != null && tClean != null) {
       estFinish = tVo2 * 0.7 + tClean * 0.3;
-      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, `${recentClean.length} clean continuous runs`);
+      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, cleanLabel);
       breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (70%)` });
-      breakdown.push({ src: "Clean continuous runs", included: true, note: `${fmtTime(tClean)} (30%)` });
+      breakdown.push({ src: cleanLabel, included: true, note: `${fmtTime(tClean)} (30%)` });
     } else if (tVo2 != null) {
       estFinish = tVo2;
       basis.push(`VO2 max ${vo2Max!.toFixed(0)}`);
       breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (100%)` });
-      if (excludedCount > 0) {
-        breakdown.push({ src: "Tempo / easy pace", included: false, note: `excluded (${excludedCount} walk/run or interval session${excludedCount === 1 ? "" : "s"})` });
+      if (netExcluded > 0) {
+        breakdown.push({ src: "Tempo / easy pace", included: false, note: `excluded (${netExcluded} walk/run or interval session${netExcluded === 1 ? "" : "s"})` });
       }
     } else if (tClean != null) {
       estFinish = tClean;
-      basis.push(`${recentClean.length} clean continuous runs`);
-      breakdown.push({ src: "Clean continuous runs", included: true, note: `${fmtTime(tClean)} (100%)` });
-      breakdown.push({ src: "VO2 max", included: false, note: "not available in last 30 days" });
+      basis.push(cleanLabel);
+      breakdown.push({ src: cleanLabel, included: true, note: `${fmtTime(tClean)} (100%)` });
+      breakdown.push({ src: "VO2 max", included: false, note: "not available" });
+    }
+
+    if (extractedFromCount > 0) {
+      breakdown.push({
+        src: "Run intervals extracted",
+        included: true,
+        note: `${extractedFromCount} walk/run session${extractedFromCount === 1 ? "" : "s"} → run-only pace recovered from GPS`,
+      });
     }
 
     // Sanity cap: if clean-run estimate is wildly slower than VO2-based fitness, snap to VO2
     if (estFinish != null && tVo2 != null && estFinish > tVo2 * 1.4) {
       estFinish = tVo2;
-      warning = "Estimate snapped to VO2 max — recent training includes walk/run or interval sessions that don't reflect race fitness.";
-    } else if (excludedCount > 0 && tClean == null && tVo2 != null) {
-      warning = "Recent walk/run or interval sessions excluded — estimate based on VO2 max only. It will sharpen as continuous running develops.";
+      warning = "Estimate snapped to VO2 max — recent training pace too slow to reflect race fitness.";
+    } else if (netExcluded > 0 && tClean == null && tVo2 != null) {
+      warning = "Some walk/run sessions excluded — estimate based on VO2 max only. It will sharpen as continuous running develops.";
     }
 
     const estPace = estFinish != null ? estFinish / km : null;
 
-    return { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount, recentClean };
-  }, [workouts, linkedActivities, raceDistance, goalTime, vo2Max]);
+    return { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount: netExcluded, recentClean };
+  }, [workouts, linkedActivities, raceDistance, goalTime, vo2Max, extractedRuns, extractedFromCount]);
+
+
 
   if (!computed) return null;
   const { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount, recentClean } = computed;
