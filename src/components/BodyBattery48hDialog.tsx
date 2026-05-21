@@ -66,6 +66,8 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [prevSleep, setPrevSleep] = useState<{ hours: number; deepPct: number; remPct: number } | null>(null);
   const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
   const insightKeyRef = useRef<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     if (!open || !user) return;
