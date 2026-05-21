@@ -202,17 +202,17 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         const byId = new Map<string, any>();
         for (const row of data || []) byId.set(String(row.id), row.raw_data);
         const out: { date: Date; pace: number; title: string }[] = [];
-        const failures: { title: string; reason: string }[] = [];
-        const successes: { title: string; pace: number; minutes: number }[] = [];
+        const failures: { title: string; reason: string; date: Date }[] = [];
+        const successes: { title: string; pace: number; minutes: number; date: Date }[] = [];
         for (const c of recent) {
           const gps = byId.get(c.actId)?.gps_track;
           const ext = extractRunFromGps(gps);
           const shortTitle = c.title.length > 38 ? c.title.slice(0, 36) + "…" : c.title;
           if (ext.ok === true) {
             out.push({ date: c.date, pace: ext.paceSecPerKm, title: `${c.title} (run segments)` });
-            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60 });
+            successes.push({ title: shortTitle, pace: ext.paceSecPerKm, minutes: ext.durationSec / 60, date: c.date });
           } else {
-            failures.push({ title: shortTitle, reason: ext.reason });
+            failures.push({ title: shortTitle, reason: ext.reason, date: c.date });
           }
         }
         if (!cancelled) {
