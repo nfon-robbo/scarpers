@@ -119,3 +119,34 @@ await supabase.functions.invoke("ai-coach", {
 ```
 
 Tick each scenario off in your PR description before merging.
+
+---
+
+## 8. Today's-activity awareness
+
+### 8a. Completed scheduled workout → short-circuit
+
+Pre-seed: an activity today at 07:00, ~matching the scheduled workout's distance and duration (±20%).
+
+Expected response:
+- Begins with `✅ Today's workout already completed`
+- Contains a trailer `<!-- DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED activity_id=... -->`
+- No `Decision:` line, no LLM-generated assessment sections.
+- Client dialog shows "View activity" + "Got it, let's go!" only.
+
+### 8b. Unplanned 5 km easy at 07:00, scheduled tempo at 17:00
+
+Expected:
+- Normal assessment runs.
+- Coach's Note contains verbatim: `⚠️ You've already run 5.0km today. If tonight's session feels too hard, skip it — you've already done significant training.`
+
+### 8c. 10 km morning + 8 km lunch, intervals scheduled
+
+Expected:
+- `Decision: ADJUSTED`
+- Recommended Workout replaced by a Rest Day table.
+- Coach's Note contains verbatim: `⚠️ OVERRIDE: You've already trained 18.0km / <minutes>min today. Replacing tonight's workout with Rest Day to prevent overtraining.`
+
+### 8d. No activities today → regression guard
+
+Expected: response identical in shape to baseline (no today-activity context, no extra warning).
