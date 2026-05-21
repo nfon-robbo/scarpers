@@ -382,6 +382,13 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     return () => clearInterval(id);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      hasChartDataRef.current = false;
+      setRefreshing(false);
+    }
+  }, [open]);
+
   const handleRecompute = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   // Fetch AI insight when truth data changes (cached across reopens by data values).
