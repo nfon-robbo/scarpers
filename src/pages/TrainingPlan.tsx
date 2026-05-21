@@ -1307,6 +1307,8 @@ const TrainingPlanPage = () => {
       token: session.access_token,
       targetDate: targetDateStr,
       todayWorkout,
+      todayDateUk: format(new Date(), "EEEE d MMMM yyyy"),
+      targetIsNotToday: picked.shifted,
       onDelta: (text) => {
         accumulated += text;
         setDayAdjustResult(accumulated);
@@ -1315,7 +1317,7 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setDayAdjusting(false);
         setDayAdjustPhase("done");
-        const isAdjusted = /Decision:\s*ADJUSTED/i.test(accumulated);
+        const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
         setDayAdjustIsModified(isAdjusted);
       },
       onError: (err) => {
@@ -1381,7 +1383,7 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setDayAdjusting(false);
         setDayAdjustPhase("done");
-        setDayAdjustIsModified(/Decision:\s*ADJUSTED/i.test(accumulated));
+        setDayAdjustIsModified(/Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated));
       },
       onError: (err) => {
         toast({ title: "Adjustment failed", description: err, variant: "destructive" });

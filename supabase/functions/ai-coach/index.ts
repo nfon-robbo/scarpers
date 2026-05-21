@@ -257,7 +257,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
       try {
@@ -465,14 +465,30 @@ ${sleepContext}`;
       
       const { data: yesterdayActivities } = await supabase
         .from("activities")
-        .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, training_load")
+        .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, training_load")
         .eq("user_id", user.id)
         .gte("start_time", yesterdayStr + "T00:00:00")
         .lt("start_time", targetDateStr + "T00:00:00");
 
+      // Explicit "hard"/"long" classification of yesterday's session
+      let yesterdayLoad = { hard: false, long: false, reason: "" as string };
+      if (yesterdayActivities && yesterdayActivities.length > 0) {
+        for (const a of yesterdayActivities) {
+          const dur = Number(a.duration_seconds || 0);
+          const avgHr = Number(a.avg_heart_rate || 0);
+          const maxHr = Number(a.max_heart_rate || 0) || 190; // fallback estimate
+          const load = Number(a.training_load || 0);
+          if (dur > 5400) { yesterdayLoad.long = true; yesterdayLoad.reason += `duration ${(dur/60).toFixed(0)}min; `; }
+          if ((dur > 3600 && avgHr >= 0.85 * maxHr) || load > 150) {
+            yesterdayLoad.hard = true;
+            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (≥85% max); `;
+          }
+        }
+      }
+
       let yesterdayContext = "";
       if (yesterdayActivities && yesterdayActivities.length > 0) {
-        yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\n`;
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\nYESTERDAY LOAD: hard=${yesterdayLoad.hard}, long=${yesterdayLoad.long}${yesterdayLoad.reason ? ` (${yesterdayLoad.reason.trim()})` : ""}\n`;
       }
 
       // Get today's daily metrics (RHR, HRV, stress)
@@ -504,6 +520,9 @@ ${sleepContext}`;
         .order("date", { ascending: false });
 
       let trendContext = "";
+      let consecutivePoorOut = 0;
+      let hrvDeltaPctOut: number | null = null;
+      let rhrDeltaOut: number | null = null;
       if (trendMetrics && trendMetrics.length > 0) {
         const nights = trendMetrics.slice(0, 7);
         const nightsLine = nights.map((n: any) => {
@@ -512,24 +531,55 @@ ${sleepContext}`;
           return `${n.date}: score ${score ?? "n/a"}, ${hrs}`;
         }).join(" | ");
 
+        const median = (arr: number[]): number | null => {
+          if (!arr.length) return null;
+          const s = [...arr].sort((a, b) => a - b);
+          const m = Math.floor(s.length / 2);
+          return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+        };
         const hrvValues = trendMetrics.map((m: any) => m.hrv).filter((v: any) => v != null && Number.isFinite(v));
         const rhrValues = trendMetrics.map((m: any) => m.resting_heart_rate).filter((v: any) => v != null && Number.isFinite(v));
-        const baselineHrv = hrvValues.length ? Math.round(hrvValues.reduce((a: number, b: number) => a + b, 0) / hrvValues.length) : null;
-        const baselineRhr = rhrValues.length ? Math.round(rhrValues.reduce((a: number, b: number) => a + b, 0) / rhrValues.length) : null;
+        const baselineHrv = hrvValues.length ? Math.round(median(hrvValues)!) : null;
+        const baselineRhr = rhrValues.length ? Math.round(median(rhrValues)!) : null;
 
-        const POOR = (n: any) =>
-          (n.sleep_score != null && n.sleep_score < 60) ||
-          (n.sleep_duration_seconds != null && n.sleep_duration_seconds < 6 * 3600);
+        // Refined POOR: (score<60 AND <7h) OR score<50
+        const POOR = (n: any) => {
+          const score = n.sleep_score;
+          const hours = n.sleep_duration_seconds ? n.sleep_duration_seconds / 3600 : null;
+          if (score != null && score < 50) return true;
+          if (score != null && score < 60 && hours != null && hours < 7) return true;
+          return false;
+        };
         let consecutivePoor = 0;
         for (const n of nights) { if (POOR(n)) consecutivePoor++; else break; }
+        consecutivePoorOut = consecutivePoor;
 
         const todayHrv = todayMetrics?.hrv ?? null;
         const todayRhr = todayMetrics?.resting_heart_rate ?? null;
         const hrvDeltaPct = (todayHrv != null && baselineHrv) ? ((todayHrv - baselineHrv) / baselineHrv * 100) : null;
         const rhrDelta = (todayRhr != null && baselineRhr != null) ? (todayRhr - baselineRhr) : null;
+        hrvDeltaPctOut = hrvDeltaPct;
+        rhrDeltaOut = rhrDelta;
 
-        trendContext = `\nSLEEP TREND (last ${nights.length} nights, most recent first):\n${nightsLine}\nConsecutive poor nights (score<60 or <6h) ending today: ${consecutivePoor}\n\nBASELINES (last 14d avg):\nHRV: ${baselineHrv ?? "n/a"} ms (today ${todayHrv != null ? Math.round(todayHrv) + " ms" : "n/a"}${hrvDeltaPct != null ? `, ${hrvDeltaPct >= 0 ? "+" : ""}${hrvDeltaPct.toFixed(0)}% vs baseline` : ""})\nResting HR: ${baselineRhr ?? "n/a"} bpm (today ${todayRhr != null ? Math.round(todayRhr) + " bpm" : "n/a"}${rhrDelta != null ? `, ${rhrDelta >= 0 ? "+" : ""}${rhrDelta.toFixed(0)} bpm vs baseline` : ""})\n`;
+        trendContext = `\nSLEEP TREND (last ${nights.length} nights, most recent first):\n${nightsLine}\nConsecutive poor nights ((score<60 & <7h) or score<50) ending today: ${consecutivePoor}\n\nBASELINES (last 14d median):\nHRV: ${baselineHrv ?? "n/a"} ms (today ${todayHrv != null ? Math.round(todayHrv) + " ms" : "n/a"}${hrvDeltaPct != null ? `, ${hrvDeltaPct >= 0 ? "+" : ""}${hrvDeltaPct.toFixed(0)}% vs baseline` : ""})\nResting HR: ${baselineRhr ?? "n/a"} bpm (today ${todayRhr != null ? Math.round(todayRhr) + " bpm" : "n/a"}${rhrDelta != null ? `, ${rhrDelta >= 0 ? "+" : ""}${rhrDelta.toFixed(0)} bpm vs baseline` : ""})\n`;
       }
+
+      // Escalation message based on chronic poor sleep
+      let escalationContext = "";
+      if (consecutivePoorOut >= 7) {
+        escalationContext = `\nESCALATION: ⚠️ MANDATORY REST — seven consecutive poor nights indicates you need medical attention, not training.\n`;
+      } else if (consecutivePoorOut >= 5) {
+        escalationContext = `\nESCALATION: ⚠️ Sleep has been poor for 5+ nights. Prioritise rest and recovery — training is secondary right now. Consider consulting a doctor if this continues.\n`;
+      } else if (consecutivePoorOut >= 3) {
+        escalationContext = `\nESCALATION: Third poor night in a row — identify what's disrupting your sleep (stress, caffeine, screen time).\n`;
+      }
+
+      // Detect today's planned intensity from the workout markdown
+      const todayWorkoutText = (today_workout || "").toLowerCase();
+      let plannedIntensity: "hard" | "easy" | "rest" = "easy";
+      if (!todayWorkoutText.trim() || /\brest\b/.test(todayWorkoutText)) plannedIntensity = "rest";
+      else if (/tempo|interval|threshold|race pace|vo2|hill repeat|hill repeats/.test(todayWorkoutText)) plannedIntensity = "hard";
+      const intensityContext = `\nTODAY PLANNED INTENSITY: ${plannedIntensity}\n`;
 
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
@@ -543,6 +593,14 @@ ${sleepContext}`;
         .order("start_time", { ascending: false })
         .limit(20);
 
+      const CADENCE_CUES = [
+        "Try a 170 BPM metronome playlist today (search 'running 170 bpm' on Spotify).",
+        "Focus on quicker foot turnover — imagine running on hot coals.",
+        "Shorten your stride 10% while maintaining the same speed — your feet should feel lighter.",
+        "Count three footfalls per second out loud for the first kilometre to lock in the rhythm.",
+        "Cue 'quick, light feet' — land softly directly under your hips, not out in front.",
+        "Run alongside a song at 170 BPM (e.g. 'Stayin' Alive') for the warm-up to set the pace.",
+      ];
       let cadenceContext = "";
       if (recentRuns && recentRuns.length > 0) {
         const cadences = recentRuns.map(r => r.avg_cadence!);
@@ -551,7 +609,10 @@ ${sleepContext}`;
         const trend = cadences.length >= 3 
           ? (cadences[0] > cadences[cadences.length - 1] ? "improving" : cadences[0] < cadences[cadences.length - 1] ? "declining" : "stable")
           : "insufficient data";
-        cadenceContext = `\nCADENCE DATA (last ${recentRuns.length} runs):\nAverage cadence: ${avgCadence} spm\nMost recent: ${latestCadence} spm\nTrend: ${trend}\nTarget range: 170-180 spm for joint protection\n${avgCadence < 160 ? "⚠️ Cadence is LOW — prioritize quick, light steps to reduce impact on knee/ankle.\n" : avgCadence >= 170 ? "✅ Cadence is in target range — great for joint health.\n" : "Cadence improving but still below target — continue cueing 'quick feet'.\n"}`;
+        const cueLine = avgCadence < 160
+          ? `\nCADENCE CUE FOR TODAY (use this exact cue verbatim in the Coach's Note): "${CADENCE_CUES[Math.floor(Math.random() * CADENCE_CUES.length)]}"\n`
+          : "";
+        cadenceContext = `\nCADENCE DATA (last ${recentRuns.length} runs):\nAverage cadence: ${avgCadence} spm\nMost recent: ${latestCadence} spm\nTrend: ${trend}\nTarget range: 170-180 spm for joint protection\n${avgCadence < 160 ? "⚠️ Cadence is LOW — prioritize quick, light steps to reduce impact on knee/ankle.\n" : avgCadence >= 170 ? "✅ Cadence is in target range — great for joint health.\n" : "Cadence improving but still below target — continue cueing 'quick feet'.\n"}${cueLine}`;
       }
 
       systemPrompt = `You are an elite endurance coach making a real-time daily adjustment decision for an athlete's workout.
@@ -578,19 +639,40 @@ You have:
 4. Today's biometrics (resting HR, HRV, stress)
 
 🚨 DECISION GATING (TREND-BASED — MUST FOLLOW) 🚨
-The default decision is **KEEP AS-IS**. Only choose **ADJUSTED** when BOTH of the following are true:
-  1. The "Consecutive poor nights" count in the SLEEP TREND block is **≥ 2** (two or more nights in a row with sleep_score < 60 or duration < 6h), AND
-  2. At least ONE corroborating signal is present:
-     - Today's HRV is **>15% below** the 14-day baseline, OR
-     - Today's resting HR is **≥3 bpm above** the 14-day baseline, OR
-     - Yesterday was a hard/long session AND last night was also poor.
+The default decision is **KEEP AS-IS**. There are now THREE possible decisions: KEEP AS-IS, SOFT ADJUSTED, ADJUSTED.
 
-A single night of poor sleep with HRV and RHR within normal range is NOT enough to ADJUST — the correct decision is KEEP AS-IS.
+Definitions used below:
+- "Poor night" = (sleep_score < 60 AND duration < 7h) OR sleep_score < 50
+- "Hard yesterday" = the YESTERDAY LOAD line reports hard=true (duration >60min at ≥85% max HR, OR training_load >150)
+- "Long yesterday" = YESTERDAY LOAD reports long=true (duration >90min)
+- "Today is hard" = TODAY PLANNED INTENSITY = hard (tempo / intervals / threshold / race pace / VO2 / hill repeats)
+
+Choose **ADJUSTED** when ANY of these triggers fires:
+  A. Consecutive poor nights ≥ 2 AND at least one corroborating signal:
+     - Today's HRV is **>15% below** the 14-day median baseline, OR
+     - Today's resting HR is **≥3 bpm above** the 14-day median baseline, OR
+     - Yesterday was hard or long AND last night was also poor.
+  B. TRAINING-LOAD VELOCITY: yesterday was hard AND today is hard AND last night was poor — even if HRV/RHR are only mildly off. Swap the hard session for an easy Z2 run. State reason: "Two consecutive hard sessions on suboptimal recovery risks overtraining."
+  C. CHRONIC SLEEP (consecutive poor nights ≥ 7): force ADJUSTED with the Recommended Workout replaced by a Rest Day table, and include the ESCALATION line verbatim in the Coach's Note.
+
+Choose **SOFT ADJUSTED** when:
+  - Exactly 1 poor night ending today AND (HRV is 10–15% below median baseline OR RHR is +2 bpm above median baseline).
+  - Keep the workout STRUCTURE and title. Either reduce target pace by 10–15 sec/km, OR add an extra 5 min warm-up with a "scale back if it doesn't ease" note. Output exactly: "## ✅ Decision: SOFT ADJUSTED — one suboptimal night with slightly elevated fatigue markers".
+
+Otherwise choose **KEEP AS-IS**.
+
+A single night of poor sleep with HRV and RHR in normal range and no velocity/escalation trigger is NOT enough to ADJUST — the correct decision is KEEP AS-IS (or SOFT ADJUSTED if the mild-deviation criteria above are met).
 
 When the decision is **KEEP AS-IS** but last night was sub-average (score < 70 or noticeably shorter than usual), the Coach's Note MUST include this exact sentence verbatim:
 > Sleep was a little below your average last night. Listen to your body during the warmup and ease off if needed.
 
-When the decision is **ADJUSTED**, the Decision section must briefly state the two-night pattern AND the corroborating metric that triggered it (e.g. "2 poor nights + HRV 22% below baseline").
+When the decision is **ADJUSTED**, the Decision section must briefly state the trigger AND the corroborating metric (e.g. "2 poor nights + HRV 22% below baseline", or "Velocity trigger: hard yesterday + hard today + poor sleep").
+
+If the context includes an ESCALATION line (3, 5 or 7+ consecutive poor nights), include that line VERBATIM in the Coach's Note section.
+
+If the user prompt contains "TARGET IS NOT TODAY: true", prepend the response with these two lines BEFORE the "## 🌙 Sleep & Recovery Assessment" heading:
+🛌 Today ({today_date_uk}) is a scheduled rest day.
+Assessing tomorrow's workout ({target_date_uk})...
 
 Sleep-science reference (use to shape adjustment magnitude, NOT to bypass the gating above):
 - Deep sleep < 15%: impaired physical recovery → reduce high-intensity work
@@ -598,7 +680,7 @@ Sleep-science reference (use to shape adjustment magnitude, NOT to bypass the ga
 - High awake time (>10%): fragmented sleep → reduce overall volume
 
 Also consider:
-- CADENCE is critical for joint health: target 170-180 spm. If recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
+- CADENCE is critical for joint health: target 170-180 spm. If recent cadence is below 160 spm, emphasize "quick, light feet" cues in your coaching note. If a "CADENCE CUE FOR TODAY" line is provided, use that EXACT cue verbatim in the Coach's Note. If cadence is trending up, praise the improvement. Always include a cadence recommendation in adjusted workouts.
 
 Your response MUST follow this exact format. Use the literal phrase "the target session" or refer to the target date — do NOT say "today" or "today's" if the target date in the user prompt is not actually today's calendar date.
 
@@ -608,7 +690,7 @@ Brief summary of last night's sleep quality and what it means for the target ses
 ## 📋 Planned Workout — {TARGET_DATE_FORMATTED}
 Replace {TARGET_DATE_FORMATTED} with the target date written in UK long format (e.g. "Thursday 15 May 2026") based on the target date provided in the user prompt. Then show the original planned workout for that date.
 
-## ✅ Decision: [KEEP AS-IS / ADJUSTED]
+## ✅ Decision: [KEEP AS-IS / SOFT ADJUSTED / ADJUSTED]
 State clearly whether you're modifying the workout or not, and why.
 
 ## 📝 Recommended Workout — {TARGET_DATE_FORMATTED}
@@ -630,20 +712,28 @@ BREVITY RULES:
 
 ${athleteContext}`;
 
-      userPrompt = `Date: ${targetDateStr}
+      const targetIsNotTodayLine = target_is_not_today
+        ? `\nTARGET IS NOT TODAY: true\ntoday_date_uk: ${today_date_uk || "today"}\ntarget_date_uk: (format ${targetDateStr} in UK long form, e.g. "Tuesday 22 May 2026")\n`
+        : "";
 
+      userPrompt = `Date: ${targetDateStr}
+${targetIsNotTodayLine}
 LAST NIGHT'S SLEEP DATA:
 ${sleepContext || "No sleep data available for last night."}
 
 ${metricsToday}
 ${trendContext}
+${escalationContext}
+${intensityContext}
 ${yesterdayContext}
 ${cadenceContext}
 
 PLANNED WORKOUT FOR ${targetDateStr}:
 ${today_workout || "No workout found for the target date."}
 
-Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+Analyze the athlete's readiness and decide whether to adjust the planned workout for ${targetDateStr}. Apply the gating rules strictly (KEEP AS-IS / SOFT ADJUSTED / ADJUSTED). Be specific and data-driven. Include cadence recommendations if cadence data is available.`;
+
+
 
     } else if (type === "chat") {
       // Fetch the user's active training plan so chat answers reference real scheduled sessions
