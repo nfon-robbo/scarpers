@@ -480,7 +480,6 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
                       ))}
                     </li>
                   )}
-                  )}
                 </ul>
               )}
             </div>
