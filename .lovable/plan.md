@@ -1,59 +1,83 @@
-Race estimate: fix weights, race-pace conversion, and walking filter
 
-All changes in src/components/RaceTimeEstimate.tsx.
+# Race prediction history + progress graph
 
-1. Weights → 60 / 30 / 10 when extraction succeeded
+Add a persistent history table for race-time predictions, auto-recalculate after every completed workout, and surface a progress graph on the Training Plan page so users can see their estimate improve over the course of the plan.
 
-* When extractedRuns.length >= 1 AND tVo2 != null:
+## 1. Database — new `race_prediction_history` table
 
-   * VO2 max: 60%
+Migration creates an append-only history table (one row per recalculation).
 
-   * Extracted tempo (median extracted pace → race pace): 30%
+Columns:
+- `id`, `user_id`, `created_at`, `calculated_at`
+- `distance` (text, e.g. `5K`, `10K`)
+- `predicted_seconds` (int) — main estimate
+- `predicted_pace_per_km` (int)
+- `vo2_max` (numeric, nullable)
+- `data_sources` (jsonb) — breakdown weights & counts at time of calc
+- `triggered_by` (text) — `plan_start` | `activity_synced` | `manual` | `scheduled`
+- `activity_id` (uuid, nullable — no FK, since `activities.id` is not a unique constraint target in this schema)
 
-   * Easy pace (median of any remaining usedClean runs, or extracted as fallback): 10%
+Indexes:
+- `(user_id, distance, calculated_at DESC)` for graph queries
+- `(user_id, created_at DESC)` for recent lookups
 
-* Otherwise keep existing logic (70/30 VO2 + clean, or 100% of whichever is available).
+RLS: users can `SELECT` / `INSERT` their own rows. No update/delete (audit trail). Service role full access for edge function writes.
 
-2. Race-pace conversion for extracted segments
+## 2. Edge function — `race-predict` updates
 
-Currently tClean = (median − 15 s/km) × km, which barely shifts pace.
+In `supabase/functions/race-predict/index.ts`:
 
-* For the extracted-tempo component: subtract 65 s/km from the median extracted pace before multiplying by km, with a floor (e.g. never faster than vo2Pace − 20) to stop the estimate going faster than VO2 fitness allows.
+- **Cache key** changes from `${userId}|${distance}` to `${userId}|${distance}|${activityCount28d}|${latestVo2Date}` so cache auto-invalidates when new activities arrive or VO2 max changes. Accept a `force: true` body flag to bypass cache for manual recalc.
+- **History write**: after a successful calculation, insert a row into `race_prediction_history` with `predicted_seconds = target_sec`, the basis array as `data_sources`, and `triggered_by` from the request body (defaults to `'manual'`). Skip the write if the latest row for `(user_id, distance)` has the same `predicted_seconds` AND was written <6h ago (dedupe near-duplicates).
+- Return the previous prediction alongside the new one so the client can show a delta toast.
 
-* For the easy-pace 10% slice: subtract 60 s/km from the median easy pace (same floor).
+## 3. Auto-recalc trigger — client side
 
-* For the legacy clean-run path (no extraction), keep the existing −15 s/km adjustment unchanged.
+In `src/pages/TrainingPlan.tsx`:
 
-Rationale for -65 s/km: The extracted segments are genuine Z2 easy pace runs (HR 132-154 bpm filtered by extraction). For beginners with VO2 max 35-42, the difference between easy pace and race pace is typically 60-70 s/km. Using -65 s/km keeps the extracted tempo prediction aligned with VO2 max predictions (won't predict faster than fitness allows). The floor cap provides additional safety.
+- When a workout becomes "completed" (new linked activity appears for a plan day that didn't have one on previous render), debounce 2s then call `race-predict` with `{ triggered_by: 'activity_synced', force: true }`.
+- On plan creation/activation (detect first mount with a plan and zero history rows for this distance), call once with `{ triggered_by: 'plan_start' }` to seed a baseline data point.
+- Show a sonner toast on significant change (>30s improvement or regression): `🎯 Race estimate updated: 35:26 → 32:57 (2:29 faster!)`.
 
-3. Filter walking / treadmill out of extraction candidates
+Background/async — do not block UI.
 
-In the candidate-build loop (around line 172–185):
+## 4. `RaceTimeEstimate.tsx` — last-updated + trend arrow
 
-* Skip any linked activity where act.activity_type === 'walking' or 'walk'.
+- Add "Last updated 2h ago" line under the estimate.
+- Add small trend arrow vs previous history row: ↓ green (faster), ↑ amber (slower), → muted (steady ±10s).
+- Add a "Recalculate" button that calls the edge function with `force: true`.
 
-* Skip when title contains walk only (e.g. recovery walks) and no GPS — keep walk/run interval runs.
+## 5. New component — `src/components/RacePredictionGraph.tsx`
 
-4. Clearer debug reason for GPS-less activities
+- Fetches all rows from `race_prediction_history` for the current user + plan's distance, ordered by `calculated_at`.
+- Renders a Recharts `LineChart` (already in deps) with:
+  - X axis: date (DD/MM/YYYY, UK format per project rule)
+  - Y axis: predicted time in MM:SS, inverted so "down" = faster
+  - Reference line at `goal_time` (dashed)
+  - Tooltip showing date, time, trigger reason, VO2 max
+- Empty state: "Your race estimate will appear here once your first workout is recorded."
+- Mounted on Training Plan page, just below the existing `RaceTimeEstimate` card.
 
-In extractRunFromGps (line 102), change:
+## 6. Out of scope (per spec)
 
-* "no gps_track data" → "no GPS recorded (indoor / treadmill / manual entry)"
+- Algorithm changes (already correct)
+- Real-time mid-workout updates
+- Push notifications
+- Multi-distance comparison on one graph
+- Graph image export
 
-Expected output for your current data
+## Files to change
 
-* VO2 max 38: 33:34 @ 6:43/km (60%)
+- `supabase/migrations/<ts>_race_prediction_history.sql` — new table + RLS
+- `supabase/functions/race-predict/index.ts` — cache key, history insert, force flag, previous-value return
+- `src/pages/TrainingPlan.tsx` — auto-recalc on workout completion, seed on plan start, toast on delta, mount graph
+- `src/components/RaceTimeEstimate.tsx` — last-updated, trend arrow, recalc button
+- `src/components/RacePredictionGraph.tsx` — new Recharts component
+- `src/integrations/supabase/types.ts` — auto-regenerated after migration
 
-* Extracted tempo: 12min @ 7:29/km → 6:24/km race pace → 32:00 (30%)
+## Technical notes
 
-* Easy pace: from extracted → 6:44/km → 33:40 (10%)
-
-* Weighted: 33:34 × 60% + 32:00 × 30% + 33:40 × 10% ≈ 32:54
-
-* Final estimate: 32:30-33:30
-
-* 2 contaminated continuous runs excluded
-
-* Walking activities no longer appear in the debug failure list
-
-This aligns extracted tempo prediction with VO2 max prediction instead of predicting faster than VO2 max allows.
+- History writes are dedup'd in the edge function so accidental double-syncs don't pollute the graph.
+- Toast threshold (30s) avoids notification spam from minor noise.
+- No FK on `activity_id` (matches existing pattern — `activities.id` isn't a unique constraint target across the codebase).
+- Cache key change is backward-compatible (old cache entries simply miss and recompute once).

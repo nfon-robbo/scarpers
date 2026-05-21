@@ -838,6 +838,48 @@ export type Database = {
         }
         Relationships: []
       }
+      race_prediction_history: {
+        Row: {
+          activity_id: string | null
+          calculated_at: string
+          created_at: string
+          data_sources: Json | null
+          distance: string
+          id: string
+          predicted_pace_per_km: number
+          predicted_seconds: number
+          triggered_by: string
+          user_id: string
+          vo2_max: number | null
+        }
+        Insert: {
+          activity_id?: string | null
+          calculated_at?: string
+          created_at?: string
+          data_sources?: Json | null
+          distance: string
+          id?: string
+          predicted_pace_per_km: number
+          predicted_seconds: number
+          triggered_by?: string
+          user_id: string
+          vo2_max?: number | null
+        }
+        Update: {
+          activity_id?: string | null
+          calculated_at?: string
+          created_at?: string
+          data_sources?: Json | null
+          distance?: string
+          id?: string
+          predicted_pace_per_km?: number
+          predicted_seconds?: number
+          triggered_by?: string
+          user_id?: string
+          vo2_max?: number | null
+        }
+        Relationships: []
+      }
       race_time_predictions: {
         Row: {
           computed_at: string
