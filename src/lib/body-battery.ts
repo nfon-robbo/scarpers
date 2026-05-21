@@ -38,10 +38,10 @@ export interface BodyBatteryResult {
 
 /** Passive drain rate (pts/hour) as a function of how long the user has been awake. */
 export function passiveDrainRate(hoursAwake: number): number {
-  if (hoursAwake <= 4) return 3;
-  if (hoursAwake <= 8) return 4;
-  if (hoursAwake <= 12) return 5;
-  return 6;
+  if (hoursAwake <= 4) return 2;
+  if (hoursAwake <= 8) return 3;
+  if (hoursAwake <= 12) return 4;
+  return 5;
 }
 
 /** Total points drained passively across `hoursAwake` hours, integrating the rate. */
