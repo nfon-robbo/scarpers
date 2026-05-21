@@ -670,7 +670,7 @@ When the decision is **ADJUSTED**, the Decision section must briefly state the t
 
 If the context includes an ESCALATION line (3, 5 or 7+ consecutive poor nights), include that line VERBATIM in the Coach's Note section.
 
-If the user prompt contains `TARGET IS NOT TODAY: true`, prepend the response with these two lines BEFORE the "## 🌙 Sleep & Recovery Assessment" heading:
+If the user prompt contains "TARGET IS NOT TODAY: true", prepend the response with these two lines BEFORE the "## 🌙 Sleep & Recovery Assessment" heading:
 🛌 Today ({today_date_uk}) is a scheduled rest day.
 Assessing tomorrow's workout ({target_date_uk})...
 
