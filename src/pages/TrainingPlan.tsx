@@ -1285,6 +1285,7 @@ const TrainingPlanPage = () => {
     setDayAdjusting(true);
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustCompletedActivityId(null);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
@@ -1318,8 +1319,14 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setDayAdjusting(false);
         setDayAdjustPhase("done");
-        const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
-        setDayAdjustIsModified(isAdjusted);
+        const completedMatch = accumulated.match(/DAY_ADJUST_STATUS:\s*WORKOUT_ALREADY_COMPLETED(?:\s+activity_id=([0-9a-f-]+))?/i);
+        if (completedMatch) {
+          setDayAdjustCompletedActivityId(completedMatch[1] || null);
+          setDayAdjustIsModified(false);
+        } else {
+          const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
+          setDayAdjustIsModified(isAdjusted);
+        }
       },
       onError: (err) => {
         toast({ title: "Day assessment failed", description: err, variant: "destructive" });
