@@ -1497,7 +1497,7 @@ const TrainingPlanPage = () => {
         setDayAdjustDialogOpen(false);
       },
     });
-  }, [user, content, toast]);
+  }, [user, content, toast, dayAdjusting]);
 
   // Auto-apply a coach recommendation passed in via navigation state (from WorkoutReviewDialog)
   const appliedRecRef = useRef(false);
