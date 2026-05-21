@@ -1385,6 +1385,7 @@ const TrainingPlanPage = () => {
       streamAICoach({
         type: "day-adjust",
         token: session.access_token,
+        featureName: "day-adjust",
         targetDate: targetDateStr,
         todayWorkout,
         todayDateUk: format(new Date(), "EEEE d MMMM yyyy"),
@@ -1425,15 +1426,18 @@ const TrainingPlanPage = () => {
           });
         },
         onError: (err) => {
+          // Keep the dialog open with an inline Retry. Toast for visibility.
           toast({ title: "Day assessment failed", description: err, variant: "destructive" });
           setDayAdjusting(false);
-          setDayAdjustDialogOpen(false);
+          setDayAdjustPhase("done");
+          setDayAdjustError(err);
         },
       });
     } catch (e) {
       console.error("day-adjust: unexpected stream error", e);
       setDayAdjusting(false);
-      setDayAdjustDialogOpen(false);
+      setDayAdjustPhase("done");
+      setDayAdjustError(String(e));
       toast({ title: "Day assessment failed", description: String(e), variant: "destructive" });
     }
   };
