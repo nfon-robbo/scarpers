@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles, RefreshCw, BatteryLow } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   ComposedChart,
   Area,
