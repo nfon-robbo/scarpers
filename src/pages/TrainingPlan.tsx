@@ -1042,6 +1042,7 @@ const TrainingPlanPage = () => {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [originalPlanBeforeReview, setOriginalPlanBeforeReview] = useState<string | null>(null);
   const [dayAdjustResult, setDayAdjustResult] = useState<string | null>(null);
+  const [dayAdjustCompletedActivityId, setDayAdjustCompletedActivityId] = useState<string | null>(null);
   const [dayAdjusting, setDayAdjusting] = useState(false);
   const [dayAdjustTargetDate, setDayAdjustTargetDate] = useState<Date>(new Date());
   const [dayAdjustMode, setDayAdjustMode] = useState<"today" | "next">("today");
@@ -1284,6 +1285,7 @@ const TrainingPlanPage = () => {
     setDayAdjusting(true);
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
+    setDayAdjustCompletedActivityId(null);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
@@ -1317,8 +1319,14 @@ const TrainingPlanPage = () => {
       onDone: () => {
         setDayAdjusting(false);
         setDayAdjustPhase("done");
-        const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
-        setDayAdjustIsModified(isAdjusted);
+        const completedMatch = accumulated.match(/DAY_ADJUST_STATUS:\s*WORKOUT_ALREADY_COMPLETED(?:\s+activity_id=([0-9a-f-]+))?/i);
+        if (completedMatch) {
+          setDayAdjustCompletedActivityId(completedMatch[1] || null);
+          setDayAdjustIsModified(false);
+        } else {
+          const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
+          setDayAdjustIsModified(isAdjusted);
+        }
       },
       onError: (err) => {
         toast({ title: "Day assessment failed", description: err, variant: "destructive" });
@@ -2629,7 +2637,7 @@ const TrainingPlanPage = () => {
             {/* AI Result */}
             {dayAdjustResult && (
               <div className="prose prose-sm max-w-none dark:prose-invert mt-2">
-                <MarkdownRenderer content={dayAdjustResult} />
+                <MarkdownRenderer content={dayAdjustResult.replace(/<!--\s*DAY_ADJUST_STATUS:[^>]*-->/g, "").trim()} />
               </div>
             )}
 
@@ -2719,6 +2727,17 @@ const TrainingPlanPage = () => {
                       </Button>
                     </>
                   )
+                ) : dayAdjustCompletedActivityId !== null ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => { dismissDayAdjust(); navigate("/activities"); }}>
+                      <Search className="w-4 h-4 mr-2" />
+                      View activity
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
+                      <Check className="w-4 h-4 mr-2" />
+                      Got it, let's go!
+                    </Button>
+                  </>
                 ) : (
                   <Button size="sm" variant="secondary" onClick={dismissDayAdjust}>
                     <Check className="w-4 h-4 mr-2" />

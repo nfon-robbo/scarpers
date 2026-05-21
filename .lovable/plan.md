@@ -1,231 +1,181 @@
-Day Ahead Assessment - Required Improvements
+Add Today's Activity Check to Assess Day Ahead
 
-CURRENT FLOW (working correctly):
+Closes the blind spot where Assess Day Ahead ignores activities already logged on the target date (morning runs, completed scheduled workouts, double-days).
 
-1. Client selects target workout (today's session or next non-rest if today is rest/completed)
+1. Edge function — fetch + classify today's activities
 
-2. Edge function pulls: sleep, biometrics, yesterday's activities, 14-day trends, cadence data, athlete context
+File: supabase/functions/ai-coach/index.ts (day-adjust branch, after the existing yesterday block ~line 489)
 
-3. Gating rule: Default KEEP AS-IS unless (consecutive poor nights ≥2 AND corroborating signal)
+After targetDateStr is computed, also query activities for the target date (not always "today" — respects the rest-day walk-forward):
 
-4. Returns structured assessment with decision + recommended workout + coach's note
+SELECT activity_id, activity_type, distance_meters, duration_seconds,
 
-5. If ADJUSTED, client surgically edits plan and auto-syncs to [intervals.icu](http://intervals.icu)
+       avg_heart_rate, max_heart_rate, training_load, start_time, raw_data
 
-IMPROVEMENTS NEEDED:
+FROM activities
 
-1. BASELINE CALCULATION STABILITY
+WHERE user_id = <auth uid from JWT>
 
-Current: 14-day mean for HRV and RHR baselines
+  AND start_time >= <targetDateStr>T00:00:00+00
 
-Problem: Outliers (2-3 bad nights) drag baseline down, reducing sensitivity
+  AND start_time <  <targetDateStr+1>T00:00:00+00
 
-Fix: Use MEDIAN instead of MEAN for 14-day HRV and RHR baselines - more robust to outliers
+  AND distance_meters >= 500
 
-CRITICAL: Median function must handle edge cases:
+  AND duration_seconds >= 60
 
-- Empty array → return null or 0 (don't crash)
+ORDER BY start_time DESC
 
-- Single value [50] → return 50
+LIMIT 5
 
-- Two values [50, 60] → return 55 (average of middle two)
+(Uses the existing service-role supabase client + [user.id](http://user.id); timezone window kept as ISO day — matches how yesterday is queried today. UK-DST drift is acceptable; documented in code comment.)
 
-- Array with nulls [50, null, 60, null, 70] → filter nulls first, then calculate median
+Pull activity name from raw_[data.name](http://data.name) / raw_data.title / raw_data.activity_name (fallback to activity_type).
 
-This prevents crashes when users have incomplete data (new accounts, missing Garmin sync)
+Classification (per activity, in order)
 
-2. "HARD WORKOUT" CORROBORATION DEFINITION
+For each row, call a new helper matchScheduledWorkout(activity, plannedWorkoutText) (see §2):
 
-Current: "Yesterday was hard/long" is vague
+a. SCHEDULED_WORKOUT_COMPLETED — distance within ±20% AND duration within ±20% AND activity_type compatible with the planned discipline, OR fuzzy name match against title keywords in today_workout.
 
-Problem: Unclear what triggers this corroboration signal
+b. Else EXTRA_ACTIVITY.
 
-Fix: Define explicit thresholds in edge function:
+Aggregate across the day:
 
-- Hard = (duration >60min AND avg_hr ≥85% max) OR (training_load >150) OR (≥20min in Z4/Z5)
+totalDistanceKm, totalDurationMin, count, scheduledMatched: boolean.
 
-- Long = duration >90min regardless of intensity
+2. Pure helpers
 
-Document this in the system prompt so AI knows when to cite it
+File: supabase/functions/ai-coach/day-adjust-logic.ts
 
-3. POOR NIGHT SCORING LOGIC
+Add:
 
-Current: score <60 OR <6 hours (treats them as equal weight)
+- extractWorkoutSignals(plannedWorkoutText) → { distanceKm?: number, durationMin?: number, keywords: string[], discipline: 'run'|'bike'|'swim'|'other' }. Regex-based, mirrors the existing intensity detector.
 
-Problem: 5.5h at score 75 (short but efficient) triggers same as 7h at score 55 (long but fragmented)
+- matchScheduledWorkout(activity, signals) → { matched: boolean, reason: string }. Within ±20% on each present signal; keyword overlap counts as a soft match.
 
-Fix: Refine poor night definition:
+- classifyTodayActivities(activities, plannedWorkoutText) → { status: 'SCHEDULED_WORKOUT_COMPLETED'|'EXTRA_ACTIVITY'|'NONE', totals, matchedActivity?, others[] }.
 
-- Poor night = (score <60 AND duration <7h) OR score <50
+- Constant EXTREME_DAY_VOLUME = { minutes: 90, km: 15 } and isExtremeAccumulatedVolume(totals).
 
-This distinguishes short-but-efficient from long-but-terrible sleep
+3. Branch the edge function response
 
-4. SOFT ADJUSTMENT TIER FOR SINGLE BAD NIGHTS
+After classification:
 
-Current: Single bad night with normal HRV/RHR → KEEP AS-IS + generic ease-off note
+SCHEDULED_WORKOUT_COMPLETED → short-circuit before calling the LLM. Stream a fixed Markdown block as if it were the LLM output (so existing SSE client code works unchanged):
 
-Problem: No actionable workout modification, just verbal suggestion
+✅ Today's workout already completed
 
-Fix: Add SOFT ADJUSTED tier between KEEP AS-IS and ADJUSTED:
+You completed **{name}** at {HH:mm}:
 
-- Triggers on: 1 poor night + (HRV 10-15% below baseline OR RHR +2 bpm)
+- Distance: {x.x} km
 
-- Modification: Keep workout structure, but reduce target pace by 10-15 sec/km OR add "Extra 5min warmup - monitor how you feel, scale back if needed"
+- Duration: {mm:ss}
 
-- Output: "✅ Decision: SOFT ADJUSTED — one suboptimal night with slightly elevated fatigue markers"
+- Avg HR: {bpm} bpm
 
-This gives runners permission to ease off without feeling like they failed the plan
+Great work — no adjustment needed. See you tomorrow for {next workout title}.
 
-5. ACTIONABLE CADENCE COACHING
+Include a machine-readable trailer line so the client can detect it deterministically:
 
-Current: Coach's Note flags if cadence <160 spm, says "aim for 170-180"
+<!-- DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED activity_id={uuid} -->
 
-Problem: No guidance on HOW to increase cadence
+"Next workout" is looked up from current_plan if available; otherwise omit that line.
 
-Fix: When cadence is flagged, include ONE concrete cue:
+EXTRA_ACTIVITY (single) → append a new section to the user prompt (after YESTERDAY context):
 
-- "Try a 170 BPM metronome playlist today (search 'running 170 bpm' on Spotify)"
+TODAY'S TRAINING (already completed before this assessment):
 
-- "Focus on quicker foot turnover - imagine running on hot coals"
+- 1 activity: {type} {x.x}km / {mm}min @ {bpm}bpm (started {HH:mm})
 
-- "Shorten your stride 10% while maintaining the same speed - your feet should feel lighter"
+- Status: EXTRA_ACTIVITY (not the scheduled workout)
 
-Rotate these cues so users get variety, not the same advice every time
+And append a mandatory system-prompt rule:
 
-6. TRAINING LOAD VELOCITY CHECK
+You MUST include this warning verbatim in Coach's Note: "⚠️ You've already run {x.x}km today. If tonight's session feels too hard, skip it — you've already done significant training."
 
-Current: Gating only checks sleep + HRV/RHR
+EXTRA_ACTIVITY (multiple) / accumulated:
 
-Problem: Back-to-back hard days (Tue tempo + Wed intervals) can accumulate fatigue before HRV/RHR degrade enough to trigger adjustment
+- Prompt context lists all activities + totals.
 
-Fix: Add training load velocity rule:
+- If isExtremeAccumulatedVolume(totals) → set a flag forceRestDay = true and inject a system rule:
 
-- IF yesterday's session was hard (per definition above)
+Decision MUST be ADJUSTED. Replace the recommended workout with a Rest Day table. Coach's Note must include: "⚠️ OVERRIDE: You've already trained {x}km / {y}min today. Replacing tonight's workout with Rest Day to prevent overtraining."
 
-- AND today is also scheduled hard (tempo/intervals/race pace)
+NONE → no change to current behaviour.
 
-- AND last night was poor (even if HRV/RHR only slightly off)
+4. Client handling
 
-- THEN recommend ADJUSTED (swap hard session for easy run)
+File: src/pages/TrainingPlan.tsx (around assessDayAhead, ~line 1320 in onDone)
 
-Reasoning: "Two consecutive hard sessions on suboptimal recovery risks overtraining"
+- In onDelta, additionally test for the trailer DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED and capture activity_id.
 
-7. CHRONIC POOR SLEEP ESCALATION
+- New state: dayAdjustCompletedActivityId: string | null.
 
-Current: Adjustment triggers after 2 nights, but no escalation logic for 3, 4, 5+ nights
+- In the dialog rendering (existing day-adjust dialog component):
 
-Problem: User might keep training on poor sleep indefinitely
+  * When status = completed: hide "Apply Changes" and "Sync to Garmin" buttons; show a "View Activity" button that routes to /activities (or the existing activity detail dialog, matching how completed-workout cards already navigate).
 
-Fix: Escalate Coach's Note based on consecutive poor nights:
+  * setDayAdjustIsModified(false) remains, so no plan diff is attempted.
 
-- Night 3: "Third poor night in a row - identify what's disrupting your sleep (stress, caffeine, screen time)"
+5. Tests
 
-- Night 5: "⚠️ Sleep has been poor for 5+ nights. Prioritize rest and recovery - training is secondary right now. Consider consulting a doctor if this continues."
+File: supabase/functions/ai-coach/day-adjust.test.ts
 
-- Night 7+: Force workout to Rest Day regardless of other metrics + "⚠️ MANDATORY REST - seven consecutive poor nights indicates you need medical attention, not training"
+Add unit tests for the new helpers:
 
-8. REST DAY CLARITY
+- extractWorkoutSignals("Tempo 8km @ 4:30/km") → distance 8, discipline 'run', keywords include 'tempo'.
 
-Current: If today is rest day, assessment walks forward to next workout
+- matchScheduledWorkout: 8.4km/35min vs planned 8km/34min → matched. 5km easy vs planned 5×800m tempo → not matched.
 
-Problem: User clicks "Assess Day Ahead" on Monday (rest day), sees "Planned Workout: Tuesday 22 May" without context
+- classifyTodayActivities with no rows → NONE; with one matched → SCHEDULED_WORKOUT_COMPLETED; with one unmatched 5km → EXTRA_ACTIVITY; with 10km + 8km → EXTRA_ACTIVITY + isExtremeAccumulatedVolume === true.
 
-Fix: If today is a rest day, prepend output with:
+File: supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md)
 
-"🛌 Today (Monday 21 May) is a scheduled rest day.
+Add 4 scenarios:
 
-Assessing tomorrow's workout (Tuesday 22 May)..."
+- Completed scheduled workout at 07:00, assess 14:00 → "already completed" block + trailer.
 
-This prevents confusion about which day is being assessed
+- Unplanned 5km easy at 07:00, assess scheduled tempo → warning verbatim in Coach's Note.
 
-IMPLEMENTATION:
+- 10km morning + 8km lunch, assess intervals → forced ADJUSTED with Rest Day override.
 
-All work in supabase/functions/ai-coach/index.ts (day-adjust branch + system prompt) and small client-side changes in src/pages/TrainingPlan.tsx and src/lib/ai-stream.ts.
+- No activities today → identical output to current behaviour (regression guard).
 
-Key changes:
+CRITICAL EDGE CASE HANDLING:
 
-- Replace mean with median for baselines (with edge case handling)
+When fetching today's activities, the query uses start_time for the date boundary. This means:
 
-- Add explicit hard/long workout classification
+- An activity that started yesterday at 23:50 and ended today at 00:10 will NOT appear in today's results (correct - it's yesterday's training)
 
-- Refine poor night predicate
+- An activity that started today at 23:50 and ends tomorrow at 00:10 WILL appear in today's results (correct - it's today's training)
 
-- Implement SOFT ADJUSTED decision tier (requires both prompt change AND client regex update)
+This start_time-based logic matches how activities are normally bucketed by day in the app and prevents double-counting overnight activities.
 
-- Build cadence cue rotation (5-6 cues, random selection)
+EXTREME_DAY_VOLUME thresholds rationale:
 
-- Add training load velocity check to gating rules
+- 90 minutes total = ~12-15km for most runners = approaching half-marathon training volume in one day
 
-- Add chronic poor sleep escalation (3/5/7+ night handling)
+- 15km total = regardless of pace, this is significant accumulated distance
 
-- Add rest day clarity prepend when target_is_not_today=true
+Either threshold alone triggers the override because both indicate high training stress that makes an additional evening workout unsafe.
 
-TEST COVERAGE REQUIRED:
+Out of scope
 
-Create test suite in supabase/functions/ai-coach/day-adjust.test.ts covering:
+- No DB migrations (uses existing activities columns).
 
-Layer 1 - Pure logic unit tests (deterministic):
+- No changes to yesterday's logic, gating thresholds, or escalation tiers.
 
-- Poor night predicate: (55, 6h)→poor; (58, 7.5h)→not poor; (48, 8h)→poor
+- No changes to adjustNextWorkout flow (that already targets a future date with no completed activities possible).
 
-- Median calculation: odd/even arrays, single value, outlier robustness
+Files touched
 
-- Median edge cases (CRITICAL): 
+- supabase/functions/ai-coach/index.ts
 
-  * Empty array [] → return null or 0, don't crash
+- supabase/functions/ai-coach/day-adjust-logic.ts
 
-  * Single value [50] → return 50
+- supabase/functions/ai-coach/day-adjust.test.ts
 
-  * Two values [50, 60] → return 55 (average of middle two)
+- supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md)
 
-  * Array with nulls [50, null, 60, null, 70] → filter nulls first, return median(50,60,70)=60
-
-- Yesterday load classifier: duration/HR/load thresholds
-
-- Today intensity detection: tempo/interval/easy/rest keywords
-
-- Cadence cue rotation: verify all 5-6 cues reachable, no duplicates
-
-- Escalation tiers: 2 nights→null; 3→warning; 5→medical advice; 7→mandatory rest
-
-- Load velocity force-adjust: combinations of yesterday hard + today hard + poor night
-
-Layer 2 - Prompt assembly integration tests:
-
-- Scenario 1 (1 poor + HRV -12%): prompt includes SOFT ADJUSTED rule
-
-- Scenario 2 (2 poor + HRV -18%): prompt includes standard ADJUSTED rule
-
-- Scenario 3 (load velocity): prompt contains yesterday hard + today hard + velocity rule
-
-- Scenario 4 (5 nights): prompt contains 5-night escalation verbatim
-
-- Scenario 5 (7 nights): prompt contains mandatory rest instruction
-
-- Scenario 6 (rest day): prompt includes prepend template when target_is_not_today=true
-
-- Scenario 7 (cadence 155): prompt contains random cadence cue + instruction
-
-Layer 3 - Manual staging checklist:
-
-Create STAGING_[TESTS.md](http://TESTS.md) with curl payloads for manual pre-deploy verification of actual LLM output.
-
-Files to create/edit:
-
-- NEW: supabase/functions/ai-coach/day-adjust-logic.ts (extracted helpers including robust median function)
-
-- NEW: supabase/functions/ai-coach/day-adjust.test.ts (Layers 1+2, ~25 assertions)
-
-- NEW: supabase/functions/ai-coach/STAGING_[TESTS.md](http://TESTS.md) (Layer 3 manual)
-
-- EDIT: supabase/functions/ai-coach/index.ts (import helpers, no behavior change)
-
-- EDIT: src/pages/TrainingPlan.tsx (regex + new payload fields)
-
-- EDIT: src/lib/ai-stream.ts (new optional fields)
-
-Run tests with: supabase--test_edge_functions with {"functions": ["ai-coach"]}
-
-Expected: ~25-30 assertions, all passing in <1 second
-
-These improvements maintain conservative gating while catching edge cases and providing more actionable guidance.
+- src/pages/TrainingPlan.tsx

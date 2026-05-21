@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import {
+  classifyTodayActivities,
+  isExtremeAccumulatedVolume,
+  type TodayActivityInput,
+} from "./day-adjust-logic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -491,7 +496,128 @@ ${sleepContext}`;
         yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\nYESTERDAY LOAD: hard=${yesterdayLoad.hard}, long=${yesterdayLoad.long}${yesterdayLoad.reason ? ` (${yesterdayLoad.reason.trim()})` : ""}\n`;
       }
 
-      // Get today's daily metrics (RHR, HRV, stress)
+      // ── TODAY'S ACTIVITIES (already-completed work on the target date) ──
+      // Bucket by start_time on the target ISO day. UK-DST drift is acceptable
+      // (matches how yesterday's activities are bucketed above).
+      const targetNext = new Date(targetDateStr);
+      targetNext.setDate(targetNext.getDate() + 1);
+      const targetNextStr = targetNext.toISOString().split("T")[0];
+      const { data: todayActivitiesRaw } = await supabase
+        .from("activities")
+        .select("id, activity_type, distance_meters, duration_seconds, avg_heart_rate, start_time, raw_data")
+        .eq("user_id", user.id)
+        .gte("start_time", targetDateStr + "T00:00:00")
+        .lt("start_time", targetNextStr + "T00:00:00")
+        .gte("distance_meters", 500)
+        .gte("duration_seconds", 60)
+        .order("start_time", { ascending: false })
+        .limit(5);
+
+      const todayActivities: TodayActivityInput[] = (todayActivitiesRaw || []).map((a: any) => ({
+        id: a.id,
+        activity_type: a.activity_type,
+        distance_meters: a.distance_meters,
+        duration_seconds: a.duration_seconds,
+        avg_heart_rate: a.avg_heart_rate,
+        start_time: a.start_time,
+        raw_data: a.raw_data,
+      }));
+
+      const todayClassification = classifyTodayActivities(todayActivities, today_workout);
+      const extremeVolume = isExtremeAccumulatedVolume(todayClassification.totals);
+
+      const fmtHHMM = (iso: string | null | undefined): string => {
+        if (!iso) return "—";
+        try {
+          return new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit", minute: "2-digit", timeZone: timezone || "Europe/London", hour12: false,
+          }).format(new Date(iso));
+        } catch { return "—"; }
+      };
+      const actName = (a: TodayActivityInput): string => {
+        const rd = (a.raw_data || {}) as any;
+        return String(rd.name || rd.title || rd.activity_name || a.activity_type || "Activity");
+      };
+
+      // SHORT-CIRCUIT: scheduled workout already completed → don't call LLM,
+      // stream a fixed Markdown block as SSE and return.
+      if (todayClassification.status === "SCHEDULED_WORKOUT_COMPLETED" && todayClassification.matchedActivity) {
+        const a = todayClassification.matchedActivity;
+        const distKm = Number(a.distance_meters || 0) / 1000;
+        const durSec = Number(a.duration_seconds || 0);
+        const mm = Math.floor(durSec / 60);
+        const ss = Math.round(durSec % 60);
+        const hr = a.avg_heart_rate != null ? Math.round(Number(a.avg_heart_rate)) : null;
+
+        const markdown =
+`✅ Today's workout already completed
+
+You completed **${actName(a)}** at ${fmtHHMM(a.start_time)}:
+- Distance: ${distKm.toFixed(1)} km
+- Duration: ${mm}:${String(ss).padStart(2, "0")}
+- Avg HR: ${hr != null ? hr + " bpm" : "n/a"}
+
+Great work — no adjustment needed. See you tomorrow.
+
+<!-- DAY_ADJUST_STATUS: WORKOUT_ALREADY_COMPLETED activity_id=${a.id || ""} -->
+`;
+
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const chunk = { choices: [{ delta: { content: markdown } }] };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+
+      // Build prompt context for EXTRA_ACTIVITY (single / multiple) and accumulated-volume override.
+      let todayActivityContext = "";
+      let todayActivityRules = "";
+      if (todayClassification.status === "EXTRA_ACTIVITY") {
+        const lines = todayActivities.map((a, i) => {
+          const distKm = (Number(a.distance_meters || 0) / 1000).toFixed(1);
+          const durMin = Math.round(Number(a.duration_seconds || 0) / 60);
+          const hr = a.avg_heart_rate != null ? Math.round(Number(a.avg_heart_rate)) + "bpm" : "n/a";
+          return `- Activity ${i + 1}: ${a.activity_type || "run"} ${distKm}km / ${durMin}min @ ${hr} (started ${fmtHHMM(a.start_time)})`;
+        }).join("\n");
+        const totDist = todayClassification.totals.totalDistanceKm.toFixed(1);
+        const totMin = Math.round(todayClassification.totals.totalDurationMin);
+
+        todayActivityContext = `\nTODAY'S TRAINING (already completed before this assessment):
+${lines}
+- Totals: ${todayClassification.totals.count} activit${todayClassification.totals.count === 1 ? "y" : "ies"}, ${totDist}km / ${totMin}min
+- Status: EXTRA_ACTIVITY (not the scheduled workout)
+`;
+
+        if (extremeVolume) {
+          todayActivityRules = `\nTODAY VOLUME OVERRIDE (MANDATORY):
+The athlete has already trained ${totDist}km / ${totMin}min today, exceeding the safe threshold (>15km or >90min).
+Decision MUST be ADJUSTED. Replace the recommended workout with a Rest Day table.
+Coach's Note MUST include verbatim: "⚠️ OVERRIDE: You've already trained ${totDist}km / ${totMin}min today. Replacing tonight's workout with Rest Day to prevent overtraining."
+`;
+        } else {
+          const lead = todayActivities[0];
+          const leadDist = (Number(lead?.distance_meters || 0) / 1000).toFixed(1);
+          todayActivityRules = `\nTODAY EXTRA-ACTIVITY RULE (MANDATORY):
+The athlete already ran ${leadDist}km today before this assessment (NOT the scheduled session). Factor accumulated fatigue into the decision.
+Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km today. If tonight's session feels too hard, skip it — you've already done significant training."
+`;
+        }
+      }
+
+
       const { data: todayMetrics } = await supabase
         .from("daily_metrics")
         .select("resting_heart_rate, hrv, stress_score, steps")
@@ -726,6 +852,8 @@ ${trendContext}
 ${escalationContext}
 ${intensityContext}
 ${yesterdayContext}
+${todayActivityContext}
+${todayActivityRules}
 ${cadenceContext}
 
 PLANNED WORKOUT FOR ${targetDateStr}:

@@ -2,10 +2,14 @@ import { assertEquals, assert, assertNotEquals } from "https://deno.land/std@0.2
 import {
   CADENCE_CUES,
   buildEscalationLine,
+  classifyTodayActivities,
   classifyYesterdayLoad,
   countConsecutivePoor,
   detectTodayIntensity,
+  extractWorkoutSignals,
+  isExtremeAccumulatedVolume,
   isPoorNight,
+  matchScheduledWorkout,
   median,
   pickCadenceCue,
   shouldForceAdjustedByLoadVelocity,
@@ -260,4 +264,90 @@ Deno.test("Scenario 7: cadence 155 selects a cue from CADENCE_CUES", () => {
   assert(avgCadence < 160);
   const cue = pickCadenceCue(() => 0.5);
   assert(CADENCE_CUES.includes(cue));
+});
+
+// ── Today's-activity awareness tests ─────────────────────────────────────────
+
+Deno.test("extractWorkoutSignals: tempo 8km parses distance + keyword", () => {
+  const s = extractWorkoutSignals("Tempo 8km @ 4:30/km");
+  assertEquals(s.distanceKm, 8);
+  assertEquals(s.discipline, "run");
+  assert(s.keywords.includes("tempo"));
+});
+
+Deno.test("extractWorkoutSignals: 'Total: 45min' parses duration", () => {
+  const s = extractWorkoutSignals("Easy run (Total: 45min)");
+  assertEquals(s.durationMin, 45);
+  assert(s.keywords.includes("easy"));
+});
+
+Deno.test("matchScheduledWorkout: within ±20% matches", () => {
+  const signals = extractWorkoutSignals("Easy 8km / 34min run");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 8400, duration_seconds: 35 * 60 },
+    signals,
+  );
+  assertEquals(r.matched, true);
+});
+
+Deno.test("matchScheduledWorkout: 5km easy vs planned 5x800m tempo → no match", () => {
+  const signals = extractWorkoutSignals("5x800m intervals @ 5k pace");
+  const r = matchScheduledWorkout(
+    { activity_type: "Run", distance_meters: 5000, duration_seconds: 28 * 60, raw_data: { name: "Easy morning run" } },
+    signals,
+  );
+  assertEquals(r.matched, false);
+});
+
+Deno.test("matchScheduledWorkout: discipline mismatch fails", () => {
+  const signals = extractWorkoutSignals("Easy 8km run");
+  const r = matchScheduledWorkout(
+    { activity_type: "Ride", distance_meters: 8000, duration_seconds: 35 * 60 },
+    signals,
+  );
+  assertEquals(r.matched, false);
+});
+
+Deno.test("classifyTodayActivities: empty → NONE", () => {
+  const c = classifyTodayActivities([], "Easy 8km");
+  assertEquals(c.status, "NONE");
+  assertEquals(c.totals.count, 0);
+});
+
+Deno.test("classifyTodayActivities: single matched → SCHEDULED_WORKOUT_COMPLETED", () => {
+  const c = classifyTodayActivities(
+    [{ id: "a1", activity_type: "Run", distance_meters: 8000, duration_seconds: 34 * 60 }],
+    "Easy 8km / 34min",
+  );
+  assertEquals(c.status, "SCHEDULED_WORKOUT_COMPLETED");
+  assertEquals(c.matchedActivity?.id, "a1");
+});
+
+Deno.test("classifyTodayActivities: unmatched 5km easy → EXTRA_ACTIVITY", () => {
+  const c = classifyTodayActivities(
+    [{ id: "a1", activity_type: "Run", distance_meters: 5000, duration_seconds: 28 * 60 }],
+    "5x800m intervals tempo",
+  );
+  assertEquals(c.status, "EXTRA_ACTIVITY");
+});
+
+Deno.test("classifyTodayActivities: 10km + 8km accumulated → EXTRA_ACTIVITY + extreme volume", () => {
+  const c = classifyTodayActivities(
+    [
+      { id: "a1", activity_type: "Run", distance_meters: 10000, duration_seconds: 55 * 60 },
+      { id: "a2", activity_type: "Run", distance_meters: 8000, duration_seconds: 44 * 60 },
+    ],
+    "5x800m intervals tempo",
+  );
+  assertEquals(c.status, "EXTRA_ACTIVITY");
+  assertEquals(c.totals.count, 2);
+  assertEquals(Math.round(c.totals.totalDistanceKm), 18);
+  assertEquals(isExtremeAccumulatedVolume(c.totals), true);
+});
+
+Deno.test("isExtremeAccumulatedVolume: 14km/85min is NOT extreme", () => {
+  assertEquals(
+    isExtremeAccumulatedVolume({ count: 2, totalDistanceKm: 14, totalDurationMin: 85 }),
+    false,
+  );
 });
