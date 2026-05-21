@@ -467,7 +467,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   }, [open, user, truth, points, readinessData, prevSleep]);
 
 
-  const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.label);
+  const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.ts);
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
@@ -606,7 +606,10 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                   </defs>
                   <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.3} vertical={false} />
                   <XAxis
-                    dataKey="label"
+                    dataKey="ts"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tickFormatter={(value) => new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
                     tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                     interval={5}
                     axisLine={false}
