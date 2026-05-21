@@ -38,6 +38,7 @@ const AnalysisTab = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "detail" | "generating">("list");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const loadAnalyses = useCallback(async () => {
     if (!user) return;
