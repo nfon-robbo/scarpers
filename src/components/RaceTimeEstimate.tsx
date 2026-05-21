@@ -289,7 +289,18 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
       ? `${extractedFromCount} extracted run segment${extractedFromCount === 1 ? "" : "s"}`
       : `${recentClean.length} clean run${recentClean.length === 1 ? "" : "s"}`;
 
-    if (tVo2 != null && tClean != null) {
+    // Walk/run phase detection: many sessions excluded, very few clean runs, no
+    // successful extraction. In that case, training pace is unreliable — lean
+    // 100% on VO2 max if we have it.
+    const walkRunPhase = excludedCount >= 3 && cleanRuns.length <= 1 && extractedFromCount === 0;
+
+    if (walkRunPhase && tVo2 != null) {
+      estFinish = tVo2;
+      basis.push(`VO2 max ${vo2Max!.toFixed(0)}`);
+      breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (100%)` });
+      breakdown.push({ src: "Training pace", included: false, note: `excluded — walk/run phase, run segment extraction not yet reliable` });
+      warning = `Based on VO2 max ${vo2Max!.toFixed(0)} only — run segment extraction in development.`;
+    } else if (tVo2 != null && tClean != null) {
       estFinish = tVo2 * 0.7 + tClean * 0.3;
       basis.push(`VO2 max ${vo2Max!.toFixed(0)}`, cleanLabel);
       breakdown.push({ src: `VO2 max ${vo2Max!.toFixed(0)}`, included: true, note: `${fmtTime(tVo2)} (70%)` });
@@ -320,7 +331,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     if (estFinish != null && tVo2 != null && estFinish > tVo2 * 1.4) {
       estFinish = tVo2;
       warning = "Estimate snapped to VO2 max — recent training pace too slow to reflect race fitness.";
-    } else if (netExcluded > 0 && tClean == null && tVo2 != null) {
+    } else if (!walkRunPhase && netExcluded > 0 && tClean == null && tVo2 != null) {
       warning = "Some walk/run sessions excluded — estimate based on VO2 max only. It will sharpen as continuous running develops.";
     }
 
