@@ -473,7 +473,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                             // FIT stores avg_step_length in mm (e.g. 795.30 mm). Some sources may store in m.
                             const meters = v > 10 ? v / 1000 : v;
                             return `${(meters * 100).toFixed(1)} cm`;
-                          })()} icon={Ruler} />},
+                          })()} icon={Ruler} />
                           
                         </div>
                       </CardContent>
