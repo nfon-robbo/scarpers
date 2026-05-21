@@ -244,7 +244,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     setCached(null);
     setCoachInsight(null);
     (async () => {
-      if (refreshNonce === 0) {
+      const shouldUseCache = refreshNonce === 0;
+      if (shouldUseCache) {
         const { data: snap } = await supabase
           .from("readiness_snapshots")
           .select("score, factors, advice, insight, recommendation, recorded_at")
@@ -573,10 +574,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     });
   }, [user, refreshNonce]);
 
-  // Auto-reload snapshots when the page becomes visible or regains focus,
-  // so the chart never shows stale scores after a tab switch or data change.
+  // Auto-reload trend snapshots only when the page becomes visible or regains focus.
+  // Do not force a full readiness recompute here: switching to screenshot/camera apps
+  // can briefly unmount chart dimensions and make the Body Battery graph disappear.
   useEffect(() => {
-    const reload = () => setRefreshNonce((n) => n + 1);
+    const reload = () => fetchTrendSnapshots();
     const onVisibility = () => { if (document.visibilityState === "visible") reload(); };
     window.addEventListener("focus", reload);
     document.addEventListener("visibilitychange", onVisibility);
