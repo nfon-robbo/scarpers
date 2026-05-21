@@ -24,6 +24,7 @@ import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 
 import RaceTimeEstimate from "@/components/RaceTimeEstimate";
+import RacePredictionGraph from "@/components/RacePredictionGraph";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
 import { expandWorkoutSteps, parseDurationSeconds as sharedParseDuration, normalizePaceInput as sharedNormalizePace } from "@/lib/plan-step-expand";
 import { importDocxPlan } from "@/lib/docx-plan-import";
@@ -499,6 +500,10 @@ const TrainingPlanPage = () => {
   const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
+  const [racePredictRefresh, setRacePredictRefresh] = useState(0);
+  const linkedActivityCountRef = useRef<number>(-1);
+  const racePredictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const racePredictSeededRef = useRef(false);
   const [editingWorkout, setEditingWorkout] = useState<ParsedWorkout | null>(null);
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
@@ -507,6 +512,71 @@ const TrainingPlanPage = () => {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-recalc race prediction when a new activity gets linked to a plan day.
+  // Debounced 2s; uses linked-activity count as the change signal so any new
+  // workout completion triggers a fresh prediction + history row.
+  useEffect(() => {
+    if (!user || !raceDistance) return;
+    const count = Object.keys(linkedActivities).length;
+    const prev = linkedActivityCountRef.current;
+    linkedActivityCountRef.current = count;
+
+    // Seed once on first render if we have a plan but no history yet
+    if (prev === -1) {
+      if (!racePredictSeededRef.current && raceDistance) {
+        racePredictSeededRef.current = true;
+        (async () => {
+          try {
+            const { data: existing } = await supabase
+              .from("race_prediction_history")
+              .select("id")
+              .eq("user_id", user.id)
+              .limit(1);
+            if (!existing || existing.length === 0) {
+              await supabase.functions.invoke("race-predict", {
+                body: { race_distance: raceDistance, triggered_by: "plan_start" },
+              });
+              setRacePredictRefresh((n) => n + 1);
+            }
+          } catch { /* non-fatal */ }
+        })();
+      }
+      return;
+    }
+
+    if (count <= prev) return; // only recalc when count grows
+
+    if (racePredictDebounceRef.current) clearTimeout(racePredictDebounceRef.current);
+    racePredictDebounceRef.current = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("race-predict", {
+          body: { race_distance: raceDistance, triggered_by: "activity_synced" },
+        });
+        if (!error && data && !data.insufficient && data.target_sec) {
+          const prevSec = data.previous_sec as number | null;
+          const newSec = Math.round(data.target_sec);
+          if (prevSec && Math.abs(prevSec - newSec) >= 30) {
+            const diff = prevSec - newSec;
+            const sign = diff > 0 ? "faster" : "slower";
+            const mm = Math.floor(Math.abs(diff) / 60);
+            const ss = String(Math.abs(diff) % 60).padStart(2, "0");
+            const fmt = (s: number) => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+            toast({
+              title: "🎯 Race estimate updated",
+              description: `${fmt(prevSec)} → ${fmt(newSec)} (${mm}:${ss} ${sign}!)`,
+            });
+          }
+          setRacePredictRefresh((n) => n + 1);
+        }
+      } catch { /* non-fatal */ }
+    }, 2000);
+    return () => {
+      if (racePredictDebounceRef.current) clearTimeout(racePredictDebounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedActivities, raceDistance, user]);
+
 
   // Load existing plan on mount
   const loadSavedPlan = useCallback(async () => {
@@ -2530,6 +2600,17 @@ const TrainingPlanPage = () => {
               linkedActivities={linkedActivities}
               raceDistance={raceDistance}
               goalTime={goalTime}
+            />
+            <RacePredictionGraph
+              raceDistance={raceDistance}
+              goalSeconds={(() => {
+                const g = (goalTime || "").trim();
+                const m = g.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/);
+                if (!m) return null;
+                const a = +m[1], b = +m[2], c = m[3] ? +m[3] : null;
+                return c != null ? a*3600 + b*60 + c : a*60 + b;
+              })()}
+              refreshKey={racePredictRefresh}
             />
             <PlanDayList
               workouts={parseWorkoutsFromPlan(content)}
