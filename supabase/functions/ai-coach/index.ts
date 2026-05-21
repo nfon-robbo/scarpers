@@ -465,14 +465,30 @@ ${sleepContext}`;
       
       const { data: yesterdayActivities } = await supabase
         .from("activities")
-        .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, training_load")
+        .select("activity_type, duration_seconds, distance_meters, avg_heart_rate, max_heart_rate, training_load")
         .eq("user_id", user.id)
         .gte("start_time", yesterdayStr + "T00:00:00")
         .lt("start_time", targetDateStr + "T00:00:00");
 
+      // Explicit "hard"/"long" classification of yesterday's session
+      let yesterdayLoad = { hard: false, long: false, reason: "" as string };
+      if (yesterdayActivities && yesterdayActivities.length > 0) {
+        for (const a of yesterdayActivities) {
+          const dur = Number(a.duration_seconds || 0);
+          const avgHr = Number(a.avg_heart_rate || 0);
+          const maxHr = Number(a.max_heart_rate || 0) || 190; // fallback estimate
+          const load = Number(a.training_load || 0);
+          if (dur > 5400) { yesterdayLoad.long = true; yesterdayLoad.reason += `duration ${(dur/60).toFixed(0)}min; `; }
+          if ((dur > 3600 && avgHr >= 0.85 * maxHr) || load > 150) {
+            yesterdayLoad.hard = true;
+            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (≥85% max); `;
+          }
+        }
+      }
+
       let yesterdayContext = "";
       if (yesterdayActivities && yesterdayActivities.length > 0) {
-        yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\n`;
+        yesterdayContext = `\nYESTERDAY'S ACTIVITIES:\n${JSON.stringify(yesterdayActivities, null, 2)}\nYESTERDAY LOAD: hard=${yesterdayLoad.hard}, long=${yesterdayLoad.long}${yesterdayLoad.reason ? ` (${yesterdayLoad.reason.trim()})` : ""}\n`;
       }
 
       // Get today's daily metrics (RHR, HRV, stress)
