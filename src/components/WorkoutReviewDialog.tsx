@@ -65,6 +65,14 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [nextSession, setNextSession] = useState<ParsedWorkout | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
 
+  // Error + retry plumbing. The streaming library will fire onError with a
+  // friendly timeout message if the AI gateway hangs; we surface it inline
+  // with a Retry button instead of leaving the user with broken text.
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const reviewRetryRef = useRef<(() => void) | null>(null);
+  const coachRetryRef = useRef<(() => void) | null>(null);
+
   // Track whether we already loaded an existing saved review for this activity
   const hydratedRef = useRef<string | null>(null);
 
