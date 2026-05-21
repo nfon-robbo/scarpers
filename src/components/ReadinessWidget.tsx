@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, RefreshCw, AlertTriangle, CheckCircle, Moon, Heart, Activity, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceArea } from "recharts";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ── Inline Sparkline (7-day mini trend) ──
 export type SparkPoint = { date: string; value: number | null };
@@ -221,16 +222,27 @@ function CircularGauge({
             {statusLabel}
           </span>
           {TrendIcon && (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-              aria-label={trendLabel}
-              title={trendLabel}
-            >
-              <TrendIcon className="h-2.5 w-2.5" />
-              {trendDelta !== 0 && trendDelta != null && (
-                <span>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</span>
-              )}
-            </span>
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex items-center gap-0.5 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground cursor-help"
+                  aria-label={trendLabel}
+                >
+                  <TrendIcon className="h-2.5 w-2.5" />
+                  {trendDelta !== 0 && trendDelta != null && (
+                    <span>{trendDelta > 0 ? `+${trendDelta}` : trendDelta}</span>
+                  )}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[240px] text-xs">
+                <p className="font-semibold mb-1.5">Readiness vs yesterday</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li className="flex items-center gap-1.5"><TrendingUp className="h-3 w-3 text-emerald-400" /> <span><span className="text-foreground font-medium">Up</span> — improved by 3+ points</span></li>
+                  <li className="flex items-center gap-1.5"><Minus className="h-3 w-3 text-slate-300" /> <span><span className="text-foreground font-medium">Stable</span> — within 2 points</span></li>
+                  <li className="flex items-center gap-1.5"><TrendingDown className="h-3 w-3 text-red-400" /> <span><span className="text-foreground font-medium">Down</span> — dropped 3+ points</span></li>
+                </ul>
+              </TooltipContent>
+            </UITooltip>
           )}
         </div>
       </div>
