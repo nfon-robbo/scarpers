@@ -288,33 +288,41 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       // ── Single source of truth: computeBodyBattery() with the same inputs as the dashboard ──
       let truthResult: BodyBatteryResult | null = null;
       if (readinessData) {
+        const sleepInputs = {
+          sleepScore: readinessData.sleepScore,
+          sleepHours: readinessData.sleepHours,
+          deepPct: readinessData.deepPct,
+          remPct: readinessData.remPct,
+          hrv: readinessData.hrv,
+          hrvBaseline: readinessData.hrvBaseline,
+          recentSleepAvgHours: readinessData.recentSleepAvgHours,
+          baselineSleepAvgHours: readinessData.baselineSleepAvgHours,
+        };
         truthResult = computeBodyBattery({
-          sleep: {
-            sleepScore: readinessData.sleepScore,
-            sleepHours: readinessData.sleepHours,
-            deepPct: readinessData.deepPct,
-            remPct: readinessData.remPct,
-            hrv: readinessData.hrv,
-            hrvBaseline: readinessData.hrvBaseline,
-            recentSleepAvgHours: readinessData.recentSleepAvgHours,
-            baselineSleepAvgHours: readinessData.baselineSleepAvgHours,
-          },
+          sleep: sleepInputs,
           wakeTimeIso: readinessData.wakeTimeIso,
           todayActivities: readinessData.todayActivities,
           now: Date.now(),
         });
         if (hourly.length > 0) {
-          const last = hourly[hourly.length - 1];
-          const offset = truthResult.percent - last.battery;
-          if (offset !== 0) {
+          const wakeMs = readinessData.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
+          if (wakeMs != null && Number.isFinite(wakeMs)) {
             for (const p of hourly) {
-              const newVal = Math.max(5, Math.min(100, p.battery + offset));
+              if (p.ts < wakeMs) continue;
+              const modelAtPoint = computeBodyBattery({
+                sleep: sleepInputs,
+                wakeTimeIso: readinessData.wakeTimeIso,
+                todayActivities: readinessData.todayActivities,
+                now: p.ts,
+              });
+              const newVal = modelAtPoint.percent;
               p.battery = newVal;
               if (p.sleepBand != null) p.sleepBand = newVal;
               if (p.awakeBand != null) p.awakeBand = newVal;
               if (p.activeBand != null) p.activeBand = newVal;
             }
           }
+          const last = hourly[hourly.length - 1];
           last.battery = truthResult.percent;
           if (last.awakeBand != null) last.awakeBand = truthResult.percent;
           if (last.activeBand != null) last.activeBand = truthResult.percent;
