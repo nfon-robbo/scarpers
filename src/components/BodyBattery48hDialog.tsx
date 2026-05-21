@@ -301,7 +301,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           const offset = truthResult.percent - last.battery;
           if (offset !== 0) {
             for (const p of hourly) {
-              const newVal = Math.max(0, Math.min(100, p.battery + offset));
+              const newVal = Math.max(5, Math.min(100, p.battery + offset));
               p.battery = newVal;
               if (p.sleepBand != null) p.sleepBand = newVal;
               if (p.awakeBand != null) p.awakeBand = newVal;
@@ -312,8 +312,29 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
           if (last.awakeBand != null) last.awakeBand = truthResult.percent;
           if (last.activeBand != null) last.activeBand = truthResult.percent;
           if (last.sleepBand != null) last.sleepBand = truthResult.percent;
+
+          // Append a "now" point so the line visibly reaches the current minute,
+          // not just the last whole-hour bucket.
+          const nowMs2 = Date.now();
+          if (nowMs2 - last.ts >= 60_000) {
+            const nowD = new Date(nowMs2);
+            const nowState = last.state === "sleep" ? "sleep" : last.state;
+            hourly.push({
+              ts: nowMs2,
+              label: nowD.toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }),
+              hour: nowD.getHours(),
+              battery: truthResult.percent,
+              delta: 0,
+              state: nowState,
+              dominantStage: last.dominantStage,
+              sleepBand: nowState === "sleep" ? truthResult.percent : null,
+              awakeBand: nowState === "awake" ? truthResult.percent : null,
+              activeBand: nowState === "active" ? truthResult.percent : null,
+            });
+          }
         }
       }
+
 
       // Bridge nulls between phases so segments visually connect.
       const bands: ("sleepBand" | "awakeBand" | "activeBand")[] = ["sleepBand", "awakeBand", "activeBand"];
