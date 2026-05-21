@@ -1279,6 +1279,11 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                       <div className="shrink-0 sm:block">{statusIcon(f.status)}</div>
                       <span className="text-foreground font-medium truncate">
                         {f.label}
+                        {isBattery && (
+                          <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                            modelled · updates hourly
+                          </span>
+                        )}
                         {hasDetail && <span className="ml-1.5 text-[10px] font-normal text-cyan-400">tap →</span>}
                       </span>
                     </div>
