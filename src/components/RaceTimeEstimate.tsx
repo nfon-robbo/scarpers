@@ -224,7 +224,7 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         if (!cancelled) {
           setExtractedRuns([]);
           setExtractedFromCount(0);
-          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed" })), successes: [] });
+          setExtractionDebug({ attempted: recent.length, succeeded: 0, failures: recent.map((c) => ({ title: c.title, reason: "fetch failed", date: c.date })), successes: [] });
         }
       }
     })();
