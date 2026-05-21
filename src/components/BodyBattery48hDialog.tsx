@@ -66,12 +66,17 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const [prevSleep, setPrevSleep] = useState<{ hours: number; deepPct: number; remPct: number } | null>(null);
   const [insight, setInsight] = useState<{ loading: boolean; text: string | null }>({ loading: false, text: null });
   const insightKeyRef = useRef<string | null>(null);
+  const hasChartDataRef = useRef(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!open || !user) return;
-    setLoading(true);
+    const showFullLoader = !hasChartDataRef.current;
+    setLoading(showFullLoader);
+    setRefreshing(!showFullLoader);
+    let cancelled = false;
 
     const now = new Date();
     now.setMinutes(0, 0, 0);
@@ -93,6 +98,7 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         .gte("start_time", startIso)
         .then(({ data }) => data || []),
     ]).then(([stages, acts]) => {
+      if (cancelled) return;
       // Aggregate prev night sleep (most recent date with >=3h before today's wake date)
       const todayWakeDate = readinessData?.wakeTimeIso
         ? new Date(readinessData.wakeTimeIso).toISOString().split("T")[0]
@@ -354,8 +360,18 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
       setTotals(tot);
       setTruth(truthResult);
       setLastUpdated(Date.now());
+      hasChartDataRef.current = true;
       setLoading(false);
+      setRefreshing(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setLoading(false);
+      setRefreshing(false);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, user, readinessData, refreshTick]);
 
   // Auto-refresh every 5 minutes while dialog is open so the value visibly ticks.
