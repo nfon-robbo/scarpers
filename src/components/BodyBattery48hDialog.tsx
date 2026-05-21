@@ -472,11 +472,27 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Body Battery — Past 48 hours</DialogTitle>
-          <DialogDescription>
-            Hourly charge level. Colours show phase: green = sleep recharge, amber = awake drain, red = activity drain.
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <DialogTitle>Body Battery — Past 48 hours</DialogTitle>
+              <DialogDescription>
+                Modelled from your sleep, time awake and today's activity. Not a live watch reading — refreshes every few minutes from your data.
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRecompute}
+              disabled={loading}
+              className="shrink-0 h-8 px-2 text-xs gap-1.5"
+              title="Recompute now"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "Recompute"}
+            </Button>
+          </div>
         </DialogHeader>
+
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
