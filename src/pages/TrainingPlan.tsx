@@ -1303,6 +1303,11 @@ const TrainingPlanPage = () => {
 
   const assessDayAhead = async () => {
     if (!user || !content) return;
+    // Lock: prevent overlapping assessments (programmatic triggers or repeat clicks)
+    if (dayAdjusting) {
+      toast({ title: "Assessment already in progress", description: "Please wait for the current assessment to finish." });
+      return;
+    }
     const picked = pickUpcomingWorkout();
     if (!picked) {
       toast({ title: "No upcoming workout", description: "There's no scheduled session coming up in your plan.", variant: "destructive" });
@@ -1317,10 +1322,41 @@ const TrainingPlanPage = () => {
     setDayAdjustResult(null);
     setDayAdjustIsModified(false);
     setDayAdjustCompletedActivityId(null);
+    setDayAdjustDetected(null);
     setDayAdjustPhase("sleep");
     setDayAdjustTargetDate(picked.dateObj);
     setDayAdjustMode("today");
     setDayAdjustShifted(picked.shifted);
+
+    // ── Cache lookup (improvement #1) ─────────────────────────────────────
+    // Count today's activities for the target date to key the cache. A new
+    // activity since the previous assessment invalidates the entry naturally.
+    let activityCount = 0;
+    try {
+      const nextDay = new Date(picked.dateObj);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const { count } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("start_time", `${targetDateStr}T00:00:00`)
+        .lt("start_time", `${format(nextDay, "yyyy-MM-dd")}T00:00:00`);
+      activityCount = count ?? 0;
+    } catch (e) {
+      console.warn("day-adjust: activity count fetch failed", e);
+    }
+
+    const cacheKey = dayAdjustCacheKey(user.id, targetDateStr, activityCount);
+    const cached = DAY_ADJUST_CACHE.get(cacheKey);
+    if (cached && Date.now() - cached.at < DAY_ADJUST_CACHE_TTL_MS) {
+      setDayAdjustResult(cached.result);
+      setDayAdjustDetected(cached.detected);
+      setDayAdjustCompletedActivityId(cached.completedActivityId);
+      setDayAdjustIsModified(cached.isModified);
+      setDayAdjustPhase("done");
+      setDayAdjusting(false);
+      return;
+    }
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -1335,37 +1371,64 @@ const TrainingPlanPage = () => {
     setTimeout(() => setDayAdjustPhase("analyzing"), 3500);
 
     let accumulated = "";
-    streamAICoach({
-      type: "day-adjust",
-      token: session.access_token,
-      targetDate: targetDateStr,
-      todayWorkout,
-      todayDateUk: format(new Date(), "EEEE d MMMM yyyy"),
-      targetIsNotToday: picked.shifted,
-      onDelta: (text) => {
-        accumulated += text;
-        setDayAdjustResult(accumulated);
-        if (dayAdjustPhase !== "done") setDayAdjustPhase("analyzing");
-      },
-      onDone: () => {
-        setDayAdjusting(false);
-        setDayAdjustPhase("done");
-        const completedMatch = accumulated.match(/DAY_ADJUST_STATUS:\s*WORKOUT_ALREADY_COMPLETED(?:\s+activity_id=([0-9a-f-]+))?/i);
-        if (completedMatch) {
-          setDayAdjustCompletedActivityId(completedMatch[1] || null);
-          setDayAdjustIsModified(false);
-        } else {
-          const isAdjusted = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
-          setDayAdjustIsModified(isAdjusted);
-        }
-      },
-      onError: (err) => {
-        toast({ title: "Day assessment failed", description: err, variant: "destructive" });
-        setDayAdjusting(false);
-        setDayAdjustDialogOpen(false);
-      },
-    });
+    let detectedSeen = false;
+    try {
+      streamAICoach({
+        type: "day-adjust",
+        token: session.access_token,
+        targetDate: targetDateStr,
+        todayWorkout,
+        todayDateUk: format(new Date(), "EEEE d MMMM yyyy"),
+        targetIsNotToday: picked.shifted,
+        onDelta: (text) => {
+          accumulated += text;
+          if (!detectedSeen) {
+            const det = parseDayAdjustDetected(accumulated);
+            if (det) {
+              detectedSeen = true;
+              setDayAdjustDetected(det);
+            }
+          }
+          setDayAdjustResult(accumulated);
+          if (dayAdjustPhase !== "done") setDayAdjustPhase("analyzing");
+        },
+        onDone: () => {
+          setDayAdjusting(false);
+          setDayAdjustPhase("done");
+          const completedMatch = accumulated.match(/DAY_ADJUST_STATUS:\s*WORKOUT_ALREADY_COMPLETED(?:\s+activity_id=([0-9a-f-]+))?/i);
+          let completedActivityId: string | null = null;
+          let isModified = false;
+          if (completedMatch) {
+            completedActivityId = completedMatch[1] || null;
+            setDayAdjustCompletedActivityId(completedActivityId);
+            setDayAdjustIsModified(false);
+          } else {
+            isModified = /Decision:\s*(ADJUSTED|SOFT ADJUSTED)/i.test(accumulated);
+            setDayAdjustIsModified(isModified);
+          }
+          // Cache the completed assessment
+          DAY_ADJUST_CACHE.set(cacheKey, {
+            result: accumulated,
+            detected: parseDayAdjustDetected(accumulated),
+            completedActivityId,
+            isModified,
+            at: Date.now(),
+          });
+        },
+        onError: (err) => {
+          toast({ title: "Day assessment failed", description: err, variant: "destructive" });
+          setDayAdjusting(false);
+          setDayAdjustDialogOpen(false);
+        },
+      });
+    } catch (e) {
+      console.error("day-adjust: unexpected stream error", e);
+      setDayAdjusting(false);
+      setDayAdjustDialogOpen(false);
+      toast({ title: "Day assessment failed", description: String(e), variant: "destructive" });
+    }
   };
+
 
   // Apply an elite-coach recommendation to the NEXT planned workout (skips today)
   const adjustNextWorkout = useCallback(async (recommendation: string) => {
