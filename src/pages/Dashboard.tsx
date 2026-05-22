@@ -27,6 +27,7 @@ import BlogPreview from "@/components/BlogPreview";
 import CoachClaireCard from "@/components/CoachClaireCard";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
+import PlanPausedBanner from "@/components/PlanPausedBanner";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import {
   evaluateAdaptation,
