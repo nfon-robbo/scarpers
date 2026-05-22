@@ -21,6 +21,10 @@ import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
 import pauseOtherIcon from "@/assets/pause-other.png";
+import pauseBgHoliday from "@/assets/pause-bg-holiday.jpg";
+import pauseBgIllness from "@/assets/pause-bg-illness.jpg";
+import pauseBgInjury from "@/assets/pause-bg-injury.jpg";
+import pauseBgOther from "@/assets/pause-bg-other.jpg";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
@@ -39,13 +43,14 @@ interface PlanDayListProps {
   pauseReason?: string | null;
 }
 
-function pauseReasonMeta(reason?: string | null): { icon: string; label: string } {
+function pauseReasonMeta(reason?: string | null): { icon: string; label: string; bg: string } {
   const r = (reason || "").toLowerCase();
-  if (/holiday|vacation|travel/.test(r)) return { icon: pauseHolidayIcon, label: "Holiday" };
-  if (/ill|sick|flu|cold/.test(r)) return { icon: pauseIllnessIcon, label: "Illness" };
-  if (/injur/.test(r)) return { icon: pauseInjuryIcon, label: "Injury" };
-  return { icon: pauseOtherIcon, label: reason && reason.trim() ? reason : "Paused" };
+  if (/holiday|vacation|travel/.test(r)) return { icon: pauseHolidayIcon, label: "Holiday", bg: pauseBgHoliday };
+  if (/ill|sick|flu|cold/.test(r)) return { icon: pauseIllnessIcon, label: "Illness", bg: pauseBgIllness };
+  if (/injur/.test(r)) return { icon: pauseInjuryIcon, label: "Injury", bg: pauseBgInjury };
+  return { icon: pauseOtherIcon, label: reason && reason.trim() ? reason : "Paused", bg: pauseBgOther };
 }
+
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
 
@@ -712,17 +717,24 @@ export default function PlanDayList({
 
                     {/* Workout card / rest */}
                     {inPauseWindow ? (
-                      <div className="flex-1 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-                        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-                          <img src={pauseMeta.icon} alt="" loading="lazy" width={28} height={28} className="w-7 h-7" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 truncate">
-                            {pauseMeta.label}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Plan paused</p>
+                      <div
+                        style={{ backgroundImage: `url(${pauseMeta.bg})` }}
+                        className="relative flex-1 overflow-hidden rounded-lg border border-primary/30 bg-cover bg-center px-3 py-2.5"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/60 to-background/20" />
+                        <div className="relative flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-background/40 backdrop-blur-sm flex items-center justify-center shrink-0">
+                            <img src={pauseMeta.icon} alt="" loading="lazy" width={28} height={28} className="w-7 h-7 drop-shadow" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate drop-shadow">
+                              {pauseMeta.label}
+                            </p>
+                            <p className="text-xs text-foreground/80 drop-shadow">Plan paused</p>
+                          </div>
                         </div>
                       </div>
+
                     ) : workout ? (
                       isCompleted ? (
                         // PlanOverview-style "completed" card
