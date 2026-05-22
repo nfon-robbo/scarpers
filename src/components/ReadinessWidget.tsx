@@ -1092,8 +1092,8 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     />
 
                     {suppressScore && (
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-200 whitespace-nowrap">
-                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 flex items-center gap-1.5 rounded-md border-2 border-yellow-400/70 bg-yellow-400/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.15em] text-yellow-200 whitespace-nowrap shadow-lg backdrop-blur-sm">
+                        <Loader2 className="h-3 w-3 animate-spin" />
                         Syncing {awaiting.join(", ")}
                       </div>
                     )}
