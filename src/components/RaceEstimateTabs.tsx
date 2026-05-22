@@ -31,6 +31,7 @@ export default function RaceEstimateTabs({
   goalTime,
   goalSeconds,
   refreshKey,
+  onPersisted,
 }: Props) {
   const [tab, setTab] = useState<"estimate" | "progress">("estimate");
 
