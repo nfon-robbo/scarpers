@@ -81,6 +81,7 @@ export default function RaceEstimateTabs({
             linkedActivities={linkedActivities}
             raceDistance={raceDistance}
             goalTime={goalTime}
+            onPersisted={onPersisted}
           />
         ) : (
           <RacePredictionGraph
