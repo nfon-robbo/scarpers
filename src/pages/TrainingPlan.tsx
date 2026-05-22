@@ -496,6 +496,13 @@ const TrainingPlanPage = () => {
     return d;
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
+  const [pausedAt, setPausedAt] = useState<Date | null>(null);
+  const [pausedUntil, setPausedUntil] = useState<Date | null>(null);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
+  const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
+  const isPlanPaused = !!pausedAt && !!pausedUntil && pausedUntil.getTime() > Date.now() - 86_400_000;
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
