@@ -1024,7 +1024,98 @@ const TrainingPlanPage = () => {
     }
   };
 
-  const regenerateForNewEndDate = async (newStart: Date, newEnd: Date) => {
+  // ─── Pause / Resume ───────────────────────────────────────────────
+  const handleConfirmPause = async (params: {
+    pausedAt: Date;
+    pausedUntil: Date;
+    reason: "holiday" | "illness" | "injury" | "other";
+    raceDateMode: RaceDateMode;
+  }) => {
+    if (!savedPlanId || !user) return;
+    const { error } = await supabase
+      .from("training_plans")
+      .update({
+        paused_at: params.pausedAt.toISOString(),
+        paused_until: params.pausedUntil.toISOString(),
+        pause_reason: params.reason,
+        race_date_mode: params.raceDateMode,
+      } as any)
+      .eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Couldn't pause plan", description: error.message, variant: "destructive" });
+      return;
+    }
+    setPausedAt(params.pausedAt);
+    setPausedUntil(params.pausedUntil);
+    setPauseReason(params.reason);
+    setPauseRaceDateMode(params.raceDateMode);
+    toast({
+      title: "Plan paused",
+      description: `Resume scheduled for ${format(params.pausedUntil, "dd MMM yyyy")}.`,
+    });
+  };
+
+  const handleConfirmResume = async (params: { resumeMode: "skip-next-week" | "continue-paused-week"; deltaDays: number }) => {
+    if (!savedPlanId || !user || !pausedAt) return;
+    const previousContent = content;
+    const fromIso = toLocalISODate(pausedAt);
+    let newContent = previousContent;
+    let trimmedNote = "";
+    let newRaceIso: string | null = raceDate ? toLocalISODate(raceDate) : null;
+
+    if (params.deltaDays > 0) {
+      newContent = shiftPlanDatesFrom(previousContent, fromIso, params.deltaDays);
+    }
+
+    if (pauseRaceDateMode === "fixed" && newRaceIso) {
+      // Keep race date fixed: trim anything that now lands past race day.
+      const trimResult = trimPlanAfterRaceDate(newContent, newRaceIso);
+      newContent = trimResult.content;
+      if (trimResult.trimmedDays > 0) {
+        trimmedNote = ` ${trimResult.trimmedDays} workout${trimResult.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
+      }
+    } else if (pauseRaceDateMode === "shift" && newRaceIso && params.deltaDays > 0) {
+      // Race day moves with everything else (already shifted by shiftPlanDatesFrom if it was >= fromIso).
+      const r = new Date(raceDate!);
+      r.setDate(r.getDate() + params.deltaDays);
+      newRaceIso = toLocalISODate(r);
+    }
+
+    const updatePayload: any = {
+      paused_at: null,
+      paused_until: null,
+      pause_reason: null,
+      race_date_mode: null,
+      content: newContent,
+    };
+    if (newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
+      updatePayload.race_date = newRaceIso;
+    }
+
+    const { error } = await supabase.from("training_plans").update(updatePayload).eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Couldn't resume plan", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    setContent(newContent);
+    setPausedAt(null);
+    setPausedUntil(null);
+    setPauseReason(null);
+    setPauseRaceDateMode(null);
+    if (updatePayload.race_date) {
+      setRaceDate(parseLocalISODate(updatePayload.race_date));
+    }
+    if (previousContent !== newContent) {
+      pushUndoEntry(savedPlanId, previousContent, "resume from pause");
+    }
+    toast({
+      title: "Training resumed",
+      description: `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-sync your watch / Intervals.icu to update scheduled sessions.`,
+    });
+  };
+
+
     if (!user) return;
     if (newEnd <= newStart) {
       toast({ title: "Invalid dates", description: "End date must be after start date.", variant: "destructive" });
