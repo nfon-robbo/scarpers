@@ -2752,6 +2752,7 @@ const TrainingPlanPage = () => {
                 return c != null ? a*3600 + b*60 + c : a*60 + b;
               })()}
               refreshKey={racePredictRefresh}
+              onPersisted={() => setRacePredictRefresh((n) => n + 1)}
             />
             <PlanDayList
               workouts={parseWorkoutsFromPlan(content)}
