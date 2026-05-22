@@ -406,7 +406,55 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
     return { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount: netExcluded, recentClean };
   }, [workouts, linkedActivities, raceDistance, goalTime, vo2Max, extractedRuns, extractedFromCount]);
 
-
+  // Persist the current gauge prediction into race_prediction_history so the
+  // progress graph stays in sync. Dedupe: skip if last row for this distance
+  // matches within 5s and was written in the last 30 minutes.
+  const estFinishForPersist = computed?.estFinish ?? null;
+  const estPaceForPersist = computed?.estPace ?? null;
+  useEffect(() => {
+    if (estFinishForPersist == null || estPaceForPersist == null) return;
+    const dist = (() => {
+      const d = String(raceDistance || "").toLowerCase();
+      if (d.includes("marathon") && !d.includes("half")) return "Marathon";
+      if (d.includes("half")) return "Half Marathon";
+      if (d.includes("10")) return "10K";
+      return "5K";
+    })();
+    const predicted_seconds = Math.round(estFinishForPersist);
+    const predicted_pace_per_km = Math.round(estPaceForPersist);
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || cancelled) return;
+        const { data: last } = await supabase
+          .from("race_prediction_history")
+          .select("predicted_seconds, calculated_at")
+          .eq("user_id", user.id)
+          .eq("distance", dist)
+          .order("calculated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled) return;
+        const isDup = last
+          && Math.abs((last.predicted_seconds ?? 0) - predicted_seconds) <= 5
+          && (Date.now() - new Date(last.calculated_at).getTime()) < 30 * 60_000;
+        if (isDup) return;
+        await supabase.from("race_prediction_history").insert({
+          user_id: user.id,
+          distance: dist,
+          predicted_seconds,
+          predicted_pace_per_km,
+          vo2_max: vo2Max,
+          data_sources: { basis: computed?.basis ?? [], source: "gauge_client" },
+          triggered_by: "manual",
+        });
+        if (!cancelled) onPersisted?.();
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estFinishForPersist, estPaceForPersist, raceDistance, vo2Max]);
 
   if (!computed) return null;
   const { km, goalSec, estFinish, estPace, basis, breakdown, warning, excludedCount, recentClean } = computed;
