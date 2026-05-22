@@ -489,7 +489,7 @@ Deno.serve(async (req) => {
         .from("readiness_snapshots")
         .select("id").eq("user_id", userId).eq("kind", "morning")
         .gte("recorded_at", todayStart.toISOString()).limit(1).maybeSingle();
-      if (!existingMorning) {
+      if (!existingMorning && !sleepMissing) {
         const morning = computeReadiness(data, "morning");
         const forbidden = ["Body Battery", "Today's Effort", "Sleep Debt"];
         const bad = (morning.factors as Array<{ label: string }>).find((f) => forbidden.includes(f.label));
