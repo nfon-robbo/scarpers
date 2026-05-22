@@ -30,6 +30,17 @@ interface PlanDayListProps {
   goalTime?: string;
   raceDistance?: string;
   onEditWorkout?: (workout: ParsedWorkout) => void;
+  isPaused?: boolean;
+  pauseWindow?: { start: Date; end: Date } | null;
+  pauseReason?: string | null;
+}
+
+function pauseReasonMeta(reason?: string | null): { icon: string; label: string } {
+  const r = (reason || "").toLowerCase();
+  if (/holiday|vacation|travel/.test(r)) return { icon: "🏖️", label: "Holiday" };
+  if (/ill|sick|flu|cold/.test(r)) return { icon: "🤒", label: "Illness" };
+  if (/injur/.test(r)) return { icon: "🩹", label: "Injury" };
+  return { icon: "⏸️", label: reason && reason.trim() ? reason : "Paused" };
 }
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
