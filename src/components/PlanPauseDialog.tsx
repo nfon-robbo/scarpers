@@ -85,7 +85,13 @@ export default function PlanPauseDialog({
       setRaceDateMode("fixed");
     }
     if (open && mode === "resume") {
-      setResumeMode("skip-next-week");
+      // Default to "cancel" if we're still inside the pause window — typical case
+      // for "holiday cancelled / feeling better" early resume.
+      const todayMs = today.getTime();
+      const inWindow = pausedAt && pausedUntil &&
+        todayMs >= new Date(pausedAt).setHours(0, 0, 0, 0) &&
+        todayMs <= new Date(pausedUntil).setHours(23, 59, 59, 999);
+      setResumeMode(inWindow ? "cancel" : "skip-next-week");
     }
   }, [open, mode, today]);
 
