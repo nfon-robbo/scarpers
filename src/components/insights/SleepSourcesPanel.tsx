@@ -123,15 +123,41 @@ const SleepSourcesPanel = () => {
       await supabase.from("sleep_stages")
         .delete().eq("user_id", user.id).eq("date", form.date).eq("source", "manual");
 
-      const rowsToInsert = [
-        { user_id: user.id, date: form.date, stage: "deep", duration_seconds: deep, source: "manual" },
-        { user_id: user.id, date: form.date, stage: "rem", duration_seconds: rem, source: "manual" },
-        { user_id: user.id, date: form.date, stage: "light", duration_seconds: light, source: "manual" },
-        { user_id: user.id, date: form.date, stage: "awake", duration_seconds: awake, source: "manual" },
-      ].filter((r) => r.duration_seconds > 0);
+      // Synthesise a sleep window so Body Battery / wake-time derivation work.
+      // Convention: `date` = wake morning. Default wake = 07:00 local, bedtime = wake - totalIncludingAwake.
+      const totalAll = deep + rem + light + awake;
+      const wakeLocal = new Date(`${form.date}T07:00:00`);
+      const bedLocal = new Date(wakeLocal.getTime() - totalAll * 1000);
+      // Partition the window sequentially: light → deep → rem → light → awake
+      // (order is cosmetic; Body Battery only needs valid start/end + stage)
+      const segments: { stage: string; dur: number }[] = [];
+      if (light > 0) segments.push({ stage: "light", dur: Math.floor(light * 0.5) });
+      if (deep > 0) segments.push({ stage: "deep", dur: deep });
+      if (rem > 0) segments.push({ stage: "rem", dur: rem });
+      if (light > 0) segments.push({ stage: "light", dur: light - Math.floor(light * 0.5) });
+      if (awake > 0) segments.push({ stage: "awake", dur: awake });
+
+      let cursor = bedLocal.getTime();
+      const rowsToInsert = segments
+        .filter((s) => s.dur > 0)
+        .map((s) => {
+          const start = new Date(cursor);
+          const end = new Date(cursor + s.dur * 1000);
+          cursor = end.getTime();
+          return {
+            user_id: user.id,
+            date: form.date,
+            stage: s.stage,
+            duration_seconds: s.dur,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            source: "manual",
+          };
+        });
 
       const { error: insErr } = await supabase.from("sleep_stages").insert(rowsToInsert);
       if (insErr) throw insErr;
+
 
       const total = deep + rem + light;
       const { data: existing } = await supabase
