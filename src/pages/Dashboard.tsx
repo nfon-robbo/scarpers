@@ -72,6 +72,11 @@ interface PlanRow {
   start_date: string;
   training_days: string[];
   race_distance: string | null;
+  paused_at?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  race_date_mode?: "fixed" | "shift" | null;
+  race_date?: string | null;
 }
 
 // ── Motivational quotes ──
