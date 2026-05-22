@@ -1092,9 +1092,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     />
 
                     {suppressScore && (
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 flex items-center gap-1.5 rounded-md border-2 border-yellow-400/70 bg-yellow-400/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.15em] text-yellow-200 whitespace-nowrap shadow-lg backdrop-blur-sm">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Syncing {awaiting.join(", ")}
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-12 flex flex-col items-start gap-1 rounded-md border-2 border-yellow-400/70 bg-yellow-400/15 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.15em] text-yellow-200 shadow-lg backdrop-blur-sm">
+                        <div className="flex items-center gap-1.5 self-center">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Syncing</span>
+                        </div>
+                        {awaiting.map((a) => (
+                          <span key={a} className="whitespace-nowrap">• {a}</span>
+                        ))}
                       </div>
                     )}
                     {/* Caption block — coach voice, sits below the gauge */}
