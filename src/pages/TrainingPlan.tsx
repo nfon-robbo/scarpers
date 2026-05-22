@@ -22,6 +22,10 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
+import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
+import PlanPausedBanner from "@/components/PlanPausedBanner";
+import { shiftPlanDatesFrom, trimPlanAfterRaceDate } from "@/lib/plan-utils";
+import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
 
 import RaceEstimateTabs from "@/components/RaceEstimateTabs";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
