@@ -14,6 +14,10 @@ import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
 import pauseOtherIcon from "@/assets/pause-other.png";
+import pauseBgHoliday from "@/assets/pause-bg-holiday.jpg";
+import pauseBgIllness from "@/assets/pause-bg-illness.jpg";
+import pauseBgInjury from "@/assets/pause-bg-injury.jpg";
+import pauseBgOther from "@/assets/pause-bg-other.jpg";
 
 export type ResumeMode = "cancel" | "skip-next-week" | "continue-paused-week";
 export type RaceDateMode = "fixed" | "shift";
@@ -51,42 +55,43 @@ const REASONS: {
   label: string;
   description: string;
   icon: string;
-  bgClass: string;
-  textClass: string;
+  bg: string;
+  borderClass: string;
 }[] = [
   {
     value: "holiday",
     label: "Holiday",
     description: "Travel, vacation or time away",
     icon: pauseHolidayIcon,
-    bgClass: "bg-gradient-to-r from-cyan-500/15 to-teal-500/10 border-cyan-500/30",
-    textClass: "text-cyan-700 dark:text-cyan-300",
+    bg: pauseBgHoliday,
+    borderClass: "border-cyan-500/40",
   },
   {
     value: "illness",
     label: "Illness",
     description: "Cold, flu or feeling unwell",
     icon: pauseIllnessIcon,
-    bgClass: "bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-amber-500/30",
-    textClass: "text-amber-700 dark:text-amber-300",
+    bg: pauseBgIllness,
+    borderClass: "border-amber-500/40",
   },
   {
     value: "injury",
     label: "Injury",
     description: "Recovering or unable to run",
     icon: pauseInjuryIcon,
-    bgClass: "bg-gradient-to-r from-rose-500/15 to-pink-500/10 border-rose-500/30",
-    textClass: "text-rose-700 dark:text-rose-300",
+    bg: pauseBgInjury,
+    borderClass: "border-rose-500/40",
   },
   {
     value: "other",
     label: "Other",
     description: "Something else — break as needed",
     icon: pauseOtherIcon,
-    bgClass: "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-violet-500/30",
-    textClass: "text-violet-700 dark:text-violet-300",
+    bg: pauseBgOther,
+    borderClass: "border-violet-500/40",
   },
 ];
+
 
 
 
@@ -282,27 +287,33 @@ export default function PlanPauseDialog({
                       type="button"
                       onClick={() => setReason(r.value)}
                       aria-pressed={selected}
+                      style={{ backgroundImage: `url(${r.bg})` }}
                       className={cn(
-                        "w-full flex items-center gap-3 rounded-md border p-3 text-left transition-all",
-                        r.bgClass,
+                        "relative w-full overflow-hidden rounded-md border p-3 text-left transition-all bg-cover bg-center",
+                        r.borderClass,
                         selected
                           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                          : "opacity-70 hover:opacity-100"
+                          : "opacity-80 hover:opacity-100"
                       )}
                     >
-                      <img
-                        src={r.icon}
-                        alt=""
-                        loading="lazy"
-                        width={32}
-                        height={32}
-                        className="w-8 h-8 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm font-semibold", r.textClass)}>{r.label}</p>
-                        <p className="text-xs text-muted-foreground">{r.description}</p>
+                      {/* Dark overlay for legibility */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/60 to-background/20" />
+                      <div className="relative flex items-center gap-3">
+                        <img
+                          src={r.icon}
+                          alt=""
+                          loading="lazy"
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 shrink-0 drop-shadow"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground drop-shadow">{r.label}</p>
+                          <p className="text-xs text-foreground/80 drop-shadow">{r.description}</p>
+                        </div>
                       </div>
                     </button>
+
                   );
                 })}
               </div>
