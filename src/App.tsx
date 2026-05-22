@@ -27,6 +27,7 @@ import AdminSEO from "./pages/AdminSEO";
 import FiveKTrainingPlan from "./pages/FiveKTrainingPlan";
 import TenKTrainingPlan from "./pages/TenKTrainingPlan";
 import AIRunningCoach from "./pages/AIRunningCoach";
+import CompareAlternative from "./pages/CompareAlternative";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
@@ -77,6 +78,7 @@ const App = () => (
             <Route path="/5k-training-plan" element={<FiveKTrainingPlan />} />
             <Route path="/10k-training-plan" element={<TenKTrainingPlan />} />
             <Route path="/ai-running-coach" element={<AIRunningCoach />} />
+            <Route path="/compare/:slug" element={<CompareAlternative />} />
             <Route
               element={
                 <ProtectedRoute>
