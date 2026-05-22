@@ -10,10 +10,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
+import pauseHolidayIcon from "@/assets/pause-holiday.png";
+import pauseIllnessIcon from "@/assets/pause-illness.png";
+import pauseInjuryIcon from "@/assets/pause-injury.png";
+import pauseOtherIcon from "@/assets/pause-other.png";
 
 export type ResumeMode = "cancel" | "skip-next-week" | "continue-paused-week";
 export type RaceDateMode = "fixed" | "shift";
 export type PauseReason = "holiday" | "illness" | "injury" | "other";
+
 
 interface PlanPauseDialogProps {
   open: boolean;
@@ -41,12 +46,13 @@ interface PlanPauseDialogProps {
   }) => Promise<void> | void;
 }
 
-const REASONS: { value: PauseReason; label: string; emoji: string }[] = [
-  { value: "holiday", label: "Holiday", emoji: "🌴" },
-  { value: "illness", label: "Illness", emoji: "🤒" },
-  { value: "injury", label: "Injury", emoji: "🩹" },
-  { value: "other", label: "Other", emoji: "⏸️" },
+const REASONS: { value: PauseReason; label: string; icon: string }[] = [
+  { value: "holiday", label: "Holiday", icon: pauseHolidayIcon },
+  { value: "illness", label: "Illness", icon: pauseIllnessIcon },
+  { value: "injury", label: "Injury", icon: pauseInjuryIcon },
+  { value: "other", label: "Other", icon: pauseOtherIcon },
 ];
+
 
 export default function PlanPauseDialog({
   open,
@@ -238,15 +244,17 @@ export default function PlanPauseDialog({
                     type="button"
                     onClick={() => setReason(r.value)}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-xs border transition-colors",
+                      "inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full text-xs border transition-colors",
                       reason === r.value
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-muted text-muted-foreground hover:bg-muted/80"
                     )}
                   >
-                    {r.emoji} {r.label}
+                    <img src={r.icon} alt="" loading="lazy" width={20} height={20} className="w-5 h-5" />
+                    {r.label}
                   </button>
                 ))}
+
               </div>
             </div>
 
