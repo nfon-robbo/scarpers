@@ -707,7 +707,19 @@ export default function PlanDayList({
                     </div>
 
                     {/* Workout card / rest */}
-                    {workout ? (
+                    {inPauseWindow ? (
+                      <div className="flex-1 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0 text-xl">
+                          {pauseMeta.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 truncate">
+                            {pauseMeta.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Plan paused</p>
+                        </div>
+                      </div>
+                    ) : workout ? (
                       isCompleted ? (
                         // PlanOverview-style "completed" card
                         <button
