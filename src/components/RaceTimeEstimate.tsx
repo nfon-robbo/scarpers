@@ -133,7 +133,7 @@ function extractRunFromGps(gps: any[]): ExtractionOutcome {
   return { ok: true, durationSec: runDur, distanceM: runDist, paceSecPerKm: pace };
 }
 
-export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime }: Props) {
+export default function RaceTimeEstimate({ workouts, linkedActivities, raceDistance, goalTime, onPersisted }: Props) {
   const [vo2Max, setVo2Max] = useState<number | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [extractedRuns, setExtractedRuns] = useState<{ date: Date; pace: number; title: string }[]>([]);
