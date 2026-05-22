@@ -3221,6 +3221,23 @@ const TrainingPlanPage = () => {
           )}
         </Card>
       </>)}
+      <PlanPauseDialog
+        open={pauseDialogOpen}
+        onOpenChange={setPauseDialogOpen}
+        mode="pause"
+        raceDate={raceDate ?? null}
+        onConfirmPause={handleConfirmPause}
+      />
+      <PlanPauseDialog
+        open={resumeDialogOpen}
+        onOpenChange={setResumeDialogOpen}
+        mode="resume"
+        raceDate={raceDate ?? null}
+        pausedAt={pausedAt}
+        pausedUntil={pausedUntil}
+        raceDateMode={pauseRaceDateMode}
+        onConfirmResume={handleConfirmResume}
+      />
     </div>
   );
 };
