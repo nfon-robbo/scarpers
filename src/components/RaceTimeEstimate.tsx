@@ -407,8 +407,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
   }, [workouts, linkedActivities, raceDistance, goalTime, vo2Max, extractedRuns, extractedFromCount]);
 
   // Persist the current gauge prediction into race_prediction_history so the
-  // progress graph stays in sync. Dedupe: skip if last row for this distance
-  // matches within 5s and was written in the last 30 minutes.
+  // progress graph stays in sync. Hard throttle: skip entirely if the last row
+  // for this distance was written less than 60 minutes ago — prevents noisy
+  // re-inserts from plan edits, pause/resume, or page navigation.
   const estFinishForPersist = computed?.estFinish ?? null;
   const estPaceForPersist = computed?.estPace ?? null;
   useEffect(() => {
@@ -436,10 +437,9 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
           .limit(1)
           .maybeSingle();
         if (cancelled) return;
-        const isDup = last
-          && Math.abs((last.predicted_seconds ?? 0) - predicted_seconds) <= 5
-          && (Date.now() - new Date(last.calculated_at).getTime()) < 30 * 60_000;
-        if (isDup) return;
+        const lastAgeMs = last ? Date.now() - new Date(last.calculated_at).getTime() : Infinity;
+        // Hard throttle — never write more than once per hour per distance.
+        if (lastAgeMs < 60 * 60_000) return;
         await supabase.from("race_prediction_history").insert({
           user_id: user.id,
           distance: dist,
