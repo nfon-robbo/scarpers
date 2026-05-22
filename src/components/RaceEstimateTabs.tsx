@@ -11,6 +11,7 @@ interface Props {
   goalTime?: string;
   goalSeconds?: number | null;
   refreshKey?: number;
+  onPersisted?: () => void;
 }
 
 function distanceLabel(rd?: string): string {
@@ -30,6 +31,7 @@ export default function RaceEstimateTabs({
   goalTime,
   goalSeconds,
   refreshKey,
+  onPersisted,
 }: Props) {
   const [tab, setTab] = useState<"estimate" | "progress">("estimate");
 
@@ -79,6 +81,7 @@ export default function RaceEstimateTabs({
             linkedActivities={linkedActivities}
             raceDistance={raceDistance}
             goalTime={goalTime}
+            onPersisted={onPersisted}
           />
         ) : (
           <RacePredictionGraph
