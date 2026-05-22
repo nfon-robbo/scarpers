@@ -131,10 +131,16 @@ export default function PlanOverview({
 
   // Workout-level stats
   const stats = useMemo(() => {
-    const total = workouts.filter(w => w.dateObj && !/rest/i.test(w.title)).length;
+    const inPauseWindow = (d: Date) => {
+      if (!pauseWindow) return false;
+      const t = d.getTime();
+      return t >= pauseWindow.start.getTime() && t <= pauseWindow.end.getTime();
+    };
+    const total = workouts.filter(w => w.dateObj && !/rest/i.test(w.title) && !inPauseWindow(w.dateObj)).length;
     // Past = strictly before today. Today only counts as "past" if already completed.
     const pastWorkouts = workouts.filter(w => {
       if (!w.dateObj || /rest/i.test(w.title)) return false;
+      if (inPauseWindow(w.dateObj)) return false;
       if (isBefore(w.dateObj, today) && !isToday(w.dateObj)) return true;
       if (isToday(w.dateObj) && completedDates.has(format(w.dateObj, "yyyy-MM-dd"))) return true;
       return false;
@@ -145,7 +151,7 @@ export default function PlanOverview({
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, completed, skipped, remaining, completionRate };
-  }, [workouts, completedDates, today]);
+  }, [workouts, completedDates, today, pauseWindow]);
 
   // Current week's workouts for the mini-calendar
   const currentWeekWorkouts = useMemo(() => {
