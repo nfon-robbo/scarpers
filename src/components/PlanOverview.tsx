@@ -92,6 +92,8 @@ export default function PlanOverview({
   completedDates = new Set(),
   linkedActivities = {},
   headerAction,
+  isPaused = false,
+  pauseWindow = null,
 }: PlanOverviewProps) {
   const today = new Date();
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
