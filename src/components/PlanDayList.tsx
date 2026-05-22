@@ -663,6 +663,10 @@ export default function PlanDayList({
                 const isDragOver = dragOverDate === key;
                 const isDragSource = dragSourceDate === key;
                 const draggable = !!workout && !!onMoveWorkout;
+                const inPauseWindow = !!(isPaused && pauseWindow &&
+                  day.getTime() >= new Date(pauseWindow.start).setHours(0, 0, 0, 0) &&
+                  day.getTime() <= new Date(pauseWindow.end).setHours(23, 59, 59, 999));
+                const pauseMeta = pauseReasonMeta(pauseReason);
 
                 return (
                   <div
