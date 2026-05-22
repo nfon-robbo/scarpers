@@ -46,12 +46,48 @@ interface PlanPauseDialogProps {
   }) => Promise<void> | void;
 }
 
-const REASONS: { value: PauseReason; label: string; icon: string }[] = [
-  { value: "holiday", label: "Holiday", icon: pauseHolidayIcon },
-  { value: "illness", label: "Illness", icon: pauseIllnessIcon },
-  { value: "injury", label: "Injury", icon: pauseInjuryIcon },
-  { value: "other", label: "Other", icon: pauseOtherIcon },
+const REASONS: {
+  value: PauseReason;
+  label: string;
+  description: string;
+  icon: string;
+  bgClass: string;
+  textClass: string;
+}[] = [
+  {
+    value: "holiday",
+    label: "Holiday",
+    description: "Travel, vacation or time away",
+    icon: pauseHolidayIcon,
+    bgClass: "bg-gradient-to-r from-cyan-500/15 to-teal-500/10 border-cyan-500/30",
+    textClass: "text-cyan-700 dark:text-cyan-300",
+  },
+  {
+    value: "illness",
+    label: "Illness",
+    description: "Cold, flu or feeling unwell",
+    icon: pauseIllnessIcon,
+    bgClass: "bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-amber-500/30",
+    textClass: "text-amber-700 dark:text-amber-300",
+  },
+  {
+    value: "injury",
+    label: "Injury",
+    description: "Recovering or unable to run",
+    icon: pauseInjuryIcon,
+    bgClass: "bg-gradient-to-r from-rose-500/15 to-pink-500/10 border-rose-500/30",
+    textClass: "text-rose-700 dark:text-rose-300",
+  },
+  {
+    value: "other",
+    label: "Other",
+    description: "Something else — break as needed",
+    icon: pauseOtherIcon,
+    bgClass: "bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-violet-500/30",
+    textClass: "text-violet-700 dark:text-violet-300",
+  },
 ];
+
 
 
 export default function PlanPauseDialog({
@@ -237,25 +273,40 @@ export default function PlanPauseDialog({
             {/* Reason */}
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Reason</Label>
-              <div className="flex flex-wrap gap-2">
-                {REASONS.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setReason(r.value)}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full text-xs border transition-colors",
-                      reason === r.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-muted text-muted-foreground hover:bg-muted/80"
-                    )}
-                  >
-                    <img src={r.icon} alt="" loading="lazy" width={20} height={20} className="w-5 h-5" />
-                    {r.label}
-                  </button>
-                ))}
-
+              <div className="flex flex-col gap-2">
+                {REASONS.map((r) => {
+                  const selected = reason === r.value;
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setReason(r.value)}
+                      aria-pressed={selected}
+                      className={cn(
+                        "w-full flex items-center gap-3 rounded-md border p-3 text-left transition-all",
+                        r.bgClass,
+                        selected
+                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          : "opacity-70 hover:opacity-100"
+                      )}
+                    >
+                      <img
+                        src={r.icon}
+                        alt=""
+                        loading="lazy"
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className={cn("text-sm font-semibold", r.textClass)}>{r.label}</p>
+                        <p className="text-xs text-muted-foreground">{r.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
             </div>
 
             {/* Race date mode */}
