@@ -115,6 +115,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "AI day-ahead & post-run review", scarpers: true, competitor: "partial" },
       { feature: "Injury history captured at onboarding", scarpers: true, competitor: "partial" },
       { feature: "Sends workouts to Garmin watch", scarpers: "Via Intervals.icu", competitor: "partial" },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
     ],
     scarpersBetter: [
       "All distances are free — 5K, 10K, half and full marathon — with no paywall on the plan itself.",
