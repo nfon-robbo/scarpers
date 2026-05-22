@@ -96,7 +96,6 @@ export default function RacePredictionGraph({ raceDistance, goalSeconds, refresh
                   axisLine={{ stroke: "hsl(var(--border))" }}
                 />
                 <YAxis
-                  reversed
                   tickFormatter={(v) => fmtTime(v)}
                   tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
                   axisLine={{ stroke: "hsl(var(--border))" }}
