@@ -11,6 +11,7 @@ interface Props {
   goalTime?: string;
   goalSeconds?: number | null;
   refreshKey?: number;
+  onPersisted?: () => void;
 }
 
 function distanceLabel(rd?: string): string {
