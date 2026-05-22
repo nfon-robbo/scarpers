@@ -115,6 +115,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "AI day-ahead & post-run review", scarpers: true, competitor: "partial" },
       { feature: "Injury history captured at onboarding", scarpers: true, competitor: "partial" },
       { feature: "Sends workouts to Garmin watch", scarpers: "Via Intervals.icu", competitor: "partial" },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
     ],
     scarpersBetter: [
       "All distances are free — 5K, 10K, half and full marathon — with no paywall on the plan itself.",
@@ -174,6 +176,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "Running IQ score (0–200)", scarpers: true, competitor: false },
       { feature: "Injury history factored into plan", scarpers: true, competitor: false },
       { feature: "Music BPM cadence targets", scarpers: true, competitor: false },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
       { feature: "Subscription required", scarpers: "Free", competitor: "Paid tier" },
     ],
     scarpersBetter: [
@@ -234,6 +238,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "AI day-ahead briefing", scarpers: true, competitor: "partial" },
       { feature: "AI post-run review", scarpers: true, competitor: "partial" },
       { feature: "Injury history at onboarding", scarpers: true, competitor: "partial" },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
       { feature: "Subscription required", scarpers: "Free", competitor: "Paid tier" },
     ],
     scarpersBetter: [
