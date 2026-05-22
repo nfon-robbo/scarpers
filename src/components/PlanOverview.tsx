@@ -15,6 +15,8 @@ interface PlanOverviewProps {
   completedDates?: Set<string>;
   linkedActivities?: Record<string, any>;
   headerAction?: React.ReactNode;
+  isPaused?: boolean;
+  pauseWindow?: { start: Date; end: Date } | null;
 }
 
 /** Circular progress gauge (SVG) */
