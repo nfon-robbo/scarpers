@@ -59,6 +59,17 @@ const AIChatbot = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const geoRef = useRef<{ lat: number; lon: number } | null>(null);
+
+  // Request geolocation once when chat opens so weather context is available.
+  useEffect(() => {
+    if (!open || geoRef.current || typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { geoRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }; },
+      () => { /* user declined or unavailable — chat still works without weather */ },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 10 * 60 * 1000 },
+    );
+  }, [open]);
 
   const stopReply = useCallback(() => {
     abortRef.current?.abort();
