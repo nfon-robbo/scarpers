@@ -22,6 +22,10 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
+import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
+import PlanPausedBanner from "@/components/PlanPausedBanner";
+import { shiftPlanDatesFrom, trimPlanAfterRaceDate } from "@/lib/plan-utils";
+import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
 
 import RaceEstimateTabs from "@/components/RaceEstimateTabs";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
@@ -492,6 +496,13 @@ const TrainingPlanPage = () => {
     return d;
   });
   const [raceDate, setRaceDate] = useState<Date | undefined>(undefined);
+  const [pausedAt, setPausedAt] = useState<Date | null>(null);
+  const [pausedUntil, setPausedUntil] = useState<Date | null>(null);
+  const [pauseReason, setPauseReason] = useState<string | null>(null);
+  const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
+  const isPlanPaused = !!pausedAt && !!pausedUntil && pausedUntil.getTime() > Date.now() - 86_400_000;
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -606,6 +617,11 @@ const TrainingPlanPage = () => {
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(loadedTrainingDays);
         setStartDate(parseLocalISODate(data.start_date));
+        const anyData = data as any;
+        setPausedAt(anyData.paused_at ? new Date(anyData.paused_at) : null);
+        setPausedUntil(anyData.paused_until ? new Date(anyData.paused_until) : null);
+        setPauseReason(anyData.pause_reason ?? null);
+        setPauseRaceDateMode((anyData.race_date_mode as RaceDateMode | null) ?? null);
         if (validatedOnLoad !== data.content) {
           supabase.from("training_plans").update({ content: validatedOnLoad }).eq("id", data.id).then(({ error }) => {
             if (error) console.error("plan validation self-heal failed:", error);
@@ -1006,6 +1022,97 @@ const TrainingPlanPage = () => {
     } finally {
       setUpdatingDates(false);
     }
+  };
+
+  // ─── Pause / Resume ───────────────────────────────────────────────
+  const handleConfirmPause = async (params: {
+    pausedAt: Date;
+    pausedUntil: Date;
+    reason: "holiday" | "illness" | "injury" | "other";
+    raceDateMode: RaceDateMode;
+  }) => {
+    if (!savedPlanId || !user) return;
+    const { error } = await supabase
+      .from("training_plans")
+      .update({
+        paused_at: params.pausedAt.toISOString(),
+        paused_until: params.pausedUntil.toISOString(),
+        pause_reason: params.reason,
+        race_date_mode: params.raceDateMode,
+      } as any)
+      .eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Couldn't pause plan", description: error.message, variant: "destructive" });
+      return;
+    }
+    setPausedAt(params.pausedAt);
+    setPausedUntil(params.pausedUntil);
+    setPauseReason(params.reason);
+    setPauseRaceDateMode(params.raceDateMode);
+    toast({
+      title: "Plan paused",
+      description: `Resume scheduled for ${format(params.pausedUntil, "dd MMM yyyy")}.`,
+    });
+  };
+
+  const handleConfirmResume = async (params: { resumeMode: "skip-next-week" | "continue-paused-week"; deltaDays: number }) => {
+    if (!savedPlanId || !user || !pausedAt) return;
+    const previousContent = content;
+    const fromIso = toLocalISODate(pausedAt);
+    let newContent = previousContent;
+    let trimmedNote = "";
+    let newRaceIso: string | null = raceDate ? toLocalISODate(raceDate) : null;
+
+    if (params.deltaDays > 0) {
+      newContent = shiftPlanDatesFrom(previousContent, fromIso, params.deltaDays);
+    }
+
+    if (pauseRaceDateMode === "fixed" && newRaceIso) {
+      // Keep race date fixed: trim anything that now lands past race day.
+      const trimResult = trimPlanAfterRaceDate(newContent, newRaceIso);
+      newContent = trimResult.content;
+      if (trimResult.trimmedDays > 0) {
+        trimmedNote = ` ${trimResult.trimmedDays} workout${trimResult.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
+      }
+    } else if (pauseRaceDateMode === "shift" && newRaceIso && params.deltaDays > 0) {
+      // Race day moves with everything else (already shifted by shiftPlanDatesFrom if it was >= fromIso).
+      const r = new Date(raceDate!);
+      r.setDate(r.getDate() + params.deltaDays);
+      newRaceIso = toLocalISODate(r);
+    }
+
+    const updatePayload: any = {
+      paused_at: null,
+      paused_until: null,
+      pause_reason: null,
+      race_date_mode: null,
+      content: newContent,
+    };
+    if (newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
+      updatePayload.race_date = newRaceIso;
+    }
+
+    const { error } = await supabase.from("training_plans").update(updatePayload).eq("id", savedPlanId);
+    if (error) {
+      toast({ title: "Couldn't resume plan", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    setContent(newContent);
+    setPausedAt(null);
+    setPausedUntil(null);
+    setPauseReason(null);
+    setPauseRaceDateMode(null);
+    if (updatePayload.race_date) {
+      setRaceDate(parseLocalISODate(updatePayload.race_date));
+    }
+    if (previousContent !== newContent) {
+      pushUndoEntry(savedPlanId, previousContent, "resume from pause");
+    }
+    toast({
+      title: "Training resumed",
+      description: `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-sync your watch / Intervals.icu to update scheduled sessions.`,
+    });
   };
 
   const regenerateForNewEndDate = async (newStart: Date, newEnd: Date) => {
@@ -2540,6 +2647,15 @@ const TrainingPlanPage = () => {
       {(content || loading) && (<>
         {content && !loading && (
           <>
+            {isPlanPaused && pausedUntil && (
+              <PlanPausedBanner
+                pausedUntil={pausedUntil}
+                reason={pauseReason}
+                raceDateMode={pauseRaceDateMode}
+                raceDate={raceDate}
+                onResume={() => setResumeDialogOpen(true)}
+              />
+            )}
             <PlanOverview
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
@@ -2547,53 +2663,79 @@ const TrainingPlanPage = () => {
               raceDate={raceDate}
               completedDates={completedDates}
               linkedActivities={linkedActivities}
+              isPaused={isPlanPaused}
+              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
               headerAction={
-                <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-                  <PopoverTrigger asChild>
+                <div className="flex flex-wrap gap-2">
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        {format(new Date(), "dd MMM yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="w-[min(92vw,360px)] max-h-[80vh] overflow-y-auto p-4 space-y-4 z-50">
+                      <div className="space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={pendingStart}
+                          onSelect={(d) => d && setPendingStart(d)}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto rounded-md border")}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">End date (race day)</Label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={pendingEnd}
+                          onSelect={(d) => d && setPendingEnd(d)}
+                          disabled={(date) => !!pendingStart && date <= pendingStart}
+                          className={cn("p-3 pointer-events-auto rounded-md border")}
+                        />
+                        <p className="text-xs text-muted-foreground max-w-[260px]">
+                          Changing the end date regenerates the whole plan. Changing only the start date shifts existing workouts.
+                        </p>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button variant="ghost" size="sm" onClick={() => setDatePopoverOpen(false)}>Cancel</Button>
+                        <Button size="sm" onClick={applyDateChanges} disabled={updatingDates}>
+                          {updatingDates && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                          Apply
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {isPlanPaused ? (
                     <Button
                       size="sm"
                       variant="secondary"
+                      onClick={() => setResumeDialogOpen(true)}
                       className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
                     >
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      {format(new Date(), "dd MMM yyyy")}
+                      <PlayIcon className="w-3.5 h-3.5" />
+                      Resume
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="w-[min(92vw,360px)] max-h-[80vh] overflow-y-auto p-4 space-y-4 z-50">
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
-                      <CalendarComponent
-                        mode="single"
-                        selected={pendingStart}
-                        onSelect={(d) => d && setPendingStart(d)}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto rounded-md border")}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">End date (race day)</Label>
-                      <CalendarComponent
-                        mode="single"
-                        selected={pendingEnd}
-                        onSelect={(d) => d && setPendingEnd(d)}
-                        disabled={(date) => !!pendingStart && date <= pendingStart}
-                        className={cn("p-3 pointer-events-auto rounded-md border")}
-                      />
-                      <p className="text-xs text-muted-foreground max-w-[260px]">
-                        Changing the end date regenerates the whole plan. Changing only the start date shifts existing workouts.
-                      </p>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button variant="ghost" size="sm" onClick={() => setDatePopoverOpen(false)}>Cancel</Button>
-                      <Button size="sm" onClick={applyDateChanges} disabled={updatingDates}>
-                        {updatingDates && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                        Apply
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPauseDialogOpen(true)}
+                      className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
+                    >
+                      <PauseIcon className="w-3.5 h-3.5" />
+                      Pause plan
+                    </Button>
+                  )}
+                </div>
               }
             />
+
             <RaceEstimateTabs
               workouts={parseWorkoutsFromPlan(content)}
               linkedActivities={linkedActivities}
@@ -3079,6 +3221,23 @@ const TrainingPlanPage = () => {
           )}
         </Card>
       </>)}
+      <PlanPauseDialog
+        open={pauseDialogOpen}
+        onOpenChange={setPauseDialogOpen}
+        mode="pause"
+        raceDate={raceDate ?? null}
+        onConfirmPause={handleConfirmPause}
+      />
+      <PlanPauseDialog
+        open={resumeDialogOpen}
+        onOpenChange={setResumeDialogOpen}
+        mode="resume"
+        raceDate={raceDate ?? null}
+        pausedAt={pausedAt}
+        pausedUntil={pausedUntil}
+        raceDateMode={pauseRaceDateMode}
+        onConfirmResume={handleConfirmResume}
+      />
     </div>
   );
 };

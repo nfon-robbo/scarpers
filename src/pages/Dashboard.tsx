@@ -27,6 +27,7 @@ import BlogPreview from "@/components/BlogPreview";
 import CoachClaireCard from "@/components/CoachClaireCard";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
+import PlanPausedBanner from "@/components/PlanPausedBanner";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import {
   evaluateAdaptation,
@@ -72,6 +73,11 @@ interface PlanRow {
   start_date: string;
   training_days: string[];
   race_distance: string | null;
+  paused_at?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  race_date_mode?: "fixed" | "shift" | null;
+  race_date?: string | null;
 }
 
 // ── Motivational quotes ──
@@ -372,7 +378,7 @@ const Dashboard = () => {
     // Get latest training plan for "Today's Workout" card
     supabase
       .from("training_plans")
-      .select("content, start_date, training_days, race_distance")
+      .select("content, start_date, training_days, race_distance, paused_at, paused_until, pause_reason, race_date_mode, race_date")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
@@ -731,6 +737,16 @@ const Dashboard = () => {
           workouts={heroData.workouts}
         />
       </div>
+
+      {plan?.paused_at && plan?.paused_until && new Date(plan.paused_until).getTime() > Date.now() - 86_400_000 && (
+        <PlanPausedBanner
+          pausedUntil={new Date(plan.paused_until)}
+          reason={plan.pause_reason}
+          raceDateMode={plan.race_date_mode ?? null}
+          raceDate={plan.race_date ? new Date(plan.race_date) : null}
+          onResume={() => navigate("/training-plan")}
+        />
+      )}
 
       {/* ── Plan adaptation offer (opt-in for both directions) ── */}
       {adaptEval && (adaptEval.direction === "up" || adaptEval.direction === "down") && user && (
