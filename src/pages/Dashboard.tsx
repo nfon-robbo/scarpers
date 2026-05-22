@@ -640,9 +640,14 @@ const Dashboard = () => {
   const [reviewOpen, setReviewOpen] = useState(false);
 
   // Auto-open the workout review when the user has completed today's run and
-  // hasn't reviewed it yet. Only prompts once per activity per browser session.
+  // hasn't reviewed it yet. Prompts at most once per activity (persistent) AND
+  // at most once per browser session (session-scoped) so dismissing on one
+  // dashboard visit keeps it dismissed for the rest of the session, even if
+  // a fresh sync swaps todaysActivity to a new id.
+  const SESSION_PROMPTED_KEY = "workoutReviewPromptedThisSession";
   useEffect(() => {
     if (!todaysActivity || !user) return;
+    if (sessionStorage.getItem(SESSION_PROMPTED_KEY) === "1") return;
     const shownKey = `workoutReviewShown:${todaysActivity.id}`;
     if (localStorage.getItem(shownKey) === "1") return;
 
@@ -660,6 +665,7 @@ const Dashboard = () => {
         return;
       }
       localStorage.setItem(shownKey, "1");
+      sessionStorage.setItem(SESSION_PROMPTED_KEY, "1");
       // Tiny delay so the dashboard renders before the dialog appears.
       setTimeout(() => setReviewOpen(true), 400);
     })();
@@ -671,12 +677,13 @@ const Dashboard = () => {
   // on the dashboard (e.g. fresh Strava sync just completed).
   useEffect(() => {
     const onAutoLinked = () => {
-      if (todaysActivity) {
-        const shownKey = `workoutReviewShown:${todaysActivity.id}`;
-        if (localStorage.getItem(shownKey) === "1") return;
-        localStorage.setItem(shownKey, "1");
-        setReviewOpen(true);
-      }
+      if (!todaysActivity) return;
+      if (sessionStorage.getItem(SESSION_PROMPTED_KEY) === "1") return;
+      const shownKey = `workoutReviewShown:${todaysActivity.id}`;
+      if (localStorage.getItem(shownKey) === "1") return;
+      localStorage.setItem(shownKey, "1");
+      sessionStorage.setItem(SESSION_PROMPTED_KEY, "1");
+      setReviewOpen(true);
     };
     window.addEventListener("workout-auto-linked", onAutoLinked);
     return () => window.removeEventListener("workout-auto-linked", onAutoLinked);
