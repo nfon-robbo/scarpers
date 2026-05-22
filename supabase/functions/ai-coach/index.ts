@@ -1139,6 +1139,71 @@ When the user asks about a future or past session (e.g. "next Friday", "this Wed
 
         chatExtraContext = unitsBlock + profileBlock + readinessBlock + runningIqBlock + analysesBlock + uploadsBlock;
 
+        // ── Weather context (Open-Meteo, free, no API key) ──
+        try {
+          const lat = Number(geo?.lat);
+          const lon = Number(geo?.lon);
+          if (isFinite(lat) && isFinite(lon)) {
+            const tempUnit = (profile?.unit_temperature || "C").toLowerCase() === "f" ? "fahrenheit" : "celsius";
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+              `&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,uv_index,is_day` +
+              `&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,uv_index,relative_humidity_2m` +
+              `&daily=sunrise,sunset,uv_index_max,precipitation_sum,temperature_2m_max,temperature_2m_min` +
+              `&forecast_days=2&timezone=auto&temperature_unit=${tempUnit}&wind_speed_unit=kmh`;
+            const wRes = await fetch(url, { signal: AbortSignal.timeout(4000) });
+            if (wRes.ok) {
+              const w = await wRes.json();
+              const wmoCode: Record<number, string> = {
+                0:"clear sky",1:"mainly clear",2:"partly cloudy",3:"overcast",
+                45:"fog",48:"depositing rime fog",
+                51:"light drizzle",53:"moderate drizzle",55:"dense drizzle",
+                56:"light freezing drizzle",57:"dense freezing drizzle",
+                61:"light rain",63:"moderate rain",65:"heavy rain",
+                66:"light freezing rain",67:"heavy freezing rain",
+                71:"light snow",73:"moderate snow",75:"heavy snow",77:"snow grains",
+                80:"light rain showers",81:"moderate rain showers",82:"violent rain showers",
+                85:"light snow showers",86:"heavy snow showers",
+                95:"thunderstorm",96:"thunderstorm w/ light hail",99:"thunderstorm w/ heavy hail",
+              };
+              const cur = w.current || {};
+              const hourly = w.hourly || {};
+              const daily = w.daily || {};
+              const tu = w.current_units?.temperature_2m || "°C";
+              // Build next-24h hourly slice starting from current hour
+              const times: string[] = hourly.time || [];
+              const nowIdx = Math.max(0, times.findIndex((t: string) => new Date(t).getTime() >= Date.now()) - 1);
+              const slice = (arr: any[]) => (arr || []).slice(nowIdx, nowIdx + 24);
+              const hours = slice(times).map((t: string, i: number) => ({
+                time: t.slice(11, 16) + " " + t.slice(5, 10),
+                tempC: slice(hourly.temperature_2m)[i],
+                feelsLike: slice(hourly.apparent_temperature)[i],
+                precipProb: slice(hourly.precipitation_probability)[i],
+                precipMm: slice(hourly.precipitation)[i],
+                conditions: wmoCode[slice(hourly.weather_code)[i]] ?? "unknown",
+                windKmh: slice(hourly.wind_speed_10m)[i],
+                gustKmh: slice(hourly.wind_gusts_10m)[i],
+                uv: slice(hourly.uv_index)[i],
+                humidity: slice(hourly.relative_humidity_2m)[i],
+              }));
+              const weatherBlock = `\n\nCURRENT WEATHER (live, from Open-Meteo, location ${lat.toFixed(2)},${lon.toFixed(2)}, timezone ${w.timezone || tz}):
+- Now: ${cur.temperature_2m}${tu}, feels like ${cur.apparent_temperature}${tu}, ${wmoCode[cur.weather_code] ?? "unknown"}, humidity ${cur.relative_humidity_2m}%, wind ${cur.wind_speed_10m} km/h (gusts ${cur.wind_gusts_10m} km/h), UV ${cur.uv_index ?? "n/a"}, precipitation ${cur.precipitation} mm, cloud ${cur.cloud_cover}%, ${cur.is_day ? "daytime" : "night"}.
+- Today: high ${daily.temperature_2m_max?.[0]}${tu} / low ${daily.temperature_2m_min?.[0]}${tu}, max UV ${daily.uv_index_max?.[0]}, total precip ${daily.precipitation_sum?.[0]} mm, sunrise ${daily.sunrise?.[0]?.slice(11,16)}, sunset ${daily.sunset?.[0]?.slice(11,16)}.
+- Tomorrow: high ${daily.temperature_2m_max?.[1]}${tu} / low ${daily.temperature_2m_min?.[1]}${tu}, max UV ${daily.uv_index_max?.[1]}, total precip ${daily.precipitation_sum?.[1]} mm, sunrise ${daily.sunrise?.[1]?.slice(11,16)}, sunset ${daily.sunset?.[1]?.slice(11,16)}.
+- Next 24h hourly: ${JSON.stringify(hours)}
+
+When the user asks about the best time to run, USE THIS DATA. Recommend a specific clock time window based on a balance of: cooler apparent temperature, low precipitation probability, lower UV (prefer <6 for long sessions), manageable wind/gusts, and daylight (between sunrise and sunset unless they prefer night). Mention the key trade-offs briefly (heat, rain, UV, wind). Convert temperatures to the user's preferred unit.`;
+              chatExtraContext += weatherBlock;
+            } else {
+              chatExtraContext += `\n\nWEATHER: lookup failed (status ${wRes.status}). Tell the user weather data was unavailable.`;
+            }
+          } else {
+            chatExtraContext += `\n\nWEATHER: no location available. If the user asks about weather or best time to run, ask them to allow location access in their browser (the chatbot requests it on open) or to share their city.`;
+          }
+        } catch (e) {
+          console.error("weather fetch error:", e);
+          chatExtraContext += `\n\nWEATHER: lookup error. Tell the user weather data was temporarily unavailable.`;
+        }
+
         // ── Race Time Predictor — only when the latest user message asks for a prediction ──
         try {
           if (RACE_PREDICTION_INTENT.test(String(chatMessages || ""))) {
