@@ -10,6 +10,7 @@ interface Props {
   linkedActivities: Record<string, any>;
   raceDistance?: string;
   goalTime?: string;
+  onPersisted?: () => void;
 }
 
 // ── Helpers (mirrored from supabase/functions/race-predict + ai-coach) ──
