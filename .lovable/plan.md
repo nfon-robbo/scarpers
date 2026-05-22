@@ -1,27 +1,31 @@
-## Editable sleep on Insights
+## Problem
 
-Make the **Sleep — Google Fit & Health Connect** panel editable so you can add or override any night manually.
+On `/dashboard`, the workout review dialog auto-opens for today's completed activity. Currently it's suppressed only if:
+- A row exists in `workout_reviews` for that activity, OR
+- `sessionStorage` flag `workoutReviewShown:<activity_id>` is set.
 
-### What I need from you per night
-- Date (DD/MM/YYYY)
-- Deep, REM, Light, Awake — each as `HH:MM`
+If the user closes the dialog without submitting a review, the flag is only in `sessionStorage`, so the next browser session (new tab, refresh after session expiry, mobile reopen) re-prompts. The user wants: once an activity has been shown/handled, never auto-prompt again.
 
-Total is derived from Deep + REM + Light. Nothing else required.
+## Fix
 
-### UX changes to `src/components/insights/SleepSourcesPanel.tsx`
-- **Add night** button in the card header → opens a dialog with: date picker + 4 HH:MM inputs.
-- Each existing row gets a small **Edit** icon. Manual rows also get a **Delete** icon. Editing a Google Fit row just creates a `manual` override for that date (Google Fit row stays visible alongside).
-- Dialog validates: date required, at least one of Deep/REM/Light > 0.
-- A third source label "Manual" is shown when the row came from manual entry.
+In `src/pages/Dashboard.tsx` (lines ~636–677):
 
-### Where the data lands
-1. **`sleep_stages`** — delete any existing `source='manual'` rows for that user+date, then insert up to four rows (`deep`, `rem`, `light`, `awake`) with `source='manual'` and `duration_seconds` from the HH:MM inputs. The panel already reads from this table; I'll widen its source filter to include `'manual'`.
-2. **`daily_metrics`** — upsert the same date with `sleep_duration_seconds`, `deep_sleep_minutes`, `rem_sleep_minutes`, `light_sleep_minutes`, `awake_during_night_minutes`. This is the table Readiness scoring and the 365-day wellness calendar read from, so manual nights feed those too.
+1. Switch the "already shown" flag from `sessionStorage` to `localStorage` so it persists across sessions/devices-per-browser.
+2. Use the same key (`workoutReviewShown:<activity_id>`) in both the initial effect and the `workout-auto-linked` listener.
+3. Keep the existing check for an existing `workout_reviews` row (still the strongest signal across devices).
 
-### Not changing
-- No schema changes — both tables already have every column needed.
-- No edge function — pure client writes, RLS already restricts to `auth.uid() = user_id`.
-- Google Fit / Health Connect sync, readiness logic, calendar rendering all untouched.
+That's it — no other files change. The "Tap for review" entry point in `PlanOverview`/`TrainingPlan` remains so the user can still open the review manually if they want.
 
-### Risk
-- If Google Fit later syncs the same date, both rows will appear side-by-side in the panel (one "Google Fit", one "Manual"). The wellness calendar / Readiness will use whichever value was written last to `daily_metrics` — usually that's fine, but worth knowing.
+## Technical detail
+
+```ts
+// before
+if (sessionStorage.getItem(shownKey) === "1") return;
+sessionStorage.setItem(shownKey, "1");
+
+// after
+if (localStorage.getItem(shownKey) === "1") return;
+localStorage.setItem(shownKey, "1");
+```
+
+Applied in both the auto-open effect and the `workout-auto-linked` handler.
