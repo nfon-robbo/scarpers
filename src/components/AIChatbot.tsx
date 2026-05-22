@@ -603,6 +603,7 @@ const AIChatbot = () => {
           messages: text,
           history: [...messages, userMsg].slice(-20).map(m => ({ role: m.role, content: m.content })),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          geo: geoRef.current,
         }),
         signal: controller.signal,
       });
