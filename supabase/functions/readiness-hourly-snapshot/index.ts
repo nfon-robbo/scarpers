@@ -445,10 +445,43 @@ Deno.serve(async (req) => {
       const data = await assembleData(supabase, userId);
       if (!data) { results.push({ user_id: userId, status: "skipped", detail: "no data" }); continue; }
 
-      const eod = computeReadiness(data, "eod");
+      let eod = computeReadiness(data, "eod");
+
+      // ── Option B: carry forward previous evening's score ──
+      // If today has no sleep data yet (sync hasn't arrived / user hasn't woken
+      // up), don't show the dramatic "bad night" drop. Instead reuse the most
+      // recent prior EOD snapshot so the trend line stays flat until real
+      // sleep data lands.
+      const sleepMissing = data.sleepHours == null && data.wakeTimeIso == null;
+      let carriedForward = false;
+      if (sleepMissing) {
+        const { data: prevSnap } = await supabase
+          .from("readiness_snapshots")
+          .select("score, factors, recorded_at")
+          .eq("user_id", userId)
+          .eq("kind", "eod")
+          .lt("recorded_at", todayStart.toISOString())
+          .order("recorded_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prevSnap?.score != null) {
+          const carriedFactors = [
+            {
+              label: "Carried forward",
+              status: "warning",
+              detail: "Waiting for tonight's sleep data — showing yesterday's score",
+            },
+            ...((prevSnap.factors as any[]) ?? []),
+          ];
+          eod = { score: prevSnap.score, factors: carriedFactors as any };
+          carriedForward = true;
+        }
+      }
+
       await supabase.from("readiness_snapshots").insert({
         user_id: userId, score: eod.score, hour, factors: eod.factors,
         recorded_at: recordedAt.toISOString(), kind: "eod",
+        ...(carriedForward ? { is_backfilled: true } : {}),
       });
 
       // Morning snapshot — only one per day
@@ -456,7 +489,7 @@ Deno.serve(async (req) => {
         .from("readiness_snapshots")
         .select("id").eq("user_id", userId).eq("kind", "morning")
         .gte("recorded_at", todayStart.toISOString()).limit(1).maybeSingle();
-      if (!existingMorning) {
+      if (!existingMorning && !sleepMissing) {
         const morning = computeReadiness(data, "morning");
         const forbidden = ["Body Battery", "Today's Effort", "Sleep Debt"];
         const bad = (morning.factors as Array<{ label: string }>).find((f) => forbidden.includes(f.label));
