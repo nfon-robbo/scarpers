@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 
-export type ResumeMode = "skip-next-week" | "continue-paused-week";
+export type ResumeMode = "cancel" | "skip-next-week" | "continue-paused-week";
 export type RaceDateMode = "fixed" | "shift";
 export type PauseReason = "holiday" | "illness" | "injury" | "other";
 
@@ -85,7 +85,13 @@ export default function PlanPauseDialog({
       setRaceDateMode("fixed");
     }
     if (open && mode === "resume") {
-      setResumeMode("skip-next-week");
+      // Default to "cancel" if we're still inside the pause window — typical case
+      // for "holiday cancelled / feeling better" early resume.
+      const todayMs = today.getTime();
+      const inWindow = pausedAt && pausedUntil &&
+        todayMs >= new Date(pausedAt).setHours(0, 0, 0, 0) &&
+        todayMs <= new Date(pausedUntil).setHours(23, 59, 59, 999);
+      setResumeMode(inWindow ? "cancel" : "skip-next-week");
     }
   }, [open, mode, today]);
 
@@ -108,6 +114,7 @@ export default function PlanPauseDialog({
   const resumeDelta = useMemo(() => {
     // How many days to shift workouts forward.
     if (!pausedAt || !pausedUntil) return 0;
+    if (resumeMode === "cancel") return 0; // restore original plan as-is
     const todayMs = today.getTime();
     const untilMs = new Date(pausedUntil).setHours(0, 0, 0, 0);
     const baseShift = Math.max(0, differenceInCalendarDays(new Date(Math.max(todayMs, untilMs)), pausedAt));
@@ -123,9 +130,10 @@ export default function PlanPauseDialog({
 
   const newRaceAfterResume = useMemo(() => {
     if (!raceDate) return null;
+    if (resumeMode === "cancel") return raceDate;
     if (existingRaceDateMode === "fixed") return raceDate; // unchanged
     return addDays(raceDate, resumeDelta);
-  }, [raceDate, resumeDelta, existingRaceDateMode]);
+  }, [raceDate, resumeDelta, existingRaceDateMode, resumeMode]);
 
   // ---------- Handlers ----------
   const handlePause = async () => {
@@ -327,9 +335,18 @@ export default function PlanPauseDialog({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Resume strategy</Label>
             <RadioGroup value={resumeMode} onValueChange={(v) => setResumeMode(v as ResumeMode)}>
               <div className="flex items-start gap-3 rounded-md border p-3">
+                <RadioGroupItem value="cancel" id="resume-cancel" className="mt-0.5" />
+                <label htmlFor="resume-cancel" className="text-sm flex-1 cursor-pointer">
+                  <p className="font-medium">Cancel pause — restore original plan</p>
+                  <p className="text-xs text-muted-foreground">
+                    Original workouts reappear exactly as planned. No dates shift, race day unchanged.
+                  </p>
+                </label>
+              </div>
+              <div className="flex items-start gap-3 rounded-md border p-3">
                 <RadioGroupItem value="skip-next-week" id="resume-skip" className="mt-0.5" />
                 <label htmlFor="resume-skip" className="text-sm flex-1 cursor-pointer">
-                  <p className="font-medium">Skip to next week <span className="text-xs text-muted-foreground">(recommended)</span></p>
+                  <p className="font-medium">Skip to next week</p>
                   <p className="text-xs text-muted-foreground">
                     Future workouts land on the Monday after your pause window.
                   </p>
@@ -350,20 +367,28 @@ export default function PlanPauseDialog({
           {/* Preview */}
           <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
             <p className="font-medium text-foreground">Preview</p>
-            <p className="text-muted-foreground">Workouts shift forward by {resumeDelta} day{resumeDelta === 1 ? "" : "s"}.</p>
-            {raceDate && existingRaceDateMode === "fixed" && (
+            {resumeMode === "cancel" ? (
               <p className="text-muted-foreground">
-                Race day stays {format(raceDate, "dd MMM yyyy")}. Workouts that no longer fit will be trimmed.
+                Pause cancelled. Original plan restored — all workouts resume as scheduled.
               </p>
+            ) : (
+              <>
+                <p className="text-muted-foreground">Workouts shift forward by {resumeDelta} day{resumeDelta === 1 ? "" : "s"}.</p>
+                {raceDate && existingRaceDateMode === "fixed" && (
+                  <p className="text-muted-foreground">
+                    Race day stays {format(raceDate, "dd MMM yyyy")}. Workouts that no longer fit will be trimmed.
+                  </p>
+                )}
+                {raceDate && existingRaceDateMode !== "fixed" && newRaceAfterResume && (
+                  <p className="text-muted-foreground">
+                    Race day moves {format(raceDate, "dd MMM")} → {format(newRaceAfterResume, "dd MMM yyyy")}.
+                  </p>
+                )}
+                <p className="text-muted-foreground/80 text-[11px] pt-1">
+                  Tip: re-sync your watch / Intervals.icu after resuming.
+                </p>
+              </>
             )}
-            {raceDate && existingRaceDateMode !== "fixed" && newRaceAfterResume && (
-              <p className="text-muted-foreground">
-                Race day moves {format(raceDate, "dd MMM")} → {format(newRaceAfterResume, "dd MMM yyyy")}.
-              </p>
-            )}
-            <p className="text-muted-foreground/80 text-[11px] pt-1">
-              Tip: re-sync your watch / Intervals.icu after resuming.
-            </p>
           </div>
         </div>
 

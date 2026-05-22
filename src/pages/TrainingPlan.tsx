@@ -1055,30 +1055,31 @@ const TrainingPlanPage = () => {
     });
   };
 
-  const handleConfirmResume = async (params: { resumeMode: "skip-next-week" | "continue-paused-week"; deltaDays: number }) => {
+  const handleConfirmResume = async (params: { resumeMode: "cancel" | "skip-next-week" | "continue-paused-week"; deltaDays: number }) => {
     if (!savedPlanId || !user || !pausedAt) return;
     const previousContent = content;
     const fromIso = toLocalISODate(pausedAt);
     let newContent = previousContent;
     let trimmedNote = "";
     let newRaceIso: string | null = raceDate ? toLocalISODate(raceDate) : null;
+    const isCancel = params.resumeMode === "cancel" || params.deltaDays === 0;
 
-    if (params.deltaDays > 0) {
+    if (!isCancel && params.deltaDays > 0) {
       newContent = shiftPlanDatesFrom(previousContent, fromIso, params.deltaDays);
-    }
 
-    if (pauseRaceDateMode === "fixed" && newRaceIso) {
-      // Keep race date fixed: trim anything that now lands past race day.
-      const trimResult = trimPlanAfterRaceDate(newContent, newRaceIso);
-      newContent = trimResult.content;
-      if (trimResult.trimmedDays > 0) {
-        trimmedNote = ` ${trimResult.trimmedDays} workout${trimResult.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
+      if (pauseRaceDateMode === "fixed" && newRaceIso) {
+        // Keep race date fixed: trim anything that now lands past race day.
+        const trimResult = trimPlanAfterRaceDate(newContent, newRaceIso);
+        newContent = trimResult.content;
+        if (trimResult.trimmedDays > 0) {
+          trimmedNote = ` ${trimResult.trimmedDays} workout${trimResult.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
+        }
+      } else if (pauseRaceDateMode === "shift" && newRaceIso) {
+        // Race day moves with everything else.
+        const r = new Date(raceDate!);
+        r.setDate(r.getDate() + params.deltaDays);
+        newRaceIso = toLocalISODate(r);
       }
-    } else if (pauseRaceDateMode === "shift" && newRaceIso && params.deltaDays > 0) {
-      // Race day moves with everything else (already shifted by shiftPlanDatesFrom if it was >= fromIso).
-      const r = new Date(raceDate!);
-      r.setDate(r.getDate() + params.deltaDays);
-      newRaceIso = toLocalISODate(r);
     }
 
     const updatePayload: any = {
@@ -1088,7 +1089,7 @@ const TrainingPlanPage = () => {
       race_date_mode: null,
       content: newContent,
     };
-    if (newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
+    if (!isCancel && newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
       updatePayload.race_date = newRaceIso;
     }
 
@@ -1110,8 +1111,10 @@ const TrainingPlanPage = () => {
       pushUndoEntry(savedPlanId, previousContent, "resume from pause");
     }
     toast({
-      title: "Training resumed",
-      description: `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-sync your watch / Intervals.icu to update scheduled sessions.`,
+      title: isCancel ? "Pause cancelled" : "Training resumed",
+      description: isCancel
+        ? "Original plan restored — all workouts back on schedule."
+        : `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-sync your watch / Intervals.icu to update scheduled sessions.`,
     });
   };
 
