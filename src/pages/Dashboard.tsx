@@ -738,6 +738,16 @@ const Dashboard = () => {
         />
       </div>
 
+      {plan?.paused_at && plan?.paused_until && new Date(plan.paused_until).getTime() > Date.now() - 86_400_000 && (
+        <PlanPausedBanner
+          pausedUntil={new Date(plan.paused_until)}
+          reason={plan.pause_reason}
+          raceDateMode={plan.race_date_mode ?? null}
+          raceDate={plan.race_date ? new Date(plan.race_date) : null}
+          onResume={() => navigate("/training-plan")}
+        />
+      )}
+
       {/* ── Plan adaptation offer (opt-in for both directions) ── */}
       {adaptEval && (adaptEval.direction === "up" || adaptEval.direction === "down") && user && (
         <PlanAdaptationBanner
