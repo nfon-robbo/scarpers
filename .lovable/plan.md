@@ -1,44 +1,27 @@
-## Restructure Readiness widget layout
+## Editable sleep on Insights
 
-Single file: `src/components/ReadinessWidget.tsx`.
+Make the **Sleep — Google Fit & Health Connect** panel editable so you can add or override any night manually.
 
-### 1. Convert outer wrapper to a vertical stack
+### What I need from you per night
+- Date (DD/MM/YYYY)
+- Deep, REM, Light, Awake — each as `HH:MM`
 
-Line 1069 currently opens `<div className="flex flex-col md:flex-row gap-5">` directly around the two columns. Wrap it in an outer vertical container:
+Total is derived from Deep + REM + Light. Nothing else required.
 
-```
-<div className="flex flex-col gap-5">
-  <div className="flex flex-col md:flex-row gap-5"> ← top row (gauge + factors)
-    ...
-  </div>
-  ← trend chart goes here, full width
-</div>
-```
+### UX changes to `src/components/insights/SleepSourcesPanel.tsx`
+- **Add night** button in the card header → opens a dialog with: date picker + 4 HH:MM inputs.
+- Each existing row gets a small **Edit** icon. Manual rows also get a **Delete** icon. Editing a Google Fit row just creates a `manual` override for that date (Google Fit row stays visible alongside).
+- Dialog validates: date required, at least one of Deep/REM/Light > 0.
+- A third source label "Manual" is shown when the row came from manual entry.
 
-### 2. Move the Readiness Trend block
+### Where the data lands
+1. **`sleep_stages`** — delete any existing `source='manual'` rows for that user+date, then insert up to four rows (`deep`, `rem`, `light`, `awake`) with `source='manual'` and `duration_seconds` from the HH:MM inputs. The panel already reads from this table; I'll widen its source filter to include `'manual'`.
+2. **`daily_metrics`** — upsert the same date with `sleep_duration_seconds`, `deep_sleep_minutes`, `rem_sleep_minutes`, `light_sleep_minutes`, `awake_during_night_minutes`. This is the table Readiness scoring and the 365-day wellness calendar read from, so manual nights feed those too.
 
-The trend block lives inside the left column at lines ~1114–1386 (the big IIFE that renders `<div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">` with the End of day / Morning / Today tabs and chart).
+### Not changing
+- No schema changes — both tables already have every column needed.
+- No edge function — pure client writes, RLS already restricts to `auth.uid() = user_id`.
+- Google Fit / Health Connect sync, readiness logic, calendar rendering all untouched.
 
-- Cut that entire IIFE out of the left column.
-- Paste it as a sibling **below** the two-column row, inside the new outer wrapper.
-- Keep the `(hasTrend || trendMode === "today")` guard intact.
-- No prop or state changes — `trendMode`, `visibleTrend`, `wakeHour`, etc. are already component-level.
-
-### 3. Let the Today chart breathe
-
-Inside the Today branch, the `ResponsiveContainer` is set to `height={160}`. Since it now spans the full card width, bump the height so the 30+ hourly snapshots are readable — `height={220}` and keep `width="100%"`. No other chart math changes; x/y domains already scale.
-
-### 4. Remove "Recovery Focus today"
-
-Delete the IIFE at lines ~1553–1620 (the block starting `// ── Recovery Focus — top 1-2 marching orders ──` and ending with its closing `})()}`), plus the `ORDERS` map inside it. No other references — `Sparkles` is still used by the key-insight row at line 1043, so keep the import.
-
-### 5. Let the factors column flex naturally
-
-Right column currently uses `flex-1 min-w-0` (line 1388) — no change needed; with the trend gone from the left side and the gauge column fixed at `md:w-[300px]`, the factors list takes the rest of the row and stacks cleanly on mobile.
-
-### Result
-
-- Top row: gauge + caption (left, 300px) · factors list (right, fills).
-- Bottom: full-width Readiness Trend card with tabs and a taller Today chart.
-- Recovery Focus removed (key insight under the gauge already covers it).
-- Mobile: stacks gauge → factors → trend (same `flex-col` behaviour at < md).
+### Risk
+- If Google Fit later syncs the same date, both rows will appear side-by-side in the panel (one "Google Fit", one "Manual"). The wellness calendar / Readiness will use whichever value was written last to `daily_metrics` — usually that's fine, but worth knowing.

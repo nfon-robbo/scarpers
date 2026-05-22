@@ -1,12 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
+import { toast } from "sonner";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
-type SourceRow = { source: "google_fit" | "health_connect"; totals: StageTotals };
+type SourceKey = "google_fit" | "health_connect" | "manual";
+type SourceRow = { source: SourceKey; totals: StageTotals };
 type Row = { date: string; sources: SourceRow[] };
 
 const fmtH = (secs: number) => {
@@ -16,65 +24,181 @@ const fmtH = (secs: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
-const fmtMin = fmtH; // HH:MM for Deep/REM/Light/Awake
+const sourceLabel = (s: SourceKey) =>
+  s === "google_fit" ? "Google Fit" : s === "health_connect" ? "Health Connect" : "Manual";
 
-const sourceLabel = (s: string) => (s === "google_fit" ? "Google Fit" : "Health Connect");
+const parseHHMM = (v: string): number => {
+  if (!v?.trim()) return 0;
+  const t = v.trim();
+  if (t.includes(":")) {
+    const [h, m] = t.split(":").map((n) => parseInt(n, 10) || 0);
+    return h * 3600 + m * 60;
+  }
+  const mins = parseInt(t, 10) || 0;
+  return mins * 60;
+};
+const secsToHHMM = (s: number) => {
+  if (!s) return "";
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  return `${h}:${String(m).padStart(2, "0")}`;
+};
+
+type FormState = { date: string; deep: string; rem: string; light: string; awake: string };
+const emptyForm = (date?: string): FormState => ({
+  date: date ?? format(new Date(), "yyyy-MM-dd"),
+  deep: "", rem: "", light: "", awake: "",
+});
 
 const SleepSourcesPanel = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm());
+  const [saving, setSaving] = useState(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!user) return;
-    (async () => {
-      const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
-      const { data } = await supabase
-        .from("sleep_stages")
-        .select("date, stage, duration_seconds, source")
-        .eq("user_id", user.id)
-        .gte("date", since)
-        .in("source", ["google_fit", "health_connect"]);
+    setLoading(true);
+    const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
+    const { data } = await supabase
+      .from("sleep_stages")
+      .select("date, stage, duration_seconds, source")
+      .eq("user_id", user.id)
+      .gte("date", since)
+      .in("source", ["google_fit", "health_connect", "manual"]);
 
-      // group by date -> source -> stage totals
-      const map = new Map<string, Map<string, StageTotals>>();
-      for (const r of data ?? []) {
-        const src = (r.source ?? "google_fit") as string;
-        if (src !== "google_fit" && src !== "health_connect") continue;
-        if (!map.has(r.date)) map.set(r.date, new Map());
-        const sm = map.get(r.date)!;
-        if (!sm.has(src)) sm.set(src, { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 });
-        const t = sm.get(src)!;
-        const key = r.stage as keyof StageTotals;
-        if (key in t) t[key] += r.duration_seconds || 0;
+    const map = new Map<string, Map<SourceKey, StageTotals>>();
+    for (const r of data ?? []) {
+      const src = (r.source ?? "google_fit") as SourceKey;
+      if (!["google_fit", "health_connect", "manual"].includes(src)) continue;
+      if (!map.has(r.date)) map.set(r.date, new Map());
+      const sm = map.get(r.date)!;
+      if (!sm.has(src)) sm.set(src, { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 });
+      const t = sm.get(src)!;
+      const key = r.stage as keyof StageTotals;
+      if (key in t) t[key] += r.duration_seconds || 0;
+    }
+
+    const built: Row[] = Array.from(map.entries())
+      .map(([date, sm]) => ({
+        date,
+        sources: Array.from(sm.entries()).map(([source, totals]) => ({ source, totals })),
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    setRows(built);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openAdd = () => { setEditingDate(null); setForm(emptyForm()); setDialogOpen(true); };
+
+  const openEdit = (date: string, totals: StageTotals) => {
+    setEditingDate(date);
+    setForm({
+      date,
+      deep: secsToHHMM(totals.deep),
+      rem: secsToHHMM(totals.rem),
+      light: secsToHHMM(totals.light || totals.sleep),
+      awake: secsToHHMM(totals.awake),
+    });
+    setDialogOpen(true);
+  };
+
+  const save = async () => {
+    if (!user) return;
+    if (!form.date) { toast.error("Pick a date"); return; }
+    const deep = parseHHMM(form.deep);
+    const rem = parseHHMM(form.rem);
+    const light = parseHHMM(form.light);
+    const awake = parseHHMM(form.awake);
+    if (deep + rem + light === 0) { toast.error("Enter at least one of Deep, REM or Light"); return; }
+
+    setSaving(true);
+    try {
+      await supabase.from("sleep_stages")
+        .delete().eq("user_id", user.id).eq("date", form.date).eq("source", "manual");
+
+      const rowsToInsert = [
+        { user_id: user.id, date: form.date, stage: "deep", duration_seconds: deep, source: "manual" },
+        { user_id: user.id, date: form.date, stage: "rem", duration_seconds: rem, source: "manual" },
+        { user_id: user.id, date: form.date, stage: "light", duration_seconds: light, source: "manual" },
+        { user_id: user.id, date: form.date, stage: "awake", duration_seconds: awake, source: "manual" },
+      ].filter((r) => r.duration_seconds > 0);
+
+      const { error: insErr } = await supabase.from("sleep_stages").insert(rowsToInsert);
+      if (insErr) throw insErr;
+
+      const total = deep + rem + light;
+      const { data: existing } = await supabase
+        .from("daily_metrics").select("id")
+        .eq("user_id", user.id).eq("date", form.date).maybeSingle();
+
+      const payload = {
+        user_id: user.id,
+        date: form.date,
+        sleep_duration_seconds: total,
+        deep_sleep_minutes: Math.round(deep / 60),
+        rem_sleep_minutes: Math.round(rem / 60),
+        light_sleep_minutes: Math.round(light / 60),
+        awake_during_night_minutes: Math.round(awake / 60),
+      };
+
+      if (existing?.id) {
+        await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+      } else {
+        await supabase.from("daily_metrics").insert(payload);
       }
 
-      const built: Row[] = Array.from(map.entries())
-        .map(([date, sm]) => ({
-          date,
-          sources: Array.from(sm.entries()).map(([source, totals]) => ({
-            source: source as "google_fit" | "health_connect",
-            totals,
-          })),
-        }))
-        .sort((a, b) => b.date.localeCompare(a.date));
+      toast.success("Sleep saved");
+      setDialogOpen(false);
+      await load();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "Failed to save sleep");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-      setRows(built);
-      setLoading(false);
-    })();
-  }, [user]);
+  const deleteManual = async (date: string) => {
+    if (!user) return;
+    if (!confirm(`Delete manual sleep entry for ${format(parseISO(date), "dd/MM/yyyy")}?`)) return;
+    try {
+      await supabase.from("sleep_stages")
+        .delete().eq("user_id", user.id).eq("date", date).eq("source", "manual");
+      toast.success("Entry deleted");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to delete");
+    }
+  };
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Sleep — Google Fit & Health Connect</CardTitle>
-        <CardDescription>Last 7 nights · per-source duration & stage breakdown</CardDescription>
+      <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle className="text-base">Sleep — Google Fit & Health Connect</CardTitle>
+          <CardDescription>Last 7 nights · per-source duration & stage breakdown</CardDescription>
+        </div>
+        <Button size="sm" variant="outline" onClick={openAdd} className="shrink-0">
+          <Plus className="w-4 h-4 mr-1" /> Add night
+        </Button>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No sleep data from Google Fit or Health Connect in the last 7 days.</p>
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p>No sleep data in the last 7 days.</p>
+            <Button size="sm" variant="outline" onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-1" /> Add your first night
+            </Button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -87,6 +211,7 @@ const SleepSourcesPanel = () => {
                   <th className="px-2 py-2">REM</th>
                   <th className="px-2 py-2">Light</th>
                   <th className="px-2 py-2">Awake</th>
+                  <th className="px-2 py-2 text-right">Edit</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,10 +226,22 @@ const SleepSourcesPanel = () => {
                         </td>
                         <td className="px-2 py-2">{sourceLabel(s.source)}</td>
                         <td className="px-2 py-2 font-semibold">{fmtH(total)}</td>
-                        <td className="px-2 py-2">{fmtMin(t.deep)}</td>
-                        <td className="px-2 py-2">{fmtMin(t.rem)}</td>
-                        <td className="px-2 py-2">{fmtMin(t.light || t.sleep)}</td>
-                        <td className="px-2 py-2">{fmtMin(t.awake)}</td>
+                        <td className="px-2 py-2">{fmtH(t.deep)}</td>
+                        <td className="px-2 py-2">{fmtH(t.rem)}</td>
+                        <td className="px-2 py-2">{fmtH(t.light || t.sleep)}</td>
+                        <td className="px-2 py-2">{fmtH(t.awake)}</td>
+                        <td className="px-2 py-2 text-right">
+                          <div className="inline-flex gap-1">
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(r.date, t)} title={s.source === "manual" ? "Edit" : "Override with manual entry"}>
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            {s.source === "manual" && (
+                              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => deleteManual(r.date)} title="Delete manual entry">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
@@ -114,6 +251,53 @@ const SleepSourcesPanel = () => {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingDate ? "Edit sleep night" : "Add sleep night"}</DialogTitle>
+            <DialogDescription>
+              Enter stage durations as <span className="font-mono">HH:MM</span> (e.g. <span className="font-mono">1:27</span> for 1h 27m).
+              Total = Deep + REM + Light.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="sleep-date">Date</Label>
+              <Input
+                id="sleep-date" type="date" value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                disabled={!!editingDate}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-deep">Deep (HH:MM)</Label>
+                <Input id="sleep-deep" placeholder="0:32" value={form.deep} onChange={(e) => setForm((f) => ({ ...f, deep: e.target.value }))} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-rem">REM (HH:MM)</Label>
+                <Input id="sleep-rem" placeholder="1:27" value={form.rem} onChange={(e) => setForm((f) => ({ ...f, rem: e.target.value }))} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-light">Light (HH:MM)</Label>
+                <Input id="sleep-light" placeholder="4:46" value={form.light} onChange={(e) => setForm((f) => ({ ...f, light: e.target.value }))} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-awake">Awake (HH:MM)</Label>
+                <Input id="sleep-awake" placeholder="0:14" value={form.awake} onChange={(e) => setForm((f) => ({ ...f, awake: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
