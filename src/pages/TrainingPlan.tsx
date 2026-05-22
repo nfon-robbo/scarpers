@@ -2647,6 +2647,15 @@ const TrainingPlanPage = () => {
       {(content || loading) && (<>
         {content && !loading && (
           <>
+            {isPlanPaused && pausedUntil && (
+              <PlanPausedBanner
+                pausedUntil={pausedUntil}
+                reason={pauseReason}
+                raceDateMode={pauseRaceDateMode}
+                raceDate={raceDate}
+                onResume={() => setResumeDialogOpen(true)}
+              />
+            )}
             <PlanOverview
               workouts={parseWorkoutsFromPlan(content)}
               planStartDate={startDate}
@@ -2654,53 +2663,79 @@ const TrainingPlanPage = () => {
               raceDate={raceDate}
               completedDates={completedDates}
               linkedActivities={linkedActivities}
+              isPaused={isPlanPaused}
+              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
               headerAction={
-                <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
-                  <PopoverTrigger asChild>
+                <div className="flex flex-wrap gap-2">
+                  <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
+                      >
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        {format(new Date(), "dd MMM yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="w-[min(92vw,360px)] max-h-[80vh] overflow-y-auto p-4 space-y-4 z-50">
+                      <div className="space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={pendingStart}
+                          onSelect={(d) => d && setPendingStart(d)}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto rounded-md border")}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">End date (race day)</Label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={pendingEnd}
+                          onSelect={(d) => d && setPendingEnd(d)}
+                          disabled={(date) => !!pendingStart && date <= pendingStart}
+                          className={cn("p-3 pointer-events-auto rounded-md border")}
+                        />
+                        <p className="text-xs text-muted-foreground max-w-[260px]">
+                          Changing the end date regenerates the whole plan. Changing only the start date shifts existing workouts.
+                        </p>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button variant="ghost" size="sm" onClick={() => setDatePopoverOpen(false)}>Cancel</Button>
+                        <Button size="sm" onClick={applyDateChanges} disabled={updatingDates}>
+                          {updatingDates && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
+                          Apply
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {isPlanPaused ? (
                     <Button
                       size="sm"
                       variant="secondary"
+                      onClick={() => setResumeDialogOpen(true)}
                       className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
                     >
-                      <CalendarIcon className="w-3.5 h-3.5" />
-                      {format(new Date(), "dd MMM yyyy")}
+                      <PlayIcon className="w-3.5 h-3.5" />
+                      Resume
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" side="bottom" sideOffset={8} collisionPadding={12} className="w-[min(92vw,360px)] max-h-[80vh] overflow-y-auto p-4 space-y-4 z-50">
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">Start date</Label>
-                      <CalendarComponent
-                        mode="single"
-                        selected={pendingStart}
-                        onSelect={(d) => d && setPendingStart(d)}
-                        initialFocus
-                        className={cn("p-3 pointer-events-auto rounded-md border")}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">End date (race day)</Label>
-                      <CalendarComponent
-                        mode="single"
-                        selected={pendingEnd}
-                        onSelect={(d) => d && setPendingEnd(d)}
-                        disabled={(date) => !!pendingStart && date <= pendingStart}
-                        className={cn("p-3 pointer-events-auto rounded-md border")}
-                      />
-                      <p className="text-xs text-muted-foreground max-w-[260px]">
-                        Changing the end date regenerates the whole plan. Changing only the start date shifts existing workouts.
-                      </p>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2 border-t">
-                      <Button variant="ghost" size="sm" onClick={() => setDatePopoverOpen(false)}>Cancel</Button>
-                      <Button size="sm" onClick={applyDateChanges} disabled={updatingDates}>
-                        {updatingDates && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                        Apply
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPauseDialogOpen(true)}
+                      className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
+                    >
+                      <PauseIcon className="w-3.5 h-3.5" />
+                      Pause plan
+                    </Button>
+                  )}
+                </div>
               }
             />
+
             <RaceEstimateTabs
               workouts={parseWorkoutsFromPlan(content)}
               linkedActivities={linkedActivities}
