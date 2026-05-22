@@ -14,6 +14,10 @@ import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
 import pauseOtherIcon from "@/assets/pause-other.png";
+import pauseBgHoliday from "@/assets/pause-bg-holiday.jpg";
+import pauseBgIllness from "@/assets/pause-bg-illness.jpg";
+import pauseBgInjury from "@/assets/pause-bg-injury.jpg";
+import pauseBgOther from "@/assets/pause-bg-other.jpg";
 
 export type ResumeMode = "cancel" | "skip-next-week" | "continue-paused-week";
 export type RaceDateMode = "fixed" | "shift";
