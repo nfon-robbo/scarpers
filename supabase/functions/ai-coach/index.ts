@@ -379,7 +379,7 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
       try {
