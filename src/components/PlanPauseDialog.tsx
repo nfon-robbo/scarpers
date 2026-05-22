@@ -287,27 +287,33 @@ export default function PlanPauseDialog({
                       type="button"
                       onClick={() => setReason(r.value)}
                       aria-pressed={selected}
+                      style={{ backgroundImage: `url(${r.bg})` }}
                       className={cn(
-                        "w-full flex items-center gap-3 rounded-md border p-3 text-left transition-all",
-                        r.bgClass,
+                        "relative w-full overflow-hidden rounded-md border p-3 text-left transition-all bg-cover bg-center",
+                        r.borderClass,
                         selected
                           ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                          : "opacity-70 hover:opacity-100"
+                          : "opacity-80 hover:opacity-100"
                       )}
                     >
-                      <img
-                        src={r.icon}
-                        alt=""
-                        loading="lazy"
-                        width={32}
-                        height={32}
-                        className="w-8 h-8 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm font-semibold", r.textClass)}>{r.label}</p>
-                        <p className="text-xs text-muted-foreground">{r.description}</p>
+                      {/* Dark overlay for legibility */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/60 to-background/20" />
+                      <div className="relative flex items-center gap-3">
+                        <img
+                          src={r.icon}
+                          alt=""
+                          loading="lazy"
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 shrink-0 drop-shadow"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground drop-shadow">{r.label}</p>
+                          <p className="text-xs text-foreground/80 drop-shadow">{r.description}</p>
+                        </div>
                       </div>
                     </button>
+
                   );
                 })}
               </div>
