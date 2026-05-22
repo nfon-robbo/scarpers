@@ -617,6 +617,11 @@ const TrainingPlanPage = () => {
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(loadedTrainingDays);
         setStartDate(parseLocalISODate(data.start_date));
+        const anyData = data as any;
+        setPausedAt(anyData.paused_at ? new Date(anyData.paused_at) : null);
+        setPausedUntil(anyData.paused_until ? new Date(anyData.paused_until) : null);
+        setPauseReason(anyData.pause_reason ?? null);
+        setPauseRaceDateMode((anyData.race_date_mode as RaceDateMode | null) ?? null);
         if (validatedOnLoad !== data.content) {
           supabase.from("training_plans").update({ content: validatedOnLoad }).eq("id", data.id).then(({ error }) => {
             if (error) console.error("plan validation self-heal failed:", error);
