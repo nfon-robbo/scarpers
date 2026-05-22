@@ -1115,7 +1115,7 @@ const TrainingPlanPage = () => {
     });
   };
 
-
+  const regenerateForNewEndDate = async (newStart: Date, newEnd: Date) => {
     if (!user) return;
     if (newEnd <= newStart) {
       toast({ title: "Invalid dates", description: "End date must be after start date.", variant: "destructive" });
