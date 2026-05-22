@@ -1141,7 +1141,11 @@ export type Database = {
           id: string
           last_adaptation_reason: string | null
           last_adapted_at: string | null
+          pause_reason: string | null
+          paused_at: string | null
+          paused_until: string | null
           race_date: string | null
+          race_date_mode: string | null
           race_distance: string
           start_date: string
           training_days: string[]
@@ -1155,7 +1159,11 @@ export type Database = {
           id?: string
           last_adaptation_reason?: string | null
           last_adapted_at?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_until?: string | null
           race_date?: string | null
+          race_date_mode?: string | null
           race_distance: string
           start_date: string
           training_days: string[]
@@ -1169,7 +1177,11 @@ export type Database = {
           id?: string
           last_adaptation_reason?: string | null
           last_adapted_at?: string | null
+          pause_reason?: string | null
+          paused_at?: string | null
+          paused_until?: string | null
           race_date?: string | null
+          race_date_mode?: string | null
           race_distance?: string
           start_date?: string
           training_days?: string[]
