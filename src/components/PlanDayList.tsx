@@ -30,6 +30,17 @@ interface PlanDayListProps {
   goalTime?: string;
   raceDistance?: string;
   onEditWorkout?: (workout: ParsedWorkout) => void;
+  isPaused?: boolean;
+  pauseWindow?: { start: Date; end: Date } | null;
+  pauseReason?: string | null;
+}
+
+function pauseReasonMeta(reason?: string | null): { icon: string; label: string } {
+  const r = (reason || "").toLowerCase();
+  if (/holiday|vacation|travel/.test(r)) return { icon: "🏖️", label: "Holiday" };
+  if (/ill|sick|flu|cold/.test(r)) return { icon: "🤒", label: "Illness" };
+  if (/injur/.test(r)) return { icon: "🩹", label: "Injury" };
+  return { icon: "⏸️", label: reason && reason.trim() ? reason : "Paused" };
 }
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
@@ -461,6 +472,9 @@ export default function PlanDayList({
   goalTime,
   raceDistance,
   onEditWorkout,
+  isPaused = false,
+  pauseWindow = null,
+  pauseReason = null,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
@@ -649,6 +663,10 @@ export default function PlanDayList({
                 const isDragOver = dragOverDate === key;
                 const isDragSource = dragSourceDate === key;
                 const draggable = !!workout && !!onMoveWorkout;
+                const inPauseWindow = !!(isPaused && pauseWindow &&
+                  day.getTime() >= new Date(pauseWindow.start).setHours(0, 0, 0, 0) &&
+                  day.getTime() <= new Date(pauseWindow.end).setHours(23, 59, 59, 999));
+                const pauseMeta = pauseReasonMeta(pauseReason);
 
                 return (
                   <div
@@ -689,7 +707,19 @@ export default function PlanDayList({
                     </div>
 
                     {/* Workout card / rest */}
-                    {workout ? (
+                    {inPauseWindow ? (
+                      <div className="flex-1 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0 text-xl">
+                          {pauseMeta.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 truncate">
+                            {pauseMeta.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Plan paused</p>
+                        </div>
+                      </div>
+                    ) : workout ? (
                       isCompleted ? (
                         // PlanOverview-style "completed" card
                         <button

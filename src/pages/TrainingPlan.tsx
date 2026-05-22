@@ -2762,6 +2762,9 @@ const TrainingPlanPage = () => {
               goalTime={goalTime}
               raceDistance={raceDistance}
               onEditWorkout={(w) => setEditingWorkout(w)}
+              isPaused={isPlanPaused}
+              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
+              pauseReason={pauseReason}
             />
             <WorkoutEditDialog
               open={!!editingWorkout}
