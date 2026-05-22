@@ -377,7 +377,7 @@ const Dashboard = () => {
     // Get latest training plan for "Today's Workout" card
     supabase
       .from("training_plans")
-      .select("content, start_date, training_days, race_distance")
+      .select("content, start_date, training_days, race_distance, paused_at, paused_until, pause_reason, race_date_mode, race_date")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
