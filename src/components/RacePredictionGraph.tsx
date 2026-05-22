@@ -67,13 +67,20 @@ export default function RacePredictionGraph({ raceDistance, goalSeconds, refresh
 
   if (loading) return null;
 
-  // Keep only the latest prediction per calendar day so intra-day recalcs
-  // don't create a confusing wave pattern.
+  // Keep one prediction per calendar day. Prefer rows from the same pipeline as
+  // the gauge ("manual" / "plan_start") over server-side "activity_synced" /
+  // "scheduled" rows, which can come from an older predictor and disagree with
+  // the gauge. Within a preferred tier, keep the latest of that day.
+  const isPreferred = (t: string) => t === "manual" || t === "plan_start";
   const latestPerDay = new Map<string, Row>();
   for (const r of rows) {
     const day = r.calculated_at.slice(0, 10);
     const prev = latestPerDay.get(day);
-    if (!prev || r.calculated_at > prev.calculated_at) latestPerDay.set(day, r);
+    if (!prev) { latestPerDay.set(day, r); continue; }
+    const prevPref = isPreferred(prev.triggered_by);
+    const curPref = isPreferred(r.triggered_by);
+    if (curPref && !prevPref) latestPerDay.set(day, r);
+    else if (curPref === prevPref && r.calculated_at > prev.calculated_at) latestPerDay.set(day, r);
   }
   const data = Array.from(latestPerDay.values())
     .sort((a, b) => a.calculated_at.localeCompare(b.calculated_at))
