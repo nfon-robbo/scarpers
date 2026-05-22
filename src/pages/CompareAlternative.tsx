@@ -176,6 +176,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "Running IQ score (0–200)", scarpers: true, competitor: false },
       { feature: "Injury history factored into plan", scarpers: true, competitor: false },
       { feature: "Music BPM cadence targets", scarpers: true, competitor: false },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
       { feature: "Subscription required", scarpers: "Free", competitor: "Paid tier" },
     ],
     scarpersBetter: [
@@ -236,6 +238,8 @@ const DATA: Record<string, CompareData> = {
       { feature: "AI day-ahead briefing", scarpers: true, competitor: "partial" },
       { feature: "AI post-run review", scarpers: true, competitor: "partial" },
       { feature: "Injury history at onboarding", scarpers: true, competitor: "partial" },
+      { feature: "Guided audio runs", scarpers: "Via Garmin", competitor: false },
+      { feature: "Strength & mobility programme", scarpers: "Via Garmin", competitor: false },
       { feature: "Subscription required", scarpers: "Free", competitor: "Paid tier" },
     ],
     scarpersBetter: [
