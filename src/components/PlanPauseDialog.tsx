@@ -114,6 +114,7 @@ export default function PlanPauseDialog({
   const resumeDelta = useMemo(() => {
     // How many days to shift workouts forward.
     if (!pausedAt || !pausedUntil) return 0;
+    if (resumeMode === "cancel") return 0; // restore original plan as-is
     const todayMs = today.getTime();
     const untilMs = new Date(pausedUntil).setHours(0, 0, 0, 0);
     const baseShift = Math.max(0, differenceInCalendarDays(new Date(Math.max(todayMs, untilMs)), pausedAt));
@@ -129,9 +130,10 @@ export default function PlanPauseDialog({
 
   const newRaceAfterResume = useMemo(() => {
     if (!raceDate) return null;
+    if (resumeMode === "cancel") return raceDate;
     if (existingRaceDateMode === "fixed") return raceDate; // unchanged
     return addDays(raceDate, resumeDelta);
-  }, [raceDate, resumeDelta, existingRaceDateMode]);
+  }, [raceDate, resumeDelta, existingRaceDateMode, resumeMode]);
 
   // ---------- Handlers ----------
   const handlePause = async () => {
