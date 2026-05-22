@@ -472,6 +472,9 @@ export default function PlanDayList({
   goalTime,
   raceDistance,
   onEditWorkout,
+  isPaused = false,
+  pauseWindow = null,
+  pauseReason = null,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
