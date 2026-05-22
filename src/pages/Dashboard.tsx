@@ -638,7 +638,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (!todaysActivity || !user) return;
     const shownKey = `workoutReviewShown:${todaysActivity.id}`;
-    if (sessionStorage.getItem(shownKey) === "1") return;
+    if (localStorage.getItem(shownKey) === "1") return;
 
     let cancelled = false;
     (async () => {
@@ -650,10 +650,10 @@ const Dashboard = () => {
         .maybeSingle();
       if (cancelled) return;
       if (existingReview) {
-        sessionStorage.setItem(shownKey, "1");
+        localStorage.setItem(shownKey, "1");
         return;
       }
-      sessionStorage.setItem(shownKey, "1");
+      localStorage.setItem(shownKey, "1");
       // Tiny delay so the dashboard renders before the dialog appears.
       setTimeout(() => setReviewOpen(true), 400);
     })();
@@ -667,8 +667,8 @@ const Dashboard = () => {
     const onAutoLinked = () => {
       if (todaysActivity) {
         const shownKey = `workoutReviewShown:${todaysActivity.id}`;
-        if (sessionStorage.getItem(shownKey) === "1") return;
-        sessionStorage.setItem(shownKey, "1");
+        if (localStorage.getItem(shownKey) === "1") return;
+        localStorage.setItem(shownKey, "1");
         setReviewOpen(true);
       }
     };
