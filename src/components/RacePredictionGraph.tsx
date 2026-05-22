@@ -67,13 +67,23 @@ export default function RacePredictionGraph({ raceDistance, goalSeconds, refresh
 
   if (loading) return null;
 
-  const data = rows.map((r) => ({
-    ts: new Date(r.calculated_at).getTime(),
-    dateLabel: format(parseISO(r.calculated_at), "dd/MM"),
-    seconds: r.predicted_seconds,
-    vo2: r.vo2_max,
-    trigger: r.triggered_by,
-  }));
+  // Keep only the latest prediction per calendar day so intra-day recalcs
+  // don't create a confusing wave pattern.
+  const latestPerDay = new Map<string, Row>();
+  for (const r of rows) {
+    const day = r.calculated_at.slice(0, 10);
+    const prev = latestPerDay.get(day);
+    if (!prev || r.calculated_at > prev.calculated_at) latestPerDay.set(day, r);
+  }
+  const data = Array.from(latestPerDay.values())
+    .sort((a, b) => a.calculated_at.localeCompare(b.calculated_at))
+    .map((r) => ({
+      ts: new Date(r.calculated_at).getTime(),
+      dateLabel: format(parseISO(r.calculated_at), "dd/MM"),
+      seconds: r.predicted_seconds,
+      vo2: r.vo2_max,
+      trigger: r.triggered_by,
+    }));
 
   // Determine trend from first vs last (>2% threshold for stable)
   let trend: Trend = "stable";
