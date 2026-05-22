@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "lucide-react";
 
-export type ResumeMode = "skip-next-week" | "continue-paused-week";
+export type ResumeMode = "cancel" | "skip-next-week" | "continue-paused-week";
 export type RaceDateMode = "fixed" | "shift";
 export type PauseReason = "holiday" | "illness" | "injury" | "other";
 
