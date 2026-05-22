@@ -21,6 +21,10 @@ import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
 import pauseOtherIcon from "@/assets/pause-other.png";
+import pauseBgHoliday from "@/assets/pause-bg-holiday.jpg";
+import pauseBgIllness from "@/assets/pause-bg-illness.jpg";
+import pauseBgInjury from "@/assets/pause-bg-injury.jpg";
+import pauseBgOther from "@/assets/pause-bg-other.jpg";
 
 interface PlanDayListProps {
   workouts: ParsedWorkout[];
@@ -39,13 +43,14 @@ interface PlanDayListProps {
   pauseReason?: string | null;
 }
 
-function pauseReasonMeta(reason?: string | null): { icon: string; label: string } {
+function pauseReasonMeta(reason?: string | null): { icon: string; label: string; bg: string } {
   const r = (reason || "").toLowerCase();
-  if (/holiday|vacation|travel/.test(r)) return { icon: pauseHolidayIcon, label: "Holiday" };
-  if (/ill|sick|flu|cold/.test(r)) return { icon: pauseIllnessIcon, label: "Illness" };
-  if (/injur/.test(r)) return { icon: pauseInjuryIcon, label: "Injury" };
-  return { icon: pauseOtherIcon, label: reason && reason.trim() ? reason : "Paused" };
+  if (/holiday|vacation|travel/.test(r)) return { icon: pauseHolidayIcon, label: "Holiday", bg: pauseBgHoliday };
+  if (/ill|sick|flu|cold/.test(r)) return { icon: pauseIllnessIcon, label: "Illness", bg: pauseBgIllness };
+  if (/injur/.test(r)) return { icon: pauseInjuryIcon, label: "Injury", bg: pauseBgInjury };
+  return { icon: pauseOtherIcon, label: reason && reason.trim() ? reason : "Paused", bg: pauseBgOther };
 }
+
 
 import { describeWorkoutLabel } from "@/lib/workout-title";
 
