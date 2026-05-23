@@ -106,12 +106,22 @@ const SleepSourcesPanel = () => {
 
   const openEdit = (date: string, totals: StageTotals) => {
     setEditingDate(date);
+    const totalAll = totals.deep + totals.rem + totals.light + totals.sleep + totals.awake;
+    // Derive bedtime from default 07:00 wake when we don't know real times
+    const wakeDefault = "07:00";
+    const wakeH = 7, wakeM = 0;
+    const bedTotalMin = wakeH * 60 + wakeM - Math.round(totalAll / 60);
+    const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
+    const bh = Math.floor(normMin / 60), bm = normMin % 60;
     setForm({
       date,
+      bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
+      wakeTime: wakeDefault,
       deep: secsToHHMM(totals.deep),
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
+      rhr: "", hrv: "",
     });
     setDialogOpen(true);
   };
