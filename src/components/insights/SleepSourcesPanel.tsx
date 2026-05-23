@@ -140,19 +140,31 @@ const SleepSourcesPanel = () => {
       await supabase.from("sleep_stages")
         .delete().eq("user_id", user.id).eq("date", form.date).eq("source", "manual");
 
-      // Synthesise a sleep window so Body Battery / wake-time derivation work.
-      // Convention: `date` = wake morning. Default wake = 07:00 local, bedtime = wake - totalIncludingAwake.
-      const totalAll = deep + rem + light + awake;
-      const wakeLocal = new Date(`${form.date}T07:00:00`);
-      const bedLocal = new Date(wakeLocal.getTime() - totalAll * 1000);
-      // Partition the window sequentially: light → deep → rem → light → awake
-      // (order is cosmetic; Body Battery only needs valid start/end + stage)
+      // Build sleep window from explicit bedtime + wake time.
+      // Convention: `date` = wake morning. If bedtime is later in the day than wake (e.g. 23:00 → 07:00), bedtime is the previous calendar day.
+      const [wH, wM] = (form.wakeTime || "07:00").split(":").map((n) => parseInt(n, 10) || 0);
+      const [bH, bM] = (form.bedtime || "23:00").split(":").map((n) => parseInt(n, 10) || 0);
+      const wakeLocal = new Date(`${form.date}T${String(wH).padStart(2, "0")}:${String(wM).padStart(2, "0")}:00`);
+      let bedLocal = new Date(`${form.date}T${String(bH).padStart(2, "0")}:${String(bM).padStart(2, "0")}:00`);
+      if (bedLocal.getTime() >= wakeLocal.getTime()) {
+        bedLocal = new Date(bedLocal.getTime() - 24 * 3600 * 1000);
+      }
+      const windowSecs = Math.max(60, Math.round((wakeLocal.getTime() - bedLocal.getTime()) / 1000));
+      const totalStages = deep + rem + light + awake;
+      // Scale stages to fit the window so segments line up with bedtime → wake exactly.
+      const scale = totalStages > 0 ? windowSecs / totalStages : 1;
+      const sDeep = Math.round(deep * scale);
+      const sRem = Math.round(rem * scale);
+      const sLightHalf = Math.round(light * scale * 0.5);
+      const sLightRest = Math.round(light * scale) - sLightHalf;
+      const sAwake = windowSecs - (sDeep + sRem + sLightHalf + sLightRest);
+
       const segments: { stage: string; dur: number }[] = [];
-      if (light > 0) segments.push({ stage: "light", dur: Math.floor(light * 0.5) });
-      if (deep > 0) segments.push({ stage: "deep", dur: deep });
-      if (rem > 0) segments.push({ stage: "rem", dur: rem });
-      if (light > 0) segments.push({ stage: "light", dur: light - Math.floor(light * 0.5) });
-      if (awake > 0) segments.push({ stage: "awake", dur: awake });
+      if (sLightHalf > 0) segments.push({ stage: "light", dur: sLightHalf });
+      if (sDeep > 0) segments.push({ stage: "deep", dur: sDeep });
+      if (sRem > 0) segments.push({ stage: "rem", dur: sRem });
+      if (sLightRest > 0) segments.push({ stage: "light", dur: sLightRest });
+      if (sAwake > 0) segments.push({ stage: "awake", dur: sAwake });
 
       let cursor = bedLocal.getTime();
       const rowsToInsert = segments
@@ -181,7 +193,10 @@ const SleepSourcesPanel = () => {
         .from("daily_metrics").select("id")
         .eq("user_id", user.id).eq("date", form.date).maybeSingle();
 
-      const payload = {
+      const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
+      const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
+
+      const payload: Record<string, unknown> = {
         user_id: user.id,
         date: form.date,
         sleep_duration_seconds: total,
@@ -190,6 +205,8 @@ const SleepSourcesPanel = () => {
         light_sleep_minutes: Math.round(light / 60),
         awake_during_night_minutes: Math.round(awake / 60),
       };
+      if (rhrNum != null && isFinite(rhrNum) && rhrNum > 0) payload.resting_heart_rate = rhrNum;
+      if (hrvNum != null && isFinite(hrvNum) && hrvNum > 0) payload.hrv = hrvNum;
 
       if (existing?.id) {
         await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
