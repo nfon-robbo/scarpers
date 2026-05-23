@@ -44,10 +44,17 @@ const secsToHHMM = (s: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
-type FormState = { date: string; deep: string; rem: string; light: string; awake: string };
+type FormState = {
+  date: string;
+  bedtime: string; wakeTime: string;
+  deep: string; rem: string; light: string; awake: string;
+  rhr: string; hrv: string;
+};
 const emptyForm = (date?: string): FormState => ({
   date: date ?? format(new Date(), "yyyy-MM-dd"),
+  bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
+  rhr: "", hrv: "",
 });
 
 const SleepSourcesPanel = () => {
