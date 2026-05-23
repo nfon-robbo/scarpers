@@ -209,9 +209,9 @@ const SleepSourcesPanel = () => {
       if (hrvNum != null && isFinite(hrvNum) && hrvNum > 0) payload.hrv = hrvNum;
 
       if (existing?.id) {
-        await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+        await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
       } else {
-        await supabase.from("daily_metrics").insert(payload);
+        await supabase.from("daily_metrics").insert(payload as never);
       }
 
       toast.success("Sleep saved");
