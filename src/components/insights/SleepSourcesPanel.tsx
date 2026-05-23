@@ -44,10 +44,17 @@ const secsToHHMM = (s: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
-type FormState = { date: string; deep: string; rem: string; light: string; awake: string };
+type FormState = {
+  date: string;
+  bedtime: string; wakeTime: string;
+  deep: string; rem: string; light: string; awake: string;
+  rhr: string; hrv: string;
+};
 const emptyForm = (date?: string): FormState => ({
   date: date ?? format(new Date(), "yyyy-MM-dd"),
+  bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
+  rhr: "", hrv: "",
 });
 
 const SleepSourcesPanel = () => {
@@ -99,12 +106,22 @@ const SleepSourcesPanel = () => {
 
   const openEdit = (date: string, totals: StageTotals) => {
     setEditingDate(date);
+    const totalAll = totals.deep + totals.rem + totals.light + totals.sleep + totals.awake;
+    // Derive bedtime from default 07:00 wake when we don't know real times
+    const wakeDefault = "07:00";
+    const wakeH = 7, wakeM = 0;
+    const bedTotalMin = wakeH * 60 + wakeM - Math.round(totalAll / 60);
+    const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
+    const bh = Math.floor(normMin / 60), bm = normMin % 60;
     setForm({
       date,
+      bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
+      wakeTime: wakeDefault,
       deep: secsToHHMM(totals.deep),
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
+      rhr: "", hrv: "",
     });
     setDialogOpen(true);
   };
@@ -123,19 +140,31 @@ const SleepSourcesPanel = () => {
       await supabase.from("sleep_stages")
         .delete().eq("user_id", user.id).eq("date", form.date).eq("source", "manual");
 
-      // Synthesise a sleep window so Body Battery / wake-time derivation work.
-      // Convention: `date` = wake morning. Default wake = 07:00 local, bedtime = wake - totalIncludingAwake.
-      const totalAll = deep + rem + light + awake;
-      const wakeLocal = new Date(`${form.date}T07:00:00`);
-      const bedLocal = new Date(wakeLocal.getTime() - totalAll * 1000);
-      // Partition the window sequentially: light → deep → rem → light → awake
-      // (order is cosmetic; Body Battery only needs valid start/end + stage)
+      // Build sleep window from explicit bedtime + wake time.
+      // Convention: `date` = wake morning. If bedtime is later in the day than wake (e.g. 23:00 → 07:00), bedtime is the previous calendar day.
+      const [wH, wM] = (form.wakeTime || "07:00").split(":").map((n) => parseInt(n, 10) || 0);
+      const [bH, bM] = (form.bedtime || "23:00").split(":").map((n) => parseInt(n, 10) || 0);
+      const wakeLocal = new Date(`${form.date}T${String(wH).padStart(2, "0")}:${String(wM).padStart(2, "0")}:00`);
+      let bedLocal = new Date(`${form.date}T${String(bH).padStart(2, "0")}:${String(bM).padStart(2, "0")}:00`);
+      if (bedLocal.getTime() >= wakeLocal.getTime()) {
+        bedLocal = new Date(bedLocal.getTime() - 24 * 3600 * 1000);
+      }
+      const windowSecs = Math.max(60, Math.round((wakeLocal.getTime() - bedLocal.getTime()) / 1000));
+      const totalStages = deep + rem + light + awake;
+      // Scale stages to fit the window so segments line up with bedtime → wake exactly.
+      const scale = totalStages > 0 ? windowSecs / totalStages : 1;
+      const sDeep = Math.round(deep * scale);
+      const sRem = Math.round(rem * scale);
+      const sLightHalf = Math.round(light * scale * 0.5);
+      const sLightRest = Math.round(light * scale) - sLightHalf;
+      const sAwake = windowSecs - (sDeep + sRem + sLightHalf + sLightRest);
+
       const segments: { stage: string; dur: number }[] = [];
-      if (light > 0) segments.push({ stage: "light", dur: Math.floor(light * 0.5) });
-      if (deep > 0) segments.push({ stage: "deep", dur: deep });
-      if (rem > 0) segments.push({ stage: "rem", dur: rem });
-      if (light > 0) segments.push({ stage: "light", dur: light - Math.floor(light * 0.5) });
-      if (awake > 0) segments.push({ stage: "awake", dur: awake });
+      if (sLightHalf > 0) segments.push({ stage: "light", dur: sLightHalf });
+      if (sDeep > 0) segments.push({ stage: "deep", dur: sDeep });
+      if (sRem > 0) segments.push({ stage: "rem", dur: sRem });
+      if (sLightRest > 0) segments.push({ stage: "light", dur: sLightRest });
+      if (sAwake > 0) segments.push({ stage: "awake", dur: sAwake });
 
       let cursor = bedLocal.getTime();
       const rowsToInsert = segments
@@ -164,7 +193,10 @@ const SleepSourcesPanel = () => {
         .from("daily_metrics").select("id")
         .eq("user_id", user.id).eq("date", form.date).maybeSingle();
 
-      const payload = {
+      const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
+      const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
+
+      const payload: Record<string, unknown> = {
         user_id: user.id,
         date: form.date,
         sleep_duration_seconds: total,
@@ -173,11 +205,13 @@ const SleepSourcesPanel = () => {
         light_sleep_minutes: Math.round(light / 60),
         awake_during_night_minutes: Math.round(awake / 60),
       };
+      if (rhrNum != null && isFinite(rhrNum) && rhrNum > 0) payload.resting_heart_rate = rhrNum;
+      if (hrvNum != null && isFinite(hrvNum) && hrvNum > 0) payload.hrv = hrvNum;
 
       if (existing?.id) {
-        await supabase.from("daily_metrics").update(payload).eq("id", existing.id);
+        await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
       } else {
-        await supabase.from("daily_metrics").insert(payload);
+        await supabase.from("daily_metrics").insert(payload as never);
       }
 
       toast.success("Sleep saved");
@@ -289,12 +323,28 @@ const SleepSourcesPanel = () => {
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="sleep-date">Date</Label>
+              <Label htmlFor="sleep-date">Wake date</Label>
               <Input
                 id="sleep-date" type="date" value={form.date}
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 disabled={!!editingDate}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-bedtime">Bedtime</Label>
+                <Input
+                  id="sleep-bedtime" type="time" value={form.bedtime}
+                  onChange={(e) => setForm((f) => ({ ...f, bedtime: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-wake">Wake time</Label>
+                <Input
+                  id="sleep-wake" type="time" value={form.wakeTime}
+                  onChange={(e) => setForm((f) => ({ ...f, wakeTime: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
@@ -312,6 +362,21 @@ const SleepSourcesPanel = () => {
               <div className="grid gap-1.5">
                 <Label htmlFor="sleep-awake">Awake (HH:MM)</Label>
                 <Input id="sleep-awake" placeholder="0:14" value={form.awake} onChange={(e) => setForm((f) => ({ ...f, awake: e.target.value }))} />
+              </div>
+            </div>
+            <div className="pt-2 border-t border-border/40">
+              <p className="text-xs text-muted-foreground mb-2">Optional — boosts Readiness & Body Battery accuracy</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-rhr">Resting HR (bpm)</Label>
+                  <Input id="sleep-rhr" inputMode="numeric" placeholder="52" value={form.rhr}
+                    onChange={(e) => setForm((f) => ({ ...f, rhr: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-hrv">HRV (ms)</Label>
+                  <Input id="sleep-hrv" inputMode="numeric" placeholder="48" value={form.hrv}
+                    onChange={(e) => setForm((f) => ({ ...f, hrv: e.target.value }))} />
+                </div>
               </div>
             </div>
           </div>
