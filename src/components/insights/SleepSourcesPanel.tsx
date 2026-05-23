@@ -364,8 +364,22 @@ const SleepSourcesPanel = () => {
                 <Input id="sleep-awake" placeholder="0:14" value={form.awake} onChange={(e) => setForm((f) => ({ ...f, awake: e.target.value }))} />
               </div>
             </div>
+            <div className="pt-2 border-t border-border/40">
+              <p className="text-xs text-muted-foreground mb-2">Optional — boosts Readiness & Body Battery accuracy</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-rhr">Resting HR (bpm)</Label>
+                  <Input id="sleep-rhr" inputMode="numeric" placeholder="52" value={form.rhr}
+                    onChange={(e) => setForm((f) => ({ ...f, rhr: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-hrv">HRV (ms)</Label>
+                  <Input id="sleep-hrv" inputMode="numeric" placeholder="48" value={form.hrv}
+                    onChange={(e) => setForm((f) => ({ ...f, hrv: e.target.value }))} />
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
             <Button onClick={save} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
