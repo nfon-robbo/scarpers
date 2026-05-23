@@ -307,6 +307,30 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
         if (hourly.length > 0) {
           const wakeMs = readinessData.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
           if (wakeMs != null && Number.isFinite(wakeMs)) {
+            // 1. Re-anchor pre-wake (sleep) curve so its end aligns with truth.startPercent
+            //    at wake. The simulated overnight charge starts from a fixed baseline,
+            //    which doesn't reflect HRV / sleep score / debt. Shifting the whole pre-wake
+            //    block keeps the shape but matches the dashboard value.
+            let anchorIdx = -1;
+            for (let i = 0; i < hourly.length; i++) {
+              if (hourly[i].ts <= wakeMs) anchorIdx = i;
+              else break;
+            }
+            if (anchorIdx >= 0) {
+              const shift = truthResult.startPercent - hourly[anchorIdx].battery;
+              if (Math.abs(shift) > 0.5) {
+                for (let i = 0; i <= anchorIdx; i++) {
+                  const p = hourly[i];
+                  const newVal = Math.round(Math.max(5, Math.min(100, p.battery + shift)));
+                  p.battery = newVal;
+                  if (p.sleepBand != null) p.sleepBand = newVal;
+                  if (p.awakeBand != null) p.awakeBand = newVal;
+                  if (p.activeBand != null) p.activeBand = newVal;
+                }
+              }
+            }
+            // 2. Post-wake points: recompute via the shared model so the chart and the
+            //    Body Battery tile always agree.
             for (const p of hourly) {
               if (p.ts < wakeMs) continue;
               const modelAtPoint = computeBodyBattery({
