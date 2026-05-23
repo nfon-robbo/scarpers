@@ -323,12 +323,28 @@ const SleepSourcesPanel = () => {
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="sleep-date">Date</Label>
+              <Label htmlFor="sleep-date">Wake date</Label>
               <Input
                 id="sleep-date" type="date" value={form.date}
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                 disabled={!!editingDate}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-bedtime">Bedtime</Label>
+                <Input
+                  id="sleep-bedtime" type="time" value={form.bedtime}
+                  onChange={(e) => setForm((f) => ({ ...f, bedtime: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="sleep-wake">Wake time</Label>
+                <Input
+                  id="sleep-wake" type="time" value={form.wakeTime}
+                  onChange={(e) => setForm((f) => ({ ...f, wakeTime: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
