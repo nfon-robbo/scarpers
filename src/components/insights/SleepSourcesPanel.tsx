@@ -380,6 +380,7 @@ const SleepSourcesPanel = () => {
               </div>
             </div>
           </div>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
             <Button onClick={save} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
