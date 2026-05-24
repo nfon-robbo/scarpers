@@ -857,6 +857,50 @@ const Landing = () => {
         </div>
       </section>
 
+      <section className="border-t border-border/40 bg-background">
+        <div className="max-w-6xl mx-auto px-5 py-14">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+            Explore Scarpers
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mb-8">
+            Free training plans, guides and the AI coaching system behind every Scarpers session.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link to="/5k-training-plan" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Plan</p>
+              <h3 className="font-semibold text-foreground mb-1">Free 5K Training Plan</h3>
+              <p className="text-sm text-muted-foreground">Personalised 6–8 week plan, beginner-friendly, sub-30 ready.</p>
+            </Link>
+            <Link to="/10k-training-plan" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Plan</p>
+              <h3 className="font-semibold text-foreground mb-1">Free 10K Training Plan</h3>
+              <p className="text-sm text-muted-foreground">8–10 weeks of threshold, intervals and race-pace work.</p>
+            </Link>
+            <Link to="/ai-running-coach" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Coach</p>
+              <h3 className="font-semibold text-foreground mb-1">How the AI Coach works</h3>
+              <p className="text-sm text-muted-foreground">Plans, briefings and reviews built from your data.</p>
+            </Link>
+            <Link to="/coach/claire-rayners" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Coach</p>
+              <h3 className="font-semibold text-foreground mb-1">Meet Coach Claire Rayners</h3>
+              <p className="text-sm text-muted-foreground">The programmable elite coaching system behind every plan.</p>
+            </Link>
+            <Link to="/blog" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Blog</p>
+              <h3 className="font-semibold text-foreground mb-1">Running Blog</h3>
+              <p className="text-sm text-muted-foreground">Training advice, race tips and AI coaching insights.</p>
+            </Link>
+            <Link to="/about" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">About</p>
+              <h3 className="font-semibold text-foreground mb-1">About Scarpers</h3>
+              <p className="text-sm text-muted-foreground">Who builds Scarpers, our editorial standards and contact.</p>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+
       <footer className="border-t border-border/40 bg-card/30 backdrop-blur">
         <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-4 gap-6 text-sm">
           <div>
