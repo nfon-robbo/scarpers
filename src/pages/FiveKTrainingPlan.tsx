@@ -9,14 +9,29 @@ const FiveKTrainingPlan = () => {
   useEffect(() => {
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
-    ld.text = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      itemListElement: [
-        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
-        { "@type": "ListItem", position: 2, name: "5K Training Plan", item: "https://www.scarpers.co.uk/5k-training-plan" },
-      ],
-    });
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Course",
+        name: "Free Personalised 5K Training Plan",
+        description: "AI-generated 6–8 week 5K training plan with three to four runs per week, HR zones and Garmin sync.",
+        provider: { "@type": "Organization", name: "Scarpers", url: "https://www.scarpers.co.uk/" },
+        url: "https://www.scarpers.co.uk/5k-training-plan",
+        hasCourseInstance: {
+          "@type": "CourseInstance",
+          courseMode: "online",
+          courseWorkload: "PT6W",
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "5K Training Plan", item: "https://www.scarpers.co.uk/5k-training-plan" },
+        ],
+      },
+    ]);
     document.head.appendChild(ld);
     return () => { ld.remove(); };
   }, []);
