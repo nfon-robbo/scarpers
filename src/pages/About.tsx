@@ -1,9 +1,37 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 import CoachClaireCard from "@/components/CoachClaireCard";
 
-const About = () => (
+const About = () => {
+  useEffect(() => {
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "Scarpers",
+        url: "https://www.scarpers.co.uk/",
+        logo: "https://www.scarpers.co.uk/og-image.png",
+        email: "hello@scarpers.co.uk",
+        description: "Independent UK-built AI running coach offering free personalised training plans for 5K, 10K, half, marathon and ultra.",
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "About", item: "https://www.scarpers.co.uk/about" },
+        ],
+      },
+    ]);
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, []);
+
+  return (
   <MarketingPageLayout
     title="About Scarpers — The AI Running Coach Behind Your Plan"
     description="Scarpers is an independent UK-built AI running coach. Learn who's behind it, how plans are generated, our editorial standards and how to contact us."
