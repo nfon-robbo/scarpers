@@ -108,6 +108,7 @@ const About = () => {
       </div>
     </article>
   </MarketingPageLayout>
-);
+  );
+};
 
 export default About;
