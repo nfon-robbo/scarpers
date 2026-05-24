@@ -83,10 +83,24 @@ const SleepCalendar = () => {
     return "bg-destructive/60 text-white";
   };
 
+  const cacheKey = (dateStr: string, score: number) =>
+    `sleep-insight:${user?.id ?? "anon"}:${dateStr}:${score}`;
+
   const fetchInsight = useCallback(async (dateStr: string) => {
     const data = byDate[dateStr];
     if (!data) return;
     setInsight("");
+
+    // Try cache first (keyed by date + score so a re-scored night re-analyses).
+    try {
+      const cached = localStorage.getItem(cacheKey(dateStr, data.score));
+      if (cached) {
+        setInsight(cached);
+        setInsightLoading(false);
+        return;
+      }
+    } catch { /* ignore */ }
+
     setInsightLoading(true);
 
     try {
@@ -143,12 +157,19 @@ const SleepCalendar = () => {
           } catch { /* partial */ }
         }
       }
+
+      // Persist completed analysis so future clicks are instant.
+      if (accumulated.trim().length > 0) {
+        try {
+          localStorage.setItem(cacheKey(dateStr, data.score), accumulated);
+        } catch { /* quota — ignore */ }
+      }
     } catch (e) {
       setInsight("Error generating insight.");
     } finally {
       setInsightLoading(false);
     }
-  }, [byDate]);
+  }, [byDate, user]);
 
   const handleDayClick = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
