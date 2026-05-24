@@ -5,7 +5,7 @@ const Terms = () => {
 
   return (
     <MarketingPageLayout
-      title="Terms of Service | Scarpers"
+      title="Terms of Service | Scarpers AI Running Coach"
       description="The terms governing your use of Scarpers — the AI running coach that generates free personalised training plans."
       canonicalPath="/terms"
     >
