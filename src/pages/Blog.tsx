@@ -29,6 +29,29 @@ const Blog = () => {
       setLoading(false);
     };
     load();
+
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        name: "Scarpers Running Blog",
+        url: "https://www.scarpers.co.uk/blog",
+        description: "Training advice, AI coaching insights and race day tips for runners chasing 5K, 10K, half, marathon and ultra.",
+        publisher: { "@type": "Organization", name: "Scarpers", url: "https://www.scarpers.co.uk/" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "Blog", item: "https://www.scarpers.co.uk/blog" },
+        ],
+      },
+    ]);
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
   }, []);
 
   return (
