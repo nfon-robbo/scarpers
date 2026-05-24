@@ -5,7 +5,7 @@ const Privacy = () => {
 
   return (
     <MarketingPageLayout
-      title="Privacy Policy | Scarpers"
+      title="Privacy Policy | Scarpers AI Running Coach"
       description="How Scarpers collects, uses and protects your data — including activity, sleep and onboarding information used to generate AI training plans."
       canonicalPath="/privacy"
     >
