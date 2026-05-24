@@ -1,8 +1,35 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 
-const AIRunningCoach = () => (
+const AIRunningCoach = () => {
+  useEffect(() => {
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "AI Running Coach — Personalised Plans by Scarpers",
+        url: "https://www.scarpers.co.uk/ai-running-coach",
+        description: "How Scarpers' AI running coach builds personalised training plans from your data, sleep and readiness.",
+        isPartOf: { "@type": "WebSite", name: "Scarpers", url: "https://www.scarpers.co.uk/" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "AI Running Coach", item: "https://www.scarpers.co.uk/ai-running-coach" },
+        ],
+      },
+    ]);
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, []);
+
+  return (
   <MarketingPageLayout
     title="AI Running Coach — Personalised Plans by Scarpers"
     description="Scarpers is an AI running coach that builds personalised training plans from your running data, sleep, readiness and goals. See how it works and how it differs from a human coach."
