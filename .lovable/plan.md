@@ -1,161 +1,445 @@
-Scope (phase 1 — basic pause/resume)
+# Create algorithm documentation
 
-Implements items 1–3 from the brief, plus the database schema. Item 4 gives users a choice between shifting the race date or keeping it fixed (with intelligent resume point). Item 5 (Garmin / [Intervals.icu](http://Intervals.icu) workout deletion + re-sync on resume) is deferred to phase 2 to keep this ship-able.
+&nbsp;
 
-The user is told clearly in both the pause and resume confirmations how their race date and plan structure will be affected.
+Create /docs/algorithms/ with four markdown files. Source of truth = the actual code (your spec values will be adjusted where they differ — see notes below). Same style across all four: numbered sections, markdown tables, formula code blocks, worked examples with real numbers, "Where it's consumed" section, file/function refs, and short "Why?" callouts on key decisions.
 
-Database
+&nbsp;
 
-New migration adds four columns to [public.training](http://public.training)_plans:
+Files
 
-- paused_at TIMESTAMPTZ NULL
+&nbsp;
 
-- paused_until TIMESTAMPTZ NULL
+sleep-score.md — written first, becomes the template.
 
-- pause_reason TEXT NULL (free text; UI offers Holiday / Illness / Injury / Other)
+&nbsp;
 
-- race_date_mode TEXT NULL ('fixed' | 'shift')
+Source: src/lib/sleep-score.ts (calculateSleepScore, scoreLabel).
 
-No RLS changes needed — the existing auth.uid() = user_id policies cover these columns. After migration runs, Supabase types regenerate automatically and the page reads them.
+&nbsp;
 
-New component: PlanPauseDialog.tsx
+Sections: Inputs · Two scoring paths (fallback duration-only vs full stages) · Component breakdown (Duration 25 · Deep 30 · REM 20 · Efficiency 15 · Light-heavy penalty −10) · Final assembly & clamp · Label thresholds · Worked example (e.g. 7h45 sleep, 18% deep, 22% REM, 91% eff → ~88) · Where consumed (SleepCalendar, readiness.ts, sleep-insight edge fn, AIChatbot).
 
-Single dialog with two modes driven by current pause state.
+&nbsp;
 
-Pause mode (when paused_at is null):
+body-battery.md
 
-- Start date: defaults to today, calendar picker.
+&nbsp;
 
-- End date: defaults to today + 7d, calendar picker, must be > start.
+Source: src/lib/body-battery.ts (computeBodyBattery, initialBatteryFromSleep, passiveDrainRate, totalPassiveDrain, activityDrain).
 
-- Reason chips: Holiday / Illness / Injury / Other (writes to pause_reason).
+&nbsp;
 
-- Race date handling (NEW): Two radio options with live preview:
+Sections per your outline, but values match code:
 
-  ● Keep race date fixed (DEFAULT)
+&nbsp;
 
-    Race stays: 6 Jul 2026
+- Starting charge = base 45 + duration (≤40) + deep bonus (≤12) + REM bonus (≤8) + HRV vs baseline (±10) + sleep-debt (±5). Floor 10, ceiling 100. (Your spec's "9 pts/hr × deep_minutes" formula isn't what the code does — I'll document the actual stepwise table.)
 
-    Plan will compress to fit
+&nbsp;
 
-    Resume at: Week 4 (recovery week recommended)
+- Passive drain bands: 0–4h → 2/hr, 4–8h → 3/hr, 8–12h → 4/hr, 12h+ → 5/hr (integrated hour-by-hour). (Your spec said 1–8h→2/hr; code says 0–4h→2, 4–8h→3. Documenting code.)
 
-    ⚠️ Week 3 skipped to maintain race date
+&nbsp;
 
-    
+- Activity drain = intensityLoad × 0.05 pts per activity, summed.
 
-  ○ Shift race date forward
+&nbsp;
 
-    Race moves: 6 Jul → 13 Jul (+7 days)
+- Status bands: Charged ≥70 · Steady ≥40 · Low ≥20 · Drained <20. Floor 5.
 
-    Full plan preserved, all weeks shift
+&nbsp;
 
-- Preview block updates based on selected option:
+- Worked example (95% start → 14h awake → 1h hard run): show passive integration ~46pts + activity ~10pts → ~39%.
 
-  * Fixed: "Resume at Week 4 on Mon 29 May. Race day stays 06 Jul (5 weeks remaining). Week 3 skipped."
+&nbsp;
 
-  * Shift: "Plan resumes Mon 29 May. Race day moves from 06 Jul → 13 Jul (+7 days)."
+- Where consumed: BodyBattery48hDialog.tsx, readiness.ts (as a penalty, not a positive weight), readiness-hourly-snapshot edge fn.
 
-- Confirm writes paused_at, paused_until, pause_reason, and race_date_mode. No date shift on pause — workouts in the pause window are simply hidden behind the banner and don't count as "missed".
+&nbsp;
 
-Resume mode (when paused_at is not null and user clicks Resume):
+- Note: there is no formal "Reserve Mode" in code — I'll document the Drained status instead and flag that "Reserve Mode" isn't implemented.
 
-Three radio options (shown only if race_date_mode was 'shift'; if 'fixed', auto-selects intelligent resume point):
+&nbsp;
 
-- Skip to next week (recommended) — shifts all workouts from paused_at onward forward so the next scheduled session lands on the Monday after paused_until. If race_date_mode was 'fixed', automatically jumps to the most appropriate week given remaining time to race.
+readiness.md
 
-- Repeat last completed week — same shift, but the week before paused_at is duplicated and inserted at the new resume point.
+&nbsp;
 
-- Continue from paused week — shifts workouts forward by exactly the pause duration (start of paused week resumes on resume date).
+Source: src/lib/readiness.ts (computeReadiness).
 
-Preview: shows new race day (if shifted) or confirmed fixed race day, and the week/date where training resumes.
+&nbsp;
 
-Confirm clears paused_at / paused_until / pause_reason / race_date_mode, rewrites content via the appropriate helper (shift or intelligent resume), and updates training_plans.race_date and start_date if they moved.
+Actual weights (not the ones in your spec):
 
-Race date handling logic:
+&nbsp;
 
-FIXED RACE DATE MODE:
+| Factor | Weight |
 
-- Calculate: pauseDays = paused_until - paused_at
+|--------|--------|
 
-- Calculate: daysToRace = race_date - paused_until  
+| Sleep Quality | 34% |
 
-- Calculate: weeksRemaining = floor(daysToRace / 7)
+| HRV vs baseline | 23% |
 
-- Determine intelligent resume point using new helper intelligentResumePoint(currentWeek, weeksRemaining, totalPlanWeeks):
+| Yesterday's Load | 16% |
 
-  * If paused during Weeks 1-3 (base building) → resume at Week 4 (recovery week)
+| Deep Sleep % | 15% |
 
-  * If paused during Week 4 (recovery) → resume at Week 5 (speed building)
+| Resting HR vs baseline | 12% |
 
-  * If paused during Weeks 5-6 (speed/race pace) → resume at same week (critical phase)
+&nbsp;
 
-  * If paused during Weeks 7-8 (taper) → resume at Week 7 (skip minimal)
+Plus EOD-only modifiers (additive ±): Recovery clock, 3-day Sleep Debt, Training Monotony (7d/28d), Today's Effort, Body Battery penalty (max −25). Morning mode skips modifiers.
 
-- Show clear messaging: "Week 3 skipped to keep race date fixed at 6 Jul"
+&nbsp;
 
-- Race date remains unchanged in database
+Sections: Inputs · Mode (morning vs eod) · Each factor's scoring curve (with the exact thresholds from code, e.g. sleep aggressive curve s≥80 raw, ≥60 ×0.75, ≥50 ×0.65, else ×0.55; HRV pct bands; RHR diff bands; deep% bands; yesterday-load bands) · Modifier formulas · Composite assembly (baseScore = Σ(factor×weight), then + modifiers + batteryPenalty, clamp 5–100) · Label thresholds (taken from ReadinessWidget) · Carry-forward behavior (note where it lives — readiness-hourly-snapshot / widget logic; I'll verify in the file before writing) · Worked example · Where consumed (ReadinessWidget, Dashboard, edge fn).
 
-- Skipped weeks are noted in pause metadata for user reference
+&nbsp;
 
-SHIFT RACE DATE MODE:
+I'll flag where your spec's "7-factor 34/18/16/13/12/4/3" diverges from the implemented 5-factor + modifiers model.
 
-- All workouts shift forward by pauseDays using existing shiftPlanDates helper
+&nbsp;
 
-- race_date shifts forward by pauseDays
+race-predictor.md
 
-- start_date shifts forward by pauseDays  
+&nbsp;
 
-- Full 8-week plan structure preserved
+Source: supabase/functions/race-predict/index.ts.
 
-- All weeks remain intact
+&nbsp;
 
-Phase 1 uses the existing shiftPlanDates(markdown, deltaDays) in TrainingPlan.tsx — we extract it into src/lib/plan-utils.ts so the dialog can call it. Add new helper intelligentResumePoint(currentWeek, weeksRemaining, totalWeeks) that calculates which week to resume at when race date is fixed. The "repeat last week" variant additionally splices the previous week's table rows in.
+IMPORTANT: This function was recently refactored (May 2026). Document the CURRENT implementation with all recent fixes.
 
-UI integration in src/pages/TrainingPlan.tsx
+&nbsp;
 
-- Load paused_at, paused_until, pause_reason, race_date_mode alongside the existing plan fetch and store in component state.
+Current weights (after May 2026 fixes): VO2 max 60% · Tempo 30% · Easy 10%
 
-- Add a <Button variant="secondary">⏸️ Pause Plan</Button> next to the existing date popover in the headerAction slot passed to PlanOverview. When paused, the same button becomes ▶️ Resume Training.
+&nbsp;
 
-- Above PlanOverview, when paused, render a new <PlanPausedBanner>:
+Sections:
 
-  * Amber/warning surface, lock icon, headline "Plan paused until DD MMM yyyy"
+&nbsp;
 
-  * Shows: "Race date: [fixed at 6 Jul | moved to 13 Jul]" based on race_date_mode
+1. Inputs
 
-  * Optional reason chip (Holiday/Illness/Injury), "Resume now" button on the right.
+   - Activities from past 56 days
 
-- Pass isPaused down to PlanOverview / PlanDayList / RaceEstimateTabs:
+   - VO2 max from past 14 days  
 
-  * PlanOverview already shows "Today's workout" — when paused, replace that block with a muted "Paused — recovery time" card and stop computing "missed" markers (skip the isBefore(today) strike-through for dates inside the pause window).
+   - Readiness scores from past 7 days
 
-  * RaceEstimateTabs — gate the auto-recalculate trigger; when paused, render the last prediction with a small "Paused" pill and skip the racePredictRefresh re-fetch.
+   - Training plan data (if available)
 
-- Dashboard.tsx (/dashboard) — read the same fields and show the banner there too so the user sees it on the home screen with race date mode clearly indicated.
+&nbsp;
 
-Manual activity logging continues to work because the activities tables and Upload page are independent of plan state.
+2. Activity Filtering (Walk/Run Contamination Removal)
 
-Out of scope (phase 2 follow-up, will land in a separate change)
+   Exclude activities that match ANY of these criteria:
 
-- Advanced intelligent compression with workout criticality analysis (phase 1 uses simple week-based resume logic).
+   - Title matches regex: /walk|interval|fartlek/i
 
-- Deleting future workouts from Garmin / [Intervals.icu](http://Intervals.icu) on pause and re-syncing on resume (item 5). Today the user must run their normal sync after resume; the resume confirmation toast will mention this.
+   - Average pace > 8:30/km (too slow to be running)
 
-Files touched
+   - Lap variance coefficient of variation (CV) > 0.30 (inconsistent effort)
 
-- supabase/migrations/<timestamp>_add_plan_pause.sql — add 4 nullable columns (including race_date_mode).
+   - Heart rate < 100 bpm for >10% of total duration
 
-- src/lib/plan-utils.ts — new file; export shiftPlanDates, intelligentResumePoint(currentWeek, weeksRemaining, totalWeeks), duplicateWeek(date) helpers extracted from TrainingPlan.tsx.
+   - Recent activities: prefer past 21 days, extend to 56 days if insufficient data
 
-- src/components/PlanPauseDialog.tsx — new dialog component with race date choice (fixed vs shift), live preview, and mode-appropriate resume options.
+&nbsp;
 
-- src/components/PlanPausedBanner.tsx — new banner component showing pause status and race date mode.
+3. Run Segment Extraction (NEW - May 2026)
 
-- src/pages/TrainingPlan.tsx — load pause state including race_date_mode, render banner, wire pause/resume button into headerAction, gate "missed" logic when paused.
+   - Data source: gps_track field in raw_data JSON
 
-- src/pages/Dashboard.tsx — render the same banner when the active plan is paused.
+   - Speed threshold: ≥ 7.0 km/h (NOTE: Garmin stores speed in km/h, not m/s)
 
-- src/components/PlanOverview.tsx — accept an isPaused prop; when true, skip the "today's workout" block and don't render strike-through on past dates inside the pause window.
+   - Minimum viable run time: 8 minutes total extracted running
 
-- src/components/RaceEstimateTabs.tsx — accept isPaused; show "Paused" pill and skip auto-refresh.
+   - Validation: extracted average pace must be < 8:30/km
+
+   - Purpose: Extract clean running segments from walk/run interval workouts
+
+   - This prevents walk breaks from contaminating tempo pace calculations
+
+&nbsp;
+
+4. Pace Extraction
+
+   - Easy pace: median pace from activities with HR ≤ 150 bpm, pace between 4:00-9:00/km
+
+   - Tempo pace: fastest sustained run ≥15 min from past 14 days
+
+     * If activity contains walk breaks: use run segment extraction
+
+     * Extract only portions where speed ≥ 7.0 km/h
+
+     * Calculate average pace from extracted segments only
+
+   - Both categories use run segment extraction to eliminate walk contamination
+
+&nbsp;
+
+5. VO2 Max → 5K Pace Conversion
+
+   - Table-based lookup (e.g., VO2 38 → 5:35/km for 5K)
+
+   - Riegel formula for distance extrapolation to other race distances
+
+   - Reference: VO2 max to race pace tables (standard running physiology)
+
+&nbsp;
+
+6. Weighted Prediction Formula (UPDATED May 2026)
+
+   Three-component weighted average:
+
+   - VO2 max baseline: 60% weight (increased from 30%)
+
+     * Direct lookup from VO2 → pace table
+
+   - Extracted tempo pace: 30% weight (unchanged)
+
+     * Conversion: tempo_pace - 65 s/km → estimated race pace
+
+     * Rationale: tempo is ~10-15 s/km slower than 5K race pace
+
+   - Easy pace: 10% weight (unchanged)
+
+     * Conversion: easy_pace - 90 s/km → estimated race pace
+
+     * Rationale: easy is ~1:30/km slower than race pace
+
+   Final prediction = (VO2_component × 0.60) + (tempo_component × 0.30) + (easy_component × 0.10)
+
+   Then multiply by distance to get total time.
+
+&nbsp;
+
+7. Pace Range Requirement (Garmin/Intervals.icu Sync)
+
+   - Problem: Single pace values fail silently on Garmin watches
+
+   - Solution: All pace targets must be ranges
+
+   - Format: center_pace ± 15 s/km
+
+   - Example: 6:00/km → range of 5:45-6:15/km
+
+   - threshold_pace requirement: 
+
+     * Must exist on athlete's Run sport settings in Intervals.icu
+
+     * If missing, Edge Function PUTs threshold_pace: 3.03 m/s before creating workout
+
+     * Without this, Garmin drops ALL pace targets from synced workouts
+
+&nbsp;
+
+8. Sanity Cap (NEW - May 2026)
+
+   - Safety check: if prediction > 1.4× VO2-only baseline → reject and use VO2-only
+
+   - Purpose: Prevent absurd predictions from contaminated or erroneous data
+
+   - Example: VO2 38 gives baseline ~33:34 for 5K
+
+     * Sanity cap: 33:34 × 1.4 = 47:08
+
+     * Any prediction >47:08 is replaced with 33:34 (VO2-only estimate)
+
+&nbsp;
+
+9. Adjustments
+
+   - Plan completion taper: up to −8% time reduction for weeks completed
+
+   - Adherence penalty: if plan completion <70%, add penalty
+
+   - Mean readiness adjustment: ±1-2% based on 7-day average readiness score
+
+   - These are secondary adjustments applied AFTER the weighted prediction
+
+&nbsp;
+
+10. Confidence Tiers
+
+    - HIGH: Recent tempo data (<7 days), VO2 max current, 5+ qualifying runs
+
+    - MEDIUM: Tempo 7-14 days old, 3-4 qualifying runs
+
+    - LOW: Stale data (>14 days), <3 qualifying runs, or missing components
+
+&nbsp;
+
+11. History Deduplication
+
+    - Skip recalculation if identical prediction exists within past 6 hours
+
+    - Prevents spam from multiple page loads or pause/resume actions
+
+    - Only user-triggered manual recalculation or new activity sync should force update
+
+&nbsp;
+
+12. Graceful Degradation
+
+    - Returns "insufficient data" response if <3 qualifying runs in past 21 days
+
+    - Returns VO2-only baseline if tempo/easy data unavailable
+
+    - Never crashes or returns null - always provides best available estimate
+
+&nbsp;
+
+13. Worked Example
+
+    User profile:
+
+    - VO2 max: 38
+
+    - Recent tempo: 7:29/km (extracted from walk/run interval workout using run segments)
+
+    - Recent easy: 8:00/km
+
+    - Target: 5K race
+
+    Component calculations:
+
+    - VO2 baseline (60%): VO2 38 → 5:35/km → 33:34 for 5K
+
+    - Tempo component (30%): 7:29/km - 65s = 6:24/km → 32:02 for 5K
+
+    - Easy component (10%): 8:00/km - 90s = 6:30/km → 32:30 for 5K
+
+    Weighted average:
+
+    (33:34 × 0.60) + (32:02 × 0.30) + (32:30 × 0.10) = 32:57
+
+    Final prediction: 32:57 for 5K (6:38/km pace)
+
+    Sanity check: 32:57 < 47:08 (1.4× baseline) ✓ PASS
+
+    Goal comparison: Target 30:00, currently 3:09 slower
+
+&nbsp;
+
+14. Where Consumed
+
+    - RaceEstimateTabs.tsx (main gauge display, current prediction)
+
+    - RacePredictionGraph.tsx (historical progress chart, trend line)
+
+    - RaceTimeEstimate.tsx (summary card with goal comparison)
+
+    - AIChatbot race prediction intent (AI assistant queries)
+
+    - supabase/functions/intervals-sync (for creating workouts with pace targets)
+
+&nbsp;
+
+15. Recent Fixes & Evolution (May 2026)
+
+    Critical improvements that fixed major prediction bugs:
+
+    - Run segment extraction from GPS tracks (7.0 km/h speed threshold)
+
+      * Problem: Walk/run interval workouts averaged walk breaks into tempo pace
+
+      * Example: 10 min run + 5 min walk = 7:29/km average (wrong)
+
+      * Solution: Extract only running segments → 6:30/km true running pace
+
+    - Walk/run activity filtering
+
+      * Exclude activities with "walk", "interval", "fartlek" in title
+
+      * Prevents contamination of pace calculations
+
+    - VO2 max weighting increased: 30% → 60%
+
+      * Old bug: User with VO2 42 predicted 47:27 for 5K (absurd)
+
+      * Root cause: Contaminated tempo data weighted too heavily (50%)
+
+      * Fix: Trust VO2 max more (60%), tempo less (30%)
+
+      * Result: Same user now predicts 32:57 (realistic)
+
+    - Pace range enforcement for Garmin sync
+
+      * Single values fail silently on watch
+
+      * Must use ±15s/km ranges
+
+    - Sanity cap implementation
+
+      * Prevents predictions >1.4× VO2 baseline
+
+      * Catches data quality issues before they reach user
+
+    - threshold_pace auto-creation
+
+      * Intervals.icu requires threshold_pace on Run sport
+
+      * Function now PUTs 3.03 m/s if missing
+
+      * Without this, ALL pace targets disappear from Garmin workouts
+
+&nbsp;
+
+16. Known Limitations
+
+    - Requires minimum 3 qualifying runs in 21 days
+
+    - Cannot predict for distances >marathon (Riegel formula breaks down)
+
+    - Assumes consistent training - sudden fitness changes lag by 7-14 days
+
+    - GPS accuracy affects run segment extraction quality
+
+    - Weather/terrain not factored (assumes similar conditions to training)
+
+&nbsp;
+
+Reference functions: 
+
+- supabase/functions/race-predict/index.ts
+
+  * extractRunSegments() - GPS track parsing
+
+  * predictRaceTime() - main prediction logic
+
+  * POST handler - orchestration and validation
+
+&nbsp;
+
+Formatting (applied to all four)
+
+&nbsp;
+
+- Numbered top-level sections, ### for sub-blocks.
+
+- Markdown tables for every threshold band.
+
+- Formulas in fenced code blocks.
+
+- "Why?" italic callouts on non-obvious choices (e.g. why deep% is weighted heaviest; why HRV missing is a mild penalty not catastrophic; why race predictor weights tempo > VO2 was WRONG and VO2 > tempo is correct).
+
+- Final "Where it's consumed" bullet list with file.tsx + function name.
+
+- UK date format if any dates appear.
+
+&nbsp;
+
+Order
+
+&nbsp;
+
+sleep-score.md → body-battery.md → readiness.md → race-predictor.md.
+
+&nbsp;
+
+No code changes outside /docs/algorithms/.
