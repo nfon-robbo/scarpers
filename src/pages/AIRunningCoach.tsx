@@ -32,7 +32,7 @@ const AIRunningCoach = () => {
   return (
   <MarketingPageLayout
     title="AI Running Coach — Personalised Plans by Scarpers"
-    description="Scarpers is an AI running coach that builds personalised training plans from your running data, sleep, readiness and goals. See how it works and how it differs from a human coach."
+    description="Scarpers is an AI running coach that builds personalised training plans from your running data, sleep and readiness. See how it works."
     canonicalPath="/ai-running-coach"
   >
     <article className="prose prose-invert max-w-none">
