@@ -160,6 +160,7 @@ const CoachClaire = () => {
       </div>
     </article>
   </MarketingPageLayout>
-);
+  );
+};
 
 export default CoachClaire;
