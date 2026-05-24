@@ -33,12 +33,11 @@ const SleepCalendar = () => {
     if (!user) return;
     const since = subDays(new Date(), 365).toISOString().split("T")[0];
 
-    // Only use Google Fit + Health Connect via sleep_stages
+    // Include all sources (google_fit, health_connect, manual, etc.)
     const { data } = await supabase
       .from("sleep_stages")
       .select("date, stage, duration_seconds, source")
       .eq("user_id", user.id)
-      .in("source", ["google_fit", "health_connect"])
       .gte("date", since)
       .order("date", { ascending: true });
 
