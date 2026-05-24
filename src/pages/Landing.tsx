@@ -857,8 +857,52 @@ const Landing = () => {
         </div>
       </section>
 
+      <section className="border-t border-border/40 bg-background">
+        <div className="max-w-6xl mx-auto px-5 py-14">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-3" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+            Explore Scarpers
+          </h2>
+          <p className="text-muted-foreground text-sm sm:text-base max-w-2xl mb-8">
+            Free training plans, guides and the AI coaching system behind every Scarpers session.
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link to="/5k-training-plan" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Plan</p>
+              <h3 className="font-semibold text-foreground mb-1">Free 5K Training Plan</h3>
+              <p className="text-sm text-muted-foreground">Personalised 6–8 week plan, beginner-friendly, sub-30 ready.</p>
+            </Link>
+            <Link to="/10k-training-plan" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Plan</p>
+              <h3 className="font-semibold text-foreground mb-1">Free 10K Training Plan</h3>
+              <p className="text-sm text-muted-foreground">8–10 weeks of threshold, intervals and race-pace work.</p>
+            </Link>
+            <Link to="/ai-running-coach" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Coach</p>
+              <h3 className="font-semibold text-foreground mb-1">How the AI Coach works</h3>
+              <p className="text-sm text-muted-foreground">Plans, briefings and reviews built from your data.</p>
+            </Link>
+            <Link to="/coach/claire-rayners" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Coach</p>
+              <h3 className="font-semibold text-foreground mb-1">Meet Coach Claire Rayners</h3>
+              <p className="text-sm text-muted-foreground">The programmable elite coaching system behind every plan.</p>
+            </Link>
+            <Link to="/blog" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Blog</p>
+              <h3 className="font-semibold text-foreground mb-1">Running Blog</h3>
+              <p className="text-sm text-muted-foreground">Training advice, race tips and AI coaching insights.</p>
+            </Link>
+            <Link to="/about" className="rounded-2xl border border-border bg-card/60 p-5 hover:border-primary/50 transition-colors">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">About</p>
+              <h3 className="font-semibold text-foreground mb-1">About Scarpers</h3>
+              <p className="text-sm text-muted-foreground">Who builds Scarpers, our editorial standards and contact.</p>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+
       <footer className="border-t border-border/40 bg-card/30 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-3 gap-6 text-sm">
+        <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-4 gap-6 text-sm">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <img src={scarpersIcon} alt="" className="h-7 w-7 object-contain" />
@@ -871,46 +915,29 @@ const Landing = () => {
           <div>
             <p className="font-semibold mb-3">Product</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li>
-                <a href="#how" className="hover:text-foreground">
-                  How it works
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-foreground">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a href="#watch" className="hover:text-foreground">
-                  Garmin sync
-                </a>
-              </li>
-              <li>
-                <a href="#faq" className="hover:text-foreground">
-                  FAQ
-                </a>
-              </li>
+              <li><a href="#how" className="hover:text-foreground">How it works</a></li>
+              <li><a href="#features" className="hover:text-foreground">Features</a></li>
+              <li><a href="#watch" className="hover:text-foreground">Garmin sync</a></li>
+              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
             </ul>
           </div>
           <div>
-            <p className="font-semibold mb-3">Account</p>
+            <p className="font-semibold mb-3">Training</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li>
-                <Link to="/auth" className="hover:text-foreground">
-                  Sign in
-                </Link>
-              </li>
-              <li>
-                <Link to="/auth" className="hover:text-foreground">
-                  Create account
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacy" className="hover:text-foreground">
-                  Privacy
-                </Link>
-              </li>
+              <li><Link to="/ai-running-coach" className="hover:text-foreground">AI Running Coach</Link></li>
+              <li><Link to="/5k-training-plan" className="hover:text-foreground">5K Training Plan</Link></li>
+              <li><Link to="/10k-training-plan" className="hover:text-foreground">10K Training Plan</Link></li>
+              <li><Link to="/coach/claire-rayners" className="hover:text-foreground">Coach Claire Rayners</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold mb-3">Company</p>
+            <ul className="space-y-2 text-muted-foreground">
+              <li><Link to="/about" className="hover:text-foreground">About</Link></li>
+              <li><Link to="/blog" className="hover:text-foreground">Blog</Link></li>
+              <li><Link to="/auth" className="hover:text-foreground">Sign in</Link></li>
+              <li><Link to="/privacy" className="hover:text-foreground">Privacy</Link></li>
+              <li><Link to="/terms" className="hover:text-foreground">Terms</Link></li>
             </ul>
           </div>
         </div>

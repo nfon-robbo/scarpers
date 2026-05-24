@@ -9,14 +9,29 @@ const TenKTrainingPlan = () => {
   useEffect(() => {
     const ld = document.createElement("script");
     ld.type = "application/ld+json";
-    ld.text = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "BreadcrumbList",
-      itemListElement: [
-        { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
-        { "@type": "ListItem", position: 2, name: "10K Training Plan", item: "https://www.scarpers.co.uk/10k-training-plan" },
-      ],
-    });
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Course",
+        name: "Free Personalised 10K Training Plan",
+        description: "AI-generated 8–10 week 10K training plan with threshold, intervals, race-pace work, HR zones and Garmin sync.",
+        provider: { "@type": "Organization", name: "Scarpers", url: "https://www.scarpers.co.uk/" },
+        url: "https://www.scarpers.co.uk/10k-training-plan",
+        hasCourseInstance: {
+          "@type": "CourseInstance",
+          courseMode: "online",
+          courseWorkload: "PT8W",
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "10K Training Plan", item: "https://www.scarpers.co.uk/10k-training-plan" },
+        ],
+      },
+    ]);
     document.head.appendChild(ld);
     return () => { ld.remove(); };
   }, []);
