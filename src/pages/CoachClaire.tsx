@@ -1,10 +1,39 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import MarketingPageLayout from "@/components/MarketingPageLayout";
 import { Sparkles, Activity, BookOpen, ShieldCheck, Cpu, Mail } from "lucide-react";
 import coachClaireImg from "@/assets/coach-claire.png";
 
-const CoachClaire = () => (
+const CoachClaire = () => {
+  useEffect(() => {
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        name: "Coach Claire Rayners",
+        url: "https://www.scarpers.co.uk/coach/claire-rayners",
+        image: "https://www.scarpers.co.uk/og-image.png",
+        jobTitle: "AI Running Coach",
+        description: "Programmable AI running coach behind every Scarpers plan, day-ahead briefing and post-run review.",
+        worksFor: { "@type": "Organization", name: "Scarpers", url: "https://www.scarpers.co.uk/" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: "https://www.scarpers.co.uk/" },
+          { "@type": "ListItem", position: 2, name: "Coach Claire Rayners", item: "https://www.scarpers.co.uk/coach/claire-rayners" },
+        ],
+      },
+    ]);
+    document.head.appendChild(ld);
+    return () => { ld.remove(); };
+  }, []);
+
+  return (
   <MarketingPageLayout
     title="Coach Claire Rayners — Scarpers' AI Running Coach"
     description="Meet Coach Claire Rayners: the system-built, programmable elite running coach behind every Scarpers plan, day-ahead briefing and post-run review."
