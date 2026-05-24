@@ -126,6 +126,7 @@ const AIRunningCoach = () => {
       </div>
     </article>
   </MarketingPageLayout>
-);
+  );
+};
 
 export default AIRunningCoach;
