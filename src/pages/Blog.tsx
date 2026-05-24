@@ -60,14 +60,30 @@ const Blog = () => {
       description="Expert running advice, AI coaching insights, training plan guides and race day tips from the team at Scarpers."
       canonicalPath="/blog"
     >
-      <div className="text-center mb-10">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">From the Coach</p>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
-          Scarpers Running Blog
-        </h1>
-        <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
-          Training advice, race day tips and AI coaching insights for runners chasing 5K, 10K, half, marathon and ultra.
-        </p>
+      <div className="mb-10">
+        <div className="text-center">
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">From the Coach</p>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>
+            Scarpers Running Blog
+          </h1>
+          <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
+            Training advice, race day tips and AI coaching insights for runners chasing 5K, 10K, half, marathon and ultra.
+          </p>
+        </div>
+        <div className="max-w-2xl mx-auto mt-8 text-sm space-y-3">
+          <p className="text-muted-foreground leading-relaxed">
+            The Scarpers blog is where we publish the thinking behind every plan the AI writes. Expect deep dives on
+            polarised training, heart-rate zones, race-day pacing, sleep, recovery and the data signals we use to
+            adapt your week. Most articles are 800–1,500 words, grounded in established endurance literature —
+            never invented case studies, never sponsored placements.
+          </p>
+          <p className="text-muted-foreground leading-relaxed">
+            Browse the latest posts below, or jump straight to the{" "}
+            <Link to="/5k-training-plan" className="text-primary underline">free 5K plan</Link>,{" "}
+            <Link to="/10k-training-plan" className="text-primary underline">free 10K plan</Link>, or read about{" "}
+            <Link to="/ai-running-coach" className="text-primary underline">how the AI coach works</Link>.
+          </p>
+        </div>
       </div>
 
       {loading ? (
