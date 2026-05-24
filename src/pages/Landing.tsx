@@ -858,7 +858,7 @@ const Landing = () => {
       </section>
 
       <footer className="border-t border-border/40 bg-card/30 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-3 gap-6 text-sm">
+        <div className="max-w-6xl mx-auto px-5 py-10 grid sm:grid-cols-4 gap-6 text-sm">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <img src={scarpersIcon} alt="" className="h-7 w-7 object-contain" />
@@ -871,46 +871,29 @@ const Landing = () => {
           <div>
             <p className="font-semibold mb-3">Product</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li>
-                <a href="#how" className="hover:text-foreground">
-                  How it works
-                </a>
-              </li>
-              <li>
-                <a href="#features" className="hover:text-foreground">
-                  Features
-                </a>
-              </li>
-              <li>
-                <a href="#watch" className="hover:text-foreground">
-                  Garmin sync
-                </a>
-              </li>
-              <li>
-                <a href="#faq" className="hover:text-foreground">
-                  FAQ
-                </a>
-              </li>
+              <li><a href="#how" className="hover:text-foreground">How it works</a></li>
+              <li><a href="#features" className="hover:text-foreground">Features</a></li>
+              <li><a href="#watch" className="hover:text-foreground">Garmin sync</a></li>
+              <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
             </ul>
           </div>
           <div>
-            <p className="font-semibold mb-3">Account</p>
+            <p className="font-semibold mb-3">Training</p>
             <ul className="space-y-2 text-muted-foreground">
-              <li>
-                <Link to="/auth" className="hover:text-foreground">
-                  Sign in
-                </Link>
-              </li>
-              <li>
-                <Link to="/auth" className="hover:text-foreground">
-                  Create account
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacy" className="hover:text-foreground">
-                  Privacy
-                </Link>
-              </li>
+              <li><Link to="/ai-running-coach" className="hover:text-foreground">AI Running Coach</Link></li>
+              <li><Link to="/5k-training-plan" className="hover:text-foreground">5K Training Plan</Link></li>
+              <li><Link to="/10k-training-plan" className="hover:text-foreground">10K Training Plan</Link></li>
+              <li><Link to="/coach/claire-rayners" className="hover:text-foreground">Coach Claire Rayners</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold mb-3">Company</p>
+            <ul className="space-y-2 text-muted-foreground">
+              <li><Link to="/about" className="hover:text-foreground">About</Link></li>
+              <li><Link to="/blog" className="hover:text-foreground">Blog</Link></li>
+              <li><Link to="/auth" className="hover:text-foreground">Sign in</Link></li>
+              <li><Link to="/privacy" className="hover:text-foreground">Privacy</Link></li>
+              <li><Link to="/terms" className="hover:text-foreground">Terms</Link></li>
             </ul>
           </div>
         </div>
