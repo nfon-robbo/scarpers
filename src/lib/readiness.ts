@@ -116,10 +116,10 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (34%) — primary recovery indicator
+  // Sleep Quality (32%) — primary recovery indicator
   if (d.sleepScore == null) {
     // Missing sleep = assume moderate-poor
-    weightedSum += 30 * 0.34;
+    weightedSum += 30 * 0.32;
     factors.push({
       label: "Sleep Quality",
       status: "poor",
@@ -129,7 +129,7 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
     const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s >= 50 ? s * 0.65 : s * 0.55;
-    weightedSum += adjustedSleep * 0.34;
+    weightedSum += adjustedSleep * 0.32;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -137,6 +137,7 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
       detail: `${s}/100 (${sl.label})${d.sleepHours != null ? ` · ${d.sleepHours.toFixed(1)}h` : ""}`,
     });
   }
+
 
   // Deep Sleep (15%) — standalone factor, critical for physical recovery
   if (d.deepPct != null) {
