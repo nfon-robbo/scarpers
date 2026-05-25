@@ -233,9 +233,12 @@ const SleepSourcesPanel = () => {
 
 
       const total = deep + rem + light;
-      const { data: existing } = await supabase
-        .from("daily_metrics").select("id, raw_data, spo2")
-        .eq("user_id", user.id).eq("date", form.date).maybeSingle();
+      const { data: existingRows } = await supabase
+        .from("daily_metrics").select("id, raw_data, spo2, created_at")
+        .eq("user_id", user.id).eq("date", form.date)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const existing = existingRows?.[0] ?? null;
 
       const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
       const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
