@@ -121,12 +121,19 @@ const SleepSourcesPanel = () => {
 
   const fetchExistingVitals = useCallback(async (date: string): Promise<GarminVitals | null> => {
     if (!user) return null;
+    // daily_metrics can have multiple rows per (user_id,date) — scan recent rows
+    // and pick the most recently created one that has garmin_sleep_vitals.
     const { data } = await supabase
-      .from("daily_metrics").select("raw_data")
-      .eq("user_id", user.id).eq("date", date).maybeSingle();
-    const raw = data?.raw_data as Record<string, unknown> | null | undefined;
-    const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
-    return v && typeof v === "object" ? (v as GarminVitals) : null;
+      .from("daily_metrics").select("raw_data, created_at")
+      .eq("user_id", user.id).eq("date", date)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    for (const row of data ?? []) {
+      const raw = row?.raw_data as Record<string, unknown> | null | undefined;
+      const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
+      if (v && typeof v === "object") return v as GarminVitals;
+    }
+    return null;
   }, [user]);
 
   const openAdd = async () => {
@@ -226,9 +233,12 @@ const SleepSourcesPanel = () => {
 
 
       const total = deep + rem + light;
-      const { data: existing } = await supabase
-        .from("daily_metrics").select("id, raw_data, spo2")
-        .eq("user_id", user.id).eq("date", form.date).maybeSingle();
+      const { data: existingRows } = await supabase
+        .from("daily_metrics").select("id, raw_data, spo2, created_at")
+        .eq("user_id", user.id).eq("date", form.date)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const existing = existingRows?.[0] ?? null;
 
       const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
       const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
