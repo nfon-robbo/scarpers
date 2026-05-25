@@ -543,6 +543,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         currentHour: now.getHours(),
         wakeTimeIso,
         todayActivities: todayActivityList,
+        spo2Avg: (todayMetrics as any)?.spo2_avg ?? null,
+        breathingPattern: (todayMetrics as any)?.breathing_pattern ?? null,
+        restlessCount: (todayMetrics as any)?.restless_count ?? null,
       });
       setLoading(false);
     });
