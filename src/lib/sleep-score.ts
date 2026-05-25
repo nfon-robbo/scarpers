@@ -68,7 +68,11 @@ export function advancedSleepAdjustments(adv?: AdvancedSleepMetrics | null) {
 }
 
 
-export function calculateSleepScore(stages: SleepStageData): number {
+export function calculateSleepScore(stages: SleepStageData, adv?: AdvancedSleepMetrics | null): number {
+  return calculateSleepScoreDetailed(stages, adv).total;
+}
+
+export function calculateSleepScoreDetailed(stages: SleepStageData, adv?: AdvancedSleepMetrics | null): SleepScoreBreakdown {
   const stageTotal = stages.deep + stages.light + stages.rem + stages.awake;
   const genericSleep = stages.sleep || 0;
   const total = stageTotal + genericSleep;
