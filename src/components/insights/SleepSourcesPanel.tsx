@@ -266,6 +266,38 @@ const SleepSourcesPanel = () => {
     }
   };
 
+  const [parsing, setParsing] = useState(false);
+  const handleScreenshot = async (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+    setParsing(true);
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("parse-garmin-sleep", { body: { imageDataUrl: dataUrl } });
+      if (error) throw error;
+      const v = data?.vitals as GarminVitals | undefined;
+      if (!v) throw new Error("No vitals returned");
+      setForm((f) => ({
+        ...f,
+        rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
+        hrv: v.avg_overnight_hrv != null ? String(v.avg_overnight_hrv) : f.hrv,
+        vitals: v,
+      }));
+      toast.success("Vitals extracted from screenshot");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "Failed to parse screenshot");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
