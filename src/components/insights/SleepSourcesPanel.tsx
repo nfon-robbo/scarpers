@@ -64,6 +64,10 @@ type FormState = {
   bedtime: string; wakeTime: string;
   deep: string; rem: string; light: string; awake: string;
   rhr: string; hrv: string;
+  spo2Avg: string; spo2Low: string;
+  respiration: string; breathingPattern: string;
+  skinTemp: string; restless: string;
+  hrv7d: string;
   vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
@@ -71,6 +75,10 @@ const emptyForm = (date?: string): FormState => ({
   bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
   rhr: "", hrv: "",
+  spo2Avg: "", spo2Low: "",
+  respiration: "", breathingPattern: "",
+  skinTemp: "", restless: "",
+  hrv7d: "",
   vitals: null,
 });
 
