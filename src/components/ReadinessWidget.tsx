@@ -445,7 +445,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const stages = groupSleepByDate(todaysStageRows as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
-      const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
+      const todayAdv = {
+        spo2_avg: (allMetrics.find((m: any) => m.date === today) as any)?.spo2_avg ?? null,
+        spo2_lowest: null,
+        breathing_pattern: (allMetrics.find((m: any) => m.date === today) as any)?.breathing_pattern ?? null,
+        restless_count: (allMetrics.find((m: any) => m.date === today) as any)?.restless_count ?? null,
+        skin_temp_deviation: null,
+      };
+      const sleepScore = hasSleepStages ? calculateSleepScore(stages, todayAdv) : null;
 
       const todayMetrics = allMetrics.find((m: any) => m.date === today);
       const yesterdayMetrics = allMetrics.find((m: any) => m.date === yesterday);
