@@ -374,13 +374,14 @@ const SleepSourcesPanel = () => {
       if (error) throw error;
       const v = data?.vitals as GarminVitals | undefined;
       if (!v) throw new Error("No vitals returned");
+      await saveGarminVitals(form.date, v);
       setForm((f) => ({
         ...f,
         rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
         hrv: v.avg_overnight_hrv != null ? String(v.avg_overnight_hrv) : f.hrv,
         vitals: v,
       }));
-      toast.success("Vitals extracted from screenshot");
+      toast.success("Vitals extracted and saved from screenshot");
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to parse screenshot");
