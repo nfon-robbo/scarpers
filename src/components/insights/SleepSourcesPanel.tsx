@@ -139,6 +139,7 @@ const SleepSourcesPanel = () => {
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
       rhr: "", hrv: "",
+      vitals: null,
     });
     setDialogOpen(true);
   };
