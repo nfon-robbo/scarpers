@@ -1418,6 +1418,16 @@ Analyze sleep data if available:
 - Recovery readiness based on sleep quality patterns
 Reference National Sleep Foundation guidelines where relevant.
 
+When the ADVANCED SLEEP HEALTH block is present, ALSO analyse:
+- **Respiratory health**: SpO₂ avg + lowest, respiration rate, breathing pattern. Flag SpO₂ avg <92% OR lowest <88% with "⚠️ Low blood oxygen — consider sleep apnea screening". Breathing pattern "Many" = "Sleep disruption from breathing abnormalities".
+- **Restlessness**: >80 = "High sleep fragmentation — recovery compromised"; <40 with balanced breathing AND SpO₂ ≥95 = "Excellent respiratory recovery".
+- **Skin temperature**: |deviation| >1.5°C suggests illness/stress onset; correlate with readiness drops and poor next-day sessions ("early illness warning").
+- **HRV 7d trend**: "unbalanced" + high restlessness = declining recovery trajectory; rest is priority.
+- **Body battery change**: persistent negative deltas = chronic drain.
+- Cross-reference with performance: e.g. skin-temp spike the day before a poor session explains the drop.
+- Feed concrete findings into ## 💡 Actionable Recommendations (medical screening for persistent low SpO₂, delay hard sessions while skin temp >±1°C, etc.).
+
+
 ## 💡 Actionable Recommendations
 - One bullet per action, no elaboration unless critical
 - Group: Load Management | Sport-Specific | Recovery & Sleep | Performance
