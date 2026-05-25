@@ -136,6 +136,50 @@ const SleepSourcesPanel = () => {
     return null;
   }, [user]);
 
+  const saveGarminVitals = useCallback(async (date: string, vitals: GarminVitals) => {
+    if (!user) return;
+
+    const { data: existingRows, error: fetchError } = await supabase
+      .from("daily_metrics")
+      .select("id, raw_data, created_at")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (fetchError) throw fetchError;
+
+    const rows = existingRows ?? [];
+    const existing = rows.find((row) => {
+      const raw = row?.raw_data as Record<string, unknown> | null | undefined;
+      return raw && typeof raw === "object" && Boolean((raw as any).garmin_sleep_vitals);
+    }) ?? rows[0] ?? null;
+
+    const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
+    const payload: Record<string, unknown> = {
+      user_id: user.id,
+      date,
+      raw_data: {
+        ...prevRaw,
+        garmin_sleep_vitals: {
+          ...vitals,
+          source: "garmin_screenshot",
+          captured_at: new Date().toISOString(),
+        },
+      },
+    };
+
+    const rhrFinal = vitals.resting_heart_rate ?? null;
+    const hrvFinal = vitals.avg_overnight_hrv ?? null;
+    if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
+    if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
+    if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) payload.spo2 = vitals.avg_spo2;
+
+    const { error } = existing?.id
+      ? await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id)
+      : await supabase.from("daily_metrics").insert(payload as never);
+    if (error) throw error;
+  }, [user]);
+
   const openAdd = async () => {
     setEditingDate(null);
     const f = emptyForm();
@@ -147,7 +191,7 @@ const SleepSourcesPanel = () => {
     setDialogOpen(true);
   };
 
-  const openEdit = (date: string, totals: StageTotals) => {
+  const openEdit = async (date: string, totals: StageTotals) => {
     setEditingDate(date);
     const totalAll = totals.deep + totals.rem + totals.light + totals.sleep + totals.awake;
     // Derive bedtime from default 07:00 wake when we don't know real times
@@ -156,6 +200,7 @@ const SleepSourcesPanel = () => {
     const bedTotalMin = wakeH * 60 + wakeM - Math.round(totalAll / 60);
     const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
+    const existing = await fetchExistingVitals(date);
     setForm({
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
@@ -164,8 +209,9 @@ const SleepSourcesPanel = () => {
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
-      rhr: "", hrv: "",
-      vitals: null,
+      rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
+      hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+      vitals: existing,
     });
     setDialogOpen(true);
   };
@@ -328,13 +374,14 @@ const SleepSourcesPanel = () => {
       if (error) throw error;
       const v = data?.vitals as GarminVitals | undefined;
       if (!v) throw new Error("No vitals returned");
+      await saveGarminVitals(form.date, v);
       setForm((f) => ({
         ...f,
         rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
         hrv: v.avg_overnight_hrv != null ? String(v.avg_overnight_hrv) : f.hrv,
         vitals: v,
       }));
-      toast.success("Vitals extracted from screenshot");
+      toast.success("Vitals extracted and saved from screenshot");
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to parse screenshot");
