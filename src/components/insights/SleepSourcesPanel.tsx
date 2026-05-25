@@ -291,6 +291,23 @@ const SleepSourcesPanel = () => {
     if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
     setParsing(true);
     try {
+      // Check if a screenshot has already been uploaded for this date
+      const existing = await fetchExistingVitals(form.date);
+      if (existing) {
+        setForm((f) => ({
+          ...f,
+          rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : f.rhr,
+          hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : f.hrv,
+          vitals: existing,
+        }));
+        const isToday = form.date === format(new Date(), "yyyy-MM-dd");
+        toast.info(
+          isToday
+            ? "You've already uploaded a screenshot today — showing saved stats"
+            : `Already uploaded for ${format(parseISO(form.date), "dd/MM/yyyy")} — showing saved stats`,
+        );
+        return;
+      }
       const dataUrl: string = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result as string);
