@@ -18,6 +18,7 @@ import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
 import SleepSourcesPanel from "@/components/insights/SleepSourcesPanel";
+import SleepHealthMetrics from "@/components/insights/SleepHealthMetrics";
 
 interface MetricsRow {
   date: string;
