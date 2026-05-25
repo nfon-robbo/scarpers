@@ -191,7 +191,7 @@ const SleepSourcesPanel = () => {
     setDialogOpen(true);
   };
 
-  const openEdit = (date: string, totals: StageTotals) => {
+  const openEdit = async (date: string, totals: StageTotals) => {
     setEditingDate(date);
     const totalAll = totals.deep + totals.rem + totals.light + totals.sleep + totals.awake;
     // Derive bedtime from default 07:00 wake when we don't know real times
@@ -200,6 +200,7 @@ const SleepSourcesPanel = () => {
     const bedTotalMin = wakeH * 60 + wakeM - Math.round(totalAll / 60);
     const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
+    const existing = await fetchExistingVitals(date);
     setForm({
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
@@ -208,8 +209,9 @@ const SleepSourcesPanel = () => {
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
-      rhr: "", hrv: "",
-      vitals: null,
+      rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
+      hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+      vitals: existing,
     });
     setDialogOpen(true);
   };
