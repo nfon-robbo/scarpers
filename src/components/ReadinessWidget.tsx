@@ -428,7 +428,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("daily_metrics")
-        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes, spo2_avg, breathing_pattern, restless_count")
         .eq("user_id", user.id)
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
