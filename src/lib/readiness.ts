@@ -30,7 +30,13 @@ export interface ReadinessData {
   // Body battery drain
   wakeTimeIso: string | null; // ISO timestamp of when user woke up
   todayActivities: { startIso: string; durationSec: number; intensityLoad: number }[];
+
+  // Optional sleep-respiration metrics (Garmin screenshot)
+  spo2Avg?: number | null;
+  breathingPattern?: string | null;   // Balanced/Few/Many
+  restlessCount?: number | null;
 }
+
 
 export interface ReadinessFactor {
   label: string;
@@ -110,10 +116,10 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
 
   // ── Phase 1: Core factors (fixed-weight average) ──
 
-  // Sleep Quality (34%) — primary recovery indicator
+  // Sleep Quality (32%) — primary recovery indicator
   if (d.sleepScore == null) {
     // Missing sleep = assume moderate-poor
-    weightedSum += 30 * 0.34;
+    weightedSum += 30 * 0.32;
     factors.push({
       label: "Sleep Quality",
       status: "poor",
@@ -123,7 +129,7 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     const s = d.sleepScore;
     // Aggressive curve: scores below 70 get hammered
     const adjustedSleep = s >= 80 ? s : s >= 60 ? s * 0.75 : s >= 50 ? s * 0.65 : s * 0.55;
-    weightedSum += adjustedSleep * 0.34;
+    weightedSum += adjustedSleep * 0.32;
     const sl = scoreLabel(s);
     factors.push({
       label: "Sleep Quality",
@@ -132,7 +138,8 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     });
   }
 
-  // Deep Sleep (15%) — standalone factor, critical for physical recovery
+
+  // Deep Sleep (14%) — standalone factor, critical for physical recovery
   if (d.deepPct != null) {
     const dp = d.deepPct;
     let deepReadiness: number;
@@ -147,62 +154,95 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
     } else {
       deepReadiness = 10; // catastrophic
     }
-    weightedSum += deepReadiness * 0.15;
+    weightedSum += deepReadiness * 0.14;
     factors.push({
       label: "Deep Sleep",
       status: dp >= 13 ? "good" : dp >= 10 ? "warning" : "poor",
       detail: `${Math.round(dp)}% of sleep · ${dp < 10 ? "Critically low" : dp < 13 ? "Low" : "Healthy"}`,
     });
   } else {
-    weightedSum += 25 * 0.15; // missing = assume poor but not catastrophic
+    weightedSum += 25 * 0.14; // missing = assume poor but not catastrophic
   }
 
-  // RHR vs baseline (12%)
+  // RHR vs baseline (11%)
   if (d.rhr != null && d.rhrBaseline != null) {
     const diff = d.rhr - d.rhrBaseline;
     const rhrScore = diff <= 0 ? 85 : diff <= 2 ? 75 : diff <= 4 ? 55 : diff <= 7 ? 35 : 15;
-    weightedSum += rhrScore * 0.12;
+    weightedSum += rhrScore * 0.11;
     factors.push({
       label: "Resting HR",
       status: diff <= 3 ? "good" : diff <= 7 ? "warning" : "poor",
       detail: `${Math.round(d.rhr)} bpm (${diff > 0 ? "+" : ""}${Math.round(diff)} vs avg)`,
     });
   } else if (d.rhr != null) {
-    weightedSum += 40 * 0.12;
+    weightedSum += 40 * 0.11;
     factors.push({ label: "Resting HR", status: "warning", detail: `${Math.round(d.rhr)} bpm (no baseline)` });
   } else {
-    weightedSum += 15 * 0.12; // missing = bad
+    weightedSum += 15 * 0.11; // missing = bad
   }
 
-  // HRV vs baseline (23%)
+  // HRV vs baseline (21%)
   if (d.hrv != null && d.hrvBaseline != null) {
     const diff = d.hrv - d.hrvBaseline;
     const pct = d.hrvBaseline > 0 ? (diff / d.hrvBaseline) * 100 : 0;
     const hrvScore = pct >= 10 ? 90 : pct >= 0 ? 75 : pct >= -10 ? 55 : pct >= -20 ? 35 : 15;
-    weightedSum += hrvScore * 0.23;
+    weightedSum += hrvScore * 0.21;
     factors.push({
       label: "HRV",
       status: pct >= -5 ? "good" : pct >= -15 ? "warning" : "poor",
       detail: `${Math.round(d.hrv)} ms (${pct >= 0 ? "+" : ""}${Math.round(pct)}% vs avg)`,
     });
   } else {
-    weightedSum += 40 * 0.23; // missing HRV = mild penalty (data-timing, not recovery)
+    weightedSum += 40 * 0.21; // missing HRV = mild penalty (data-timing, not recovery)
     factors.push({ label: "HRV", status: "warning", detail: "Not synced" });
   }
 
-  // Yesterday's Load — intensity-weighted (16%)
+  // Yesterday's Load — intensity-weighted (15%)
   if (d.yesterdayLoad != null) {
     const l = d.yesterdayLoad;
     const loadScore = l <= 15 ? 85 : l <= 40 ? 70 : l <= 80 ? 45 : l <= 140 ? 25 : 10;
-    weightedSum += loadScore * 0.16;
+    weightedSum += loadScore * 0.15;
     factors.push({
       label: "Yesterday's Load",
       status: l <= 40 ? "good" : l <= 80 ? "warning" : "poor",
       detail: `${Math.floor(l / 60)}:${String(Math.round(l % 60)).padStart(2, "0")} training`,
     });
   } else {
-    weightedSum += 50 * 0.16; // rest day = decent
+    weightedSum += 50 * 0.15; // rest day = decent
   }
+
+  // Respiration Health (7%) — Garmin screenshot vitals; neutral when missing
+  {
+    const hasAny = d.spo2Avg != null || d.breathingPattern != null || d.restlessCount != null;
+    if (!hasAny) {
+      weightedSum += 50 * 0.07;
+    } else {
+      let r = 50;
+      if (d.spo2Avg != null) {
+        if (d.spo2Avg >= 95) r += 20;
+        else if (d.spo2Avg < 90) r -= 30;
+      }
+      const bp = (d.breathingPattern ?? "").toLowerCase();
+      if (bp === "balanced") r += 15;
+      else if (bp === "many") r -= 15;
+      if (d.restlessCount != null) {
+        if (d.restlessCount < 40) r += 15;
+        else if (d.restlessCount > 80) r -= 20;
+      }
+      r = Math.max(0, Math.min(100, r));
+      weightedSum += r * 0.07;
+      const parts: string[] = [];
+      if (d.spo2Avg != null) parts.push(`SpO₂ ${Math.round(d.spo2Avg)}%`);
+      if (bp) parts.push(`breathing ${bp}`);
+      if (d.restlessCount != null) parts.push(`${d.restlessCount} restless`);
+      factors.push({
+        label: "Respiration Health",
+        status: r >= 70 ? "good" : r >= 45 ? "warning" : "poor",
+        detail: parts.join(" · ") || `${r}/100`,
+      });
+    }
+  }
+
 
   // Normalise to 0-100 with fixed denominator
   let baseScore = weightedSum / TOTAL_WEIGHT;

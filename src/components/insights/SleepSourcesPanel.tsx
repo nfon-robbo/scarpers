@@ -64,6 +64,10 @@ type FormState = {
   bedtime: string; wakeTime: string;
   deep: string; rem: string; light: string; awake: string;
   rhr: string; hrv: string;
+  spo2Avg: string; spo2Low: string;
+  respiration: string; breathingPattern: string;
+  skinTemp: string; restless: string;
+  hrv7d: string;
   vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
@@ -71,6 +75,10 @@ const emptyForm = (date?: string): FormState => ({
   bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
   rhr: "", hrv: "",
+  spo2Avg: "", spo2Low: "",
+  respiration: "", breathingPattern: "",
+  skinTemp: "", restless: "",
+  hrv7d: "",
   vitals: null,
 });
 
@@ -172,7 +180,14 @@ const SleepSourcesPanel = () => {
     const hrvFinal = vitals.avg_overnight_hrv ?? null;
     if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
     if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
-    if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) payload.spo2 = vitals.avg_spo2;
+    if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) { payload.spo2 = vitals.avg_spo2; payload.spo2_avg = vitals.avg_spo2; }
+    if (vitals.lowest_spo2 != null && isFinite(vitals.lowest_spo2)) payload.spo2_lowest = vitals.lowest_spo2;
+    if (vitals.avg_respiration != null && isFinite(vitals.avg_respiration)) payload.respiration_avg = vitals.avg_respiration;
+    if (vitals.breathing_variations) payload.breathing_pattern = vitals.breathing_variations;
+    if (vitals.skin_temp_change_c != null && isFinite(vitals.skin_temp_change_c)) payload.skin_temp_deviation = vitals.skin_temp_change_c;
+    if (vitals.restless_moments != null && isFinite(vitals.restless_moments)) payload.restless_count = vitals.restless_moments;
+    if (vitals.hrv_7d_status) payload.hrv_7d_trend = vitals.hrv_7d_status;
+    if (vitals.body_battery_change != null && isFinite(vitals.body_battery_change)) payload.body_battery_change = vitals.body_battery_change;
 
     const { error } = existing?.id
       ? await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id)
@@ -187,6 +202,13 @@ const SleepSourcesPanel = () => {
     setForm(existing ? { ...f, vitals: existing,
       rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
       hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+      spo2Avg: existing.avg_spo2 != null ? String(existing.avg_spo2) : "",
+      spo2Low: existing.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
+      respiration: existing.avg_respiration != null ? String(existing.avg_respiration) : "",
+      breathingPattern: existing.breathing_variations ?? "",
+      skinTemp: existing.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
+      restless: existing.restless_moments != null ? String(existing.restless_moments) : "",
+      hrv7d: existing.hrv_7d_status ?? "",
     } : f);
     setDialogOpen(true);
   };
@@ -202,6 +224,7 @@ const SleepSourcesPanel = () => {
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
     const existing = await fetchExistingVitals(date);
     setForm({
+      ...emptyForm(date),
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
       wakeTime: wakeDefault,
@@ -211,6 +234,13 @@ const SleepSourcesPanel = () => {
       awake: secsToHHMM(totals.awake),
       rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
       hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+      spo2Avg: existing?.avg_spo2 != null ? String(existing.avg_spo2) : "",
+      spo2Low: existing?.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
+      respiration: existing?.avg_respiration != null ? String(existing.avg_respiration) : "",
+      breathingPattern: existing?.breathing_variations ?? "",
+      skinTemp: existing?.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
+      restless: existing?.restless_moments != null ? String(existing.restless_moments) : "",
+      hrv7d: existing?.hrv_7d_status ?? "",
       vitals: existing,
     });
     setDialogOpen(true);
@@ -306,10 +336,31 @@ const SleepSourcesPanel = () => {
       if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
       if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
 
+      // Advanced metrics — prefer form value, fall back to parsed vitals
+      const num = (s: string) => (s.trim() ? parseFloat(s) : null);
+      const int = (s: string) => (s.trim() ? parseInt(s, 10) : null);
+      const spo2Avg = num(form.spo2Avg) ?? v?.avg_spo2 ?? null;
+      const spo2Low = num(form.spo2Low) ?? v?.lowest_spo2 ?? null;
+      const resp = num(form.respiration) ?? v?.avg_respiration ?? null;
+      const breath = (form.breathingPattern.trim() || v?.breathing_variations || null);
+      const skin = num(form.skinTemp) ?? v?.skin_temp_change_c ?? null;
+      const restl = int(form.restless) ?? (v?.restless_moments ?? null);
+      const hrvTrend = (form.hrv7d.trim() || v?.hrv_7d_status || null);
+      const bbChange = v?.body_battery_change ?? null;
+      if (spo2Avg != null && isFinite(spo2Avg)) { payload.spo2_avg = spo2Avg; payload.spo2 = spo2Avg; }
+      if (spo2Low != null && isFinite(spo2Low)) payload.spo2_lowest = spo2Low;
+      if (resp != null && isFinite(resp)) payload.respiration_avg = resp;
+      if (breath) payload.breathing_pattern = breath;
+      if (skin != null && isFinite(skin)) payload.skin_temp_deviation = skin;
+      if (restl != null && isFinite(restl)) payload.restless_count = restl;
+      if (hrvTrend) payload.hrv_7d_trend = hrvTrend;
+      if (bbChange != null && isFinite(bbChange)) payload.body_battery_change = bbChange;
+
       if (v) {
         const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
         payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
       }
+
 
       if (existing?.id) {
         await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
@@ -532,6 +583,59 @@ const SleepSourcesPanel = () => {
                 </div>
               </div>
             </div>
+
+            <div className="pt-2 border-t border-border/40">
+              <p className="text-xs text-muted-foreground mb-2">Advanced metrics (optional — auto-filled from Garmin screenshot)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-spo2avg">SpO₂ Avg (%)</Label>
+                  <Input id="sleep-spo2avg" inputMode="decimal" placeholder="98" value={form.spo2Avg}
+                    onChange={(e) => setForm((f) => ({ ...f, spo2Avg: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-spo2low">SpO₂ Low (%)</Label>
+                  <Input id="sleep-spo2low" inputMode="decimal" placeholder="90" value={form.spo2Low}
+                    onChange={(e) => setForm((f) => ({ ...f, spo2Low: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-resp">Respiration (brpm)</Label>
+                  <Input id="sleep-resp" inputMode="decimal" placeholder="13" value={form.respiration}
+                    onChange={(e) => setForm((f) => ({ ...f, respiration: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-breath">Breathing pattern</Label>
+                  <select id="sleep-breath" className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.breathingPattern}
+                    onChange={(e) => setForm((f) => ({ ...f, breathingPattern: e.target.value }))}>
+                    <option value="">—</option>
+                    <option value="Balanced">Balanced</option>
+                    <option value="Few">Few</option>
+                    <option value="Many">Many</option>
+                  </select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-skin">Skin temp (°C)</Label>
+                  <Input id="sleep-skin" inputMode="decimal" placeholder="-0.5" value={form.skinTemp}
+                    onChange={(e) => setForm((f) => ({ ...f, skinTemp: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-restless">Restless count</Label>
+                  <Input id="sleep-restless" inputMode="numeric" placeholder="60" value={form.restless}
+                    onChange={(e) => setForm((f) => ({ ...f, restless: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5 col-span-2">
+                  <Label htmlFor="sleep-hrv7d">7d HRV trend</Label>
+                  <select id="sleep-hrv7d" className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.hrv7d}
+                    onChange={(e) => setForm((f) => ({ ...f, hrv7d: e.target.value }))}>
+                    <option value="">—</option>
+                    <option value="Balanced">Balanced</option>
+                    <option value="Unbalanced">Unbalanced</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
 
             <div className="pt-2 border-t border-border/40">
               <div className="flex items-center justify-between gap-2 mb-2">

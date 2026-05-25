@@ -428,7 +428,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         .then(({ data }) => data || []),
       supabase
         .from("daily_metrics")
-        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes")
+        .select("date, resting_heart_rate, hrv, stress_score, sleep_score, sleep_duration_seconds, deep_sleep_minutes, rem_sleep_minutes, light_sleep_minutes, awake_during_night_minutes, spo2_avg, breathing_pattern, restless_count")
         .eq("user_id", user.id)
         .gte("date", twentyEightDaysAgo)
         .order("date", { ascending: true })
@@ -445,7 +445,14 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const stages = groupSleepByDate(todaysStageRows as any);
       const totalSleep = stages.deep + stages.light + stages.rem;
       const hasSleepStages = totalSleep > 0;
-      const sleepScore = hasSleepStages ? calculateSleepScore(stages) : null;
+      const todayAdv = {
+        spo2_avg: (allMetrics.find((m: any) => m.date === today) as any)?.spo2_avg ?? null,
+        spo2_lowest: null,
+        breathing_pattern: (allMetrics.find((m: any) => m.date === today) as any)?.breathing_pattern ?? null,
+        restless_count: (allMetrics.find((m: any) => m.date === today) as any)?.restless_count ?? null,
+        skin_temp_deviation: null,
+      };
+      const sleepScore = hasSleepStages ? calculateSleepScore(stages, todayAdv) : null;
 
       const todayMetrics = allMetrics.find((m: any) => m.date === today);
       const yesterdayMetrics = allMetrics.find((m: any) => m.date === yesterday);
@@ -543,6 +550,9 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         currentHour: now.getHours(),
         wakeTimeIso,
         todayActivities: todayActivityList,
+        spo2Avg: (todayMetrics as any)?.spo2_avg ?? null,
+        breathingPattern: (todayMetrics as any)?.breathing_pattern ?? null,
+        restlessCount: (todayMetrics as any)?.restless_count ?? null,
       });
       setLoading(false);
     });

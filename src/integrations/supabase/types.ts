@@ -405,22 +405,30 @@ export type Database = {
         Row: {
           active_calories: number | null
           awake_during_night_minutes: number | null
+          body_battery_change: number | null
           body_fat_percentage: number | null
+          breathing_pattern: string | null
           calories_total: number | null
           created_at: string
           date: string
           deep_sleep_minutes: number | null
           height_m: number | null
           hrv: number | null
+          hrv_7d_trend: string | null
           id: string
           light_sleep_minutes: number | null
           raw_data: Json | null
           rem_sleep_minutes: number | null
+          respiration_avg: number | null
           resting_heart_rate: number | null
+          restless_count: number | null
+          skin_temp_deviation: number | null
           sleep_duration_seconds: number | null
           sleep_score: number | null
           source_file: string | null
           spo2: number | null
+          spo2_avg: number | null
+          spo2_lowest: number | null
           steps: number | null
           stress_score: number | null
           upload_id: string | null
@@ -431,22 +439,30 @@ export type Database = {
         Insert: {
           active_calories?: number | null
           awake_during_night_minutes?: number | null
+          body_battery_change?: number | null
           body_fat_percentage?: number | null
+          breathing_pattern?: string | null
           calories_total?: number | null
           created_at?: string
           date: string
           deep_sleep_minutes?: number | null
           height_m?: number | null
           hrv?: number | null
+          hrv_7d_trend?: string | null
           id?: string
           light_sleep_minutes?: number | null
           raw_data?: Json | null
           rem_sleep_minutes?: number | null
+          respiration_avg?: number | null
           resting_heart_rate?: number | null
+          restless_count?: number | null
+          skin_temp_deviation?: number | null
           sleep_duration_seconds?: number | null
           sleep_score?: number | null
           source_file?: string | null
           spo2?: number | null
+          spo2_avg?: number | null
+          spo2_lowest?: number | null
           steps?: number | null
           stress_score?: number | null
           upload_id?: string | null
@@ -457,22 +473,30 @@ export type Database = {
         Update: {
           active_calories?: number | null
           awake_during_night_minutes?: number | null
+          body_battery_change?: number | null
           body_fat_percentage?: number | null
+          breathing_pattern?: string | null
           calories_total?: number | null
           created_at?: string
           date?: string
           deep_sleep_minutes?: number | null
           height_m?: number | null
           hrv?: number | null
+          hrv_7d_trend?: string | null
           id?: string
           light_sleep_minutes?: number | null
           raw_data?: Json | null
           rem_sleep_minutes?: number | null
+          respiration_avg?: number | null
           resting_heart_rate?: number | null
+          restless_count?: number | null
+          skin_temp_deviation?: number | null
           sleep_duration_seconds?: number | null
           sleep_score?: number | null
           source_file?: string | null
           spo2?: number | null
+          spo2_avg?: number | null
+          spo2_lowest?: number | null
           steps?: number | null
           stress_score?: number | null
           upload_id?: string | null
