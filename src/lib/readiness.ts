@@ -30,7 +30,13 @@ export interface ReadinessData {
   // Body battery drain
   wakeTimeIso: string | null; // ISO timestamp of when user woke up
   todayActivities: { startIso: string; durationSec: number; intensityLoad: number }[];
+
+  // Optional sleep-respiration metrics (Garmin screenshot)
+  spo2Avg?: number | null;
+  breathingPattern?: string | null;   // Balanced/Few/Many
+  restlessCount?: number | null;
 }
+
 
 export interface ReadinessFactor {
   label: string;
