@@ -136,6 +136,50 @@ const SleepSourcesPanel = () => {
     return null;
   }, [user]);
 
+  const saveGarminVitals = useCallback(async (date: string, vitals: GarminVitals) => {
+    if (!user) return;
+
+    const { data: existingRows, error: fetchError } = await supabase
+      .from("daily_metrics")
+      .select("id, raw_data, created_at")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (fetchError) throw fetchError;
+
+    const rows = existingRows ?? [];
+    const existing = rows.find((row) => {
+      const raw = row?.raw_data as Record<string, unknown> | null | undefined;
+      return raw && typeof raw === "object" && Boolean((raw as any).garmin_sleep_vitals);
+    }) ?? rows[0] ?? null;
+
+    const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
+    const payload: Record<string, unknown> = {
+      user_id: user.id,
+      date,
+      raw_data: {
+        ...prevRaw,
+        garmin_sleep_vitals: {
+          ...vitals,
+          source: "garmin_screenshot",
+          captured_at: new Date().toISOString(),
+        },
+      },
+    };
+
+    const rhrFinal = vitals.resting_heart_rate ?? null;
+    const hrvFinal = vitals.avg_overnight_hrv ?? null;
+    if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
+    if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
+    if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) payload.spo2 = vitals.avg_spo2;
+
+    const { error } = existing?.id
+      ? await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id)
+      : await supabase.from("daily_metrics").insert(payload as never);
+    if (error) throw error;
+  }, [user]);
+
   const openAdd = async () => {
     setEditingDate(null);
     const f = emptyForm();
