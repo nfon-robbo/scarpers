@@ -168,7 +168,7 @@ export function calculateSleepScoreDetailed(stages: SleepStageData, adv?: Advanc
   }
 
   const raw = durationScore + deepScore + remScore + effScore - lightPenalty;
-  return Math.round(Math.max(0, Math.min(100, raw)));
+  return mk(Math.max(0, Math.min(100, raw)));
 }
 
 export function scoreLabel(score: number): { label: string; color: string } {
