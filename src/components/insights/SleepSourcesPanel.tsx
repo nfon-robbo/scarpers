@@ -119,7 +119,26 @@ const SleepSourcesPanel = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setEditingDate(null); setForm(emptyForm()); setDialogOpen(true); };
+  const fetchExistingVitals = useCallback(async (date: string): Promise<GarminVitals | null> => {
+    if (!user) return null;
+    const { data } = await supabase
+      .from("daily_metrics").select("raw_data")
+      .eq("user_id", user.id).eq("date", date).maybeSingle();
+    const raw = data?.raw_data as Record<string, unknown> | null | undefined;
+    const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
+    return v && typeof v === "object" ? (v as GarminVitals) : null;
+  }, [user]);
+
+  const openAdd = async () => {
+    setEditingDate(null);
+    const f = emptyForm();
+    const existing = await fetchExistingVitals(f.date);
+    setForm(existing ? { ...f, vitals: existing,
+      rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
+      hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+    } : f);
+    setDialogOpen(true);
+  };
 
   const openEdit = (date: string, totals: StageTotals) => {
     setEditingDate(date);
