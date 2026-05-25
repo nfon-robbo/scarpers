@@ -411,7 +411,7 @@ const Landing = () => {
               size="sm"
               className="text-foreground hover:text-foreground bg-background/30 backdrop-blur rounded-full"
             >
-              <Link to="/auth">Sign In</Link>
+              <Link rel="nofollow" to="/auth">Sign In</Link>
             </Button>
           </nav>
         </header>
@@ -433,7 +433,7 @@ const Landing = () => {
                 size="lg"
                 className="h-12 px-7 rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0 hover:opacity-90 text-base shadow-lg shadow-primary/30"
               >
-                <Link to="/auth">
+                <Link rel="nofollow" to="/auth">
                   Start Free <ArrowRight className="w-4 h-4 ml-1" />
                 </Link>
               </Button>
@@ -488,7 +488,7 @@ const Landing = () => {
                   size="lg"
                   className="rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground border-0"
                 >
-                  <Link to="/auth">
+                  <Link rel="nofollow" to="/auth">
                     Start Free <ArrowRight className="w-4 h-4 ml-1" />
                   </Link>
                 </Button>
@@ -839,7 +839,7 @@ const Landing = () => {
               size="lg"
               className="h-12 px-8 rounded-full bg-foreground text-background hover:bg-foreground/90 text-base"
             >
-              <Link to="/auth">
+              <Link rel="nofollow" to="/auth">
                 Start Free <ArrowRight className="w-4 h-4 ml-1" />
               </Link>
             </Button>
@@ -849,7 +849,7 @@ const Landing = () => {
               variant="outline"
               className="h-12 px-8 rounded-full text-base border-foreground/30"
             >
-              <Link to="/auth">
+              <Link rel="nofollow" to="/auth">
                 <Watch className="w-4 h-4 mr-1" /> Connect Garmin
               </Link>
             </Button>
@@ -935,7 +935,7 @@ const Landing = () => {
             <ul className="space-y-2 text-muted-foreground">
               <li><Link to="/about" className="hover:text-foreground">About</Link></li>
               <li><Link to="/blog" className="hover:text-foreground">Blog</Link></li>
-              <li><Link to="/auth" className="hover:text-foreground">Sign in</Link></li>
+              <li><Link rel="nofollow" to="/auth" className="hover:text-foreground">Sign in</Link></li>
               <li><Link to="/privacy" className="hover:text-foreground">Privacy</Link></li>
               <li><Link to="/terms" className="hover:text-foreground">Terms</Link></li>
             </ul>

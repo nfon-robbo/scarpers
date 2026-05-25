@@ -214,7 +214,7 @@ const BlogInteractions = ({ postId, postTitle, postSlug }: Props) => {
           </div>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">
-            <Link to="/auth" className="text-primary hover:underline">Sign in</Link> to leave a comment.
+            <Link rel="nofollow" to="/auth" className="text-primary hover:underline">Sign in</Link> to leave a comment.
           </p>
         )}
 

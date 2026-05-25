@@ -120,7 +120,7 @@ const FiveKTrainingPlan = () => {
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild size="lg" className="rounded-full">
-          <Link to="/auth">Get my free 5K plan</Link>
+          <Link rel="nofollow" to="/auth">Get my free 5K plan</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="rounded-full">
           <Link to="/ai-running-coach">How the AI works</Link>

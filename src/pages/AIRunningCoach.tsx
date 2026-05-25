@@ -115,7 +115,7 @@ const AIRunningCoach = () => {
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild size="lg" className="rounded-full">
-          <Link to="/auth">Start free</Link>
+          <Link rel="nofollow" to="/auth">Start free</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="rounded-full">
           <Link to="/5k-training-plan">5K plan</Link>
