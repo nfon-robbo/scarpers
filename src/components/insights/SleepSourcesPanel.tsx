@@ -210,6 +210,7 @@ const SleepSourcesPanel = () => {
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
     const existing = await fetchExistingVitals(date);
     setForm({
+      ...emptyForm(date),
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
       wakeTime: wakeDefault,
@@ -219,6 +220,13 @@ const SleepSourcesPanel = () => {
       awake: secsToHHMM(totals.awake),
       rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
       hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+      spo2Avg: existing?.avg_spo2 != null ? String(existing.avg_spo2) : "",
+      spo2Low: existing?.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
+      respiration: existing?.avg_respiration != null ? String(existing.avg_respiration) : "",
+      breathingPattern: existing?.breathing_variations ?? "",
+      skinTemp: existing?.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
+      restless: existing?.restless_moments != null ? String(existing.restless_moments) : "",
+      hrv7d: existing?.hrv_7d_status ?? "",
       vitals: existing,
     });
     setDialogOpen(true);
