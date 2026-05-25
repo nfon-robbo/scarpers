@@ -585,6 +585,59 @@ const SleepSourcesPanel = () => {
             </div>
 
             <div className="pt-2 border-t border-border/40">
+              <p className="text-xs text-muted-foreground mb-2">Advanced metrics (optional — auto-filled from Garmin screenshot)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-spo2avg">SpO₂ Avg (%)</Label>
+                  <Input id="sleep-spo2avg" inputMode="decimal" placeholder="98" value={form.spo2Avg}
+                    onChange={(e) => setForm((f) => ({ ...f, spo2Avg: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-spo2low">SpO₂ Low (%)</Label>
+                  <Input id="sleep-spo2low" inputMode="decimal" placeholder="90" value={form.spo2Low}
+                    onChange={(e) => setForm((f) => ({ ...f, spo2Low: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-resp">Respiration (brpm)</Label>
+                  <Input id="sleep-resp" inputMode="decimal" placeholder="13" value={form.respiration}
+                    onChange={(e) => setForm((f) => ({ ...f, respiration: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-breath">Breathing pattern</Label>
+                  <select id="sleep-breath" className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.breathingPattern}
+                    onChange={(e) => setForm((f) => ({ ...f, breathingPattern: e.target.value }))}>
+                    <option value="">—</option>
+                    <option value="Balanced">Balanced</option>
+                    <option value="Few">Few</option>
+                    <option value="Many">Many</option>
+                  </select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-skin">Skin temp (°C)</Label>
+                  <Input id="sleep-skin" inputMode="decimal" placeholder="-0.5" value={form.skinTemp}
+                    onChange={(e) => setForm((f) => ({ ...f, skinTemp: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sleep-restless">Restless count</Label>
+                  <Input id="sleep-restless" inputMode="numeric" placeholder="60" value={form.restless}
+                    onChange={(e) => setForm((f) => ({ ...f, restless: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5 col-span-2">
+                  <Label htmlFor="sleep-hrv7d">7d HRV trend</Label>
+                  <select id="sleep-hrv7d" className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={form.hrv7d}
+                    onChange={(e) => setForm((f) => ({ ...f, hrv7d: e.target.value }))}>
+                    <option value="">—</option>
+                    <option value="Balanced">Balanced</option>
+                    <option value="Unbalanced">Unbalanced</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+
+            <div className="pt-2 border-t border-border/40">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="text-xs text-muted-foreground">
                   <Sparkles className="w-3 h-3 inline mr-1" />
