@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Upload, Sparkles } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
 
@@ -44,17 +44,34 @@ const secsToHHMM = (s: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
+type GarminVitals = {
+  breathing_variations?: string | null;
+  restless_moments?: number | null;
+  avg_overnight_hr?: number | null;
+  resting_heart_rate?: number | null;
+  body_battery_change?: number | null;
+  avg_spo2?: number | null;
+  lowest_spo2?: number | null;
+  avg_respiration?: number | null;
+  lowest_respiration?: number | null;
+  avg_overnight_hrv?: number | null;
+  hrv_7d_status?: string | null;
+  skin_temp_change_c?: number | null;
+};
+
 type FormState = {
   date: string;
   bedtime: string; wakeTime: string;
   deep: string; rem: string; light: string; awake: string;
   rhr: string; hrv: string;
+  vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
   date: date ?? format(new Date(), "yyyy-MM-dd"),
   bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
   rhr: "", hrv: "",
+  vitals: null,
 });
 
 const SleepSourcesPanel = () => {
@@ -122,6 +139,7 @@ const SleepSourcesPanel = () => {
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
       rhr: "", hrv: "",
+      vitals: null,
     });
     setDialogOpen(true);
   };
@@ -190,11 +208,12 @@ const SleepSourcesPanel = () => {
 
       const total = deep + rem + light;
       const { data: existing } = await supabase
-        .from("daily_metrics").select("id")
+        .from("daily_metrics").select("id, raw_data, spo2")
         .eq("user_id", user.id).eq("date", form.date).maybeSingle();
 
       const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
       const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
+      const v = form.vitals;
 
       const payload: Record<string, unknown> = {
         user_id: user.id,
@@ -205,8 +224,17 @@ const SleepSourcesPanel = () => {
         light_sleep_minutes: Math.round(light / 60),
         awake_during_night_minutes: Math.round(awake / 60),
       };
-      if (rhrNum != null && isFinite(rhrNum) && rhrNum > 0) payload.resting_heart_rate = rhrNum;
-      if (hrvNum != null && isFinite(hrvNum) && hrvNum > 0) payload.hrv = hrvNum;
+      // Prefer explicit inputs; fall back to parsed vitals
+      const rhrFinal = rhrNum ?? (v?.resting_heart_rate ?? null);
+      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? null);
+      if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
+      if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
+      if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
+
+      if (v) {
+        const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
+        payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
+      }
 
       if (existing?.id) {
         await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
@@ -237,6 +265,38 @@ const SleepSourcesPanel = () => {
       toast.error(e?.message ?? "Failed to delete");
     }
   };
+
+  const [parsing, setParsing] = useState(false);
+  const handleScreenshot = async (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+    setParsing(true);
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("parse-garmin-sleep", { body: { imageDataUrl: dataUrl } });
+      if (error) throw error;
+      const v = data?.vitals as GarminVitals | undefined;
+      if (!v) throw new Error("No vitals returned");
+      setForm((f) => ({
+        ...f,
+        rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
+        hrv: v.avg_overnight_hrv != null ? String(v.avg_overnight_hrv) : f.hrv,
+        vitals: v,
+      }));
+      toast.success("Vitals extracted from screenshot");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message ?? "Failed to parse screenshot");
+    } finally {
+      setParsing(false);
+    }
+  };
+
 
   return (
     <Card>
@@ -378,6 +438,43 @@ const SleepSourcesPanel = () => {
                     onChange={(e) => setForm((f) => ({ ...f, hrv: e.target.value }))} />
                 </div>
               </div>
+            </div>
+
+            <div className="pt-2 border-t border-border/40">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs text-muted-foreground">
+                  <Sparkles className="w-3 h-3 inline mr-1" />
+                  Upload a Garmin "Sleep Metrics" screenshot — we'll auto-fill RHR, HRV & save SpO₂, respiration, body battery change and more.
+                </p>
+              </div>
+              <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border/60 px-3 py-2 text-xs cursor-pointer hover:bg-accent/30">
+                {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                <span>{parsing ? "Reading screenshot…" : form.vitals ? "Replace screenshot" : "Upload Garmin screenshot"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={parsing}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleScreenshot(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {form.vitals && (
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  {form.vitals.avg_overnight_hr != null && <div>Avg HR: <span className="text-foreground">{form.vitals.avg_overnight_hr} bpm</span></div>}
+                  {form.vitals.body_battery_change != null && <div>Body Battery: <span className="text-foreground">{form.vitals.body_battery_change >= 0 ? "+" : ""}{form.vitals.body_battery_change}</span></div>}
+                  {form.vitals.avg_spo2 != null && <div>Avg SpO₂: <span className="text-foreground">{form.vitals.avg_spo2}%</span></div>}
+                  {form.vitals.lowest_spo2 != null && <div>Lowest SpO₂: <span className="text-foreground">{form.vitals.lowest_spo2}%</span></div>}
+                  {form.vitals.avg_respiration != null && <div>Avg Resp: <span className="text-foreground">{form.vitals.avg_respiration} brpm</span></div>}
+                  {form.vitals.restless_moments != null && <div>Restless: <span className="text-foreground">{form.vitals.restless_moments}</span></div>}
+                  {form.vitals.breathing_variations && <div>Breathing: <span className="text-foreground">{form.vitals.breathing_variations}</span></div>}
+                  {form.vitals.hrv_7d_status && <div>7d HRV: <span className="text-foreground">{form.vitals.hrv_7d_status}</span></div>}
+                  {form.vitals.skin_temp_change_c != null && <div>Skin temp: <span className="text-foreground">{form.vitals.skin_temp_change_c >= 0 ? "+" : ""}{form.vitals.skin_temp_change_c}°</span></div>}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
