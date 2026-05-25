@@ -44,17 +44,34 @@ const secsToHHMM = (s: number) => {
   return `${h}:${String(m).padStart(2, "0")}`;
 };
 
+type GarminVitals = {
+  breathing_variations?: string | null;
+  restless_moments?: number | null;
+  avg_overnight_hr?: number | null;
+  resting_heart_rate?: number | null;
+  body_battery_change?: number | null;
+  avg_spo2?: number | null;
+  lowest_spo2?: number | null;
+  avg_respiration?: number | null;
+  lowest_respiration?: number | null;
+  avg_overnight_hrv?: number | null;
+  hrv_7d_status?: string | null;
+  skin_temp_change_c?: number | null;
+};
+
 type FormState = {
   date: string;
   bedtime: string; wakeTime: string;
   deep: string; rem: string; light: string; awake: string;
   rhr: string; hrv: string;
+  vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
   date: date ?? format(new Date(), "yyyy-MM-dd"),
   bedtime: "23:00", wakeTime: "07:00",
   deep: "", rem: "", light: "", awake: "",
   rhr: "", hrv: "",
+  vitals: null,
 });
 
 const SleepSourcesPanel = () => {
