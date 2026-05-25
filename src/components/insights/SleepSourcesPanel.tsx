@@ -329,10 +329,31 @@ const SleepSourcesPanel = () => {
       if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
       if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
 
+      // Advanced metrics — prefer form value, fall back to parsed vitals
+      const num = (s: string) => (s.trim() ? parseFloat(s) : null);
+      const int = (s: string) => (s.trim() ? parseInt(s, 10) : null);
+      const spo2Avg = num(form.spo2Avg) ?? v?.avg_spo2 ?? null;
+      const spo2Low = num(form.spo2Low) ?? v?.lowest_spo2 ?? null;
+      const resp = num(form.respiration) ?? v?.avg_respiration ?? null;
+      const breath = (form.breathingPattern.trim() || v?.breathing_variations || null);
+      const skin = num(form.skinTemp) ?? v?.skin_temp_change_c ?? null;
+      const restl = int(form.restless) ?? (v?.restless_moments ?? null);
+      const hrvTrend = (form.hrv7d.trim() || v?.hrv_7d_status || null);
+      const bbChange = v?.body_battery_change ?? null;
+      if (spo2Avg != null && isFinite(spo2Avg)) { payload.spo2_avg = spo2Avg; payload.spo2 = spo2Avg; }
+      if (spo2Low != null && isFinite(spo2Low)) payload.spo2_lowest = spo2Low;
+      if (resp != null && isFinite(resp)) payload.respiration_avg = resp;
+      if (breath) payload.breathing_pattern = breath;
+      if (skin != null && isFinite(skin)) payload.skin_temp_deviation = skin;
+      if (restl != null && isFinite(restl)) payload.restless_count = restl;
+      if (hrvTrend) payload.hrv_7d_trend = hrvTrend;
+      if (bbChange != null && isFinite(bbChange)) payload.body_battery_change = bbChange;
+
       if (v) {
         const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
         payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
       }
+
 
       if (existing?.id) {
         await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
