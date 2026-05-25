@@ -118,7 +118,7 @@ const TenKTrainingPlan = () => {
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button asChild size="lg" className="rounded-full">
-          <Link to="/auth">Get my free 10K plan</Link>
+          <Link rel="nofollow" to="/auth">Get my free 10K plan</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="rounded-full">
           <Link to="/5k-training-plan">Looking for 5K?</Link>

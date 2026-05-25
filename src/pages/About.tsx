@@ -100,7 +100,7 @@ const About = () => {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Button asChild size="lg" className="rounded-full">
-          <Link to="/auth">Get my free plan</Link>
+          <Link rel="nofollow" to="/auth">Get my free plan</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="rounded-full">
           <Link to="/ai-running-coach">How the AI works</Link>

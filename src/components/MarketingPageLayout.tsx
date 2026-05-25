@@ -108,7 +108,7 @@ const MarketingPageLayout = ({ title, description, canonicalPath, noindex, ogTyp
             <Link to="/5k-training-plan" className="hidden sm:inline text-muted-foreground hover:text-foreground">5K Plan</Link>
             <Link to="/10k-training-plan" className="hidden sm:inline text-muted-foreground hover:text-foreground">10K Plan</Link>
             <Button asChild size="sm" className="rounded-full">
-              <Link to="/auth">Sign in</Link>
+              <Link rel="nofollow" to="/auth">Sign in</Link>
             </Button>
           </nav>
         </div>
@@ -123,7 +123,7 @@ const MarketingPageLayout = ({ title, description, canonicalPath, noindex, ogTyp
             <Link to="/blog" className="hover:text-foreground">Blog</Link>
             <Link to="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link to="/terms" className="hover:text-foreground">Terms</Link>
-            <Link to="/auth" className="hover:text-foreground">Sign in</Link>
+            <Link rel="nofollow" to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>
         </div>
       </footer>

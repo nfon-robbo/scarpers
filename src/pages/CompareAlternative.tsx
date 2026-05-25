@@ -440,7 +440,7 @@ const CompareAlternative = () => {
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Button asChild size="lg" className="rounded-full">
-              <Link to="/auth">Get started free</Link>
+              <Link rel="nofollow" to="/auth">Get started free</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="rounded-full">
               <Link to="/ai-running-coach">How the AI coach works</Link>

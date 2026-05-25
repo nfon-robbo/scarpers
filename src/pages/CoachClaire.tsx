@@ -152,7 +152,7 @@ const CoachClaire = () => {
 
       <div className="mt-10 flex flex-wrap gap-3">
         <Button asChild size="lg" className="rounded-full">
-          <Link to="/auth">Get coached by Claire</Link>
+          <Link rel="nofollow" to="/auth">Get coached by Claire</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="rounded-full">
           <Link to="/about">About Scarpers</Link>
