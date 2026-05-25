@@ -73,26 +73,35 @@ export function calculateSleepScore(stages: SleepStageData, adv?: AdvancedSleepM
 }
 
 export function calculateSleepScoreDetailed(stages: SleepStageData, adv?: AdvancedSleepMetrics | null): SleepScoreBreakdown {
+  const adj = advancedSleepAdjustments(adv);
+  const mk = (core: number): SleepScoreBreakdown => {
+    const total = Math.round(Math.max(0, Math.min(100, core + adj.spo2 + adj.breathing + adj.restless + adj.skin)));
+    return { core: Math.round(core), spo2Adj: adj.spo2, breathingAdj: adj.breathing, restlessAdj: adj.restless, skinTempAdj: adj.skin, total };
+  };
+
   const stageTotal = stages.deep + stages.light + stages.rem + stages.awake;
   const genericSleep = stages.sleep || 0;
   const total = stageTotal + genericSleep;
-  if (total === 0) return 0;
+  if (total === 0) return mk(0);
 
   // If we only have generic "sleep" data (no stage breakdown),
   // score based on duration alone
   const hasStages = stageTotal > 0;
   if (!hasStages) {
     const totalHours = genericSleep / 3600;
-    if (totalHours >= 7 && totalHours <= 9) return 75;
-    if (totalHours >= 6 && totalHours < 7) return Math.round(50 + 25 * ((totalHours - 6)));
-    if (totalHours > 9 && totalHours <= 10) return Math.round(65 + 10 * (10 - totalHours));
-    if (totalHours < 6) return Math.round(Math.max(15, 50 * (totalHours / 6)));
-    return 55; // >10h
+    let s: number;
+    if (totalHours >= 7 && totalHours <= 9) s = 75;
+    else if (totalHours >= 6 && totalHours < 7) s = 50 + 25 * (totalHours - 6);
+    else if (totalHours > 9 && totalHours <= 10) s = 65 + 10 * (10 - totalHours);
+    else if (totalHours < 6) s = Math.max(15, 50 * (totalHours / 6));
+    else s = 55;
+    return mk(s);
   }
 
   const totalHours = total / 3600;
   const sleepTime = stages.deep + stages.light + stages.rem + genericSleep;
-  if (sleepTime === 0) return 0;
+  if (sleepTime === 0) return mk(0);
+
   const deepPct = (stages.deep / sleepTime) * 100;
   const remPct = (stages.rem / sleepTime) * 100;
   const efficiency = (sleepTime / total) * 100;
