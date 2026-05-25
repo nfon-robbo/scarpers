@@ -185,6 +185,7 @@ const WellnessTab = () => {
       <SleepSourcesPanel />
       <GoogleFitConnect />
       <SleepCalendar />
+      <SleepHealthMetrics />
       <SleepStagesChart />
 
       {metrics.some(m => m.steps != null) && (
