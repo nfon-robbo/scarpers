@@ -439,6 +439,43 @@ const SleepSourcesPanel = () => {
                 </div>
               </div>
             </div>
+
+            <div className="pt-2 border-t border-border/40">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs text-muted-foreground">
+                  <Sparkles className="w-3 h-3 inline mr-1" />
+                  Upload a Garmin "Sleep Metrics" screenshot — we'll auto-fill RHR, HRV & save SpO₂, respiration, body battery change and more.
+                </p>
+              </div>
+              <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border/60 px-3 py-2 text-xs cursor-pointer hover:bg-accent/30">
+                {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                <span>{parsing ? "Reading screenshot…" : form.vitals ? "Replace screenshot" : "Upload Garmin screenshot"}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={parsing}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleScreenshot(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {form.vitals && (
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  {form.vitals.avg_overnight_hr != null && <div>Avg HR: <span className="text-foreground">{form.vitals.avg_overnight_hr} bpm</span></div>}
+                  {form.vitals.body_battery_change != null && <div>Body Battery: <span className="text-foreground">{form.vitals.body_battery_change >= 0 ? "+" : ""}{form.vitals.body_battery_change}</span></div>}
+                  {form.vitals.avg_spo2 != null && <div>Avg SpO₂: <span className="text-foreground">{form.vitals.avg_spo2}%</span></div>}
+                  {form.vitals.lowest_spo2 != null && <div>Lowest SpO₂: <span className="text-foreground">{form.vitals.lowest_spo2}%</span></div>}
+                  {form.vitals.avg_respiration != null && <div>Avg Resp: <span className="text-foreground">{form.vitals.avg_respiration} brpm</span></div>}
+                  {form.vitals.restless_moments != null && <div>Restless: <span className="text-foreground">{form.vitals.restless_moments}</span></div>}
+                  {form.vitals.breathing_variations && <div>Breathing: <span className="text-foreground">{form.vitals.breathing_variations}</span></div>}
+                  {form.vitals.hrv_7d_status && <div>7d HRV: <span className="text-foreground">{form.vitals.hrv_7d_status}</span></div>}
+                  {form.vitals.skin_temp_change_c != null && <div>Skin temp: <span className="text-foreground">{form.vitals.skin_temp_change_c >= 0 ? "+" : ""}{form.vitals.skin_temp_change_c}°</span></div>}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
