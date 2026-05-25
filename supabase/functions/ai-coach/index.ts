@@ -465,9 +465,40 @@ serve(async (req) => {
         stress: m.stress_score,
         steps: m.steps,
         weight: m.weight,
+        // Advanced sleep metrics (Phase 3) — null when not provided
+        spo2_avg: m.spo2_avg ?? null,
+        spo2_lowest: m.spo2_lowest ?? null,
+        respiration_avg: m.respiration_avg ?? null,
+        breathing_pattern: m.breathing_pattern ?? null,
+        skin_temp_deviation: m.skin_temp_deviation ?? null,
+        restless_count: m.restless_count ?? null,
+        hrv_7d_trend: m.hrv_7d_trend ?? null,
+        body_battery_change: m.body_battery_change ?? null,
       }));
       metricsContext = `\nDAILY HEALTH METRICS (last ${metrics.length} days):\n${JSON.stringify(metricsSummary, null, 2)}\n`;
+
+      // Compact human-readable Advanced Sleep Health block (only nights with at least one advanced field)
+      const advRows = metrics.filter((m: any) =>
+        m.spo2_avg != null || m.spo2_lowest != null || m.respiration_avg != null ||
+        m.breathing_pattern || m.skin_temp_deviation != null || m.restless_count != null ||
+        m.hrv_7d_trend || m.body_battery_change != null
+      );
+      if (advRows.length > 0) {
+        const lines = advRows.map((m: any) => {
+          const parts: string[] = [];
+          if (m.spo2_avg != null) parts.push(`SpO₂ ${m.spo2_avg}%${m.spo2_lowest != null ? ` (low ${m.spo2_lowest}%)` : ""}`);
+          if (m.breathing_pattern) parts.push(`breathing ${String(m.breathing_pattern).toLowerCase()}`);
+          if (m.respiration_avg != null) parts.push(`${m.respiration_avg} brpm`);
+          if (m.restless_count != null) parts.push(`${m.restless_count} restless`);
+          if (m.skin_temp_deviation != null) parts.push(`skin ${m.skin_temp_deviation > 0 ? "+" : ""}${m.skin_temp_deviation}°C`);
+          if (m.hrv_7d_trend) parts.push(`HRV trend ${String(m.hrv_7d_trend).toLowerCase()}`);
+          if (m.body_battery_change != null) parts.push(`battery ${m.body_battery_change > 0 ? "+" : ""}${m.body_battery_change}`);
+          return `${m.date}: ${parts.join(", ")}`;
+        });
+        metricsContext += `\nADVANCED SLEEP HEALTH (nights with respiratory/restlessness/skin-temp data):\n${lines.join("\n")}\n`;
+      }
     }
+
 
     // Fetch Google Fit sleep stages and compute sleep scores
     // PERF: bound to last 60 days to avoid full-table scans for users with
@@ -1386,6 +1417,16 @@ Analyze sleep data if available:
 - Correlation between poor sleep nights and next-day training performance
 - Recovery readiness based on sleep quality patterns
 Reference National Sleep Foundation guidelines where relevant.
+
+When the ADVANCED SLEEP HEALTH block is present, ALSO analyse:
+- **Respiratory health**: SpO₂ avg + lowest, respiration rate, breathing pattern. Flag SpO₂ avg <92% OR lowest <88% with "⚠️ Low blood oxygen — consider sleep apnea screening". Breathing pattern "Many" = "Sleep disruption from breathing abnormalities".
+- **Restlessness**: >80 = "High sleep fragmentation — recovery compromised"; <40 with balanced breathing AND SpO₂ ≥95 = "Excellent respiratory recovery".
+- **Skin temperature**: |deviation| >1.5°C suggests illness/stress onset; correlate with readiness drops and poor next-day sessions ("early illness warning").
+- **HRV 7d trend**: "unbalanced" + high restlessness = declining recovery trajectory; rest is priority.
+- **Body battery change**: persistent negative deltas = chronic drain.
+- Cross-reference with performance: e.g. skin-temp spike the day before a poor session explains the drop.
+- Feed concrete findings into ## 💡 Actionable Recommendations (medical screening for persistent low SpO₂, delay hard sessions while skin temp >±1°C, etc.).
+
 
 ## 💡 Actionable Recommendations
 - One bullet per action, no elaboration unless critical

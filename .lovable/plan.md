@@ -1,85 +1,64 @@
+## Phase 3 — Wire advanced sleep metrics into AI Analysis
 
-# Advanced Sleep Metrics Enhancement
+Enrich the `ai-coach` Edge Function so the AI Analysis (and every other analysis-type prompt that shares this context) sees the Phase 1+2 sleep columns: `spo2_avg`, `spo2_lowest`, `respiration_avg`, `breathing_pattern`, `skin_temp_deviation`, `restless_count`, `hrv_7d_trend`, `body_battery_change`.
 
-The Garmin screenshot parser already extracts SpO₂, breathing pattern, respiration, restless count, skin temp change, 7d HRV status and body battery change — these are stored as JSON in `daily_metrics.raw_data.garmin_sleep_vitals`. This plan promotes them to first-class columns, wires them through the scoring/readiness algorithms, surfaces them in the UI, and lets users edit them manually.
+### Scope
+Single file: `supabase/functions/ai-coach/index.ts`. No DB changes, no client changes. Backward compatible — when columns are NULL, output is unchanged.
 
-## Phase 1 — Foundation (schema + manual form + alerts)
+### Changes
 
-### 1. Database migration
-Add to `daily_metrics`:
-- `spo2_avg` numeric — % (also keep existing `spo2` for back-compat, mirror writes)
-- `spo2_lowest` numeric
-- `respiration_avg` numeric — brpm
-- `breathing_pattern` text — 'Balanced' | 'Few' | 'Many'
-- `skin_temp_deviation` numeric — °C from baseline
-- `restless_count` integer
-- `hrv_7d_trend` text — 'Balanced' | 'Unbalanced'
-- `body_battery_change` integer
+**1. Extend `metricsSummary` (around L460)**
+The query already does `select("*")`, so no query change is needed. Add the new fields to the mapped summary so they land in `metricsContext` JSON:
 
-All nullable, no defaults. No RLS changes (existing policies cover it).
+```ts
+const metricsSummary = metrics.map((m) => ({
+  date: m.date,
+  resting_hr: m.resting_heart_rate ? Math.round(m.resting_heart_rate) : null,
+  hrv: m.hrv ? Math.round(m.hrv) : null,
+  sleep_hours: m.sleep_duration_seconds ? (m.sleep_duration_seconds / 3600).toFixed(1) : null,
+  stress: m.stress_score,
+  steps: m.steps,
+  weight: m.weight,
+  // NEW — advanced sleep metrics (omit nulls so prompt stays compact)
+  spo2_avg: m.spo2_avg ?? null,
+  spo2_lowest: m.spo2_lowest ?? null,
+  respiration_avg: m.respiration_avg ?? null,
+  breathing_pattern: m.breathing_pattern ?? null,
+  skin_temp_deviation: m.skin_temp_deviation ?? null,
+  restless_count: m.restless_count ?? null,
+  hrv_7d_trend: m.hrv_7d_trend ?? null,
+  body_battery_change: m.body_battery_change ?? null,
+}));
+```
 
-### 2. Garmin parser writes columns
-In `SleepSourcesPanel.saveGarminVitals` and `save`, in addition to writing `raw_data.garmin_sleep_vitals`, also write to the new scalar columns (so they're queryable for charts/readiness without parsing JSON).
+**2. Add a compact "Advanced Sleep Health" block to `metricsContext`**
+After the existing `metricsContext = ...JSON...` line, append a small human-readable section that filters to nights with at least one advanced field. Keeps the model focused on signal, not nulls.
 
-### 3. Manual entry form — new "Advanced Metrics (optional)" section
-In `src/components/insights/SleepSourcesPanel.tsx`, after RHR/HRV inputs, add a collapsible group:
-- SpO₂ Avg / SpO₂ Low (number, 70–100)
-- Respiration brpm (8–25) / Breathing Pattern (select: Balanced/Few/Many)
-- Skin Temp °C (−3 to +3) / Restless Count (0–200)
-- 7d HRV Trend (select: Balanced/Unbalanced)
+```
+Advanced Sleep Health (nights with respiratory/restlessness data):
+2026-05-25: SpO₂ 97% (low 94%), breathing balanced, 15 brpm, 28 restless, skin +0.3°C, HRV trend balanced, battery +42
+2026-05-24: SpO₂ 91% (low 86%), breathing many, 35 restless, skin +1.8°C, HRV trend unbalanced
+```
 
-Auto-fills from parsed Garmin vitals; user edits override. On save, all values flow into the new columns plus `raw_data.garmin_sleep_vitals` (source `"manual"` when typed by hand).
+**3. Extend the analysis system prompt (`## 😴 Sleep & Recovery`, ~L1381)**
+Append guidance so the model uses the new fields. Append (do not replace) these bullets:
 
-### 4. Health alerts component
-New `src/components/HealthAlerts.tsx` rendered on the Insights page (and inside `ReadinessWidget` mini-strip):
-- Red: SpO₂ <90 · Restless >100 · Skin temp >±2.5°C
-- Amber: SpO₂ 90–92 · Restless 60–100 · Breathing "Many" · Skin temp >±1.5°C
-- Green: SpO₂ ≥95 + breathing Balanced + restless <40 ("Excellent oxygen levels")
+- When advanced sleep metrics are present, also analyse:
+  - **Respiratory health**: SpO₂ avg, lowest SpO₂, respiration rate, breathing pattern. Flag SpO₂ avg <92% or lowest <88% with "⚠️ Low blood oxygen — consider sleep apnea screening". Flag breathing pattern "Many" as disruption.
+  - **Restlessness**: >80 events = "High fragmentation — recovery compromised"; <40 with balanced breathing and SpO₂ ≥95 = "Excellent respiratory recovery".
+  - **Skin temperature**: |deviation| >1.5°C suggests illness/stress; correlate with readiness drops and poor next-day sessions ("early illness warning").
+  - **HRV 7d trend**: "unbalanced" combined with high restlessness = declining recovery trajectory; recommend prioritising rest.
+  - **Body battery change**: persistent negative deltas indicate chronic drain.
+- Cross-reference these markers with performance: e.g. skin temp spike on the day before a poor session = illness onset explanation.
+- Feed concrete findings into `## 💡 Actionable Recommendations` (medical screening for persistent low SpO₂, delay hard sessions while skin temp elevated, etc.).
 
-Each alert: icon, one-line headline, one-line context, optional suggestion. Pulls latest 1–3 nights from `daily_metrics`.
+**4. Deploy & smoke-test**
+- Deploy `ai-coach` via the edge-function deploy tool.
+- Curl `/ai-coach` with `{ "type": "analysis" }` as the logged-in preview user; confirm the streamed Markdown's Sleep & Recovery section references SpO₂ / breathing / skin temp for the 25/05/2026 night and that no errors appear for nights where advanced columns are NULL.
+- Check `ai-coach` logs for runtime errors.
 
-## Phase 2 — Algorithms
-
-### 5. Sleep score (`src/lib/sleep-score.ts`)
-Add optional `AdvancedSleepMetrics` to `calculateSleepScore` signature (back-compat: works without it). New components added AFTER current `raw` calc, then clamped 0–100:
-
-- **SpO₂ bonus** (−10..+5): avg ≥95 +5; 92–95 +3; 88–92 +1; <88 −5; lowest <85 additional −5
-- **Breathing** (−3..+3): Balanced +3; Few +1; Many −3
-- **Restlessness penalty** (−5..0): <30 0; 30–60 −2; 60–100 −4; >100 −5
-- **Skin temp penalty** (−5..0): |dev| ≤1 0; >1.5 −3; >2.5 −5
-
-Score remains clamped 0–100. Return an optional `breakdown` object so the UI can show "+SpO₂ +5, restless −2" etc.
-
-### 6. Readiness (`src/lib/readiness.ts`) — Option A (6th factor)
-Rebalance:
-- Sleep Quality 32% (−2), HRV 21% (−2), Yesterday's Load 15% (−1), Deep% 14% (−1), RHR 11% (−1)
-- **Respiration Health 7% (NEW)**
-
-Respiration Health (0–100): base 50, +20 if SpO₂≥95 / −30 if <90 · +15 Balanced / −15 Many · +15 restless<40 / −20 restless>80 · clamp 0–100.
-
-Missing metrics → factor returns 50 (neutral), so users without Garmin vitals see no change to existing scores.
-
-### 7. Insights mini-stats row
-Below sleep score in `SleepCalendar` detail popup (and a strip in `WellnessTab`):
-- 💨 Breathing · 🫁 SpO₂ · 😴 Restless · 🌡️ Skin temp
-Colour-coded by the thresholds above.
-
-## Phase 3 — Polish
-
-### 8. AI chatbot context
-In `src/components/AIChatbot.tsx` last-30-nights context block, include SpO₂ / breathing / restless / skin / HRV-trend lines per night when present.
-
-### 9. Documentation
-Append "Advanced Metrics" section to `docs/algorithms/sleep-score.md` and a "Respiration Health factor" note to `docs/algorithms/readiness.md` matching the implemented formulas.
-
-## Technical Notes
-
-- Existing parser (`parse-garmin-sleep` edge function) already returns every field needed — **no edge function changes**.
-- Form numeric validation done client-side with `min`/`max` on `<Input type="number">` plus a `clamp` helper; invalid values blocked on save with a toast.
-- Score breakdown surfaced via a new `SleepScoreBreakdown` type returned alongside the score (callers ignoring it stay back-compat).
-- All new columns nullable so historical rows continue to render and score cleanly.
-
-## Out of scope
-- Long-term trend charts for SpO₂/restlessness (can be a follow-up)
-- Sleep apnea screening flow beyond the alert text
-- Pushing new metrics into Strava / external services
+### Out of scope (separate follow-ups already on the plan)
+- `HealthAlerts.tsx` UI component.
+- Sleep mini-stats strip in `SleepCalendar` popup.
+- `docs/algorithms/sleep-score.md` and `readiness.md` updates.
+- Same enrichment for `android-coach` / `readiness-advice` prompts (can mirror this pattern later if desired).
