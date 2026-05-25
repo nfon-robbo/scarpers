@@ -208,11 +208,12 @@ const SleepSourcesPanel = () => {
 
       const total = deep + rem + light;
       const { data: existing } = await supabase
-        .from("daily_metrics").select("id")
+        .from("daily_metrics").select("id, raw_data, spo2")
         .eq("user_id", user.id).eq("date", form.date).maybeSingle();
 
       const rhrNum = form.rhr.trim() ? parseFloat(form.rhr) : null;
       const hrvNum = form.hrv.trim() ? parseFloat(form.hrv) : null;
+      const v = form.vitals;
 
       const payload: Record<string, unknown> = {
         user_id: user.id,
@@ -223,8 +224,17 @@ const SleepSourcesPanel = () => {
         light_sleep_minutes: Math.round(light / 60),
         awake_during_night_minutes: Math.round(awake / 60),
       };
-      if (rhrNum != null && isFinite(rhrNum) && rhrNum > 0) payload.resting_heart_rate = rhrNum;
-      if (hrvNum != null && isFinite(hrvNum) && hrvNum > 0) payload.hrv = hrvNum;
+      // Prefer explicit inputs; fall back to parsed vitals
+      const rhrFinal = rhrNum ?? (v?.resting_heart_rate ?? null);
+      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? null);
+      if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
+      if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
+      if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
+
+      if (v) {
+        const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
+        payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
+      }
 
       if (existing?.id) {
         await supabase.from("daily_metrics").update(payload as never).eq("id", existing.id);
