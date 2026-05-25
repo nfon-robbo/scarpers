@@ -22,6 +22,52 @@ export interface SleepStageData {
   sleep: number;  // generic sleep (no stage breakdown)
 }
 
+/** Optional Garmin-screenshot vitals that adjust the final score. */
+export interface AdvancedSleepMetrics {
+  spo2_avg?: number | null;            // %
+  spo2_lowest?: number | null;         // %
+  breathing_pattern?: string | null;   // "Balanced" | "Few" | "Many"
+  restless_count?: number | null;
+  skin_temp_deviation?: number | null; // °C from baseline (signed)
+}
+
+export interface SleepScoreBreakdown {
+  core: number;          // pre-adjustment score
+  spo2Adj: number;
+  breathingAdj: number;
+  restlessAdj: number;
+  skinTempAdj: number;
+  total: number;         // clamped 0-100
+}
+
+export function advancedSleepAdjustments(adv?: AdvancedSleepMetrics | null) {
+  let spo2 = 0;
+  if (adv?.spo2_avg != null) {
+    const a = adv.spo2_avg;
+    spo2 = a >= 95 ? 5 : a >= 92 ? 3 : a >= 88 ? 1 : -5;
+    if (adv.spo2_lowest != null && adv.spo2_lowest < 85) spo2 -= 5;
+  }
+  let breathing = 0;
+  const bp = (adv?.breathing_pattern ?? "").toLowerCase();
+  if (bp === "balanced") breathing = 3;
+  else if (bp === "few") breathing = 1;
+  else if (bp === "many") breathing = -3;
+
+  let restless = 0;
+  if (adv?.restless_count != null) {
+    const r = adv.restless_count;
+    restless = r < 30 ? 0 : r < 60 ? -2 : r <= 100 ? -4 : -5;
+  }
+
+  let skin = 0;
+  if (adv?.skin_temp_deviation != null) {
+    const d = Math.abs(adv.skin_temp_deviation);
+    skin = d <= 1 ? 0 : d > 2.5 ? -5 : d > 1.5 ? -3 : 0;
+  }
+  return { spo2, breathing, restless, skin };
+}
+
+
 export function calculateSleepScore(stages: SleepStageData): number {
   const stageTotal = stages.deep + stages.light + stages.rem + stages.awake;
   const genericSleep = stages.sleep || 0;
