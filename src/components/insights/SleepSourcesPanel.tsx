@@ -119,7 +119,26 @@ const SleepSourcesPanel = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setEditingDate(null); setForm(emptyForm()); setDialogOpen(true); };
+  const fetchExistingVitals = useCallback(async (date: string): Promise<GarminVitals | null> => {
+    if (!user) return null;
+    const { data } = await supabase
+      .from("daily_metrics").select("raw_data")
+      .eq("user_id", user.id).eq("date", date).maybeSingle();
+    const raw = data?.raw_data as Record<string, unknown> | null | undefined;
+    const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
+    return v && typeof v === "object" ? (v as GarminVitals) : null;
+  }, [user]);
+
+  const openAdd = async () => {
+    setEditingDate(null);
+    const f = emptyForm();
+    const existing = await fetchExistingVitals(f.date);
+    setForm(existing ? { ...f, vitals: existing,
+      rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
+      hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
+    } : f);
+    setDialogOpen(true);
+  };
 
   const openEdit = (date: string, totals: StageTotals) => {
     setEditingDate(date);
@@ -272,6 +291,23 @@ const SleepSourcesPanel = () => {
     if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
     setParsing(true);
     try {
+      // Check if a screenshot has already been uploaded for this date
+      const existing = await fetchExistingVitals(form.date);
+      if (existing) {
+        setForm((f) => ({
+          ...f,
+          rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : f.rhr,
+          hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : f.hrv,
+          vitals: existing,
+        }));
+        const isToday = form.date === format(new Date(), "yyyy-MM-dd");
+        toast.info(
+          isToday
+            ? "You've already uploaded a screenshot today — showing saved stats"
+            : `Already uploaded for ${format(parseISO(form.date), "dd/MM/yyyy")} — showing saved stats`,
+        );
+        return;
+      }
       const dataUrl: string = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result as string);
