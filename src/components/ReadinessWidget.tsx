@@ -740,15 +740,21 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       return;
     }
 
-    const dayMs = 86400000;
+    const localDateKey = (iso: string) => {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
     const totalDays = 7;
     const days: string[] = [];
+    const baseLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     for (let i = totalDays - 1; i >= 0; i--) {
-      days.push(new Date(today.getTime() - i * dayMs).toISOString().split("T")[0]);
+      const d = new Date(baseLocal);
+      d.setDate(baseLocal.getDate() - i);
+      days.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
     }
     const byDay = new Map<string, TrendSnapshot[]>();
     trendSnapshots.forEach((s) => {
-      const d = s.recorded_at.split("T")[0];
+      const d = localDateKey(s.recorded_at);
       if (!byDay.has(d)) byDay.set(d, []);
       byDay.get(d)!.push(s);
     });
@@ -764,11 +770,12 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         }
       }
       return {
-        day: new Date(d).toLocaleDateString(undefined, { weekday: "short" }),
+        day: new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { weekday: "short" }),
         score: pick ? pick.score : null,
       };
     });
     setTrend(trendArr);
+
   }, [trendSnapshots, trendMode]);
 
   const result = useMemo(() => data ? computeReadiness(data) : null, [data]);
