@@ -1406,6 +1406,11 @@ Summarize: training load trends (chronic vs acute), training frequency, volume t
 ## 🏃 Execution Analysis  
 Analyze: pace/speed progression, heart rate efficiency (aerobic decoupling indicators), power trends if available, cadence patterns. Provide evidence-based progression tracking.
 
+Also assess SPEED-DEVELOPMENT READINESS:
+- Pace plateau: ≥3 recent easy runs at similar pace with no improvement → flag as a candidate for strides.
+- Established aerobic base: ≥3 weeks of consistent easy running AND 7-day avg readiness ≥60 → flag as ready for structured intervals.
+- Low cadence (<165 spm) or form-efficiency concerns → tie to strides (turnover/mechanics).
+
 ## 🫀 Physiology & Readiness
 Analyze: heart rate trends (resting HR proxy from avg HR patterns), recovery patterns (days between hard sessions), any crash signatures (sudden drops in performance/consistency), fatigue indicators.
 
@@ -1432,6 +1437,23 @@ When the ADVANCED SLEEP HEALTH block is present, ALSO analyse:
 - One bullet per action, no elaboration unless critical
 - Group: Load Management | Sport-Specific | Recovery & Sleep | Performance
 - Max 3-5 bullets total across all categories
+
+SPEED DEVELOPMENT GUIDANCE (use under the Sport-Specific group when appropriate):
+- **Strides first**: if pace is plateauing or cadence is low, recommend 4–6 × 20s at ~90% effort with 30s standing/walking recovery, appended to an easy run, up to 2× per week (e.g. Tue/Thu). Benefits: form, leg power, running economy, fast-mechanics retention.
+- **Structured intervals** (only after ≥2 weeks of strides tolerated AND ≥3 weeks consistent base AND stable 7-day readiness ≥60): 1× per week max, replacing an easy run (do NOT add volume). Pick ONE: \`6 × 3min at 5K effort, 2min easy jog\` OR \`5 × 1K at 5K–10K effort, 2min easy jog\`.
+- **Pace target** for interval bullets — always express as a ±15s/km range:
+  1. First choice: predicted 5K pace from race predictor if present in data block
+  2. Second choice: current tempo pace − 30–45s/km
+  3. Fallback: easy pace − 90s/km
+  Example: "Target 6:15–6:45/km for 3min reps (based on tempo pace 7:00/km)"
+- **Progression**: always recommend strides BEFORE structured intervals; never jump straight to intervals.
+
+DO NOT recommend any speed work (strides or intervals) when ANY of these is true — instead emit: "Stick with easy running until readiness improves — defer strides/intervals.":
+- 7-day avg readiness < 50
+- last-3-night avg sleep score < 60
+- HRV 7d trend declining
+- yesterday's load was high AND today's planned effort is already elevated
+- injury signals present in athlete context
 
 BREVITY RULES (strict):
 - Each section above: 3-5 bullet points MAX, no prose paragraphs
