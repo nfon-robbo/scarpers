@@ -606,15 +606,15 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                       <span className="flex items-center gap-1">
                         <Moon className="w-3 h-3" /> Deep
                       </span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeDeep)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.deepRecharge ?? totals.rechargeDeep)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>REM</span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeRem)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.remRecharge ?? totals.rechargeRem)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Light</span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeLight)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.lightRecharge ?? totals.rechargeLight)}%</span>
                     </div>
                   </div>
                 </div>
