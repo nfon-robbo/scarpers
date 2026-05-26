@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Activity, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Activity, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Wind, HeartPulse } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
@@ -13,6 +13,10 @@ interface Row {
   spo2_avg: number | null;
   spo2_lowest: number | null;
   restless_count: number | null;
+  breathing_pattern: string | null;
+  respiration_avg: number | null;
+  hrv: number | null;
+  hrv_7d_trend: string | null;
 }
 
 const tooltipStyle = {
@@ -56,7 +60,7 @@ const SleepHealthMetrics = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     supabase
       .from("daily_metrics")
-      .select("date, spo2_avg, spo2_lowest, restless_count")
+      .select("date, spo2_avg, spo2_lowest, restless_count, breathing_pattern, respiration_avg, hrv, hrv_7d_trend")
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: true })
@@ -92,6 +96,28 @@ const SleepHealthMetrics = () => {
     return { data, recentAvg, trend };
   }, [rows]);
 
+  const breathing = useMemo(() => {
+    const recent = rows.filter(r => r.breathing_pattern || r.respiration_avg != null).slice(-7);
+    if (recent.length === 0) return null;
+    const patterns = recent.map(r => (r.breathing_pattern || "").toLowerCase()).filter(Boolean);
+    const counts: Record<string, number> = {};
+    patterns.forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+    const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const resps = recent.filter(r => r.respiration_avg != null).map(r => Number(r.respiration_avg));
+    const avgResp = avg(resps);
+    return { dominant, avgResp, days: recent.length };
+  }, [rows]);
+
+  const hrv7 = useMemo(() => {
+    const withHrv = rows.filter(r => r.hrv != null).map(r => Number(r.hrv));
+    const last7 = withHrv.slice(-7);
+    const prev7 = withHrv.slice(-14, -7);
+    const avg7 = avg(last7);
+    const avgPrev = avg(prev7);
+    const trendLabel = rows.slice(-1)[0]?.hrv_7d_trend || null;
+    return { avg7, avgPrev, trendLabel, count: last7.length };
+  }, [rows]);
+
   if (loading) {
     return (
       <Card>
@@ -102,7 +128,7 @@ const SleepHealthMetrics = () => {
     );
   }
 
-  if (spo2.data.length === 0 && restless.data.length === 0) return null;
+  if (spo2.data.length === 0 && restless.data.length === 0 && !breathing && hrv7.avg7 == null) return null;
 
   const spo2Color = spo2.recentAvg == null
     ? "hsl(var(--muted-foreground))"
@@ -136,6 +162,40 @@ const SleepHealthMetrics = () => {
         <CardDescription>Respiratory & restlessness trends from advanced sleep tracking</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {(breathing || hrv7.avg7 != null) && (
+          <div className="grid grid-cols-2 gap-3">
+            {breathing && (
+              <div className="p-3 rounded-lg border border-border bg-card/50">
+                <div className="flex items-center gap-1.5 mb-1 text-xs text-muted-foreground">
+                  <Wind className="w-3.5 h-3.5" />
+                  Breathing
+                </div>
+                <p className="text-lg font-semibold capitalize">{breathing.dominant ?? "—"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {breathing.avgResp != null ? `${breathing.avgResp.toFixed(0)} brpm avg · ` : ""}{breathing.days}d
+                </p>
+              </div>
+            )}
+            {hrv7.avg7 != null && (
+              <div className="p-3 rounded-lg border border-border bg-card/50">
+                <div className="flex items-center gap-1.5 mb-1 text-xs text-muted-foreground">
+                  <HeartPulse className="w-3.5 h-3.5" />
+                  HRV (7d avg)
+                </div>
+                <p className="text-lg font-semibold">{hrv7.avg7.toFixed(0)} <span className="text-xs font-normal text-muted-foreground">ms</span></p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 capitalize inline-flex items-center gap-1">
+                  {hrv7.avgPrev != null && (
+                    <>
+                      <TrendIcon dir={hrv7.avg7 > hrv7.avgPrev * 1.03 ? "up" : hrv7.avg7 < hrv7.avgPrev * 0.97 ? "down" : "stable"} />
+                      vs prev 7d
+                    </>
+                  )}
+                  {hrv7.trendLabel && <span className="ml-1">· {hrv7.trendLabel}</span>}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         {spo2.data.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
