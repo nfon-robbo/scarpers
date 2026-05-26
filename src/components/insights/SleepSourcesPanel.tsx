@@ -55,6 +55,7 @@ type GarminVitals = {
   avg_respiration?: number | null;
   lowest_respiration?: number | null;
   avg_overnight_hrv?: number | null;
+  hrv_7d_avg?: number | null;
   hrv_7d_status?: string | null;
   skin_temp_change_c?: number | null;
 };
@@ -81,6 +82,47 @@ const emptyForm = (date?: string): FormState => ({
   hrv7d: "",
   vitals: null,
 });
+
+const cleanLabel = (value?: string | null) => value?.trim() ?? "";
+
+const normaliseBreathingPattern = (value?: string | null) => {
+  const label = cleanLabel(value);
+  const lower = label.toLowerCase();
+  if (!label) return "";
+  if (lower.includes("balanced")) return "Balanced";
+  if (lower.includes("few")) return "Few";
+  if (lower.includes("some")) return "Some";
+  if (lower.includes("many")) return "Many";
+  return label;
+};
+
+const normaliseHrvStatus = (value?: string | null) => {
+  const label = cleanLabel(value);
+  const lower = label.toLowerCase();
+  if (!label) return "";
+  if (lower.includes("balanced")) return "Balanced";
+  if (lower.includes("unbalanced")) return "Unbalanced";
+  if (lower === "low" || lower.includes("low")) return "Low";
+  if (lower === "high" || lower.includes("high")) return "High";
+  return label;
+};
+
+const applyVitalsToForm = (f: FormState, v: GarminVitals): FormState => {
+  const hrvValue = v.avg_overnight_hrv ?? v.hrv_7d_avg;
+  return {
+    ...f,
+    rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
+    hrv: hrvValue != null ? String(hrvValue) : f.hrv,
+    spo2Avg: v.avg_spo2 != null ? String(v.avg_spo2) : f.spo2Avg,
+    spo2Low: v.lowest_spo2 != null ? String(v.lowest_spo2) : f.spo2Low,
+    respiration: v.avg_respiration != null ? String(v.avg_respiration) : f.respiration,
+    breathingPattern: normaliseBreathingPattern(v.breathing_variations) || f.breathingPattern,
+    skinTemp: v.skin_temp_change_c != null ? String(v.skin_temp_change_c) : f.skinTemp,
+    restless: v.restless_moments != null ? String(v.restless_moments) : f.restless,
+    hrv7d: normaliseHrvStatus(v.hrv_7d_status) || f.hrv7d,
+    vitals: v,
+  };
+};
 
 const SleepSourcesPanel = () => {
   const { user } = useAuth();
@@ -177,16 +219,18 @@ const SleepSourcesPanel = () => {
     };
 
     const rhrFinal = vitals.resting_heart_rate ?? null;
-    const hrvFinal = vitals.avg_overnight_hrv ?? null;
+    const hrvFinal = vitals.avg_overnight_hrv ?? vitals.hrv_7d_avg ?? null;
     if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
     if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
     if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) { payload.spo2 = vitals.avg_spo2; payload.spo2_avg = vitals.avg_spo2; }
     if (vitals.lowest_spo2 != null && isFinite(vitals.lowest_spo2)) payload.spo2_lowest = vitals.lowest_spo2;
     if (vitals.avg_respiration != null && isFinite(vitals.avg_respiration)) payload.respiration_avg = vitals.avg_respiration;
-    if (vitals.breathing_variations) payload.breathing_pattern = vitals.breathing_variations;
+    const breathingPattern = normaliseBreathingPattern(vitals.breathing_variations);
+    if (breathingPattern) payload.breathing_pattern = breathingPattern;
     if (vitals.skin_temp_change_c != null && isFinite(vitals.skin_temp_change_c)) payload.skin_temp_deviation = vitals.skin_temp_change_c;
     if (vitals.restless_moments != null && isFinite(vitals.restless_moments)) payload.restless_count = vitals.restless_moments;
-    if (vitals.hrv_7d_status) payload.hrv_7d_trend = vitals.hrv_7d_status;
+    const hrvStatus = normaliseHrvStatus(vitals.hrv_7d_status);
+    if (hrvStatus) payload.hrv_7d_trend = hrvStatus;
     if (vitals.body_battery_change != null && isFinite(vitals.body_battery_change)) payload.body_battery_change = vitals.body_battery_change;
 
     const { error } = existing?.id
@@ -199,17 +243,7 @@ const SleepSourcesPanel = () => {
     setEditingDate(null);
     const f = emptyForm();
     const existing = await fetchExistingVitals(f.date);
-    setForm(existing ? { ...f, vitals: existing,
-      rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
-      hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
-      spo2Avg: existing.avg_spo2 != null ? String(existing.avg_spo2) : "",
-      spo2Low: existing.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
-      respiration: existing.avg_respiration != null ? String(existing.avg_respiration) : "",
-      breathingPattern: existing.breathing_variations ?? "",
-      skinTemp: existing.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
-      restless: existing.restless_moments != null ? String(existing.restless_moments) : "",
-      hrv7d: existing.hrv_7d_status ?? "",
-    } : f);
+    setForm(existing ? applyVitalsToForm(f, existing) : f);
     setDialogOpen(true);
   };
 
@@ -223,7 +257,7 @@ const SleepSourcesPanel = () => {
     const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
     const existing = await fetchExistingVitals(date);
-    setForm({
+    const baseForm = {
       ...emptyForm(date),
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
@@ -232,17 +266,8 @@ const SleepSourcesPanel = () => {
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
-      rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
-      hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
-      spo2Avg: existing?.avg_spo2 != null ? String(existing.avg_spo2) : "",
-      spo2Low: existing?.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
-      respiration: existing?.avg_respiration != null ? String(existing.avg_respiration) : "",
-      breathingPattern: existing?.breathing_variations ?? "",
-      skinTemp: existing?.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
-      restless: existing?.restless_moments != null ? String(existing.restless_moments) : "",
-      hrv7d: existing?.hrv_7d_status ?? "",
-      vitals: existing,
-    });
+    };
+    setForm(existing ? applyVitalsToForm(baseForm, existing) : baseForm);
     setDialogOpen(true);
   };
 
@@ -331,7 +356,7 @@ const SleepSourcesPanel = () => {
       };
       // Prefer explicit inputs; fall back to parsed vitals
       const rhrFinal = rhrNum ?? (v?.resting_heart_rate ?? null);
-      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? null);
+      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? v?.hrv_7d_avg ?? null);
       if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
       if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
       if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
@@ -342,10 +367,10 @@ const SleepSourcesPanel = () => {
       const spo2Avg = num(form.spo2Avg) ?? v?.avg_spo2 ?? null;
       const spo2Low = num(form.spo2Low) ?? v?.lowest_spo2 ?? null;
       const resp = num(form.respiration) ?? v?.avg_respiration ?? null;
-      const breath = (form.breathingPattern.trim() || v?.breathing_variations || null);
+      const breath = (normaliseBreathingPattern(form.breathingPattern) || normaliseBreathingPattern(v?.breathing_variations) || null);
       const skin = num(form.skinTemp) ?? v?.skin_temp_change_c ?? null;
       const restl = int(form.restless) ?? (v?.restless_moments ?? null);
-      const hrvTrend = (form.hrv7d.trim() || v?.hrv_7d_status || null);
+      const hrvTrend = (normaliseHrvStatus(form.hrv7d) || normaliseHrvStatus(v?.hrv_7d_status) || null);
       const bbChange = v?.body_battery_change ?? null;
       if (spo2Avg != null && isFinite(spo2Avg)) { payload.spo2_avg = spo2Avg; payload.spo2 = spo2Avg; }
       if (spo2Low != null && isFinite(spo2Low)) payload.spo2_lowest = spo2Low;
@@ -398,23 +423,6 @@ const SleepSourcesPanel = () => {
     if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
     setParsing(true);
     try {
-      // Check if a screenshot has already been uploaded for this date
-      const existing = await fetchExistingVitals(form.date);
-      if (existing) {
-        setForm((f) => ({
-          ...f,
-          rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : f.rhr,
-          hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : f.hrv,
-          vitals: existing,
-        }));
-        const isToday = form.date === format(new Date(), "yyyy-MM-dd");
-        toast.info(
-          isToday
-            ? "You've already uploaded a screenshot today — showing saved stats"
-            : `Already uploaded for ${format(parseISO(form.date), "dd/MM/yyyy")} — showing saved stats`,
-        );
-        return;
-      }
       const dataUrl: string = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result as string);
@@ -426,13 +434,8 @@ const SleepSourcesPanel = () => {
       const v = data?.vitals as GarminVitals | undefined;
       if (!v) throw new Error("No vitals returned");
       await saveGarminVitals(form.date, v);
-      setForm((f) => ({
-        ...f,
-        rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
-        hrv: v.avg_overnight_hrv != null ? String(v.avg_overnight_hrv) : f.hrv,
-        vitals: v,
-      }));
-      toast.success("Vitals extracted and saved from screenshot");
+      setForm((f) => applyVitalsToForm(f, v));
+      toast.success("Vitals extracted, shown below and saved");
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Failed to parse screenshot");
@@ -610,6 +613,7 @@ const SleepSourcesPanel = () => {
                     <option value="">—</option>
                     <option value="Balanced">Balanced</option>
                     <option value="Few">Few</option>
+                    <option value="Some">Some</option>
                     <option value="Many">Many</option>
                   </select>
                 </div>
@@ -631,6 +635,8 @@ const SleepSourcesPanel = () => {
                     <option value="">—</option>
                     <option value="Balanced">Balanced</option>
                     <option value="Unbalanced">Unbalanced</option>
+                    <option value="Low">Low</option>
+                    <option value="High">High</option>
                   </select>
                 </div>
               </div>
