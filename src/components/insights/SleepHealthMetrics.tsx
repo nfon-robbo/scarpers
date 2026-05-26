@@ -96,6 +96,28 @@ const SleepHealthMetrics = () => {
     return { data, recentAvg, trend };
   }, [rows]);
 
+  const breathing = useMemo(() => {
+    const recent = rows.filter(r => r.breathing_pattern || r.respiration_avg != null).slice(-7);
+    if (recent.length === 0) return null;
+    const patterns = recent.map(r => (r.breathing_pattern || "").toLowerCase()).filter(Boolean);
+    const counts: Record<string, number> = {};
+    patterns.forEach(p => { counts[p] = (counts[p] || 0) + 1; });
+    const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const resps = recent.filter(r => r.respiration_avg != null).map(r => Number(r.respiration_avg));
+    const avgResp = avg(resps);
+    return { dominant, avgResp, days: recent.length };
+  }, [rows]);
+
+  const hrv7 = useMemo(() => {
+    const withHrv = rows.filter(r => r.hrv != null).map(r => Number(r.hrv));
+    const last7 = withHrv.slice(-7);
+    const prev7 = withHrv.slice(-14, -7);
+    const avg7 = avg(last7);
+    const avgPrev = avg(prev7);
+    const trendLabel = rows.slice(-1)[0]?.hrv_7d_trend || null;
+    return { avg7, avgPrev, trendLabel, count: last7.length };
+  }, [rows]);
+
   if (loading) {
     return (
       <Card>
@@ -106,7 +128,7 @@ const SleepHealthMetrics = () => {
     );
   }
 
-  if (spo2.data.length === 0 && restless.data.length === 0) return null;
+  if (spo2.data.length === 0 && restless.data.length === 0 && !breathing && hrv7.avg7 == null) return null;
 
   const spo2Color = spo2.recentAvg == null
     ? "hsl(var(--muted-foreground))"
