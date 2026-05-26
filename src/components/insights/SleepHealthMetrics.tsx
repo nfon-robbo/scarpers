@@ -60,7 +60,7 @@ const SleepHealthMetrics = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     supabase
       .from("daily_metrics")
-      .select("date, spo2_avg, spo2_lowest, restless_count")
+      .select("date, spo2_avg, spo2_lowest, restless_count, breathing_pattern, respiration_avg, hrv, hrv_7d_trend")
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: true })
