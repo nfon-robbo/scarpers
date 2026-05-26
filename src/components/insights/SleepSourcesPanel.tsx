@@ -243,17 +243,7 @@ const SleepSourcesPanel = () => {
     setEditingDate(null);
     const f = emptyForm();
     const existing = await fetchExistingVitals(f.date);
-    setForm(existing ? { ...f, vitals: existing,
-      rhr: existing.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
-      hrv: existing.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
-      spo2Avg: existing.avg_spo2 != null ? String(existing.avg_spo2) : "",
-      spo2Low: existing.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
-      respiration: existing.avg_respiration != null ? String(existing.avg_respiration) : "",
-      breathingPattern: existing.breathing_variations ?? "",
-      skinTemp: existing.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
-      restless: existing.restless_moments != null ? String(existing.restless_moments) : "",
-      hrv7d: existing.hrv_7d_status ?? "",
-    } : f);
+    setForm(existing ? applyVitalsToForm(f, existing) : f);
     setDialogOpen(true);
   };
 
@@ -267,7 +257,7 @@ const SleepSourcesPanel = () => {
     const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
     const bh = Math.floor(normMin / 60), bm = normMin % 60;
     const existing = await fetchExistingVitals(date);
-    setForm({
+    const baseForm = {
       ...emptyForm(date),
       date,
       bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
@@ -276,17 +266,8 @@ const SleepSourcesPanel = () => {
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
       awake: secsToHHMM(totals.awake),
-      rhr: existing?.resting_heart_rate != null ? String(existing.resting_heart_rate) : "",
-      hrv: existing?.avg_overnight_hrv != null ? String(existing.avg_overnight_hrv) : "",
-      spo2Avg: existing?.avg_spo2 != null ? String(existing.avg_spo2) : "",
-      spo2Low: existing?.lowest_spo2 != null ? String(existing.lowest_spo2) : "",
-      respiration: existing?.avg_respiration != null ? String(existing.avg_respiration) : "",
-      breathingPattern: existing?.breathing_variations ?? "",
-      skinTemp: existing?.skin_temp_change_c != null ? String(existing.skin_temp_change_c) : "",
-      restless: existing?.restless_moments != null ? String(existing.restless_moments) : "",
-      hrv7d: existing?.hrv_7d_status ?? "",
-      vitals: existing,
-    });
+    };
+    setForm(existing ? applyVitalsToForm(baseForm, existing) : baseForm);
     setDialogOpen(true);
   };
 
