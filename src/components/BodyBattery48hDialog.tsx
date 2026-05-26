@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles, RefreshCw, BatteryLow } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -493,6 +493,34 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.ts);
 
+  const rechargeSummary = useMemo(() => {
+    if (!truth || points.length === 0) return null;
+    const wakeMs = readinessData?.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
+    const sleepCandidates = points
+      .map((p, index) => ({ ...p, index }))
+      .filter((p) => p.state === "sleep" && (wakeMs == null || !Number.isFinite(wakeMs) || p.ts <= wakeMs + 3600_000));
+    const lastSleep = sleepCandidates.at(-1);
+    if (!lastSleep) return null;
+
+    let firstSleepIndex = lastSleep.index;
+    while (firstSleepIndex > 0 && points[firstSleepIndex - 1].state === "sleep") firstSleepIndex -= 1;
+    const windowStart = Math.max(0, firstSleepIndex - 1);
+    const overnight = points.slice(windowStart, lastSleep.index + 1);
+    const previousLow = overnight.reduce((min, p) => Math.min(min, p.battery), overnight[0]?.battery ?? truth.startPercent);
+    const morningBattery = truth.startPercent;
+    const actualRecharge = Math.max(0, morningBattery - previousLow);
+    const stageScale = totals?.rechargeTotal ? actualRecharge / totals.rechargeTotal : 0;
+
+    return {
+      actualRecharge,
+      morningBattery,
+      previousLow,
+      deepRecharge: (totals?.rechargeDeep ?? 0) * stageScale,
+      remRecharge: (totals?.rechargeRem ?? 0) * stageScale,
+      lightRecharge: (totals?.rechargeLight ?? 0) * stageScale,
+    };
+  }, [points, readinessData?.wakeTimeIso, totals, truth]);
+
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
     const p: HourPoint = payload[0].payload;
@@ -565,21 +593,28 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium uppercase tracking-wide">
                     <TrendingUp className="w-3.5 h-3.5" /> Recharged
                   </div>
-                  <div className="text-2xl font-bold text-foreground mt-0.5">+{fmt(totals.rechargeTotal)}%</div>
+                  <div className="text-2xl font-bold text-foreground mt-0.5">
+                    +{fmt(rechargeSummary?.actualRecharge ?? totals.rechargeTotal)}%
+                  </div>
                   <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                    {rechargeSummary && (
+                      <div className="pb-1 border-b border-border/40 text-foreground/90 leading-snug">
+                        Recharged to {fmt(rechargeSummary.morningBattery)}% ({rechargeSummary.morningBattery >= 85 ? "excellent" : rechargeSummary.morningBattery >= 70 ? "strong" : "steady"}) from yesterday's low of {fmt(rechargeSummary.previousLow)}%
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="flex items-center gap-1">
                         <Moon className="w-3 h-3" /> Deep
                       </span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeDeep)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.deepRecharge ?? totals.rechargeDeep)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>REM</span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeRem)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.remRecharge ?? totals.rechargeRem)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Light</span>
-                      <span className="font-mono text-foreground">+{fmt(totals.rechargeLight)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.lightRecharge ?? totals.rechargeLight)}%</span>
                     </div>
                   </div>
                 </div>
