@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Activity, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Wind, HeartPulse } from "lucide-react";
+import { Activity, BatteryCharging, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Wind, HeartPulse } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
@@ -17,6 +17,7 @@ interface Row {
   respiration_avg: number | null;
   hrv: number | null;
   hrv_7d_trend: string | null;
+  body_battery_change: number | null;
 }
 
 const tooltipStyle = {
@@ -60,7 +61,7 @@ const SleepHealthMetrics = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     supabase
       .from("daily_metrics")
-      .select("date, spo2_avg, spo2_lowest, restless_count, breathing_pattern, respiration_avg, hrv, hrv_7d_trend")
+      .select("date, spo2_avg, spo2_lowest, restless_count, breathing_pattern, respiration_avg, hrv, hrv_7d_trend, body_battery_change")
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: true })
@@ -118,6 +119,11 @@ const SleepHealthMetrics = () => {
     return { avg7, avgPrev, trendLabel, count: last7.length };
   }, [rows]);
 
+  const bodyBattery = useMemo(() => {
+    const recent = rows.filter(r => r.body_battery_change != null).slice(-7).map(r => Number(r.body_battery_change));
+    return { latest: recent.at(-1) ?? null, avg7: avg(recent), count: recent.length };
+  }, [rows]);
+
   if (loading) {
     return (
       <Card>
@@ -128,7 +134,7 @@ const SleepHealthMetrics = () => {
     );
   }
 
-  if (spo2.data.length === 0 && restless.data.length === 0 && !breathing && hrv7.avg7 == null) return null;
+  if (spo2.data.length === 0 && restless.data.length === 0 && !breathing && hrv7.avg7 == null && bodyBattery.latest == null) return null;
 
   const spo2Color = spo2.recentAvg == null
     ? "hsl(var(--muted-foreground))"
@@ -162,7 +168,7 @@ const SleepHealthMetrics = () => {
         <CardDescription>Respiratory & restlessness trends from advanced sleep tracking</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {(breathing || hrv7.avg7 != null) && (
+        {(breathing || hrv7.avg7 != null || bodyBattery.latest != null) && (
           <div className="grid grid-cols-2 gap-3">
             {breathing && (
               <div className="p-3 rounded-lg border border-border bg-card/50">
@@ -191,6 +197,18 @@ const SleepHealthMetrics = () => {
                     </>
                   )}
                   {hrv7.trendLabel && <span className="ml-1">· {hrv7.trendLabel}</span>}
+                </p>
+              </div>
+            )}
+            {bodyBattery.latest != null && (
+              <div className="p-3 rounded-lg border border-border bg-card/50">
+                <div className="flex items-center gap-1.5 mb-1 text-xs text-muted-foreground">
+                  <BatteryCharging className="w-3.5 h-3.5" />
+                  Body Battery
+                </div>
+                <p className="text-lg font-semibold">{bodyBattery.latest >= 0 ? "+" : ""}{bodyBattery.latest}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {bodyBattery.avg7 != null ? `${bodyBattery.avg7 >= 0 ? "+" : ""}${bodyBattery.avg7.toFixed(0)} avg · ` : ""}{bodyBattery.count}d
                 </p>
               </div>
             )}
