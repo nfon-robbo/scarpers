@@ -1,20 +1,21 @@
-Plan:
+## Fix: Group Readiness Trend by local date
 
-1. Replace the RECHARGED tile calculation with a chart-only helper in `BodyBattery48hDialog.tsx`.
-   - Identify the most recent contiguous sleep block in `points`.
-   - Use the battery value immediately before sleep starts as `eveningBattery`.
-   - Use the highest battery value in the sleep block / first wake point after sleep as `morningBattery`.
-   - Calculate `actualRecharge = morningBattery - eveningBattery`.
+**Problem:** In `ReadinessWidget.tsx` (lines 743–771), the 7-day morning/EOD trend groups snapshots by UTC date (`s.recorded_at.split("T")[0]`) and labels days from UTC midnight. A snapshot at 00:45 Tuesday BST (= 23:45 Monday UTC) gets filed under Monday, so "Monday EOD" actually shows a Tuesday-morning value.
 
-2. Remove the unsafe fallback to `totals.rechargeTotal` for the main tile.
-   - `totals.rechargeTotal` is theoretical sleep-stage points and must not drive the displayed `+X% RECHARGED` value.
-   - If chart-derived values cannot be found, show a neutral unavailable state instead of a wrong theoretical number.
+**Fix (frontend only, scope-limited):**
 
-3. Update the tile copy to make the values auditable.
-   - Example: `+46%`
-   - Supporting line: `Recharged to 51% from yesterday's low of 5%`.
-   - Keep the stage rows only as proportional context, scaled to the actual recharge, or label them clearly so they do not imply raw theoretical battery gain.
+1. Add a small helper `localDateKey(iso)` inside the effect that returns `YYYY-MM-DD` using the browser's local timezone (same pattern already used at line 719 for the "today" branch).
+2. Replace the `days` array generation to use local-date keys:
+   - Start from `today` at local midnight and walk back 7 days using local-date math (avoid `toISOString().split("T")[0]`, which is UTC).
+3. Replace `const d = s.recorded_at.split("T")[0]` with `const d = localDateKey(s.recorded_at)` when bucketing into `byDay`.
+4. Keep the weekday label using `new Date(${d}T00:00:00)` so the "Mon/Tue/…" label matches the local-date bucket.
 
-4. Validate with the reported scenario.
-   - Given chart data around `5% → 51%`, the tile should display `+46% RECHARGED`.
-   - It should never display `+95%` unless the chart itself shows an actual 95-point rise.
+No changes to:
+- Edge functions / hourly snapshot writer (deferred per request).
+- "Morning" snapshot window definition (deferred).
+- Deduping (deferred).
+- Backend, DB, or any other component.
+
+**Result:** A snapshot at 00:45 Tue BST is bucketed under Tue, "Monday EOD" only contains Monday-local snapshots, and BST/other-timezone users see correctly-labelled days.
+
+**File touched:** `src/components/ReadinessWidget.tsx` only (the `useEffect` at lines 712–772).
