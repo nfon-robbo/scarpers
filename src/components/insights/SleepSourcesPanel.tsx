@@ -68,7 +68,7 @@ type FormState = {
   spo2Avg: string; spo2Low: string;
   respiration: string; breathingPattern: string;
   skinTemp: string; restless: string;
-  hrv7d: string;
+  hrv7d: string; bodyBattery: string;
   vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
@@ -79,7 +79,7 @@ const emptyForm = (date?: string): FormState => ({
   spo2Avg: "", spo2Low: "",
   respiration: "", breathingPattern: "",
   skinTemp: "", restless: "",
-  hrv7d: "",
+  hrv7d: "", bodyBattery: "",
   vitals: null,
 });
 
@@ -120,6 +120,7 @@ const applyVitalsToForm = (f: FormState, v: GarminVitals): FormState => {
     skinTemp: v.skin_temp_change_c != null ? String(v.skin_temp_change_c) : f.skinTemp,
     restless: v.restless_moments != null ? String(v.restless_moments) : f.restless,
     hrv7d: normaliseHrvStatus(v.hrv_7d_status) || f.hrv7d,
+    bodyBattery: v.body_battery_change != null ? String(v.body_battery_change) : f.bodyBattery,
     vitals: v,
   };
 };
