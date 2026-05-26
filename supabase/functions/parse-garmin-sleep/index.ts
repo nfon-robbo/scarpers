@@ -46,7 +46,7 @@ Return STRICT JSON only — no prose, no code fences — with these keys (use nu
   "restless_moments": number | null,
   "avg_overnight_hr": number | null,           // bpm
   "resting_heart_rate": number | null,         // bpm
-  "body_battery_change": number | null,        // signed integer, e.g. +51 -> 51, -10 -> -10
+  "body_battery_change": number | null,        // signed overnight change/recharge, e.g. +51 -> 51, -10 -> -10
   "avg_spo2": number | null,                   // percent
   "lowest_spo2": number | null,                // percent
   "avg_respiration": number | null,            // brpm
@@ -56,7 +56,7 @@ Return STRICT JSON only — no prose, no code fences — with these keys (use nu
   "hrv_7d_status": string | null,              // e.g. "Balanced", "Unbalanced", "Low"
   "skin_temp_change_c": number | null          // celsius, signed
 }
-Do not ignore visible labels like Breathing variations/pattern, Restless moments, 7-day average HRV, HRV status, or Skin temperature. If the screenshot shows a 7-day HRV average value, put the number in hrv_7d_avg even if overnight HRV is not shown.`;
+Do not ignore visible labels like Body Battery, Recharge, Change, Breathing variations/pattern, Restless moments, 7-day average HRV, HRV status, or Skin temperature. If Body Battery shows an overnight recharge/change such as +51, return body_battery_change: 51. If the screenshot shows a 7-day HRV average value, put the number in hrv_7d_avg even if overnight HRV is not shown.`;
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
