@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2, Moon, Sun, Activity, TrendingUp, TrendingDown, Sparkles, RefreshCw, BatteryLow } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -492,6 +492,26 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
 
 
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.ts);
+
+  const rechargeSummary = useMemo(() => {
+    if (!truth || points.length === 0) return null;
+    const wakeMs = readinessData?.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
+    const sleepCandidates = points
+      .map((p, index) => ({ ...p, index }))
+      .filter((p) => p.state === "sleep" && (wakeMs == null || !Number.isFinite(wakeMs) || p.ts <= wakeMs + 3600_000));
+    const lastSleep = sleepCandidates.at(-1);
+    if (!lastSleep) return null;
+
+    let firstSleepIndex = lastSleep.index;
+    while (firstSleepIndex > 0 && points[firstSleepIndex - 1].state === "sleep") firstSleepIndex -= 1;
+    const windowStart = Math.max(0, firstSleepIndex - 1);
+    const overnight = points.slice(windowStart, lastSleep.index + 1);
+    const previousLow = overnight.reduce((min, p) => Math.min(min, p.battery), overnight[0]?.battery ?? truth.startPercent);
+    const morningBattery = truth.startPercent;
+    const actualRecharge = Math.max(0, morningBattery - previousLow);
+
+    return { actualRecharge, morningBattery, previousLow };
+  }, [points, readinessData?.wakeTimeIso, truth]);
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
