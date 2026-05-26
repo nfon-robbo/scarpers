@@ -517,7 +517,7 @@ const SleepSourcesPanel = () => {
       </CardContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingDate ? "Edit sleep night" : "Add sleep night"}</DialogTitle>
             <DialogDescription>
