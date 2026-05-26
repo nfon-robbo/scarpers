@@ -219,16 +219,18 @@ const SleepSourcesPanel = () => {
     };
 
     const rhrFinal = vitals.resting_heart_rate ?? null;
-    const hrvFinal = vitals.avg_overnight_hrv ?? null;
+    const hrvFinal = vitals.avg_overnight_hrv ?? vitals.hrv_7d_avg ?? null;
     if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
     if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
     if (vitals.avg_spo2 != null && isFinite(vitals.avg_spo2)) { payload.spo2 = vitals.avg_spo2; payload.spo2_avg = vitals.avg_spo2; }
     if (vitals.lowest_spo2 != null && isFinite(vitals.lowest_spo2)) payload.spo2_lowest = vitals.lowest_spo2;
     if (vitals.avg_respiration != null && isFinite(vitals.avg_respiration)) payload.respiration_avg = vitals.avg_respiration;
-    if (vitals.breathing_variations) payload.breathing_pattern = vitals.breathing_variations;
+    const breathingPattern = normaliseBreathingPattern(vitals.breathing_variations);
+    if (breathingPattern) payload.breathing_pattern = breathingPattern;
     if (vitals.skin_temp_change_c != null && isFinite(vitals.skin_temp_change_c)) payload.skin_temp_deviation = vitals.skin_temp_change_c;
     if (vitals.restless_moments != null && isFinite(vitals.restless_moments)) payload.restless_count = vitals.restless_moments;
-    if (vitals.hrv_7d_status) payload.hrv_7d_trend = vitals.hrv_7d_status;
+    const hrvStatus = normaliseHrvStatus(vitals.hrv_7d_status);
+    if (hrvStatus) payload.hrv_7d_trend = hrvStatus;
     if (vitals.body_battery_change != null && isFinite(vitals.body_battery_change)) payload.body_battery_change = vitals.body_battery_change;
 
     const { error } = existing?.id
