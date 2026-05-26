@@ -509,9 +509,17 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
     const previousLow = overnight.reduce((min, p) => Math.min(min, p.battery), overnight[0]?.battery ?? truth.startPercent);
     const morningBattery = truth.startPercent;
     const actualRecharge = Math.max(0, morningBattery - previousLow);
+    const stageScale = totals?.rechargeTotal ? actualRecharge / totals.rechargeTotal : 0;
 
-    return { actualRecharge, morningBattery, previousLow };
-  }, [points, readinessData?.wakeTimeIso, truth]);
+    return {
+      actualRecharge,
+      morningBattery,
+      previousLow,
+      deepRecharge: (totals?.rechargeDeep ?? 0) * stageScale,
+      remRecharge: (totals?.rechargeRem ?? 0) * stageScale,
+      lightRecharge: (totals?.rechargeLight ?? 0) * stageScale,
+    };
+  }, [points, readinessData?.wakeTimeIso, totals, truth]);
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
