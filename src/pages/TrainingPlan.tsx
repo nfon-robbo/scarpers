@@ -572,9 +572,16 @@ const TrainingPlanPage = () => {
             const mm = Math.floor(Math.abs(diff) / 60);
             const ss = String(Math.abs(diff) % 60).padStart(2, "0");
             const fmt = (s: number) => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+            const basis: string[] = Array.isArray(data.basis) ? data.basis : [];
+            const adherencePct = typeof data.adherence === "number"
+              ? Math.round(data.adherence * 100) : null;
+            const reasons: string[] = [];
+            if (basis.length) reasons.push(basis.join(" · "));
+            if (adherencePct != null) reasons.push(`plan adherence ${adherencePct}%`);
+            const why = reasons.length ? `\nWhy: ${reasons.join(" · ")}` : "";
             toast({
               title: "🎯 Race estimate updated",
-              description: `${fmt(prevSec)} → ${fmt(newSec)} (${mm}:${ss} ${sign}!)`,
+              description: `${fmt(prevSec)} → ${fmt(newSec)} (${mm}:${ss} ${sign}!)${why}`,
             });
           }
           setRacePredictRefresh((n) => n + 1);
