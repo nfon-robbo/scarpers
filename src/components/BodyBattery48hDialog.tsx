@@ -585,8 +585,15 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium uppercase tracking-wide">
                     <TrendingUp className="w-3.5 h-3.5" /> Recharged
                   </div>
-                  <div className="text-2xl font-bold text-foreground mt-0.5">+{fmt(totals.rechargeTotal)}%</div>
+                  <div className="text-2xl font-bold text-foreground mt-0.5">
+                    +{fmt(rechargeSummary?.actualRecharge ?? totals.rechargeTotal)}%
+                  </div>
                   <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                    {rechargeSummary && (
+                      <div className="pb-1 border-b border-border/40 text-foreground/90 leading-snug">
+                        Recharged to {fmt(rechargeSummary.morningBattery)}% ({rechargeSummary.morningBattery >= 85 ? "excellent" : rechargeSummary.morningBattery >= 70 ? "strong" : "steady"}) from yesterday's low of {fmt(rechargeSummary.previousLow)}%
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="flex items-center gap-1">
                         <Moon className="w-3 h-3" /> Deep
