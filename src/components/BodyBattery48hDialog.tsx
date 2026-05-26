@@ -602,27 +602,31 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
                     <TrendingUp className="w-3.5 h-3.5" /> Recharged
                   </div>
                   <div className="text-2xl font-bold text-foreground mt-0.5">
-                    +{fmt(rechargeSummary?.actualRecharge ?? totals.rechargeTotal)}%
+                    {rechargeSummary ? `+${fmt(rechargeSummary.actualRecharge)}%` : "—"}
                   </div>
                   <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
-                    {rechargeSummary && (
+                    {rechargeSummary ? (
                       <div className="pb-1 border-b border-border/40 text-foreground/90 leading-snug">
                         Recharged to {fmt(rechargeSummary.morningBattery)}% ({rechargeSummary.morningBattery >= 85 ? "excellent" : rechargeSummary.morningBattery >= 70 ? "strong" : "steady"}) from yesterday's low of {fmt(rechargeSummary.previousLow)}%
+                      </div>
+                    ) : (
+                      <div className="pb-1 border-b border-border/40 text-foreground/90 leading-snug">
+                        No overnight recharge detected in the last 48h.
                       </div>
                     )}
                     <div className="flex justify-between">
                       <span className="flex items-center gap-1">
                         <Moon className="w-3 h-3" /> Deep
                       </span>
-                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.deepRecharge ?? totals.rechargeDeep)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.deepRecharge ?? 0)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>REM</span>
-                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.remRecharge ?? totals.rechargeRem)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.remRecharge ?? 0)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Light</span>
-                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.lightRecharge ?? totals.rechargeLight)}%</span>
+                      <span className="font-mono text-foreground">+{fmt(rechargeSummary?.lightRecharge ?? 0)}%</span>
                     </div>
                   </div>
                 </div>
