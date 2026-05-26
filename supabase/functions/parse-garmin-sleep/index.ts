@@ -39,10 +39,10 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const prompt = `Extract sleep vitals from this Garmin Connect "Sleep Metrics" screenshot.
+    const prompt = `Extract sleep vitals from this Garmin Connect sleep screenshot. It may be English.
 Return STRICT JSON only — no prose, no code fences — with these keys (use null if not visible):
 {
-  "breathing_variations": string | null,       // e.g. "Few", "Some", "Many" — as shown
+  "breathing_variations": string | null,       // e.g. "Balanced", "Few", "Some", "Many" — as shown
   "restless_moments": number | null,
   "avg_overnight_hr": number | null,           // bpm
   "resting_heart_rate": number | null,         // bpm
@@ -52,9 +52,11 @@ Return STRICT JSON only — no prose, no code fences — with these keys (use nu
   "avg_respiration": number | null,            // brpm
   "lowest_respiration": number | null,         // brpm
   "avg_overnight_hrv": number | null,          // ms
+  "hrv_7d_avg": number | null,                 // 7-day average HRV in ms if shown
   "hrv_7d_status": string | null,              // e.g. "Balanced", "Unbalanced", "Low"
   "skin_temp_change_c": number | null          // celsius, signed
-}`;
+}
+Do not ignore visible labels like Breathing variations/pattern, Restless moments, 7-day average HRV, HRV status, or Skin temperature. If the screenshot shows a 7-day HRV average value, put the number in hrv_7d_avg even if overnight HRV is not shown.`;
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
