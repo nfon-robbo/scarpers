@@ -68,7 +68,7 @@ type FormState = {
   spo2Avg: string; spo2Low: string;
   respiration: string; breathingPattern: string;
   skinTemp: string; restless: string;
-  hrv7d: string;
+  hrv7d: string; bodyBattery: string;
   vitals: GarminVitals | null;
 };
 const emptyForm = (date?: string): FormState => ({
@@ -79,7 +79,7 @@ const emptyForm = (date?: string): FormState => ({
   spo2Avg: "", spo2Low: "",
   respiration: "", breathingPattern: "",
   skinTemp: "", restless: "",
-  hrv7d: "",
+  hrv7d: "", bodyBattery: "",
   vitals: null,
 });
 
@@ -120,6 +120,7 @@ const applyVitalsToForm = (f: FormState, v: GarminVitals): FormState => {
     skinTemp: v.skin_temp_change_c != null ? String(v.skin_temp_change_c) : f.skinTemp,
     restless: v.restless_moments != null ? String(v.restless_moments) : f.restless,
     hrv7d: normaliseHrvStatus(v.hrv_7d_status) || f.hrv7d,
+    bodyBattery: v.body_battery_change != null ? String(v.body_battery_change) : f.bodyBattery,
     vitals: v,
   };
 };
@@ -371,7 +372,7 @@ const SleepSourcesPanel = () => {
       const skin = num(form.skinTemp) ?? v?.skin_temp_change_c ?? null;
       const restl = int(form.restless) ?? (v?.restless_moments ?? null);
       const hrvTrend = (normaliseHrvStatus(form.hrv7d) || normaliseHrvStatus(v?.hrv_7d_status) || null);
-      const bbChange = v?.body_battery_change ?? null;
+      const bbChange = int(form.bodyBattery) ?? v?.body_battery_change ?? null;
       if (spo2Avg != null && isFinite(spo2Avg)) { payload.spo2_avg = spo2Avg; payload.spo2 = spo2Avg; }
       if (spo2Low != null && isFinite(spo2Low)) payload.spo2_lowest = spo2Low;
       if (resp != null && isFinite(resp)) payload.respiration_avg = resp;
@@ -638,6 +639,11 @@ const SleepSourcesPanel = () => {
                     <option value="Low">Low</option>
                     <option value="High">High</option>
                   </select>
+                </div>
+                <div className="grid gap-1.5 col-span-2">
+                  <Label htmlFor="sleep-body-battery">Body Battery change</Label>
+                  <Input id="sleep-body-battery" inputMode="numeric" placeholder="+51" value={form.bodyBattery}
+                    onChange={(e) => setForm((f) => ({ ...f, bodyBattery: e.target.value }))} />
                 </div>
               </div>
             </div>
