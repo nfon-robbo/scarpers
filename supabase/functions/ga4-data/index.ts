@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         try { isInvalidGrant = JSON.parse(t)?.error === "invalid_grant"; } catch { /* noop */ }
         if (isInvalidGrant) {
           await sb.from("ga4_tokens").delete().eq("id", tokenRow.id);
-          return json({ error: "GA4 reconnect required", reauth_required: true, detail: t }, 401);
+          return json({ error: "GA4 reconnect required", reauth_required: true, detail: t });
         }
         return json({ error: "Token refresh failed", detail: t }, 500);
       }
