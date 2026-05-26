@@ -162,6 +162,40 @@ const SleepHealthMetrics = () => {
         <CardDescription>Respiratory & restlessness trends from advanced sleep tracking</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {(breathing || hrv7.avg7 != null) && (
+          <div className="grid grid-cols-2 gap-3">
+            {breathing && (
+              <div className="p-3 rounded-lg border border-border bg-card/50">
+                <div className="flex items-center gap-1.5 mb-1 text-xs text-muted-foreground">
+                  <Wind className="w-3.5 h-3.5" />
+                  Breathing
+                </div>
+                <p className="text-lg font-semibold capitalize">{breathing.dominant ?? "—"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {breathing.avgResp != null ? `${breathing.avgResp.toFixed(0)} brpm avg · ` : ""}{breathing.days}d
+                </p>
+              </div>
+            )}
+            {hrv7.avg7 != null && (
+              <div className="p-3 rounded-lg border border-border bg-card/50">
+                <div className="flex items-center gap-1.5 mb-1 text-xs text-muted-foreground">
+                  <HeartPulse className="w-3.5 h-3.5" />
+                  HRV (7d avg)
+                </div>
+                <p className="text-lg font-semibold">{hrv7.avg7.toFixed(0)} <span className="text-xs font-normal text-muted-foreground">ms</span></p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 capitalize inline-flex items-center gap-1">
+                  {hrv7.avgPrev != null && (
+                    <>
+                      <TrendIcon dir={hrv7.avg7 > hrv7.avgPrev * 1.03 ? "up" : hrv7.avg7 < hrv7.avgPrev * 0.97 ? "down" : "stable"} />
+                      vs prev 7d
+                    </>
+                  )}
+                  {hrv7.trendLabel && <span className="ml-1">· {hrv7.trendLabel}</span>}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         {spo2.data.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
