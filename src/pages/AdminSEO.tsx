@@ -111,11 +111,24 @@ const AdminSEO = () => {
     setGa4Loading(true); setGa4Error(null);
     try {
       const { data, error } = await supabase.functions.invoke("ga4-data", { body: { action: "report", days } });
+      const payload = data as any;
+      if (payload?.reauth_required) {
+        setGa4Connected(false);
+        setGa4Data(null);
+        setGa4Error("Google Analytics connection expired. Please reconnect.");
+        return;
+      }
       if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if (payload?.error) throw new Error(payload.error);
       setGa4Data(data as Ga4Data);
     } catch (e: any) {
-      setGa4Error(e?.message ?? "Failed to load GA4 data");
+      const msg = e?.message ?? "Failed to load GA4 data";
+      if (/reconnect required|invalid_grant|expired or revoked/i.test(msg)) {
+        setGa4Connected(false);
+        setGa4Error("Google Analytics connection expired. Please reconnect.");
+      } else {
+        setGa4Error(msg);
+      }
     } finally { setGa4Loading(false); }
   };
   const connectGa4 = async () => {
