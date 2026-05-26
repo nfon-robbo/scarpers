@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Activity, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Activity, Droplet, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Wind, HeartPulse } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from "recharts";
@@ -13,6 +13,10 @@ interface Row {
   spo2_avg: number | null;
   spo2_lowest: number | null;
   restless_count: number | null;
+  breathing_pattern: string | null;
+  respiration_avg: number | null;
+  hrv: number | null;
+  hrv_7d_trend: string | null;
 }
 
 const tooltipStyle = {
