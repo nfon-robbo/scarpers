@@ -356,7 +356,7 @@ const SleepSourcesPanel = () => {
       };
       // Prefer explicit inputs; fall back to parsed vitals
       const rhrFinal = rhrNum ?? (v?.resting_heart_rate ?? null);
-      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? null);
+      const hrvFinal = hrvNum ?? (v?.avg_overnight_hrv ?? v?.hrv_7d_avg ?? null);
       if (rhrFinal != null && isFinite(rhrFinal) && rhrFinal > 0) payload.resting_heart_rate = rhrFinal;
       if (hrvFinal != null && isFinite(hrvFinal) && hrvFinal > 0) payload.hrv = hrvFinal;
       if (v?.avg_spo2 != null && isFinite(v.avg_spo2)) payload.spo2 = v.avg_spo2;
@@ -367,10 +367,10 @@ const SleepSourcesPanel = () => {
       const spo2Avg = num(form.spo2Avg) ?? v?.avg_spo2 ?? null;
       const spo2Low = num(form.spo2Low) ?? v?.lowest_spo2 ?? null;
       const resp = num(form.respiration) ?? v?.avg_respiration ?? null;
-      const breath = (form.breathingPattern.trim() || v?.breathing_variations || null);
+      const breath = (normaliseBreathingPattern(form.breathingPattern) || normaliseBreathingPattern(v?.breathing_variations) || null);
       const skin = num(form.skinTemp) ?? v?.skin_temp_change_c ?? null;
       const restl = int(form.restless) ?? (v?.restless_moments ?? null);
-      const hrvTrend = (form.hrv7d.trim() || v?.hrv_7d_status || null);
+      const hrvTrend = (normaliseHrvStatus(form.hrv7d) || normaliseHrvStatus(v?.hrv_7d_status) || null);
       const bbChange = v?.body_battery_change ?? null;
       if (spo2Avg != null && isFinite(spo2Avg)) { payload.spo2_avg = spo2Avg; payload.spo2 = spo2Avg; }
       if (spo2Low != null && isFinite(spo2Low)) payload.spo2_lowest = spo2Low;
@@ -613,6 +613,7 @@ const SleepSourcesPanel = () => {
                     <option value="">—</option>
                     <option value="Balanced">Balanced</option>
                     <option value="Few">Few</option>
+                    <option value="Some">Some</option>
                     <option value="Many">Many</option>
                   </select>
                 </div>
@@ -634,6 +635,8 @@ const SleepSourcesPanel = () => {
                     <option value="">—</option>
                     <option value="Balanced">Balanced</option>
                     <option value="Unbalanced">Unbalanced</option>
+                    <option value="Low">Low</option>
+                    <option value="High">High</option>
                   </select>
                 </div>
               </div>
