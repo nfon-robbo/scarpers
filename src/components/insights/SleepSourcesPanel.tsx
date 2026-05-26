@@ -55,6 +55,7 @@ type GarminVitals = {
   avg_respiration?: number | null;
   lowest_respiration?: number | null;
   avg_overnight_hrv?: number | null;
+  hrv_7d_avg?: number | null;
   hrv_7d_status?: string | null;
   skin_temp_change_c?: number | null;
 };
@@ -81,6 +82,47 @@ const emptyForm = (date?: string): FormState => ({
   hrv7d: "",
   vitals: null,
 });
+
+const cleanLabel = (value?: string | null) => value?.trim() ?? "";
+
+const normaliseBreathingPattern = (value?: string | null) => {
+  const label = cleanLabel(value);
+  const lower = label.toLowerCase();
+  if (!label) return "";
+  if (lower.includes("balanced")) return "Balanced";
+  if (lower.includes("few")) return "Few";
+  if (lower.includes("some")) return "Some";
+  if (lower.includes("many")) return "Many";
+  return label;
+};
+
+const normaliseHrvStatus = (value?: string | null) => {
+  const label = cleanLabel(value);
+  const lower = label.toLowerCase();
+  if (!label) return "";
+  if (lower.includes("balanced")) return "Balanced";
+  if (lower.includes("unbalanced")) return "Unbalanced";
+  if (lower === "low" || lower.includes("low")) return "Low";
+  if (lower === "high" || lower.includes("high")) return "High";
+  return label;
+};
+
+const applyVitalsToForm = (f: FormState, v: GarminVitals): FormState => {
+  const hrvValue = v.avg_overnight_hrv ?? v.hrv_7d_avg;
+  return {
+    ...f,
+    rhr: v.resting_heart_rate != null ? String(v.resting_heart_rate) : f.rhr,
+    hrv: hrvValue != null ? String(hrvValue) : f.hrv,
+    spo2Avg: v.avg_spo2 != null ? String(v.avg_spo2) : f.spo2Avg,
+    spo2Low: v.lowest_spo2 != null ? String(v.lowest_spo2) : f.spo2Low,
+    respiration: v.avg_respiration != null ? String(v.avg_respiration) : f.respiration,
+    breathingPattern: normaliseBreathingPattern(v.breathing_variations) || f.breathingPattern,
+    skinTemp: v.skin_temp_change_c != null ? String(v.skin_temp_change_c) : f.skinTemp,
+    restless: v.restless_moments != null ? String(v.restless_moments) : f.restless,
+    hrv7d: normaliseHrvStatus(v.hrv_7d_status) || f.hrv7d,
+    vitals: v,
+  };
+};
 
 const SleepSourcesPanel = () => {
   const { user } = useAuth();
