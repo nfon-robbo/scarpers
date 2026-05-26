@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
       if (!r.ok) {
         const t = await r.text();
         console.error("Refresh failed:", t);
+        // If Google says the refresh token is dead, clear the stored row so the
+        // UI shows a Reconnect button instead of looping on the same error.
+        let isInvalidGrant = false;
+        try { isInvalidGrant = JSON.parse(t)?.error === "invalid_grant"; } catch { /* noop */ }
+        if (isInvalidGrant) {
+          await sb.from("ga4_tokens").delete().eq("id", tokenRow.id);
+          return json({ error: "GA4 reconnect required", reauth_required: true, detail: t }, 401);
+        }
         return json({ error: "Token refresh failed", detail: t }, 500);
       }
       const j = await r.json();
