@@ -494,32 +494,40 @@ const BodyBattery48hDialog = ({ open, onOpenChange, readinessData }: Props) => {
   const midnightTicks = points.filter((p) => p.hour === 0).map((p) => p.ts);
 
   const rechargeSummary = useMemo(() => {
-    if (!truth || points.length === 0) return null;
-    const wakeMs = readinessData?.wakeTimeIso ? new Date(readinessData.wakeTimeIso).getTime() : null;
-    const sleepCandidates = points
-      .map((p, index) => ({ ...p, index }))
-      .filter((p) => p.state === "sleep" && (wakeMs == null || !Number.isFinite(wakeMs) || p.ts <= wakeMs + 3600_000));
-    const lastSleep = sleepCandidates.at(-1);
-    if (!lastSleep) return null;
+    if (points.length === 0) return null;
+    // Locate the most recent contiguous sleep block in the chart data.
+    let endIdx = -1;
+    for (let i = points.length - 1; i >= 0; i--) {
+      if (points[i].state === "sleep") { endIdx = i; break; }
+    }
+    if (endIdx < 0) return null;
+    let startIdx = endIdx;
+    while (startIdx > 0 && points[startIdx - 1].state === "sleep") startIdx -= 1;
 
-    let firstSleepIndex = lastSleep.index;
-    while (firstSleepIndex > 0 && points[firstSleepIndex - 1].state === "sleep") firstSleepIndex -= 1;
-    const windowStart = Math.max(0, firstSleepIndex - 1);
-    const overnight = points.slice(windowStart, lastSleep.index + 1);
-    const previousLow = overnight.reduce((min, p) => Math.min(min, p.battery), overnight[0]?.battery ?? truth.startPercent);
-    const morningBattery = truth.startPercent;
-    const actualRecharge = Math.max(0, morningBattery - previousLow);
+    // Evening = battery just before sleep began.
+    const eveningBattery = startIdx > 0 ? points[startIdx - 1].battery : points[startIdx].battery;
+    // Morning = peak battery during/just after the sleep block.
+    let morningBattery = points[startIdx].battery;
+    for (let i = startIdx; i <= endIdx; i++) {
+      if (points[i].battery > morningBattery) morningBattery = points[i].battery;
+    }
+    if (endIdx + 1 < points.length && points[endIdx + 1].battery > morningBattery) {
+      morningBattery = points[endIdx + 1].battery;
+    }
+    const actualRecharge = Math.max(0, morningBattery - eveningBattery);
+    if (actualRecharge < 1) return null;
+
+    // Stage rows scaled to actual recharge — purely contextual.
     const stageScale = totals?.rechargeTotal ? actualRecharge / totals.rechargeTotal : 0;
-
     return {
       actualRecharge,
       morningBattery,
-      previousLow,
+      previousLow: eveningBattery,
       deepRecharge: (totals?.rechargeDeep ?? 0) * stageScale,
       remRecharge: (totals?.rechargeRem ?? 0) * stageScale,
       lightRecharge: (totals?.rechargeLight ?? 0) * stageScale,
     };
-  }, [points, readinessData?.wakeTimeIso, totals, truth]);
+  }, [points, totals]);
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload?.length) return null;
