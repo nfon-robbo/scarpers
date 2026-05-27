@@ -182,17 +182,24 @@ serve(async (req) => {
     if (easyPace) basis.push(`easy ${Math.floor(easyPace/60)}:${String(Math.round(easyPace%60)).padStart(2,"0")}/km`);
 
     // ── History write: dedupe near-duplicates within 6h ──
+    // previous_sec must compare same-source (server-written) rows only — the
+    // gauge client also writes here as triggered_by='manual', and comparing
+    // a tempo/pace estimate to a VO2-only estimate produces phantom
+    // "worsening" notifications.
     let previous_sec: number | null = null;
+    let previous_runs_21d: number | null = null;
     try {
       const { data: lastRow } = await supabase
         .from("race_prediction_history")
-        .select("predicted_seconds, calculated_at")
+        .select("predicted_seconds, calculated_at, data_sources")
         .eq("user_id", user.id)
         .eq("distance", raceDistance)
+        .in("triggered_by", ["activity_synced", "plan_start", "scheduled"])
         .order("calculated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       previous_sec = lastRow?.predicted_seconds ?? null;
+      previous_runs_21d = (lastRow?.data_sources as any)?.runs_in_last_21d ?? null;
       const targetSecRounded = Math.round(T);
       const isDup =
         lastRow &&
@@ -226,6 +233,7 @@ serve(async (req) => {
       weeks_completed: Math.round(weeksCompleted),
       adherence,
       previous_sec,
+      previous_runs_21d,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message || "predict failed" }),

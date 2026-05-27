@@ -1,66 +1,67 @@
-**Goal**
+## Investigation findings
 
-Teach the AI Analysis report (the type === "analysis" branch in ai-coach) to recommend strides and structured speed work when appropriate, and to suppress them when recovery is poor.
+I traced the toast `33:34 → 38:49`. It isn't one estimate worsening — it's **two different estimators being compared as if they were one**, plus **duplicate activities** from a Strava re-sync polluting the inputs.
 
-**Scope**
+### 1. Duplicate activities created at 12:00 today
 
-- One file: supabase/functions/ai-coach/index.ts, system prompt at lines ~1399–1440 only.
-- No client/UI changes. No data model changes. No new edge function.
-- Other prompt branches (chat, day-adjust, plan-review, plan-generate, etc.) untouched.
+A Strava import ran at 12:00 and re-inserted runs that already existed as FIT uploads. Examples for your account:
 
-**Changes**
+```
+2026-05-22 07:58:15  FIT   2225m / 1200s   (created 22 May)
+2026-05-22 07:58:15  Strava 2224m / 1395s  (created today 12:00)  ← duplicate
+2026-05-21 10:34:00  FIT   2929m / 1680s   (created 21 May)
+2026-05-21 10:34:00  Strava 2929m / 1680s  (created today 12:00)  ← duplicate
+```
 
-1. Add a new "Speed Development" subsection inside Execution Analysis
+`runs_in_last_21d` in `race_prediction_history` jumped from 9 → 11 at exactly 12:00. `purgeStravaOverlaps` in `src/lib/activity-dedupe.ts` is supposed to delete Strava rows that overlap FIT rows within ±15min, but the Strava import path isn't calling it after the insert. So duplicates pile up on every re-sync.
 
-After the existing Execution Analysis paragraph, add guidance instructing the model to:
+### 2. The toast compares two unrelated estimators
 
-- Detect pace plateau (multiple recent runs at similar pace, no improvement) and flag it.
-- Detect "established aerobic base" (≥3 weeks consistent easy running, 7-day avg readiness ≥60) and flag readiness for speed work.
-- Detect low cadence / form-efficiency concerns and tie them to strides.
+History rows for this user, last 24h:
 
-2. Extend Actionable Recommendations rules
+```
+manual / gauge_client     →  2014s (33:34)   basis: VO2max 38 only
+activity_synced / server  →  2329s (38:49)   basis: tempo 8:13/km + easy 9:34/km
+```
 
-Append a "Speed Development Guidance" block to the system prompt with these rules the model must follow when emitting bullets under the Sport-Specific group:
+- `RaceTimeEstimate.tsx` (the gauge on TrainingPlan) writes a **VO2max-only** estimate as `triggered_by: "manual"`.
+- The edge function `race-predict` writes a **tempo+easy pace** estimate as `triggered_by: "activity_synced"`.
+- In `TrainingPlan.tsx` the toast reads `previous_sec` from the edge function, which is "the last row for this distance regardless of source". The last row is almost always the gauge's VO2 estimate, so the server's pace-based estimate is diffed against the gauge's VO2 estimate. They never agree → "5:15 slower" appears any time the auto-link count grows, even with zero new running.
 
-- Strides recipe — 4–6 × 20s at ~90% effort, 30s standing/walking recovery, appended to an easy run, up to 2× per week (e.g. Tue/Thu). Benefits: form, leg power, running economy, fast-mechanics retention.
-- Structured intervals recipe — 1× per week max, only after ≥3 weeks of consistent easy base AND stable readiness ≥60. Options: 6×3min at 5K effort, 2min easy jog OR 5×1K at 5K–10K effort, 2min easy jog. Replace an easy run, do not add volume. **Pace target calculation:**
-  - First choice: Use predicted 5K pace from race predictor (if available in recent analysis)
-  - Second choice: Current tempo pace - 30-45s/km
-  - Fallback: Easy pace - 90s/km
-  - Always express as a range (±15s/km) for safety
-  - Example output: "Target 6:15-6:45/km for 3min intervals (based on your tempo pace of 7:00/km)"
-- Progression rule — always recommend strides first; only graduate to structured intervals once strides have been tolerated for 2+ weeks.
+### 3. Server tempo is being computed from walk/run sessions
 
-3. Gating rules (suppression)
+The 8:13/km "tempo" is a walk-polluted run. The doc `docs/algorithms/race-predictor.md` already flags this under "Planned filtering improvements" (title/HR/lap-CV filters, GPS run-segment extraction) — not yet implemented. With duplicates removed the predictor is still inflated, but the false "worsening" notification is the immediate user-facing bug.
 
-Add a hard "DO NOT recommend speed work when" block:
+## Plan
 
-- 7-day avg readiness < 50
-- recent sleep score < 60 (last 3 nights avg)
-- HRV 7d trend declining
-- yesterday's load high AND today's planned effort already elevated
-- injury signals present in athlete context
+### A. Stop Strava re-imports from creating duplicate rows
 
-When suppressed, the model must instead say: "Stick with easy running until readiness improves — defer strides/intervals."
+In `src/lib/strava-background-import.ts`, after each page of imports completes (and once more at the end), call `purgeStravaOverlaps(userId, fitStartTimes, 15)` for the FIT activities in the touched time window. Reuse `purgeAllStravaOverlaps` on the full-account sweep path. Net effect: Strava rows that collide with a FIT row are deleted immediately, preserving the FIT-wins precedence already established in `dedupeActivities`.
 
-4. Output formatting
+Also clean up the 2 existing duplicates for this user via a one-off `purgeAllStravaOverlaps` call when the user next opens the app (or as a one-time SQL cleanup migration — your choice; I'd prefer the client sweep so it heals other users with the same issue).
 
-- New bullets land under existing ## 💡 Actionable Recommendations → Sport-Specific group.
-- Respect existing brevity rule (3–5 bullets total across all categories). Speed recs replace, not extend, the cap.
-- Keep the strict no-mobility/no-yoga rule that already governs workout output (these recs are coaching prose, not plan rows, so unaffected).
+### B. Stop the toast from comparing apples to oranges
 
-**Out of scope (explicitly NOT in this change)**
+In `supabase/functions/race-predict/index.ts`, change the `previous_sec` lookup to filter by `triggered_by IN ('activity_synced','plan_start','scheduled')` so it ignores the gauge's `manual / gauge_client` rows. Same-source comparison only.
 
-- Plan generation prompt (plan-generate) — not editing the actual training plan markdown.
-- Auto-adapt rules (plan-auto-adapt) — upward adaptation already adds strides; not touching.
-- Chatbot prompt — not editing.
-- No new memory file; constraints live in the prompt itself.
+Optional follow-up (not in this plan unless you want it): give the gauge a distinct `triggered_by` value like `gauge_client` instead of `manual`, so the two sources are unambiguous in the table.
 
-**Verification**
+### C. Suppress the toast when the change is suspicious
 
-After deploy, request an AI Analysis from Dashboard for the active test user and confirm:
+In `TrainingPlan.tsx` (line ~569) only fire the toast when **both**:
+- `prevSec` exists and was written by the server (now guaranteed by B), and
+- `runs_in_last_21d` actually increased vs the previous server row (add `previous_runs_21d` to the edge response and compare).
 
-1. Strides recommended when pace is flat in last 3+ easy runs.
-2. Structured 6×3min / 5×1K suggested only when readiness 7d avg ≥60 and base ≥3 weeks consistent.
-3. Speed work suppressed (with the "stick with easy" line) when readiness <50 or sleep <60.
-4. Pace targets in the bullet reference the user's actual tempo/race predictor pace from the data block, calculated as: race pace (first choice) OR tempo - 30-45s/km (second choice) OR easy - 90s/km (fallback).
+If runs didn't grow, still update the chart silently but don't toast — this is the contract "no new running → no notification".
+
+### D. Note the deferred work
+
+Race-predictor walk/run filtering (title keyword, HR < 100, lap-CV, GPS speed-segment extraction) stays as-is — it's already tracked in `docs/algorithms/race-predictor.md §11`. Out of scope for this fix.
+
+## Files touched
+
+- `src/lib/strava-background-import.ts` — call `purgeStravaOverlaps` per page; sweep once at end.
+- `supabase/functions/race-predict/index.ts` — same-source `previous_sec`; return `previous_runs_21d`.
+- `src/pages/TrainingPlan.tsx` — gate the toast on runs-count actually increasing.
+
+No DB schema changes, no migration required.

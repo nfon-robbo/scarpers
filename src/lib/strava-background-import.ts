@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { autoLinkActivitiesToPlan } from "@/lib/auto-link-activities";
+import { purgeAllStravaOverlaps } from "@/lib/activity-dedupe";
 import { format } from "date-fns";
 
 let running = false;
@@ -57,6 +58,21 @@ export async function startStravaBackgroundImport(accessToken: string) {
       description: `${totalImported} new activities imported${totalSkipped > 0 ? `, ${totalSkipped} already existed` : ""}.`,
       duration: 6000,
     });
+
+    // Dedupe: delete any Strava rows that overlap a FIT activity within ±15min.
+    // FIT wins. Prevents Strava re-syncs from inflating run counts and skewing
+    // race-predictor inputs.
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const removed = await purgeAllStravaOverlaps(user.id, 15);
+        if (removed > 0) {
+          console.log(`[strava-import] purged ${removed} Strava duplicates overlapping FIT activities`);
+        }
+      }
+    } catch (purgeErr) {
+      console.error("[strava-import] dedupe sweep failed", purgeErr);
+    }
 
     // Auto-link any newly synced activities to the active training plan
     if (totalImported > 0) {

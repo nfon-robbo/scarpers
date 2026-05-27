@@ -565,8 +565,13 @@ const TrainingPlanPage = () => {
         });
         if (!error && data && !data.insufficient && data.target_sec) {
           const prevSec = data.previous_sec as number | null;
+          const prevRuns = data.previous_runs_21d as number | null;
+          const curRuns = data.runs_in_last_21d as number | null;
           const newSec = Math.round(data.target_sec);
-          if (prevSec && Math.abs(prevSec - newSec) >= 30) {
+          // Only notify if runs actually grew vs the previous server-written
+          // row — otherwise the change is just noise from re-syncs or readiness.
+          const runsGrew = prevRuns != null && curRuns != null && curRuns > prevRuns;
+          if (prevSec && runsGrew && Math.abs(prevSec - newSec) >= 30) {
             const diff = prevSec - newSec;
             const sign = diff > 0 ? "faster" : "slower";
             const mm = Math.floor(Math.abs(diff) / 60);
