@@ -233,6 +233,7 @@ serve(async (req) => {
       weeks_completed: Math.round(weeksCompleted),
       adherence,
       previous_sec,
+      previous_runs_21d,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message || "predict failed" }),
