@@ -1257,6 +1257,43 @@ const TrainingPlanPage = () => {
     });
   };
 
+  // Auto-generate after onboarding redirect. Runs once when the initial plan
+  // load resolves with no existing plan.
+  const autoGenTriggeredRef = useRef(false);
+  const autoGenPendingRef = useRef(false);
+  useEffect(() => {
+    if (autoGenTriggeredRef.current) return;
+    if (initialLoading) return;
+    const s: any = location.state;
+    if (!s?.autoGenerate) return;
+    autoGenTriggeredRef.current = true;
+    if (content) {
+      navigate(location.pathname, { replace: true });
+      return;
+    }
+    if (s.raceDistance) setRaceDistance(s.raceDistance);
+    if (s.goalTime) setGoalTime(s.goalTime);
+    if (Array.isArray(s.trainingDays) && s.trainingDays.length) setTrainingDays(s.trainingDays);
+    if (s.currentPaceMin) setCurrentPaceMin(s.currentPaceMin);
+    if (s.currentPaceMax) setCurrentPaceMax(s.currentPaceMax);
+    if (s.raceDate) setRaceDate(parseLocalISODate(s.raceDate));
+    if (s.letAIDecide) setLetAIDecide(true);
+    autoGenPendingRef.current = true;
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLoading, location.state, content]);
+
+  // Fires generatePlan after the state from autoGenerate has been applied.
+  useEffect(() => {
+    if (!autoGenPendingRef.current) return;
+    if (loading) return;
+    autoGenPendingRef.current = false;
+    generatePlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceDistance, trainingDays, raceDate, letAIDecide]);
+
+
+
   const [reviewing, setReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<string | null>(null);
   const [reviewStreaming, setReviewStreaming] = useState("");

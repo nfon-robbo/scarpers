@@ -16,8 +16,11 @@ import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Integrations"];
+const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
 const STORAGE_KEY = "scarpers:onboarding-state";
+const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const mapRaceDistance = (d: string): string => (d === "half" ? "half-marathon" : d);
 
 const METRIC_UNITS: UnitPreferences = {
   distance: "km", speed: "min/km", elevation: "m", temperature: "C", weight: "kg", height: "cm",
@@ -52,6 +55,9 @@ type OnboardingState = {
   raceDistance: string;
   goalTimeMm: string;
   goalTimeSs: string;
+  trainingDays: string[];
+  currentPaceMin: string;
+  currentPaceMax: string;
 };
 
 const loadState = (): Partial<OnboardingState> => {
@@ -97,6 +103,9 @@ const Onboarding = () => {
   const [raceDistance, setRaceDistance] = useState(initial.raceDistance ?? "");
   const [goalTimeMm, setGoalTimeMm] = useState(initial.goalTimeMm ?? "");
   const [goalTimeSs, setGoalTimeSs] = useState(initial.goalTimeSs ?? "");
+  const [trainingDays, setTrainingDays] = useState<string[]>(initial.trainingDays ?? ["Mon", "Wed", "Fri", "Sat"]);
+  const [currentPaceMin, setCurrentPaceMin] = useState(initial.currentPaceMin ?? "");
+  const [currentPaceMax, setCurrentPaceMax] = useState(initial.currentPaceMax ?? "");
   const [customOpen, setCustomOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -111,9 +120,10 @@ const Onboarding = () => {
       weightKg, weightLbs, weightSt, weightStLbs,
       experienceLevel, trainingGoals, injuries, athleteContext,
       unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs,
+      trainingDays, currentPaceMin, currentPaceMax,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs]);
+  }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs, trainingDays, currentPaceMin, currentPaceMax]);
 
   const applyUnitSystem = (system: "metric" | "imperial") => {
     const target = system === "metric" ? METRIC_UNITS : IMPERIAL_UNITS;
@@ -188,7 +198,33 @@ const Onboarding = () => {
 
       if (error) throw error;
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
-      navigate("/dashboard");
+
+      // If user has a race, jump straight into plan generation so onboarding
+      // actually delivers a plan instead of dumping them on the dashboard.
+      if (hasRace === "yes" && raceDistance && raceDate && trainingDays.length > 0) {
+        navigate("/training-plan", {
+          state: {
+            autoGenerate: true,
+            raceDistance: mapRaceDistance(raceDistance),
+            raceDate,
+            goalTime: goalTimeMm ? `${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}` : "",
+            trainingDays,
+            currentPaceMin,
+            currentPaceMax,
+          },
+        });
+      } else {
+        navigate("/training-plan", {
+          state: {
+            autoGenerate: true,
+            raceDistance: "half-marathon",
+            letAIDecide: true,
+            trainingDays,
+            currentPaceMin,
+            currentPaceMax,
+          },
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error saving profile",
@@ -209,6 +245,7 @@ const Onboarding = () => {
       if (hasRace === "yes" && (!raceDate || !raceDistance)) return false;
       return true;
     }
+    if (step === 4) return trainingDays.length > 0;
     return true;
   };
 
@@ -506,6 +543,57 @@ const Onboarding = () => {
           )}
 
           {step === 4 && (
+            <div className="space-y-5">
+              <p className="text-sm text-muted-foreground">
+                We'll use this to build your personalised plan. You can tweak it any time.
+              </p>
+              <div className="space-y-2">
+                <Label>Which days can you train?</Label>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {DAY_OPTIONS.map((d) => {
+                    const active = trainingDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setTrainingDays((prev) =>
+                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg border-2 py-2 text-xs font-semibold transition-all",
+                          active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">{trainingDays.length} day(s) selected</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Current easy pace (optional)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Fastest e.g. 5:30"
+                    value={currentPaceMin}
+                    onChange={(e) => setCurrentPaceMin(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Slowest e.g. 6:30"
+                    value={currentPaceMax}
+                    onChange={(e) => setCurrentPaceMax(e.target.value)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Connect your accounts to pull in runs and sleep data automatically. You can skip and add these later in Settings.
@@ -527,7 +615,7 @@ const Onboarding = () => {
               </Button>
             ) : (
               <Button onClick={handleComplete} disabled={loading} className="flex-1">
-                {loading ? "Saving..." : "Go to Dashboard"}
+                {loading ? "Saving..." : "Build my plan"}
               </Button>
             )}
           </div>
