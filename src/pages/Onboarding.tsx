@@ -615,7 +615,7 @@ const Onboarding = () => {
               </Button>
             ) : (
               <Button onClick={handleComplete} disabled={loading} className="flex-1">
-                {loading ? "Saving..." : "Go to Dashboard"}
+                {loading ? "Saving..." : "Build my plan"}
               </Button>
             )}
           </div>
