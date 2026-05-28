@@ -659,7 +659,7 @@ const Onboarding = () => {
                   <input
                     ref={fitInputRef}
                     type="file"
-                    accept=".fit"
+                    accept=".fit,.zip"
                     multiple
                     className="hidden"
                     onChange={(e) => handleFitUpload(e.target.files)}
