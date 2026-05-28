@@ -674,7 +674,7 @@ const Onboarding = () => {
                     {fitParsing ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
                     ) : (
-                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT files to auto-detect</>
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP</>
                     )}
                   </Button>
                   <p className="text-[11px] text-muted-foreground text-center">
