@@ -168,9 +168,11 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
       const valueFor = (d: string): number | null => {
         switch (label) {
           case "Sleep Quality": {
+            const stored = mByDate.get(d)?.sleep_score;
+            if (stored != null) return Number(stored);
             const s = stagesByDate.get(d);
             if (s && s.total > 0) return calculateSleepScore({ deep: s.deep, light: s.light, rem: s.rem, awake: 0, sleep: 0 });
-            return mByDate.get(d)?.sleep_score ?? null;
+            return null;
           }
           case "Deep Sleep": {
             const s = stagesByDate.get(d);
