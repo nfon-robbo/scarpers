@@ -338,6 +338,16 @@ const RunningIQWidget = () => {
             </span>
           </div>
 
+          {cleanRunCount !== null &&
+            totalSessionCount !== null &&
+            cleanRunCount < RUNNING_IQ_MIN_CLEAN_RUNS && (
+              <p className="text-[11px] text-muted-foreground -mt-3 mb-4 leading-snug">
+                Computed from {cleanRunCount} continuous run{cleanRunCount === 1 ? "" : "s"} ·{" "}
+                {totalSessionCount} total session{totalSessionCount === 1 ? "" : "s"} — score will
+                stabilise as you build continuous running.
+              </p>
+            )}
+
           {/* Pillar Breakdown */}
           <div className="space-y-3">
             {result.pillars.map((p) => (
