@@ -16,8 +16,11 @@ import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Integrations"];
+const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
 const STORAGE_KEY = "scarpers:onboarding-state";
+const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const mapRaceDistance = (d: string): string => (d === "half" ? "half-marathon" : d);
 
 const METRIC_UNITS: UnitPreferences = {
   distance: "km", speed: "min/km", elevation: "m", temperature: "C", weight: "kg", height: "cm",
