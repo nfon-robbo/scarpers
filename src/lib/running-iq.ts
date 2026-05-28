@@ -10,6 +10,7 @@ export interface RunActivity {
   start_time: string | null;
   /** Optional — when present, used to exclude pure walks from load calculations. */
   activity_type?: string | null;
+  raw_data?: unknown;
 }
 
 // ── Walk/Run detection ──
@@ -25,7 +26,7 @@ function isWalking(r: RunActivity): boolean {
 
 /** Blended walk/run interval session — summary metrics are unreliable for pace, cadence, HR:pace. */
 function isWalkRunInterval(r: RunActivity): boolean {
-  if (isWalking(r)) return true;
+  if (isWalking(r)) return false;
   // Cadence reading that's far below normal running cadence = walk/run blend.
   if (r.avg_cadence != null && r.avg_cadence > 40 && r.avg_cadence < 150) return true;
   return false;
@@ -33,7 +34,58 @@ function isWalkRunInterval(r: RunActivity): boolean {
 
 /** Activity we trust for pace/cadence/HR:pace metrics — pure continuous run. */
 function isCleanRun(r: RunActivity): boolean {
-  return !isWalkRunInterval(r);
+  return !isWalking(r) && !isWalkRunInterval(r);
+}
+
+function getGpsTrack(r: RunActivity): Array<Record<string, unknown>> {
+  const raw = r.raw_data as Record<string, unknown> | null | undefined;
+  const track = raw?.gps_track;
+  return Array.isArray(track) ? (track as Array<Record<string, unknown>>) : [];
+}
+
+function pointSpeedKmh(point: Record<string, unknown>): number | null {
+  const speed = Number(point.speed);
+  if (!Number.isFinite(speed) || speed <= 0) return null;
+  // FIT imports already store km/h; Strava import stores km/h too. Guard m/s just in case.
+  return speed <= 12 ? speed * 3.6 : speed;
+}
+
+function pointDistanceMeters(point: Record<string, unknown>): number | null {
+  const value = Number(point.distance_meters ?? point.distance);
+  if (!Number.isFinite(value) || value < 0) return null;
+  // FIT parser uses km before converting in some raw paths; normal stored gps_track uses metres.
+  return value < 100 && value > 0 ? value * 1000 : value;
+}
+
+function runLoadDistanceKm(r: RunActivity): number {
+  const totalKm = (r.distance_meters || 0) / 1000;
+  if (totalKm <= 0 || isWalking(r)) return 0;
+  if (!isWalkRunInterval(r)) return totalKm;
+
+  const track = getGpsTrack(r);
+  if (track.length >= 2) {
+    let runMeters = 0;
+    let previousDistance: number | null = pointDistanceMeters(track[0]);
+
+    for (let i = 1; i < track.length; i++) {
+      const point = track[i];
+      const speedKmh = pointSpeedKmh(point);
+      const cadence = Number(point.cadence);
+      const isRunPoint = (speedKmh != null && speedKmh >= 7) || (Number.isFinite(cadence) && cadence >= 150);
+      const currentDistance = pointDistanceMeters(point);
+      const delta = currentDistance != null && previousDistance != null
+        ? Math.max(0, currentDistance - previousDistance)
+        : 0;
+
+      if (isRunPoint) runMeters += delta;
+      if (currentDistance != null) previousDistance = currentDistance;
+    }
+
+    if (runMeters > 0) return Math.min(totalKm, runMeters / 1000);
+  }
+
+  // Without track samples, keep the session in load instead of treating valid training as zero.
+  return totalKm;
 }
 
 export interface RunningIQInput {
