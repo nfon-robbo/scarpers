@@ -649,6 +649,36 @@ const Onboarding = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
+
+                <div className="rounded-xl border border-dashed border-border p-3 mt-2 space-y-2">
+                  <input
+                    ref={fitInputRef}
+                    type="file"
+                    accept=".fit"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFitUpload(e.target.files)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fitInputRef.current?.click()}
+                    disabled={fitParsing}
+                    className="w-full"
+                  >
+                    {fitParsing ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT files to auto-detect</>
+                    )}
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Drop in a few recent runs and we'll calculate your easy-pace range for you.
+                  </p>
+                  {fitSummary && (
+                    <p className="text-xs text-primary font-medium text-center">{fitSummary}</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
