@@ -229,6 +229,29 @@ const Onboarding = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs, trainingDays, currentPaceMin, currentPaceMax]);
 
+  // Seed plan-builder fields from earlier steps the first time we enter step 4.
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!goalTimeFree && goalTimeMm) {
+      setGoalTimeFree(`${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}`);
+    }
+    if (!planRaceDate && hasRace === "yes" && raceDate) {
+      try { setPlanRaceDate(new Date(raceDate)); } catch {}
+    }
+    if (!raceDistance && hasRace !== "yes") {
+      setRaceDistance("half-marathon");
+    } else if (raceDistance === "half") {
+      setRaceDistance("half-marathon");
+    } else if (raceDistance === "other") {
+      setRaceDistance("half-marathon");
+    }
+    if (hasRace !== "yes" && !letAIDecide && !planRaceDate) {
+      setLetAIDecide(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+
   const applyUnitSystem = (system: "metric" | "imperial") => {
     const target = system === "metric" ? METRIC_UNITS : IMPERIAL_UNITS;
     (Object.keys(target) as (keyof UnitPreferences)[]).forEach((k) => setUnit(k, target[k] as any));
