@@ -115,9 +115,7 @@ Deno.serve(async (req) => {
       const errorParam = url.searchParams.get("error");
 
       if (errorParam) {
-        return new Response(`<html><body><script>window.close();</script>Strava authorization denied.</body></html>`, {
-          headers: { "Content-Type": "text/html" },
-        });
+        return popupPage({ title: "Authorization denied", body: "You cancelled Strava access. You can try again from Settings." });
       }
 
       if (!code || !state) {
