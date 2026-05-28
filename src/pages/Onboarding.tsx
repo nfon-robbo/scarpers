@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,23 +10,54 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits, type UnitPreferences } from "@/hooks/useUnits";
-import { Activity, ChevronRight, ChevronLeft, ChevronDown, Upload, Loader2 } from "lucide-react";
+import {
+  Activity, ChevronRight, ChevronLeft, ChevronDown,
+  Upload, Loader2, Calendar as CalendarIcon, Sparkles,
+} from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "@/lib/fit-parser";
+import { streamAICoach } from "@/lib/ai-stream";
 import { cn } from "@/lib/utils";
+
+const RACE_DISTANCES = [
+  { value: "5k", label: "5K" },
+  { value: "10k", label: "10K" },
+  { value: "half-marathon", label: "Half Marathon" },
+  { value: "marathon", label: "Marathon" },
+];
+const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const formatPace = (minPerKm: number): string => {
   const m = Math.floor(minPerKm);
   const s = Math.round((minPerKm - m) * 60);
   return `${m}:${String(s).padStart(2, "0")}`;
 };
+const toLocalISODate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+const nextMonday = () => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? 1 : 8 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+};
 
 const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
 const STORAGE_KEY = "scarpers:onboarding-state";
-const DAY_OPTIONS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_OPTIONS = DAYS_OF_WEEK;
+
+
+
 
 const mapRaceDistance = (d: string): string => (d === "half" ? "half-marathon" : d);
 
@@ -113,9 +145,16 @@ const Onboarding = () => {
   const [trainingDays, setTrainingDays] = useState<string[]>(initial.trainingDays ?? ["Mon", "Wed", "Fri", "Sat"]);
   const [currentPaceMin, setCurrentPaceMin] = useState(initial.currentPaceMin ?? "");
   const [currentPaceMax, setCurrentPaceMax] = useState(initial.currentPaceMax ?? "");
+  const [goalTimeFree, setGoalTimeFree] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date>(() => nextMonday());
+  const [planRaceDate, setPlanRaceDate] = useState<Date | undefined>(undefined);
+  const [letAIDecide, setLetAIDecide] = useState(false);
+  const [planBuilding, setPlanBuilding] = useState(false);
+  const [planContent, setPlanContent] = useState("");
   const [fitParsing, setFitParsing] = useState(false);
   const [fitSummary, setFitSummary] = useState<string | null>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFitUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -190,6 +229,29 @@ const Onboarding = () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs, trainingDays, currentPaceMin, currentPaceMax]);
 
+  // Seed plan-builder fields from earlier steps the first time we enter step 4.
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!goalTimeFree && goalTimeMm) {
+      setGoalTimeFree(`${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}`);
+    }
+    if (!planRaceDate && hasRace === "yes" && raceDate) {
+      try { setPlanRaceDate(new Date(raceDate)); } catch {}
+    }
+    if (!raceDistance && hasRace !== "yes") {
+      setRaceDistance("half-marathon");
+    } else if (raceDistance === "half") {
+      setRaceDistance("half-marathon");
+    } else if (raceDistance === "other") {
+      setRaceDistance("half-marathon");
+    }
+    if (hasRace !== "yes" && !letAIDecide && !planRaceDate) {
+      setLetAIDecide(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+
   const applyUnitSystem = (system: "metric" | "imperial") => {
     const target = system === "metric" ? METRIC_UNITS : IMPERIAL_UNITS;
     (Object.keys(target) as (keyof UnitPreferences)[]).forEach((k) => setUnit(k, target[k] as any));
@@ -204,98 +266,133 @@ const Onboarding = () => {
     setCustomOpen(true);
   };
 
+  const saveProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const contextParts: string[] = [];
+    if (injuries.trim()) contextParts.push(`Injuries / niggles: ${injuries.trim()}`);
+    if (athleteContext.trim()) contextParts.push(athleteContext.trim());
+
+    const heightCmFinal = (() => {
+      if (units.height === "ft") {
+        const ft = Number(heightFt) || 0;
+        const inches = Number(heightIn) || 0;
+        const total = ft * 30.48 + inches * 2.54;
+        return total > 0 ? Math.round(total) : null;
+      }
+      return heightCm ? Number(heightCm) : null;
+    })();
+    const weightKgFinal = (() => {
+      if (units.weight === "lbs") {
+        const lbs = Number(weightLbs) || 0;
+        return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
+      }
+      if (units.weight === "st") {
+        const st = Number(weightSt) || 0;
+        const lbs = Number(weightStLbs) || 0;
+        const totalLbs = st * 14 + lbs;
+        return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
+      }
+      return weightKg ? Number(weightKg) : null;
+    })();
+    const raceGoalSeconds = hasRace === "yes" && goalTimeMm
+      ? Number(goalTimeMm) * 60 + (Number(goalTimeSs) || 0)
+      : null;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        name,
+        primary_sport: "running",
+        experience_level: experienceLevel || "intermediate",
+        training_goals: trainingGoals,
+        athlete_context: contextParts.join("\n\n"),
+        sex: sex || null,
+        date_of_birth: dob || null,
+        height_cm: heightCmFinal,
+        weight_kg: weightKgFinal,
+        race_date: hasRace === "yes" && raceDate ? raceDate : null,
+        race_distance: hasRace === "yes" && raceDistance ? mapRaceDistance(raceDistance) : null,
+        race_goal_time_seconds: raceGoalSeconds,
+        onboarding_completed: true,
+      } as any)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return user.id;
+  };
+
   const handleComplete = async () => {
+    if (planBuilding) return;
+    if (trainingDays.length === 0) {
+      toast({ title: "Pick at least one training day", variant: "destructive" });
+      return;
+    }
+    if (!letAIDecide && !planRaceDate) {
+      toast({ title: "Pick a race date", description: "Or let the AI recommend one.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
+    setPlanBuilding(true);
+    setPlanContent("");
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const contextParts: string[] = [];
-      if (injuries.trim()) contextParts.push(`Injuries / niggles: ${injuries.trim()}`);
-      if (athleteContext.trim()) contextParts.push(athleteContext.trim());
-
-      // DOB fallback: if user skipped DOB, age defaults to 30 in src/components/RunningIQWidget.tsx
-      // (ageYears = 30), which feeds max-HR & VO2 scoring. Encourage users to fill DOB for accuracy.
-      const heightCmFinal = (() => {
-        if (units.height === "ft") {
-          const ft = Number(heightFt) || 0;
-          const inches = Number(heightIn) || 0;
-          const total = ft * 30.48 + inches * 2.54;
-          return total > 0 ? Math.round(total) : null;
-        }
-        return heightCm ? Number(heightCm) : null;
-      })();
-      const weightKgFinal = (() => {
-        if (units.weight === "lbs") {
-          const lbs = Number(weightLbs) || 0;
-          return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
-        }
-        if (units.weight === "st") {
-          const st = Number(weightSt) || 0;
-          const lbs = Number(weightStLbs) || 0;
-          const totalLbs = st * 14 + lbs;
-          return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
-        }
-        return weightKg ? Number(weightKg) : null;
-      })();
-      const raceGoalSeconds = hasRace === "yes" && goalTimeMm
-        ? Number(goalTimeMm) * 60 + (Number(goalTimeSs) || 0)
-        : null;
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          name,
-          primary_sport: "running",
-          experience_level: experienceLevel || "intermediate",
-          training_goals: trainingGoals,
-          athlete_context: contextParts.join("\n\n"),
-          sex: sex || null,
-          date_of_birth: dob || null,
-          height_cm: heightCmFinal,
-          weight_kg: weightKgFinal,
-          race_date: hasRace === "yes" && raceDate ? raceDate : null,
-          race_distance: hasRace === "yes" && raceDistance ? raceDistance : null,
-          race_goal_time_seconds: raceGoalSeconds,
-          onboarding_completed: true,
-        } as any)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      const userId = await saveProfile();
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
 
-      // If user has a race, jump straight into plan generation so onboarding
-      // actually delivers a plan instead of dumping them on the dashboard.
-      if (hasRace === "yes" && raceDistance && raceDate && trainingDays.length > 0) {
-        navigate("/training-plan", {
-          state: {
-            autoGenerate: true,
-            raceDistance: mapRaceDistance(raceDistance),
-            raceDate,
-            goalTime: goalTimeMm ? `${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}` : "",
-            trainingDays,
-            currentPaceMin,
-            currentPaceMax,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expired — please sign in again.");
+
+      const effectiveRaceDistance = raceDistance && raceDistance !== "" && raceDistance !== "other"
+        ? mapRaceDistance(raceDistance)
+        : "half-marathon";
+
+      await new Promise<void>((resolve, reject) => {
+        let accumulated = "";
+        streamAICoach({
+          type: "training-plan",
+          token: session.access_token,
+          raceDistance: effectiveRaceDistance,
+          goalTime: goalTimeFree || "",
+          currentPaceMin,
+          currentPaceMax,
+          trainingDays,
+          startDate: toLocalISODate(startDate),
+          raceDate: letAIDecide ? "ai-recommend" : (planRaceDate ? toLocalISODate(planRaceDate) : undefined),
+          onDelta: (text) => {
+            accumulated += text;
+            setPlanContent(accumulated);
           },
-        });
-      } else {
-        navigate("/training-plan", {
-          state: {
-            autoGenerate: true,
-            raceDistance: "half-marathon",
-            letAIDecide: true,
-            trainingDays,
-            currentPaceMin,
-            currentPaceMax,
+          onDone: async () => {
+            try {
+              const { error: insertErr } = await supabase.from("training_plans").insert({
+                user_id: userId,
+                race_distance: effectiveRaceDistance,
+                goal_time: goalTimeFree || null,
+                training_days: trainingDays,
+                start_date: toLocalISODate(startDate),
+                race_date: letAIDecide ? "ai-recommend" : (planRaceDate ? toLocalISODate(planRaceDate) : null),
+                content: accumulated,
+              } as any);
+              if (insertErr) throw insertErr;
+              resolve();
+            } catch (e) { reject(e); }
           },
+          onError: (err) => reject(new Error(err)),
         });
-      }
+      });
+
+      toast({ title: "Plan ready!", description: "Welcome to Scarpers." });
+      navigate("/training-plan");
     } catch (error: any) {
       toast({
-        title: "Error saving profile",
+        title: "Couldn't finish setup",
         description: error.message,
         variant: "destructive",
       });
+      setPlanBuilding(false);
     } finally {
       setLoading(false);
     }
@@ -610,52 +707,63 @@ const Onboarding = () => {
           {step === 4 && (
             <div className="space-y-5">
               <p className="text-sm text-muted-foreground">
-                We'll use this to build your personalised plan. You can tweak it any time.
+                Same builder you'll see in-app. Pick your race, your days, and we'll generate your plan when you finish.
               </p>
+
               <div className="space-y-2">
-                <Label>Which days can you train?</Label>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {DAY_OPTIONS.map((d) => {
-                    const active = trainingDays.includes(d);
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() =>
-                          setTrainingDays((prev) =>
-                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-                          )
-                        }
-                        className={cn(
-                          "rounded-lg border-2 py-2 text-xs font-semibold transition-all",
-                          active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"
-                        )}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
+                <Label className="text-sm font-medium">Race Distance</Label>
+                <div className="flex flex-wrap gap-2">
+                  {RACE_DISTANCES.map((d) => (
+                    <Button
+                      key={d.value}
+                      variant={raceDistance === d.value || (d.value === "half-marathon" && raceDistance === "half") ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setRaceDistance(d.value)}
+                    >
+                      {d.label}
+                    </Button>
+                  ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{trainingDays.length} day(s) selected</p>
               </div>
 
               <div className="space-y-2">
-                <Label>Current easy pace (optional)</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <Label className="text-sm font-medium">Goal Time <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 30:00 or 1:45:00"
+                  value={goalTimeFree}
+                  onChange={(e) => setGoalTimeFree(e.target.value)}
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Target finish time — the AI will build pace targets around hitting this.
+                </p>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border/50 p-4 bg-muted/20">
+                <Label className="text-sm font-medium">Current Easy Run Pace <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  If you know your current easy/Z2 pace, enter the range (min:sec per km). The plan will start here and progress toward your goal.
+                </p>
+                <div className="flex items-center gap-2 max-w-[360px]">
                   <Input
-                    placeholder="Fastest e.g. 5:30"
+                    type="text"
+                    placeholder="e.g. 7:00"
                     value={currentPaceMin}
                     onChange={(e) => setCurrentPaceMin(e.target.value)}
+                    className="text-center"
                   />
+                  <span className="text-muted-foreground text-sm">to</span>
                   <Input
-                    placeholder="Slowest e.g. 6:30"
+                    type="text"
+                    placeholder="e.g. 7:30"
                     value={currentPaceMax}
                     onChange={(e) => setCurrentPaceMax(e.target.value)}
+                    className="text-center"
                   />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
-                <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
-
-                <div className="rounded-xl border border-dashed border-border p-3 mt-2 space-y-2">
+                <div className="pt-2">
                   <input
                     ref={fitInputRef}
                     type="file"
@@ -667,26 +775,114 @@ const Onboarding = () => {
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={() => fitInputRef.current?.click()}
                     disabled={fitParsing}
-                    className="w-full"
                   >
                     {fitParsing ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading…</>
                     ) : (
-                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP</>
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP to auto-detect</>
                     )}
                   </Button>
-                  <p className="text-[11px] text-muted-foreground text-center">
-                    Drop in a few recent runs and we'll calculate your easy-pace range for you.
-                  </p>
                   {fitSummary && (
-                    <p className="text-xs text-primary font-medium text-center">{fitSummary}</p>
+                    <p className="text-xs text-primary font-medium mt-2">{fitSummary}</p>
                   )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Training Days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <Button
+                      key={day}
+                      variant={trainingDays.includes(day) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        setTrainingDays((prev) =>
+                          prev.includes(day) ? prev.filter((x) => x !== day) : [...prev, day]
+                        )
+                      }
+                      className="w-12"
+                    >
+                      {day}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {trainingDays.length} days selected — rest days will be scheduled on the others
+                </p>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(startDate, "dd/MM/yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(d) => d && setStartDate(d)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Race Date</Label>
+                  {!letAIDecide && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !planRaceDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {planRaceDate ? format(planRaceDate, "dd/MM/yyyy") : "Pick a race date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={planRaceDate}
+                          onSelect={setPlanRaceDate}
+                          disabled={(date) => date < startDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      id="ai-decide"
+                      checked={letAIDecide}
+                      onCheckedChange={(v) => {
+                        setLetAIDecide(!!v);
+                        if (v) setPlanRaceDate(undefined);
+                      }}
+                    />
+                    <Label htmlFor="ai-decide" className="text-sm cursor-pointer text-muted-foreground">
+                      Let the AI recommend a race date
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
           )}
+
 
           {step === 5 && (
             <div className="space-y-4">
@@ -698,8 +894,22 @@ const Onboarding = () => {
             </div>
           )}
 
+          {planBuilding && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                Building your personalised plan…
+              </div>
+              {planContent && (
+                <pre className="text-[11px] leading-relaxed text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap font-mono">
+                  {planContent.slice(-1200)}
+                </pre>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3">
-            {step > 0 && (
+            {step > 0 && !planBuilding && (
               <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
                 <ChevronLeft className="w-4 h-4 mr-1" /> Back
               </Button>
@@ -709,11 +919,16 @@ const Onboarding = () => {
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button onClick={handleComplete} disabled={loading} className="flex-1">
-                {loading ? "Saving..." : "Build my plan"}
+              <Button onClick={handleComplete} disabled={loading || planBuilding} className="flex-1">
+                {planBuilding ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
+                ) : loading ? "Saving…" : (
+                  <><Sparkles className="w-4 h-4 mr-2" /> Build my plan</>
+                )}
               </Button>
             )}
           </div>
+
         </CardContent>
       </Card>
     </div>
