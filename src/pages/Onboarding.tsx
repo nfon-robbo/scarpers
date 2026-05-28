@@ -894,8 +894,22 @@ const Onboarding = () => {
             </div>
           )}
 
+          {planBuilding && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                Building your personalised plan…
+              </div>
+              {planContent && (
+                <pre className="text-[11px] leading-relaxed text-muted-foreground max-h-48 overflow-y-auto whitespace-pre-wrap font-mono">
+                  {planContent.slice(-1200)}
+                </pre>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3">
-            {step > 0 && (
+            {step > 0 && !planBuilding && (
               <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
                 <ChevronLeft className="w-4 h-4 mr-1" /> Back
               </Button>
@@ -905,11 +919,16 @@ const Onboarding = () => {
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button onClick={handleComplete} disabled={loading} className="flex-1">
-                {loading ? "Saving..." : "Build my plan"}
+              <Button onClick={handleComplete} disabled={loading || planBuilding} className="flex-1">
+                {planBuilding ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating…</>
+                ) : loading ? "Saving…" : (
+                  <><Sparkles className="w-4 h-4 mr-2" /> Build my plan</>
+                )}
               </Button>
             )}
           </div>
+
         </CardContent>
       </Card>
     </div>
