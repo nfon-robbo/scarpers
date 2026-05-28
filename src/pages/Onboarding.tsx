@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,10 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits, type UnitPreferences } from "@/hooks/useUnits";
-import { Activity, ChevronRight, ChevronLeft, ChevronDown } from "lucide-react";
+import { Activity, ChevronRight, ChevronLeft, ChevronDown, Upload, Loader2 } from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
+import { parseFitBuffer } from "@/lib/fit-parser";
 import { cn } from "@/lib/utils";
+
+const formatPace = (minPerKm: number): string => {
+  const m = Math.floor(minPerKm);
+  const s = Math.round((minPerKm - m) * 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+};
 
 const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
 const STORAGE_KEY = "scarpers:onboarding-state";
@@ -106,6 +113,59 @@ const Onboarding = () => {
   const [trainingDays, setTrainingDays] = useState<string[]>(initial.trainingDays ?? ["Mon", "Wed", "Fri", "Sat"]);
   const [currentPaceMin, setCurrentPaceMin] = useState(initial.currentPaceMin ?? "");
   const [currentPaceMax, setCurrentPaceMax] = useState(initial.currentPaceMax ?? "");
+  const [fitParsing, setFitParsing] = useState(false);
+  const [fitSummary, setFitSummary] = useState<string | null>(null);
+  const fitInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFitUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setFitParsing(true);
+    setFitSummary(null);
+    try {
+      const paces: number[] = []; // min/km per activity
+      let runCount = 0;
+      for (const file of Array.from(files)) {
+        if (!/\.fit$/i.test(file.name)) continue;
+        try {
+          const buf = await file.arrayBuffer();
+          const acts = await parseFitBuffer(buf, file.name);
+          for (const a of acts) {
+            const isRun = (a.activity_type || "").toLowerCase().includes("run");
+            if (!isRun) continue;
+            // Prefer distance/duration over avg_speed to avoid stopped-time bias.
+            if (a.distance_meters && a.duration_seconds && a.distance_meters > 800) {
+              const pace = (a.duration_seconds / 60) / (a.distance_meters / 1000);
+              if (pace > 3 && pace < 12) {
+                paces.push(pace);
+                runCount++;
+              }
+            } else if (a.avg_speed && a.avg_speed > 4 && a.avg_speed < 25) {
+              paces.push(60 / a.avg_speed);
+              runCount++;
+            }
+          }
+        } catch (e) {
+          console.warn("FIT parse failed", file.name, e);
+        }
+      }
+      if (paces.length === 0) {
+        toast({ title: "No runs detected", description: "Couldn't find any running activities in those files.", variant: "destructive" });
+        return;
+      }
+      paces.sort((a, b) => a - b);
+      // 25th / 75th percentile for a sensible easy-pace range.
+      const q = (p: number) => paces[Math.min(paces.length - 1, Math.floor(paces.length * p))];
+      const fast = q(0.25);
+      const slow = q(0.75);
+      setCurrentPaceMin(formatPace(fast));
+      setCurrentPaceMax(formatPace(slow));
+      setFitSummary(`Analysed ${runCount} run(s) — easy pace ${formatPace(fast)}–${formatPace(slow)} min/km`);
+      toast({ title: "Pace detected", description: `From ${runCount} run(s).` });
+    } finally {
+      setFitParsing(false);
+      if (fitInputRef.current) fitInputRef.current.value = "";
+    }
+  };
   const [customOpen, setCustomOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -589,6 +649,36 @@ const Onboarding = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
+
+                <div className="rounded-xl border border-dashed border-border p-3 mt-2 space-y-2">
+                  <input
+                    ref={fitInputRef}
+                    type="file"
+                    accept=".fit"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFitUpload(e.target.files)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fitInputRef.current?.click()}
+                    disabled={fitParsing}
+                    className="w-full"
+                  >
+                    {fitParsing ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT files to auto-detect</>
+                    )}
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Drop in a few recent runs and we'll calculate your easy-pace range for you.
+                  </p>
+                  {fitSummary && (
+                    <p className="text-xs text-primary font-medium text-center">{fitSummary}</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
