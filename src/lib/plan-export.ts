@@ -113,7 +113,16 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
               }
               const target = getCell(targetIdx, cells[2] || "");
               const explicitHrZone = getCell(hrIdx, "");
-              const derivedHrZone = explicitHrZone || (/\bZ\d|\bLTHR\b|\bbpm\b/i.test(target) ? target : "");
+              // When no dedicated HR Zone column exists, extract JUST the zone
+              // label (e.g. "Z2", "Z2-Z3") from the target. Copying the full
+              // target string in causes downstream renderers to display the
+              // same value twice (once as Target, once as HR Zone).
+              let derivedHrZone = explicitHrZone;
+              if (!derivedHrZone) {
+                const zoneMatches = Array.from(target.matchAll(/Z(\d)/gi)).map((m) => `Z${m[1]}`);
+                if (zoneMatches.length === 1) derivedHrZone = zoneMatches[0];
+                else if (zoneMatches.length > 1) derivedHrZone = `${zoneMatches[0]}-${zoneMatches[zoneMatches.length - 1]}`;
+              }
               segments.push({
                 segment: segName,
                 duration: getCell(durationIdx, cells[1] || ""),
