@@ -165,6 +165,7 @@ export async function streamAICoach({
       if (settled) return; // timeout fired while we were reading
       const { done, value } = await reader.read();
       if (done) break;
+      resetIdle(); // bytes received → reset idle watchdog
       buffer += decoder.decode(value, { stream: true });
 
       let newlineIndex: number;
