@@ -707,52 +707,63 @@ const Onboarding = () => {
           {step === 4 && (
             <div className="space-y-5">
               <p className="text-sm text-muted-foreground">
-                We'll use this to build your personalised plan. You can tweak it any time.
+                Same builder you'll see in-app. Pick your race, your days, and we'll generate your plan when you finish.
               </p>
+
               <div className="space-y-2">
-                <Label>Which days can you train?</Label>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {DAY_OPTIONS.map((d) => {
-                    const active = trainingDays.includes(d);
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() =>
-                          setTrainingDays((prev) =>
-                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-                          )
-                        }
-                        className={cn(
-                          "rounded-lg border-2 py-2 text-xs font-semibold transition-all",
-                          active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"
-                        )}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
+                <Label className="text-sm font-medium">Race Distance</Label>
+                <div className="flex flex-wrap gap-2">
+                  {RACE_DISTANCES.map((d) => (
+                    <Button
+                      key={d.value}
+                      variant={raceDistance === d.value || (d.value === "half-marathon" && raceDistance === "half") ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setRaceDistance(d.value)}
+                    >
+                      {d.label}
+                    </Button>
+                  ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{trainingDays.length} day(s) selected</p>
               </div>
 
               <div className="space-y-2">
-                <Label>Current easy pace (optional)</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <Label className="text-sm font-medium">Goal Time <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 30:00 or 1:45:00"
+                  value={goalTimeFree}
+                  onChange={(e) => setGoalTimeFree(e.target.value)}
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Target finish time — the AI will build pace targets around hitting this.
+                </p>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border/50 p-4 bg-muted/20">
+                <Label className="text-sm font-medium">Current Easy Run Pace <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  If you know your current easy/Z2 pace, enter the range (min:sec per km). The plan will start here and progress toward your goal.
+                </p>
+                <div className="flex items-center gap-2 max-w-[360px]">
                   <Input
-                    placeholder="Fastest e.g. 5:30"
+                    type="text"
+                    placeholder="e.g. 7:00"
                     value={currentPaceMin}
                     onChange={(e) => setCurrentPaceMin(e.target.value)}
+                    className="text-center"
                   />
+                  <span className="text-muted-foreground text-sm">to</span>
                   <Input
-                    placeholder="Slowest e.g. 6:30"
+                    type="text"
+                    placeholder="e.g. 7:30"
                     value={currentPaceMax}
                     onChange={(e) => setCurrentPaceMax(e.target.value)}
+                    className="text-center"
                   />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
-                <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
-
-                <div className="rounded-xl border border-dashed border-border p-3 mt-2 space-y-2">
+                <div className="pt-2">
                   <input
                     ref={fitInputRef}
                     type="file"
@@ -764,26 +775,114 @@ const Onboarding = () => {
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={() => fitInputRef.current?.click()}
                     disabled={fitParsing}
-                    className="w-full"
                   >
                     {fitParsing ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading…</>
                     ) : (
-                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP</>
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP to auto-detect</>
                     )}
                   </Button>
-                  <p className="text-[11px] text-muted-foreground text-center">
-                    Drop in a few recent runs and we'll calculate your easy-pace range for you.
-                  </p>
                   {fitSummary && (
-                    <p className="text-xs text-primary font-medium text-center">{fitSummary}</p>
+                    <p className="text-xs text-primary font-medium mt-2">{fitSummary}</p>
                   )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Training Days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <Button
+                      key={day}
+                      variant={trainingDays.includes(day) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        setTrainingDays((prev) =>
+                          prev.includes(day) ? prev.filter((x) => x !== day) : [...prev, day]
+                        )
+                      }
+                      className="w-12"
+                    >
+                      {day}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {trainingDays.length} days selected — rest days will be scheduled on the others
+                </p>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(startDate, "dd/MM/yyyy")}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={startDate}
+                        onSelect={(d) => d && setStartDate(d)}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Race Date</Label>
+                  {!letAIDecide && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !planRaceDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {planRaceDate ? format(planRaceDate, "dd/MM/yyyy") : "Pick a race date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={planRaceDate}
+                          onSelect={setPlanRaceDate}
+                          disabled={(date) => date < startDate}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      id="ai-decide"
+                      checked={letAIDecide}
+                      onCheckedChange={(v) => {
+                        setLetAIDecide(!!v);
+                        if (v) setPlanRaceDate(undefined);
+                      }}
+                    />
+                    <Label htmlFor="ai-decide" className="text-sm cursor-pointer text-muted-foreground">
+                      Let the AI recommend a race date
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
           )}
+
 
           {step === 5 && (
             <div className="space-y-4">
