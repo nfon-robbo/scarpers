@@ -1061,6 +1061,10 @@ export default function PlanDayList({
                   {selectedWorkout.rawText}
                 </p>
               )}
+
+              {/race\s*day|🏁/i.test(`${selectedWorkout.title} ${selectedWorkout.rawText}`) && (
+                <RaceStrategyBlock raceDistance={raceDistance} workouts={workouts} />
+              )}
             </>
           )}
         </DialogContent>
