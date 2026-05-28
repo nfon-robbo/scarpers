@@ -124,28 +124,33 @@ const Onboarding = () => {
     try {
       const paces: number[] = []; // min/km per activity
       let runCount = 0;
+
+      const collect = (acts: ParsedActivity[]) => {
+        for (const a of acts) {
+          const isRun = (a.activity_type || "").toLowerCase().includes("run");
+          if (!isRun) continue;
+          if (a.distance_meters && a.duration_seconds && a.distance_meters > 800) {
+            const pace = (a.duration_seconds / 60) / (a.distance_meters / 1000);
+            if (pace > 3 && pace < 12) { paces.push(pace); runCount++; }
+          } else if (a.avg_speed && a.avg_speed > 4 && a.avg_speed < 25) {
+            paces.push(60 / a.avg_speed);
+            runCount++;
+          }
+        }
+      };
+
       for (const file of Array.from(files)) {
-        if (!/\.fit$/i.test(file.name)) continue;
         try {
-          const buf = await file.arrayBuffer();
-          const acts = await parseFitBuffer(buf, file.name);
-          for (const a of acts) {
-            const isRun = (a.activity_type || "").toLowerCase().includes("run");
-            if (!isRun) continue;
-            // Prefer distance/duration over avg_speed to avoid stopped-time bias.
-            if (a.distance_meters && a.duration_seconds && a.distance_meters > 800) {
-              const pace = (a.duration_seconds / 60) / (a.distance_meters / 1000);
-              if (pace > 3 && pace < 12) {
-                paces.push(pace);
-                runCount++;
-              }
-            } else if (a.avg_speed && a.avg_speed > 4 && a.avg_speed < 25) {
-              paces.push(60 / a.avg_speed);
-              runCount++;
-            }
+          if (/\.zip$/i.test(file.name)) {
+            const result = await parseZipFile(file);
+            collect(result.activities);
+          } else if (/\.fit$/i.test(file.name)) {
+            const buf = await file.arrayBuffer();
+            const acts = await parseFitBuffer(buf, file.name);
+            collect(acts);
           }
         } catch (e) {
-          console.warn("FIT parse failed", file.name, e);
+          console.warn("Upload parse failed", file.name, e);
         }
       }
       if (paces.length === 0) {
