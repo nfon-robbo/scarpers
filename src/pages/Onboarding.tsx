@@ -198,7 +198,33 @@ const Onboarding = () => {
 
       if (error) throw error;
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
-      navigate("/dashboard");
+
+      // If user has a race, jump straight into plan generation so onboarding
+      // actually delivers a plan instead of dumping them on the dashboard.
+      if (hasRace === "yes" && raceDistance && raceDate && trainingDays.length > 0) {
+        navigate("/training-plan", {
+          state: {
+            autoGenerate: true,
+            raceDistance: mapRaceDistance(raceDistance),
+            raceDate,
+            goalTime: goalTimeMm ? `${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}` : "",
+            trainingDays,
+            currentPaceMin,
+            currentPaceMax,
+          },
+        });
+      } else {
+        navigate("/training-plan", {
+          state: {
+            autoGenerate: true,
+            raceDistance: "half-marathon",
+            letAIDecide: true,
+            trainingDays,
+            currentPaceMin,
+            currentPaceMax,
+          },
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error saving profile",
@@ -219,6 +245,7 @@ const Onboarding = () => {
       if (hasRace === "yes" && (!raceDate || !raceDistance)) return false;
       return true;
     }
+    if (step === 4) return trainingDays.length > 0;
     return true;
   };
 
