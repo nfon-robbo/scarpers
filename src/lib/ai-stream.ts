@@ -1,10 +1,18 @@
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-coach`;
 
-// Client-side watchdog. The edge function + upstream LLM gateway can hang for
-// >150s during Gemini overloads, leaving the UI spinning forever. We give the
-// stream 140s end-to-end; if nothing finishes by then, we abort the fetch and
-// surface a friendly retryable error to the caller.
-const STREAM_TIMEOUT_MS = 140_000;
+// Client-side watchdog. We use an IDLE timeout (reset on every byte) rather
+// than an absolute one, because plan generation runs the initial model call
+// plus up to 4 server-side continuation passes to guarantee the plan reaches
+// race day — easily >2 minutes for long plans. As long as the server is
+// streaming tokens, we keep the connection alive.
+const IDLE_TIMEOUT_MS = 90_000;            // no bytes for 90s → abort
+// Hard ceiling so a runaway server can't keep the UI spinning forever.
+const MAX_TOTAL_MS_DEFAULT = 180_000;      // most calls (chat, day-adjust, etc.)
+const MAX_TOTAL_MS_PLAN = 600_000;         // plan generation may chain 4+ model calls
+const PLAN_TYPES = new Set([
+  "training-plan", "plan-adjust", "plan-easier", "plan-harder",
+  "plan-apply", "plan-continuation",
+]);
 const TIMEOUT_MESSAGE = "AI gateway timed out. This usually resolves quickly.";
 
 export async function streamAICoach({
