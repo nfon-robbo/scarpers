@@ -3,7 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, TrendingUp, ChevronRight, History } from "lucide-react";
+import { Loader2, TrendingUp, ChevronRight, History, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { computeRunningIQ, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
 import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
@@ -63,18 +64,22 @@ const RunningIQWidget = () => {
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<RunningIQResult | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
-  useEffect(() => {
-    if (!user) return;
-
+  const loadScore = (userId: string, opts: { force?: boolean } = {}) => {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 3600000).toISOString();
 
-    // First check if there's a recent snapshot (e.g. from mobile)
+    if (opts.force) {
+      localStorage.removeItem(`running_iq_snapshot_last_${userId}`);
+      computeFromData(userId, now);
+      return;
+    }
+
     supabase
       .from("running_iq_snapshots")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("recorded_at", oneHourAgo)
       .order("recorded_at", { ascending: false })
       .limit(1)
@@ -92,11 +97,27 @@ const RunningIQWidget = () => {
           setLoading(false);
           return;
         }
-
-        // No recent snapshot — compute from scratch
-        computeFromData(user.id, now);
+        computeFromData(userId, now);
       });
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    loadScore(user.id);
   }, [user]);
+
+  const handleRecalculate = async () => {
+    if (!user || recalculating) return;
+    setRecalculating(true);
+    setLoading(true);
+    try {
+      loadScore(user.id, { force: true });
+      toast.success("Running IQ recalculated");
+    } finally {
+      // setLoading will be flipped off inside computeFromData
+      setTimeout(() => setRecalculating(false), 500);
+    }
+  };
 
   const computeFromData = (userId: string, now: Date) => {
     const twelveWeeksAgo = new Date(now.getTime() - 12 * 7 * 86400000);
@@ -260,7 +281,18 @@ const RunningIQWidget = () => {
                 Keep running — history will appear here
               </p>
             </div>
-            <IQGauge score={result.adjustedScore} label={result.label} />
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onClick={handleRecalculate}
+                disabled={recalculating}
+                title="Recalculate now"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
+              </button>
+              <IQGauge score={result.adjustedScore} label={result.label} />
+            </div>
           </div>
 
           {/* Label badge */}
