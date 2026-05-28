@@ -14,7 +14,7 @@ import { useUnits, type UnitPreferences } from "@/hooks/useUnits";
 import { Activity, ChevronRight, ChevronLeft, ChevronDown, Upload, Loader2 } from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
-import { parseFitBuffer } from "@/lib/fit-parser";
+import { parseFitBuffer, parseZipFile, type ParsedActivity } from "@/lib/fit-parser";
 import { cn } from "@/lib/utils";
 
 const formatPace = (minPerKm: number): string => {
@@ -124,28 +124,33 @@ const Onboarding = () => {
     try {
       const paces: number[] = []; // min/km per activity
       let runCount = 0;
+
+      const collect = (acts: ParsedActivity[]) => {
+        for (const a of acts) {
+          const isRun = (a.activity_type || "").toLowerCase().includes("run");
+          if (!isRun) continue;
+          if (a.distance_meters && a.duration_seconds && a.distance_meters > 800) {
+            const pace = (a.duration_seconds / 60) / (a.distance_meters / 1000);
+            if (pace > 3 && pace < 12) { paces.push(pace); runCount++; }
+          } else if (a.avg_speed && a.avg_speed > 4 && a.avg_speed < 25) {
+            paces.push(60 / a.avg_speed);
+            runCount++;
+          }
+        }
+      };
+
       for (const file of Array.from(files)) {
-        if (!/\.fit$/i.test(file.name)) continue;
         try {
-          const buf = await file.arrayBuffer();
-          const acts = await parseFitBuffer(buf, file.name);
-          for (const a of acts) {
-            const isRun = (a.activity_type || "").toLowerCase().includes("run");
-            if (!isRun) continue;
-            // Prefer distance/duration over avg_speed to avoid stopped-time bias.
-            if (a.distance_meters && a.duration_seconds && a.distance_meters > 800) {
-              const pace = (a.duration_seconds / 60) / (a.distance_meters / 1000);
-              if (pace > 3 && pace < 12) {
-                paces.push(pace);
-                runCount++;
-              }
-            } else if (a.avg_speed && a.avg_speed > 4 && a.avg_speed < 25) {
-              paces.push(60 / a.avg_speed);
-              runCount++;
-            }
+          if (/\.zip$/i.test(file.name)) {
+            const result = await parseZipFile(file);
+            collect(result.activities);
+          } else if (/\.fit$/i.test(file.name)) {
+            const buf = await file.arrayBuffer();
+            const acts = await parseFitBuffer(buf, file.name);
+            collect(acts);
           }
         } catch (e) {
-          console.warn("FIT parse failed", file.name, e);
+          console.warn("Upload parse failed", file.name, e);
         }
       }
       if (paces.length === 0) {
@@ -654,7 +659,7 @@ const Onboarding = () => {
                   <input
                     ref={fitInputRef}
                     type="file"
-                    accept=".fit"
+                    accept=".fit,.zip"
                     multiple
                     className="hidden"
                     onChange={(e) => handleFitUpload(e.target.files)}
@@ -669,7 +674,7 @@ const Onboarding = () => {
                     {fitParsing ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading files…</>
                     ) : (
-                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT files to auto-detect</>
+                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP</>
                     )}
                   </Button>
                   <p className="text-[11px] text-muted-foreground text-center">
