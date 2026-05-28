@@ -266,7 +266,7 @@ export default function PlanCalendarView({ workouts, planStartDate, completedDat
                           <span className="font-medium">Target:</span> {seg.target}
                         </p>
                       )}
-                      {seg.hrZone && (
+                      {seg.hrZone && !/bpm/i.test(seg.target) && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Activity className="w-3 h-3" /> {seg.hrZone}{hrZoneBpm(seg.hrZone) && ` (${hrZoneBpm(seg.hrZone)})`}
                         </p>
