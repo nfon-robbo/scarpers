@@ -209,7 +209,10 @@ const RunningIQWidget = () => {
         planned = trainingDays.length * 4;
         const fourWeeksAgo = new Date(now.getTime() - 28 * 86400000);
         const recentRunCount = runs.filter(
-          (r) => r.start_time && new Date(r.start_time) >= fourWeeksAgo
+          (r) =>
+            r.start_time &&
+            new Date(r.start_time) >= fourWeeksAgo &&
+            !(typeof r.activity_type === "string" && /walk|hike/i.test(r.activity_type))
         ).length;
         missed = Math.max(0, planned - recentRunCount);
       }
