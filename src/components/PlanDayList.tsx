@@ -17,6 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
+import RaceStrategyBlock from "@/components/RaceStrategyBlock";
 import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
@@ -1059,6 +1060,10 @@ export default function PlanDayList({
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">
                   {selectedWorkout.rawText}
                 </p>
+              )}
+
+              {/race\s*day|🏁/i.test(`${selectedWorkout.title} ${selectedWorkout.rawText}`) && (
+                <RaceStrategyBlock raceDistance={raceDistance} workouts={workouts} />
               )}
             </>
           )}
