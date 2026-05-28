@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,18 +10,46 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits, type UnitPreferences } from "@/hooks/useUnits";
-import { Activity, ChevronRight, ChevronLeft, ChevronDown, Upload, Loader2 } from "lucide-react";
+import {
+  Activity, ChevronRight, ChevronLeft, ChevronDown,
+  Upload, Loader2, Calendar as CalendarIcon, Sparkles,
+} from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "@/lib/fit-parser";
+import { streamAICoach } from "@/lib/ai-stream";
 import { cn } from "@/lib/utils";
+
+const RACE_DISTANCES = [
+  { value: "5k", label: "5K" },
+  { value: "10k", label: "10K" },
+  { value: "half-marathon", label: "Half Marathon" },
+  { value: "marathon", label: "Marathon" },
+];
+const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const formatPace = (minPerKm: number): string => {
   const m = Math.floor(minPerKm);
   const s = Math.round((minPerKm - m) * 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+};
+const toLocalISODate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+const nextMonday = () => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? 1 : 8 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
 };
 
 const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
