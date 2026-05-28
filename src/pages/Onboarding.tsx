@@ -14,7 +14,7 @@ import { useUnits, type UnitPreferences } from "@/hooks/useUnits";
 import { Activity, ChevronRight, ChevronLeft, ChevronDown, Upload, Loader2 } from "lucide-react";
 import GoogleFitConnect from "@/components/GoogleFitConnect";
 import StravaConnect from "@/components/StravaConnect";
-import { parseFitBuffer } from "@/lib/fit-parser";
+import { parseFitBuffer, parseZipFile, type ParsedActivity } from "@/lib/fit-parser";
 import { cn } from "@/lib/utils";
 
 const formatPace = (minPerKm: number): string => {
