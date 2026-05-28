@@ -63,6 +63,7 @@ const RunningIQWidget = () => {
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<RunningIQResult | null>(null);
+  const [cleanRunCount, setCleanRunCount] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
 
