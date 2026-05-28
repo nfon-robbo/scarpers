@@ -54,6 +54,9 @@ const nextMonday = () => {
 
 const STEPS = ["Welcome", "Units", "About You", "Experience & Goals", "Training Schedule", "Integrations"];
 const STORAGE_KEY = "scarpers:onboarding-state";
+const DAY_OPTIONS = DAYS_OF_WEEK;
+
+
 
 
 const mapRaceDistance = (d: string): string => (d === "half" ? "half-marathon" : d);
