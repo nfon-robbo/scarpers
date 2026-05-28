@@ -55,6 +55,9 @@ type OnboardingState = {
   raceDistance: string;
   goalTimeMm: string;
   goalTimeSs: string;
+  trainingDays: string[];
+  currentPaceMin: string;
+  currentPaceMax: string;
 };
 
 const loadState = (): Partial<OnboardingState> => {
