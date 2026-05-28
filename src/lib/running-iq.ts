@@ -53,8 +53,7 @@ function pointSpeedKmh(point: Record<string, unknown>): number | null {
 function pointDistanceMeters(point: Record<string, unknown>): number | null {
   const value = Number(point.distance_meters ?? point.distance);
   if (!Number.isFinite(value) || value < 0) return null;
-  // FIT parser uses km before converting in some raw paths; normal stored gps_track uses metres.
-  return value < 100 && value > 0 ? value * 1000 : value;
+  return value;
 }
 
 function runLoadDistanceKm(r: RunActivity): number {
