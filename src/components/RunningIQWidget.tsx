@@ -144,6 +144,7 @@ const RunningIQWidget = () => {
         max_heart_rate: a.max_heart_rate,
         avg_cadence: a.avg_cadence,
         start_time: a.start_time,
+        activity_type: a.activity_type,
       })) as RunActivity[];
 
       const metrics = allMetrics as any[];
