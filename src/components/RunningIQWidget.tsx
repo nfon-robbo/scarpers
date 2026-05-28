@@ -128,7 +128,7 @@ const RunningIQWidget = () => {
     Promise.all([
       supabase
         .from("activities")
-        .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect, activity_type")
+        .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect, activity_type, raw_data")
         .eq("user_id", userId)
         .gte("start_time", twelveWeeksAgo.toISOString())
         .order("start_time", { ascending: true })
@@ -166,6 +166,7 @@ const RunningIQWidget = () => {
         avg_cadence: a.avg_cadence,
         start_time: a.start_time,
         activity_type: a.activity_type,
+        raw_data: a.raw_data,
       })) as RunActivity[];
 
       const metrics = allMetrics as any[];
