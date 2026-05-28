@@ -441,10 +441,14 @@ serve(async (req) => {
     }
 
     if (!activities || activities.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No activities found. Please upload FIT files first." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Training plan generation (e.g. during onboarding) can proceed without history.
+      // Other modes still require activities.
+      if (type !== "training-plan") {
+        return new Response(
+          JSON.stringify({ error: "No activities found. Please upload FIT files first." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Fetch daily metrics for health/readiness context (always, not just AI-decide)
