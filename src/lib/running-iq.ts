@@ -470,10 +470,16 @@ const coachingTips: Record<string, string> = {
 // ── Main Calculation ──
 
 export function computeRunningIQ(input: RunningIQInput): RunningIQResult {
-  // Filter to last 12 weeks
+  // Filter to last 12 weeks. Pure walks are excluded entirely so they
+  // never contribute to weekly distance, ACWR, or run count.
   const cutoff = new Date(Date.now() - 12 * 7 * 86400000);
   const recentRuns = input.runs.filter(
-    (r) => r.start_time && new Date(r.start_time) >= cutoff && r.distance_meters && r.distance_meters > 0
+    (r) =>
+      r.start_time &&
+      new Date(r.start_time) >= cutoff &&
+      r.distance_meters &&
+      r.distance_meters > 0 &&
+      !isWalking(r),
   );
 
   const weeks = groupByWeek(recentRuns);
