@@ -37,6 +37,14 @@ function isCleanRun(r: RunActivity): boolean {
   return !isWalking(r) && !isWalkRunInterval(r);
 }
 
+/** Count clean continuous runs in the provided activity list (caller filters by window). */
+export function countCleanRuns(runs: RunActivity[]): number {
+  return runs.filter(isCleanRun).length;
+}
+
+/** Minimum clean runs required before Running IQ is considered stable enough to display. */
+export const RUNNING_IQ_MIN_CLEAN_RUNS = 6;
+
 function getGpsTrack(r: RunActivity): Array<Record<string, unknown>> {
   const raw = r.raw_data as Record<string, unknown> | null | undefined;
   const track = raw?.gps_track;
