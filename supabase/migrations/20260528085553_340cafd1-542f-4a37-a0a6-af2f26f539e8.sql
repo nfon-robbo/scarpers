@@ -1,0 +1,4 @@
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS race_date DATE NULL,
+  ADD COLUMN IF NOT EXISTS race_distance TEXT NULL,
+  ADD COLUMN IF NOT EXISTS race_goal_time_seconds INTEGER NULL;
