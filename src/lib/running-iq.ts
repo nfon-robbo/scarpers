@@ -182,7 +182,9 @@ function groupByWeek(runs: RunActivity[]): WeekData[] {
         distances.push(distKm);
         if (distKm > longestRunKm) longestRunKm = distKm;
 
-        if (distKm > 0 && r.duration_seconds) {
+        // Pace + HR:pace per week only from clean continuous runs —
+        // blended walk/run averages would corrupt the trend.
+        if (distKm > 0 && r.duration_seconds && isCleanRun(r)) {
           const paceMinPerKm = (r.duration_seconds / 60) / distKm;
           paces.push(paceMinPerKm);
 
