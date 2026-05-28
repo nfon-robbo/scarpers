@@ -145,9 +145,16 @@ const Onboarding = () => {
   const [trainingDays, setTrainingDays] = useState<string[]>(initial.trainingDays ?? ["Mon", "Wed", "Fri", "Sat"]);
   const [currentPaceMin, setCurrentPaceMin] = useState(initial.currentPaceMin ?? "");
   const [currentPaceMax, setCurrentPaceMax] = useState(initial.currentPaceMax ?? "");
+  const [goalTimeFree, setGoalTimeFree] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date>(() => nextMonday());
+  const [planRaceDate, setPlanRaceDate] = useState<Date | undefined>(undefined);
+  const [letAIDecide, setLetAIDecide] = useState(false);
+  const [planBuilding, setPlanBuilding] = useState(false);
+  const [planContent, setPlanContent] = useState("");
   const [fitParsing, setFitParsing] = useState(false);
   const [fitSummary, setFitSummary] = useState<string | null>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleFitUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
