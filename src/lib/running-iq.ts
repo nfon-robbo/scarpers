@@ -222,15 +222,17 @@ function calcAerobicCapacity(
     rhrScore = restingHRScore(input.restingHR, input.ageYears);
   }
 
-  // Aerobic-pace efficiency: median pace on easy runs
+  // Aerobic-pace efficiency: median pace on easy *clean* runs only.
+  // Walk/run intervals have blended pace and would drag the median.
   const maxAerobicHR = 0.75 * (220 - input.ageYears);
-  let easyRuns = runs.filter(
+  const cleanRuns = runs.filter(isCleanRun);
+  let easyRuns = cleanRuns.filter(
     (r) => r.avg_heart_rate && r.avg_heart_rate <= maxAerobicHR && r.distance_meters && r.duration_seconds
   );
 
-  // Fallback: slow runs >= 40 min
+  // Fallback: clean runs >= 40 min
   if (easyRuns.length < 3) {
-    easyRuns = runs.filter(
+    easyRuns = cleanRuns.filter(
       (r) => r.duration_seconds && r.duration_seconds >= 2400 && r.distance_meters && r.distance_meters > 0
     );
   }
