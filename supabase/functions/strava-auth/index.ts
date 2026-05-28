@@ -6,6 +6,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function popupPage(opts: { title: string; body: string; success?: boolean }) {
+  const accent = opts.success ? "#fc4c02" : "#f87171";
+  const icon = opts.success ? "✓" : "✕";
+  const messageType = opts.success ? "strava-connected" : "strava-error";
+  const html = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>${opts.title} · Scarpers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;}
+  body{background:radial-gradient(ellipse at top,#1a0f2e 0%,#0b0613 60%);color:#e7e3f1;font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .card{max-width:380px;width:100%;text-align:center;background:rgba(255,255,255,0.04);border:1px solid rgba(252,76,2,0.18);border-radius:20px;padding:36px 28px;backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+  .icon{width:64px;height:64px;border-radius:50%;background:${accent}22;color:${accent};display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 20px;font-weight:700;}
+  h1{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:34px;letter-spacing:0.04em;margin:0 0 10px;color:#fff;}
+  p{margin:0 0 24px;color:#b4adc7;font-size:15px;line-height:1.5;}
+  button{background:${accent};color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;}
+  button:hover{filter:brightness(1.08);}
+</style></head>
+<body>
+  <div class="card">
+    <div class="icon">${icon}</div>
+    <h1>${opts.title}</h1>
+    <p>${opts.body}</p>
+    <button onclick="window.close()">Close window</button>
+  </div>
+  <script>
+    try { window.opener && window.opener.postMessage(${JSON.stringify(messageType)}, '*'); } catch(e){}
+    setTimeout(function(){ try { window.close(); } catch(e){} }, 600);
+  </script>
+</body></html>`;
+  return new Response(html, {
+    headers: new Headers({
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+    }),
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
