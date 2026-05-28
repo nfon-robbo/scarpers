@@ -137,9 +137,7 @@ Deno.serve(async (req) => {
       if (!tokenRes.ok) {
         const err = await tokenRes.text();
         console.error("Strava token exchange failed:", err);
-        return new Response(`<html><body><script>window.close();</script>Token exchange failed.</body></html>`, {
-          headers: { "Content-Type": "text/html" },
-        });
+        return popupPage({ title: "Connection failed", body: "Strava rejected the authorization. Please try again." });
       }
 
       const tokenData = await tokenRes.json();
@@ -154,9 +152,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!nonceRow || new Date(nonceRow.expires_at).getTime() < Date.now()) {
-        return new Response(`<html><body><script>window.close();</script>Authentication failed or link expired.</body></html>`, {
-          headers: { "Content-Type": "text/html" },
-        });
+        return popupPage({ title: "Link expired", body: "This connection link has expired. Please start again from Settings." });
       }
       // Single-use: delete now.
       await supabase.from("oauth_state").delete().eq("nonce", state);
@@ -176,17 +172,14 @@ Deno.serve(async (req) => {
 
       if (dbError) {
         console.error("DB upsert error:", dbError);
-        return new Response(`<html><body><script>window.close();</script>Failed to save tokens.</body></html>`, {
-          headers: { "Content-Type": "text/html" },
-        });
+        return popupPage({ title: "Couldn't save", body: "We connected to Strava but couldn't store your tokens. Please try again." });
       }
 
-      // Redirect back to app
-      const appUrl = url.origin.replace("datdwxsugeobqigtopnz.supabase.co", "id-preview--a8999b7f-9989-4a1f-a2b0-909ccd9e7b62.lovable.app");
-      return new Response(
-        `<html><body><script>window.opener?.postMessage('strava-connected','*');window.close();</script><p>Connected! You can close this window.</p></body></html>`,
-        { headers: { "Content-Type": "text/html" } }
-      );
+      return popupPage({
+        title: "Connected",
+        body: "Strava is linked. This window will close automatically.",
+        success: true,
+      });
     }
 
     // Step 3: Check connection status
