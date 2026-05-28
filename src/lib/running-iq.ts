@@ -230,7 +230,7 @@ function groupByWeek(runs: RunActivity[]): WeekData[] {
       let longestRunKm = 0;
 
       for (const r of weekRuns) {
-        const distKm = (r.distance_meters || 0) / 1000;
+        const distKm = runLoadDistanceKm(r);
         distances.push(distKm);
         if (distKm > longestRunKm) longestRunKm = distKm;
 
@@ -307,6 +307,7 @@ function calcEfficiency(runs: RunActivity[]): number {
   // All economy metrics use clean runs only. Walk/run intervals would
   // pollute HR:pace (blended pace) and cadence (blended 0-spm walk segments).
   const clean = runs.filter(isCleanRun);
+  if (clean.length < 3) return 50;
 
   // HR-to-Pace ratio
   const runsWithData = clean.filter(
@@ -451,7 +452,7 @@ function calcConsistency(
 }
 
 function calcProgression(weeks: WeekData[]): number {
-  if (weeks.length < 6) return 58; // neutral
+  if (weeks.length === 0) return 58; // neutral
 
   // Pace trend
   const weeklyPaces = weeks.filter((w) => w.avgPace > 0).map((w) => w.avgPace);
@@ -484,11 +485,12 @@ function calcProgression(weeks: WeekData[]): number {
   // Distance ramp rate
   const distances = weeks.map((w) => w.totalDistanceKm);
   let rampScore = 60;
-  if (distances.length >= 8) {
-    const recent4 = distances.slice(-4);
-    const prior4 = distances.slice(-8, -4);
-    const recentAvg = recent4.reduce((a, b) => a + b, 0) / 4;
-    const priorAvg = prior4.reduce((a, b) => a + b, 0) / 4;
+  if (distances.length >= 2) {
+    const half = Math.max(1, Math.floor(distances.length / 2));
+    const recent = distances.slice(-half);
+    const prior = distances.slice(-half * 2, -half);
+    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const priorAvg = prior.reduce((a, b) => a + b, 0) / prior.length;
     if (priorAvg > 0) {
       const ramp = (recentAvg - priorAvg) / priorAvg;
       if (ramp >= 0.05 && ramp <= 0.15) rampScore = 95;
