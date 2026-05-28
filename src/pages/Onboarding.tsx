@@ -103,6 +103,9 @@ const Onboarding = () => {
   const [raceDistance, setRaceDistance] = useState(initial.raceDistance ?? "");
   const [goalTimeMm, setGoalTimeMm] = useState(initial.goalTimeMm ?? "");
   const [goalTimeSs, setGoalTimeSs] = useState(initial.goalTimeSs ?? "");
+  const [trainingDays, setTrainingDays] = useState<string[]>(initial.trainingDays ?? ["Mon", "Wed", "Fri", "Sat"]);
+  const [currentPaceMin, setCurrentPaceMin] = useState(initial.currentPaceMin ?? "");
+  const [currentPaceMax, setCurrentPaceMax] = useState(initial.currentPaceMax ?? "");
   const [customOpen, setCustomOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -117,9 +120,10 @@ const Onboarding = () => {
       weightKg, weightLbs, weightSt, weightStLbs,
       experienceLevel, trainingGoals, injuries, athleteContext,
       unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs,
+      trainingDays, currentPaceMin, currentPaceMax,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs]);
+  }, [step, name, sex, dob, heightCm, heightFt, heightIn, weightKg, weightLbs, weightSt, weightStLbs, experienceLevel, trainingGoals, injuries, athleteContext, unitSystem, hasRace, raceDate, raceDistance, goalTimeMm, goalTimeSs, trainingDays, currentPaceMin, currentPaceMax]);
 
   const applyUnitSystem = (system: "metric" | "imperial") => {
     const target = system === "metric" ? METRIC_UNITS : IMPERIAL_UNITS;
