@@ -1,67 +1,88 @@
-## Investigation findings
+**Onboarding Overhaul — Implementation Plan**
 
-I traced the toast `33:34 → 38:49`. It isn't one estimate worsening — it's **two different estimators being compared as if they were one**, plus **duplicate activities** from a Strava re-sync polluting the inputs.
+**1. DB migration (additive, nullable)**
 
-### 1. Duplicate activities created at 12:00 today
+Add to profiles:
 
-A Strava import ran at 12:00 and re-inserted runs that already existed as FIT uploads. Examples for your account:
+- race_date DATE NULL
+- race_distance TEXT NULL (values: 5k, 10k, half, marathon, other)
+- race_goal_time_seconds INTEGER NULL
 
-```
-2026-05-22 07:58:15  FIT   2225m / 1200s   (created 22 May)
-2026-05-22 07:58:15  Strava 2224m / 1395s  (created today 12:00)  ← duplicate
-2026-05-21 10:34:00  FIT   2929m / 1680s   (created 21 May)
-2026-05-21 10:34:00  Strava 2929m / 1680s  (created today 12:00)  ← duplicate
-```
+No backfill, no constraint changes. Existing users unaffected.
 
-`runs_in_last_21d` in `race_prediction_history` jumped from 9 → 11 at exactly 12:00. `purgeStravaOverlaps` in `src/lib/activity-dedupe.ts` is supposed to delete Strava rows that overlap FIT rows within ±15min, but the Strava import path isn't calling it after the insert. So duplicates pile up on every re-sync.
+**2. src/pages/Onboarding.tsx**
 
-### 2. The toast compares two unrelated estimators
+State additions: hasRace: 'yes'|'no'|'', raceDate, raceDistance, goalTimeMm, goalTimeSs. Default experienceLevel to "" (was "intermediate"). Add unitSystem: 'metric'|'imperial'|'custom'|'' to OnboardingState localStorage.
 
-History rows for this user, last 24h:
+Step 0 (Welcome): Under DOB add muted helper text: "We use this to set your heart-rate zones." Already required (name).
 
-```
-manual / gauge_client     →  2014s (33:34)   basis: VO2max 38 only
-activity_synced / server  →  2329s (38:49)   basis: tempo 8:13/km + easy 9:34/km
-```
+Step 1 (Units) — rewrite:
 
-- `RaceTimeEstimate.tsx` (the gauge on TrainingPlan) writes a **VO2max-only** estimate as `triggered_by: "manual"`.
-- The edge function `race-predict` writes a **tempo+easy pace** estimate as `triggered_by: "activity_synced"`.
-- In `TrainingPlan.tsx` the toast reads `previous_sec` from the edge function, which is "the last row for this distance regardless of source". The last row is almost always the gauge's VO2 estimate, so the server's pace-based estimate is diffed against the gauge's VO2 estimate. They never agree → "5:15 slower" appears any time the auto-link count grows, even with zero new running.
+- Two large toggle cards: Metric / Imperial.
+- Selecting Metric calls setUnit for all six → km, min/km, m, C, kg, cm.
+- Selecting Imperial → mi, min/mi, ft, F, lbs, ft.
+- Below: a collapsible "Customise units" (shadcn Collapsible) revealing the existing six selects unchanged. Opening it sets unitSystem='custom'.
+- Important: opening the Customise expander must pre-populate all six selects with sensible defaults (not blank) before the user touches them. A user who goes straight to custom without first tapping Metric or Imperial must not be left with empty selects that block canNext(). If no prior unitSystem is set, pre-populate with Metric defaults when the expander opens.
+- Persist selection to localStorage; no DB schema change needed (units already on profile via useUnits).
 
-### 3. Server tempo is being computed from walk/run sessions
+Step 2 (About You / biometrics): Add header line above fields: "These power your race predictions and recovery scores."
 
-The 8:13/km "tempo" is a walk-polluted run. The doc `docs/algorithms/race-predictor.md` already flags this under "Planned filtering improvements" (title/HR/lap-CV filters, GPS run-segment extraction) — not yet implemented. With duplicates removed the predictor is still inflated, but the false "worsening" notification is the immediate user-facing bug.
+Step 3 (Experience & Goals) — restructured:
 
-## Plan
+- Experience level — replace Select with 4 large tap-target buttons (Beginner / Intermediate / Advanced / Elite) in a 2×2 grid. None preselected. canNext() for step 3 requires a choice.
+- Race block (new, above goals): "Do you have a race coming up?" Yes / Not yet toggle. If Yes: required Date input (HTML date), required Select distance (5K/10K/Half/Marathon/Other), optional goal time (two number inputs mm and ss, placeholder adjusted by distance e.g. 45:00 for 10K). canNext(): if hasRace==='yes', require raceDate + raceDistance. Goal time optional.
+- Existing free-text "Training goals", "Injuries", "Anything else" remain below unchanged.
 
-### A. Stop Strava re-imports from creating duplicate rows
+canNext() matrix:
 
-In `src/lib/strava-background-import.ts`, after each page of imports completes (and once more at the end), call `purgeStravaOverlaps(userId, fitStartTimes, 15)` for the FIT activities in the touched time window. Reuse `purgeAllStravaOverlaps` on the full-account sweep path. Net effect: Strava rows that collide with a FIT row are deleted immediately, preserving the FIT-wins precedence already established in `dedupeActivities`.
+- step 0: name required
+- step 1: a unit system chosen (metric/imperial/custom) — see Customise expander note above
+- step 2: no gate (current behaviour)
+- step 3: experienceLevel chosen AND race fields satisfied
+- step 4: no gate
 
-Also clean up the 2 existing duplicates for this user via a one-off `purgeAllStravaOverlaps` call when the user next opens the app (or as a one-time SQL cleanup migration — your choice; I'd prefer the client sweep so it heals other users with the same issue).
+handleComplete: persist new columns:
 
-### B. Stop the toast from comparing apples to oranges
+race_date: hasRace==='yes' ? raceDate : null, race_distance: hasRace==='yes' ? raceDistance : null, race_goal_time_seconds: hasRace==='yes' && goalTimeMm ? (Number(goalTimeMm)*60 + Number(goalTimeSs||0)) : null,
 
-In `supabase/functions/race-predict/index.ts`, change the `previous_sec` lookup to filter by `triggered_by IN ('activity_synced','plan_start','scheduled')` so it ignores the gauge's `manual / gauge_client` rows. Same-source comparison only.
+Add a code comment near DOB handling: verify the actual max-HR fallback value and file location during implementation before writing this comment. Do not assume 190 bpm — check src/lib/readiness.ts (or wherever max HR is calculated) and reference the real constant and file accurately. A wrong comment here is worse than no comment.
 
-Optional follow-up (not in this plan unless you want it): give the gauge a distinct `triggered_by` value like `gauge_client` instead of `manual`, so the two sources are unambiguous in the table.
+**3. /reset-password page (new src/pages/ResetPassword.tsx)**
 
-### C. Suppress the toast when the change is suspicious
+Single component, public route, two modes:
 
-In `TrainingPlan.tsx` (line ~569) only fire the toast when **both**:
-- `prevSec` exists and was written by the server (now guaranteed by B), and
-- `runs_in_last_21d` actually increased vs the previous server row (add `previous_runs_21d` to the edge response and compare).
+- Request mode (default): email input → supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' }). Success toast.
+- Update mode: detect when window.location.hash contains type=recovery OR a PASSWORD_RECOVERY event fires on onAuthStateChange. Show new password + confirm fields → supabase.auth.updateUser({ password }) → toast → navigate('/dashboard').
 
-If runs didn't grow, still update the chart silently but don't toast — this is the contract "no new running → no notification".
+Register in src/App.tsx as a public route /reset-password.
 
-### D. Note the deferred work
+**4. src/pages/Auth.tsx**
 
-Race-predictor walk/run filtering (title keyword, HR < 100, lap-CV, GPS speed-segment extraction) stays as-is — it's already tracked in `docs/algorithms/race-predictor.md §11`. Out of scope for this fix.
+- Add "Forgot password?" link (small, under password input or next to Sign-in button) → routes to /reset-password. Only show on the Sign-in tab.
+- Add "Continue with Google" button (above the email field, with an "or" divider) using lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + '/dashboard' }) per Lovable Cloud guidance (managed Google OAuth). Handle result.error with toast; result.redirected returns silently.
+- Replace the "Check your email" toast on signup with: toast({ title: "Account created", description: "Welcome — let's set up your profile." }). Supabase redirects via session listener to /dashboard → ProtectedRoute → /onboarding.
 
-## Files touched
+**5. Auth config**
 
-- `src/lib/strava-background-import.ts` — call `purgeStravaOverlaps` per page; sweep once at end.
-- `supabase/functions/race-predict/index.ts` — same-source `previous_sec`; return `previous_runs_21d`.
-- `src/pages/TrainingPlan.tsx` — gate the toast on runs-count actually increasing.
+- Call configure_auth with auto_confirm_email: true (keep other flags as-is). New email signups land directly in onboarding.
+- Call configure_social_auth with providers: ["google"] so the Google button works immediately.
 
-No DB schema changes, no migration required.
+**6. Email-verification reminder banner (lightweight)**
+
+In src/components/AppLayout.tsx (or a new EmailVerifyBanner component rendered inside it), check [user.email](http://user.email)_confirmed_at. If null, render a dismissible banner above page content: "Verify your email to secure your account. [Resend]". Resend calls supabase.auth.resend({ type: 'signup', email: [user.email](http://user.email) }). Dismissal stored in sessionStorage (per-session only, so it reappears next visit until verified).
+
+**Files touched**
+
+- migration (new): adds 3 columns to profiles
+- src/pages/Onboarding.tsx (edit)
+- src/pages/Auth.tsx (edit)
+- src/pages/ResetPassword.tsx (new)
+- src/App.tsx (add route)
+- src/components/AppLayout.tsx + new EmailVerifyBanner.tsx
+- auth config (tool calls, no file)
+
+**Out of scope (confirmed)**
+
+Intervals/Garmin in onboarding, post-entry profile flow, walk/run filtering, phone sign-in.
+
+Confirm and I'll start with the migration, then code changes in one pass.
