@@ -281,7 +281,18 @@ const RunningIQWidget = () => {
                 Keep running — history will appear here
               </p>
             </div>
-            <IQGauge score={result.adjustedScore} label={result.label} />
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onClick={handleRecalculate}
+                disabled={recalculating}
+                title="Recalculate now"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
+              </button>
+              <IQGauge score={result.adjustedScore} label={result.label} />
+            </div>
           </div>
 
           {/* Label badge */}
