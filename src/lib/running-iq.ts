@@ -8,6 +8,32 @@ export interface RunActivity {
   max_heart_rate: number | null;
   avg_cadence: number | null;
   start_time: string | null;
+  /** Optional — when present, used to exclude pure walks from load calculations. */
+  activity_type?: string | null;
+}
+
+// ── Walk/Run detection ──
+// We don't have lap data at this layer, so we use cadence + activity_type
+// heuristics to identify walk/run interval sessions. A true running cadence
+// floor is ~150 spm; anything well below that with a non-trivial cadence
+// reading is almost certainly a blended walk/run average.
+
+/** Activity is pure walking — exclude from running pillars entirely. */
+function isWalking(r: RunActivity): boolean {
+  return typeof r.activity_type === "string" && /walk|hike/i.test(r.activity_type);
+}
+
+/** Blended walk/run interval session — summary metrics are unreliable for pace, cadence, HR:pace. */
+function isWalkRunInterval(r: RunActivity): boolean {
+  if (isWalking(r)) return true;
+  // Cadence reading that's far below normal running cadence = walk/run blend.
+  if (r.avg_cadence != null && r.avg_cadence > 40 && r.avg_cadence < 150) return true;
+  return false;
+}
+
+/** Activity we trust for pace/cadence/HR:pace metrics — pure continuous run. */
+function isCleanRun(r: RunActivity): boolean {
+  return !isWalkRunInterval(r);
 }
 
 export interface RunningIQInput {
