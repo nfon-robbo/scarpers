@@ -35,8 +35,8 @@ serve(async (req) => {
 
     if (!creds?.athlete_id || !creds?.api_key) {
       return new Response(
-        JSON.stringify({ error: "Intervals.icu not connected. Add your athlete ID and API key in Settings." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ skipped: "not_connected", synced: 0, total: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
