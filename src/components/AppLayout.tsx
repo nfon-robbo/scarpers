@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
+import EmailVerifyBanner from "@/components/EmailVerifyBanner";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -211,6 +212,7 @@ const AppLayout = () => {
         mainMargin
       )} style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
+          <EmailVerifyBanner />
           <Outlet />
         </div>
         <footer className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 border-t border-border/50">
