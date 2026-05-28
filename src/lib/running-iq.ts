@@ -250,8 +250,12 @@ function calcAerobicCapacity(
 }
 
 function calcEfficiency(runs: RunActivity[]): number {
+  // All economy metrics use clean runs only. Walk/run intervals would
+  // pollute HR:pace (blended pace) and cadence (blended 0-spm walk segments).
+  const clean = runs.filter(isCleanRun);
+
   // HR-to-Pace ratio
-  const runsWithData = runs.filter(
+  const runsWithData = clean.filter(
     (r) => r.avg_heart_rate && r.distance_meters && r.duration_seconds && r.distance_meters > 0
   );
 
@@ -268,7 +272,7 @@ function calcEfficiency(runs: RunActivity[]): number {
   }
 
   // Cardiac drift proxy
-  const longRuns = runs.filter(
+  const longRuns = clean.filter(
     (r) => r.duration_seconds && r.duration_seconds >= 3600 && r.avg_heart_rate && r.max_heart_rate
   );
   let driftScore = 50;
@@ -280,8 +284,8 @@ function calcEfficiency(runs: RunActivity[]): number {
     ]);
   }
 
-  // Cadence
-  const withCadence = runs.filter((r) => r.avg_cadence && r.avg_cadence > 0);
+  // Cadence — only count clean continuous runs (≥150 spm threshold inside isCleanRun).
+  const withCadence = clean.filter((r) => r.avg_cadence && r.avg_cadence >= 150);
   let cadenceScore = 50;
   if (withCadence.length > 0) {
     const avgCad = withCadence.reduce((s, r) => s + r.avg_cadence!, 0) / withCadence.length;
