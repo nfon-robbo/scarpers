@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, TrendingUp, ChevronRight, History, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { computeRunningIQ, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import { computeRunningIQ, countCleanRuns, RUNNING_IQ_MIN_CLEAN_RUNS, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
 import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
 import { calculateSleepScore } from "@/lib/sleep-score";
