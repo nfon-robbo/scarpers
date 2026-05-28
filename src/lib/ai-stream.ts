@@ -70,28 +70,45 @@ export async function streamAICoach({
   const startedAt = Date.now();
   const controller = new AbortController();
   let settled = false;
+  const maxTotalMs = PLAN_TYPES.has(type) ? MAX_TOTAL_MS_PLAN : MAX_TOTAL_MS_DEFAULT;
+
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let hardTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const fireTimeout = (reason: "idle" | "hard") => {
+    if (settled) return;
+    console.warn("[AI_TIMEOUT]", {
+      feature: featureName || "unknown",
+      reason,
+      duration: Date.now() - startedAt,
+      timestamp: Date.now(),
+    });
+    settled = true;
+    if (idleTimer) clearTimeout(idleTimer);
+    if (hardTimer) clearTimeout(hardTimer);
+    try { controller.abort(); } catch { /* noop */ }
+    onError(TIMEOUT_MESSAGE);
+  };
+
+  const resetIdle = () => {
+    if (settled) return;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => fireTimeout("idle"), IDLE_TIMEOUT_MS);
+  };
 
   const settle = () => {
     if (settled) return false;
     settled = true;
-    clearTimeout(timer);
+    if (idleTimer) clearTimeout(idleTimer);
+    if (hardTimer) clearTimeout(hardTimer);
     return true;
   };
 
   const safeDone = () => { if (settle()) onDone(); };
   const safeError = (msg: string) => { if (settle()) onError(msg); };
 
-  const timer = setTimeout(() => {
-    if (settled) return;
-    console.warn("[AI_TIMEOUT]", {
-      feature: featureName || "unknown",
-      duration: Date.now() - startedAt,
-      timestamp: Date.now(),
-    });
-    settled = true;
-    try { controller.abort(); } catch { /* noop */ }
-    onError(TIMEOUT_MESSAGE);
-  }, STREAM_TIMEOUT_MS);
+  hardTimer = setTimeout(() => fireTimeout("hard"), maxTotalMs);
+  resetIdle();
 
   try {
     const body: Record<string, unknown> = { type };
