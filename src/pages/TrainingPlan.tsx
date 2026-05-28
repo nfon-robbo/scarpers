@@ -1260,18 +1260,17 @@ const TrainingPlanPage = () => {
   // Auto-generate after onboarding redirect. Runs once when the initial plan
   // load resolves with no existing plan.
   const autoGenTriggeredRef = useRef(false);
+  const autoGenPendingRef = useRef(false);
   useEffect(() => {
     if (autoGenTriggeredRef.current) return;
     if (initialLoading) return;
     const s: any = location.state;
     if (!s?.autoGenerate) return;
+    autoGenTriggeredRef.current = true;
     if (content) {
-      // User already has a plan — skip auto-gen but clear state.
-      autoGenTriggeredRef.current = true;
       navigate(location.pathname, { replace: true });
       return;
     }
-    autoGenTriggeredRef.current = true;
     if (s.raceDistance) setRaceDistance(s.raceDistance);
     if (s.goalTime) setGoalTime(s.goalTime);
     if (Array.isArray(s.trainingDays) && s.trainingDays.length) setTrainingDays(s.trainingDays);
@@ -1279,11 +1278,20 @@ const TrainingPlanPage = () => {
     if (s.currentPaceMax) setCurrentPaceMax(s.currentPaceMax);
     if (s.raceDate) setRaceDate(parseLocalISODate(s.raceDate));
     if (s.letAIDecide) setLetAIDecide(true);
+    autoGenPendingRef.current = true;
     navigate(location.pathname, { replace: true });
-    // Defer one tick so state is applied before generatePlan reads it.
-    setTimeout(() => { generatePlan(); }, 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialLoading, location.state, content]);
+
+  // Fires generatePlan after the state from autoGenerate has been applied.
+  useEffect(() => {
+    if (!autoGenPendingRef.current) return;
+    if (loading) return;
+    autoGenPendingRef.current = false;
+    generatePlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceDistance, trainingDays, raceDate, letAIDecide]);
+
 
 
   const [reviewing, setReviewing] = useState(false);
