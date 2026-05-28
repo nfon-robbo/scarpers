@@ -2439,7 +2439,9 @@ const TrainingPlanPage = () => {
                   const lines = [`${dayLabel} — ${w.title}`];
                   if (w.segments.length > 0) {
                     w.segments.forEach((s, i) => {
-                      const parts = [s.segment, s.duration, s.target, s.hrZone].filter(Boolean);
+                      // Drop hrZone — target already contains the HR range, so including
+                      // both produces a redundant trailing "• Z2" abbreviation.
+                      const parts = [s.segment, s.duration, s.target].filter(Boolean);
                       lines.push(`  ${i + 1}. ${parts.join(" • ")}`);
                       if (s.notes) lines.push(`     ${s.notes}`);
                     });
