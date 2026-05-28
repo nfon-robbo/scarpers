@@ -266,98 +266,133 @@ const Onboarding = () => {
     setCustomOpen(true);
   };
 
+  const saveProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    const contextParts: string[] = [];
+    if (injuries.trim()) contextParts.push(`Injuries / niggles: ${injuries.trim()}`);
+    if (athleteContext.trim()) contextParts.push(athleteContext.trim());
+
+    const heightCmFinal = (() => {
+      if (units.height === "ft") {
+        const ft = Number(heightFt) || 0;
+        const inches = Number(heightIn) || 0;
+        const total = ft * 30.48 + inches * 2.54;
+        return total > 0 ? Math.round(total) : null;
+      }
+      return heightCm ? Number(heightCm) : null;
+    })();
+    const weightKgFinal = (() => {
+      if (units.weight === "lbs") {
+        const lbs = Number(weightLbs) || 0;
+        return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
+      }
+      if (units.weight === "st") {
+        const st = Number(weightSt) || 0;
+        const lbs = Number(weightStLbs) || 0;
+        const totalLbs = st * 14 + lbs;
+        return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
+      }
+      return weightKg ? Number(weightKg) : null;
+    })();
+    const raceGoalSeconds = hasRace === "yes" && goalTimeMm
+      ? Number(goalTimeMm) * 60 + (Number(goalTimeSs) || 0)
+      : null;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        name,
+        primary_sport: "running",
+        experience_level: experienceLevel || "intermediate",
+        training_goals: trainingGoals,
+        athlete_context: contextParts.join("\n\n"),
+        sex: sex || null,
+        date_of_birth: dob || null,
+        height_cm: heightCmFinal,
+        weight_kg: weightKgFinal,
+        race_date: hasRace === "yes" && raceDate ? raceDate : null,
+        race_distance: hasRace === "yes" && raceDistance ? mapRaceDistance(raceDistance) : null,
+        race_goal_time_seconds: raceGoalSeconds,
+        onboarding_completed: true,
+      } as any)
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    return user.id;
+  };
+
   const handleComplete = async () => {
+    if (planBuilding) return;
+    if (trainingDays.length === 0) {
+      toast({ title: "Pick at least one training day", variant: "destructive" });
+      return;
+    }
+    if (!letAIDecide && !planRaceDate) {
+      toast({ title: "Pick a race date", description: "Or let the AI recommend one.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
+    setPlanBuilding(true);
+    setPlanContent("");
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const contextParts: string[] = [];
-      if (injuries.trim()) contextParts.push(`Injuries / niggles: ${injuries.trim()}`);
-      if (athleteContext.trim()) contextParts.push(athleteContext.trim());
-
-      // DOB fallback: if user skipped DOB, age defaults to 30 in src/components/RunningIQWidget.tsx
-      // (ageYears = 30), which feeds max-HR & VO2 scoring. Encourage users to fill DOB for accuracy.
-      const heightCmFinal = (() => {
-        if (units.height === "ft") {
-          const ft = Number(heightFt) || 0;
-          const inches = Number(heightIn) || 0;
-          const total = ft * 30.48 + inches * 2.54;
-          return total > 0 ? Math.round(total) : null;
-        }
-        return heightCm ? Number(heightCm) : null;
-      })();
-      const weightKgFinal = (() => {
-        if (units.weight === "lbs") {
-          const lbs = Number(weightLbs) || 0;
-          return lbs > 0 ? +(lbs / 2.20462).toFixed(2) : null;
-        }
-        if (units.weight === "st") {
-          const st = Number(weightSt) || 0;
-          const lbs = Number(weightStLbs) || 0;
-          const totalLbs = st * 14 + lbs;
-          return totalLbs > 0 ? +(totalLbs / 2.20462).toFixed(2) : null;
-        }
-        return weightKg ? Number(weightKg) : null;
-      })();
-      const raceGoalSeconds = hasRace === "yes" && goalTimeMm
-        ? Number(goalTimeMm) * 60 + (Number(goalTimeSs) || 0)
-        : null;
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          name,
-          primary_sport: "running",
-          experience_level: experienceLevel || "intermediate",
-          training_goals: trainingGoals,
-          athlete_context: contextParts.join("\n\n"),
-          sex: sex || null,
-          date_of_birth: dob || null,
-          height_cm: heightCmFinal,
-          weight_kg: weightKgFinal,
-          race_date: hasRace === "yes" && raceDate ? raceDate : null,
-          race_distance: hasRace === "yes" && raceDistance ? raceDistance : null,
-          race_goal_time_seconds: raceGoalSeconds,
-          onboarding_completed: true,
-        } as any)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      const userId = await saveProfile();
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
 
-      // If user has a race, jump straight into plan generation so onboarding
-      // actually delivers a plan instead of dumping them on the dashboard.
-      if (hasRace === "yes" && raceDistance && raceDate && trainingDays.length > 0) {
-        navigate("/training-plan", {
-          state: {
-            autoGenerate: true,
-            raceDistance: mapRaceDistance(raceDistance),
-            raceDate,
-            goalTime: goalTimeMm ? `${goalTimeMm}:${(goalTimeSs || "00").padStart(2, "0")}` : "",
-            trainingDays,
-            currentPaceMin,
-            currentPaceMax,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expired — please sign in again.");
+
+      const effectiveRaceDistance = raceDistance && raceDistance !== "" && raceDistance !== "other"
+        ? mapRaceDistance(raceDistance)
+        : "half-marathon";
+
+      await new Promise<void>((resolve, reject) => {
+        let accumulated = "";
+        streamAICoach({
+          type: "training-plan",
+          token: session.access_token,
+          raceDistance: effectiveRaceDistance,
+          goalTime: goalTimeFree || "",
+          currentPaceMin,
+          currentPaceMax,
+          trainingDays,
+          startDate: toLocalISODate(startDate),
+          raceDate: letAIDecide ? "ai-recommend" : (planRaceDate ? toLocalISODate(planRaceDate) : undefined),
+          onDelta: (text) => {
+            accumulated += text;
+            setPlanContent(accumulated);
           },
-        });
-      } else {
-        navigate("/training-plan", {
-          state: {
-            autoGenerate: true,
-            raceDistance: "half-marathon",
-            letAIDecide: true,
-            trainingDays,
-            currentPaceMin,
-            currentPaceMax,
+          onDone: async () => {
+            try {
+              const { error: insertErr } = await supabase.from("training_plans").insert({
+                user_id: userId,
+                race_distance: effectiveRaceDistance,
+                goal_time: goalTimeFree || null,
+                training_days: trainingDays,
+                start_date: toLocalISODate(startDate),
+                race_date: letAIDecide ? "ai-recommend" : (planRaceDate ? toLocalISODate(planRaceDate) : null),
+                content: accumulated,
+              } as any);
+              if (insertErr) throw insertErr;
+              resolve();
+            } catch (e) { reject(e); }
           },
+          onError: (err) => reject(new Error(err)),
         });
-      }
+      });
+
+      toast({ title: "Plan ready!", description: "Welcome to Scarpers." });
+      navigate("/training-plan");
     } catch (error: any) {
       toast({
-        title: "Error saving profile",
+        title: "Couldn't finish setup",
         description: error.message,
         variant: "destructive",
       });
+      setPlanBuilding(false);
     } finally {
       setLoading(false);
     }
