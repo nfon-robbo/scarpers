@@ -17,6 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import WorkoutIntervalChart from "@/components/WorkoutIntervalChart";
+import RaceStrategyBlock from "@/components/RaceStrategyBlock";
 import pauseHolidayIcon from "@/assets/pause-holiday.png";
 import pauseIllnessIcon from "@/assets/pause-illness.png";
 import pauseInjuryIcon from "@/assets/pause-injury.png";
