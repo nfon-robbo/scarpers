@@ -67,9 +67,30 @@ const RunningIQWidget = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
 
+  const fetchCleanRunCount = async (userId: string) => {
+    const twelveWeeksAgo = new Date(Date.now() - 12 * 7 * 86400000).toISOString();
+    const { data } = await supabase
+      .from("activities")
+      .select("avg_cadence, activity_type")
+      .eq("user_id", userId)
+      .gte("start_time", twelveWeeksAgo);
+    const rows = (data || []) as Array<{ avg_cadence: number | null; activity_type: string | null }>;
+    const count = countCleanRuns(
+      rows.map((r) => ({
+        avg_cadence: r.avg_cadence ?? undefined,
+        activity_type: r.activity_type ?? undefined,
+      })) as RunActivity[]
+    );
+    setCleanRunCount(count);
+    return count;
+  };
+
   const loadScore = (userId: string, opts: { force?: boolean } = {}) => {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 3600000).toISOString();
+
+    // Always recount in parallel so suppression stays accurate.
+    fetchCleanRunCount(userId);
 
     if (opts.force) {
       localStorage.removeItem(`running_iq_snapshot_last_${userId}`);
