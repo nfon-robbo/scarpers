@@ -294,37 +294,6 @@ const RunningIQWidget = () => {
 
   if (!result) return null;
 
-  // Suppress score during walk/run base-building phase — needs enough clean continuous runs to be stable.
-  if (cleanRunCount !== null && cleanRunCount < RUNNING_IQ_MIN_CLEAN_RUNS) {
-    return (
-      <Card className="glass border-border/30 overflow-hidden relative opacity-80">
-        <div className="absolute inset-0 bg-gradient-to-br from-muted/20 via-transparent to-muted/10" />
-        <CardContent className="p-5 relative z-10">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="text-lg font-bold text-muted-foreground">Running IQ</h3>
-              <p className="text-xs text-muted-foreground/80 mt-0.5">Locked while you build a base</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRecalculate}
-              disabled={recalculating}
-              title="Recalculate"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            Building base — Running IQ unlocks after your first continuous running sessions.
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            {cleanRunCount} of {RUNNING_IQ_MIN_CLEAN_RUNS} continuous runs logged in the last 12 weeks.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
 
 
   return (
