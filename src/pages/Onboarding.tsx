@@ -543,6 +543,57 @@ const Onboarding = () => {
           )}
 
           {step === 4 && (
+            <div className="space-y-5">
+              <p className="text-sm text-muted-foreground">
+                We'll use this to build your personalised plan. You can tweak it any time.
+              </p>
+              <div className="space-y-2">
+                <Label>Which days can you train?</Label>
+                <div className="grid grid-cols-7 gap-1.5">
+                  {DAY_OPTIONS.map((d) => {
+                    const active = trainingDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setTrainingDays((prev) =>
+                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg border-2 py-2 text-xs font-semibold transition-all",
+                          active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">{trainingDays.length} day(s) selected</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Current easy pace (optional)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Fastest e.g. 5:30"
+                    value={currentPaceMin}
+                    onChange={(e) => setCurrentPaceMin(e.target.value)}
+                  />
+                  <Input
+                    placeholder="Slowest e.g. 6:30"
+                    value={currentPaceMax}
+                    onChange={(e) => setCurrentPaceMax(e.target.value)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">min/km — helps the AI pitch your plan correctly.</p>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Connect your accounts to pull in runs and sleep data automatically. You can skip and add these later in Settings.
