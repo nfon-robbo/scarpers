@@ -51,7 +51,29 @@ const GoogleFitConnect = () => {
         { headers: { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }
       );
       const { url } = await res.json();
-      window.open(url, "google-fit-auth", "width=600,height=700");
+      const popup = window.open(url, "google-fit-auth", "width=600,height=700");
+
+      // COOP can block postMessage from the callback page, so also poll
+      // status until we see "connected" or the popup closes.
+      let attempts = 0;
+      let notified = false;
+      const interval = setInterval(async () => {
+        attempts++;
+        const popupClosed = !popup || popup.closed;
+        await checkStatus();
+        setConnected((prev) => {
+          if (prev && !notified) {
+            notified = true;
+            toast({ title: "Google Fit connected!", description: "You can now sync sleep stage data." });
+            try { popup?.close(); } catch { /* ignore */ }
+            clearInterval(interval);
+          }
+          return prev;
+        });
+        if (popupClosed || attempts > 60) {
+          clearInterval(interval);
+        }
+      }, 2000);
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
