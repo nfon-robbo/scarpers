@@ -83,6 +83,7 @@ const RunningIQWidget = () => {
       })) as RunActivity[]
     );
     setCleanRunCount(count);
+    setTotalSessionCount(rows.length);
     return count;
   };
 
