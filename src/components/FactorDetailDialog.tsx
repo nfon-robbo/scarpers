@@ -204,16 +204,26 @@ const FactorDetailDialog = ({ open, onOpenChange, label, status, detail }: Props
     });
   }, [open, user, label, meta]);
 
+  // Parse the authoritative "current" value from the detail string passed in
+  // by the readiness widget (e.g. "91/100 (Excellent) · 7.8h", "62 bpm", "48 ms").
+  // This guarantees the "Now" tile matches the number shown on the dashboard.
+  const detailValue = useMemo<number | null>(() => {
+    if (!detail) return null;
+    const m = detail.match(/-?\d+(?:\.\d+)?/);
+    return m ? parseFloat(m[0]) : null;
+  }, [detail]);
+
   const stats = useMemo(() => {
     const nums = points.filter((p) => typeof p.value === "number").map((p) => p.value as number);
-    if (nums.length === 0) return null;
-    const last = [...points].reverse().find((p) => p.value != null)?.value ?? null;
+    if (nums.length === 0 && detailValue == null) return null;
+    const seriesLast = [...points].reverse().find((p) => p.value != null)?.value ?? null;
+    const last = detailValue ?? seriesLast;
     const baseline = nums.length >= 5 ? nums.slice(0, -1) : nums;
-    const avg = baseline.reduce((a, b) => a + b, 0) / baseline.length;
-    const min = Math.min(...nums);
-    const max = Math.max(...nums);
+    const avg = baseline.length ? baseline.reduce((a, b) => a + b, 0) / baseline.length : (last ?? 0);
+    const min = nums.length ? Math.min(...nums, ...(last != null ? [last] : [])) : (last ?? 0);
+    const max = nums.length ? Math.max(...nums, ...(last != null ? [last] : [])) : (last ?? 0);
     return { last, avg, min, max, count: nums.length };
-  }, [points]);
+  }, [points, detailValue]);
 
   const color = statusColor(status);
   const gradId = `factor-grad-${label.replace(/\s+/g, "-")}`;
