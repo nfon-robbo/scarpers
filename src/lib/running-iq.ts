@@ -8,6 +8,32 @@ export interface RunActivity {
   max_heart_rate: number | null;
   avg_cadence: number | null;
   start_time: string | null;
+  /** Optional — when present, used to exclude pure walks from load calculations. */
+  activity_type?: string | null;
+}
+
+// ── Walk/Run detection ──
+// We don't have lap data at this layer, so we use cadence + activity_type
+// heuristics to identify walk/run interval sessions. A true running cadence
+// floor is ~150 spm; anything well below that with a non-trivial cadence
+// reading is almost certainly a blended walk/run average.
+
+/** Activity is pure walking — exclude from running pillars entirely. */
+function isWalking(r: RunActivity): boolean {
+  return typeof r.activity_type === "string" && /walk|hike/i.test(r.activity_type);
+}
+
+/** Blended walk/run interval session — summary metrics are unreliable for pace, cadence, HR:pace. */
+function isWalkRunInterval(r: RunActivity): boolean {
+  if (isWalking(r)) return true;
+  // Cadence reading that's far below normal running cadence = walk/run blend.
+  if (r.avg_cadence != null && r.avg_cadence > 40 && r.avg_cadence < 150) return true;
+  return false;
+}
+
+/** Activity we trust for pace/cadence/HR:pace metrics — pure continuous run. */
+function isCleanRun(r: RunActivity): boolean {
+  return !isWalkRunInterval(r);
 }
 
 export interface RunningIQInput {
@@ -156,7 +182,9 @@ function groupByWeek(runs: RunActivity[]): WeekData[] {
         distances.push(distKm);
         if (distKm > longestRunKm) longestRunKm = distKm;
 
-        if (distKm > 0 && r.duration_seconds) {
+        // Pace + HR:pace per week only from clean continuous runs —
+        // blended walk/run averages would corrupt the trend.
+        if (distKm > 0 && r.duration_seconds && isCleanRun(r)) {
           const paceMinPerKm = (r.duration_seconds / 60) / distKm;
           paces.push(paceMinPerKm);
 
@@ -196,15 +224,17 @@ function calcAerobicCapacity(
     rhrScore = restingHRScore(input.restingHR, input.ageYears);
   }
 
-  // Aerobic-pace efficiency: median pace on easy runs
+  // Aerobic-pace efficiency: median pace on easy *clean* runs only.
+  // Walk/run intervals have blended pace and would drag the median.
   const maxAerobicHR = 0.75 * (220 - input.ageYears);
-  let easyRuns = runs.filter(
+  const cleanRuns = runs.filter(isCleanRun);
+  let easyRuns = cleanRuns.filter(
     (r) => r.avg_heart_rate && r.avg_heart_rate <= maxAerobicHR && r.distance_meters && r.duration_seconds
   );
 
-  // Fallback: slow runs >= 40 min
+  // Fallback: clean runs >= 40 min
   if (easyRuns.length < 3) {
-    easyRuns = runs.filter(
+    easyRuns = cleanRuns.filter(
       (r) => r.duration_seconds && r.duration_seconds >= 2400 && r.distance_meters && r.distance_meters > 0
     );
   }
@@ -222,8 +252,12 @@ function calcAerobicCapacity(
 }
 
 function calcEfficiency(runs: RunActivity[]): number {
+  // All economy metrics use clean runs only. Walk/run intervals would
+  // pollute HR:pace (blended pace) and cadence (blended 0-spm walk segments).
+  const clean = runs.filter(isCleanRun);
+
   // HR-to-Pace ratio
-  const runsWithData = runs.filter(
+  const runsWithData = clean.filter(
     (r) => r.avg_heart_rate && r.distance_meters && r.duration_seconds && r.distance_meters > 0
   );
 
@@ -240,7 +274,7 @@ function calcEfficiency(runs: RunActivity[]): number {
   }
 
   // Cardiac drift proxy
-  const longRuns = runs.filter(
+  const longRuns = clean.filter(
     (r) => r.duration_seconds && r.duration_seconds >= 3600 && r.avg_heart_rate && r.max_heart_rate
   );
   let driftScore = 50;
@@ -252,8 +286,8 @@ function calcEfficiency(runs: RunActivity[]): number {
     ]);
   }
 
-  // Cadence
-  const withCadence = runs.filter((r) => r.avg_cadence && r.avg_cadence > 0);
+  // Cadence — only count clean continuous runs (≥150 spm threshold inside isCleanRun).
+  const withCadence = clean.filter((r) => r.avg_cadence && r.avg_cadence >= 150);
   let cadenceScore = 50;
   if (withCadence.length > 0) {
     const avgCad = withCadence.reduce((s, r) => s + r.avg_cadence!, 0) / withCadence.length;
@@ -436,10 +470,16 @@ const coachingTips: Record<string, string> = {
 // ── Main Calculation ──
 
 export function computeRunningIQ(input: RunningIQInput): RunningIQResult {
-  // Filter to last 12 weeks
+  // Filter to last 12 weeks. Pure walks are excluded entirely so they
+  // never contribute to weekly distance, ACWR, or run count.
   const cutoff = new Date(Date.now() - 12 * 7 * 86400000);
   const recentRuns = input.runs.filter(
-    (r) => r.start_time && new Date(r.start_time) >= cutoff && r.distance_meters && r.distance_meters > 0
+    (r) =>
+      r.start_time &&
+      new Date(r.start_time) >= cutoff &&
+      r.distance_meters &&
+      r.distance_meters > 0 &&
+      !isWalking(r),
   );
 
   const weeks = groupByWeek(recentRuns);
