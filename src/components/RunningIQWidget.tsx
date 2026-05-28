@@ -107,7 +107,7 @@ const RunningIQWidget = () => {
     Promise.all([
       supabase
         .from("activities")
-        .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect")
+        .select("distance_meters, duration_seconds, avg_heart_rate, max_heart_rate, avg_cadence, start_time, training_load, training_effect, activity_type")
         .eq("user_id", userId)
         .gte("start_time", twelveWeeksAgo.toISOString())
         .order("start_time", { ascending: true })
