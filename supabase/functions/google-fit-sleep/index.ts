@@ -130,8 +130,8 @@ Deno.serve(async (req) => {
     });
 
     if (!tokenRow) {
-      return new Response(JSON.stringify({ error: "Google Fit not connected", traceId: trace.traceId }), {
-        status: 400,
+      return new Response(JSON.stringify({ skipped: "not_connected", synced: 0, sessions: 0, traceId: trace.traceId }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
