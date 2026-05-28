@@ -804,6 +804,9 @@ export type Database = {
           name: string | null
           onboarding_completed: boolean
           primary_sport: string | null
+          race_date: string | null
+          race_distance: string | null
+          race_goal_time_seconds: number | null
           sex: string | null
           training_goals: string | null
           unit_distance: string
@@ -826,6 +829,9 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
+          race_date?: string | null
+          race_distance?: string | null
+          race_goal_time_seconds?: number | null
           sex?: string | null
           training_goals?: string | null
           unit_distance?: string
@@ -848,6 +854,9 @@ export type Database = {
           name?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
+          race_date?: string | null
+          race_distance?: string | null
+          race_goal_time_seconds?: number | null
           sex?: string | null
           training_goals?: string | null
           unit_distance?: string
