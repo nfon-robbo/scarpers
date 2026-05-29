@@ -1476,7 +1476,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={series} margin={{ top: 10, right: 56, bottom: 4, left: 4 }}>
+                    <AreaChart data={series} margin={{ top: 10, right: 8, bottom: 4, left: 4 }}>
                       <defs>
                         <linearGradient id="readinessLineFill" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#ffffff" stopOpacity={0.15} />
