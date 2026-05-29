@@ -313,7 +313,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
-  const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("end");
+  const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("today");
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [wakeHour, setWakeHour] = useState<number | null>(null);
   const [trend, setTrend] = useState<{ day: string; score: number | null; hour?: number }[]>([]);
@@ -1348,41 +1348,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
             <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness Trend</h4>
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex rounded-md bg-white/5 border border-border/40 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setTrendMode("end")}
-                      className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
-                        trendMode === "end" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
-                      )}
-                    >
-                      End of day
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTrendMode("morning")}
-                      className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
-                        trendMode === "morning" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
-                      )}
-                    >
-                      Morning
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTrendMode("today")}
-                      className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded-sm transition-colors",
-                        trendMode === "today" ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"
-                      )}
-                    >
-                      Today
-                    </button>
-                  </div>
-                  <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
-                </div>
+                <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
               </div>
               {trendMode === "morning" && (
                 <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
