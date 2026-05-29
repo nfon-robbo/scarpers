@@ -1359,7 +1359,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               )}
               {trendMode === "today" && (
                 <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
-                  Hourly snapshots taken throughout today.
+                  Snapshots across the last 7 days · scroll horizontally to see history.
                 </p>
               )}
               {trendMode === "today" ? (() => {
