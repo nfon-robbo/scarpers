@@ -1231,6 +1231,83 @@ const AdminSEO = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!promptSuggestion} onOpenChange={(o) => !o && setPromptSuggestion(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Copy prompt for external AI
+            </DialogTitle>
+          </DialogHeader>
+          {promptSuggestion && (() => {
+            const s = promptSuggestion;
+            const kw = suggestionsKeyword;
+            const prompt = `You are helping improve SEO for scarpers.co.uk (an AI running coach app for UK runners, built with React + Vite + Tailwind + Supabase).
+
+TARGET KEYWORD: "${kw}"
+CURRENT RANKING: ${suggestionsPosition ? `#${suggestionsPosition} on Google UK` : "Not currently ranking in top 100"}
+
+SUGGESTION TYPE: ${s.type}
+TITLE: ${s.title}
+EFFORT: ${s.effort} · IMPACT: ${s.impact}
+
+DESCRIPTION:
+${s.description}
+${s.blogTitle ? `\nPROPOSED BLOG TITLE: ${s.blogTitle}` : ""}${s.blogSlug ? `\nPROPOSED SLUG: /blog/${s.blogSlug}` : ""}${s.blogOutline?.length ? `\n\nOUTLINE:\n${s.blogOutline.map(p => `- ${p}`).join("\n")}` : ""}
+
+CONTENT RULES (must follow):
+- UK English spelling throughout
+- Single H1 with the primary keyword; H2 subheadings; H3 only where genuinely nested
+- Minimum 800 words for blog posts
+- No named author/byline (site attribution = "By the Scarpers Team")
+- No invented case studies or testimonials
+- Do NOT claim Apple Watch or calendar integration (not built)
+- Scarpers features that ARE live: AI training plans, Garmin/Strava/Google Fit data import, readiness score, Running IQ
+- Apply 80/20 easy/hard rule, 10% weekly mileage rule, 5 HR zones, 170-180 spm cadence target where relevant
+- One natural CTA at the end linking to https://www.scarpers.co.uk/
+- Return ONLY the HTML body content (no <html>/<body> tags, no markdown fences)
+
+TASK:
+${s.type === "blog_post" ? "Write the full SEO-optimised blog post following the outline and rules above." :
+  s.type === "meta_update" ? "Produce the new <title> (under 60 chars) and <meta name=\"description\"> (under 160 chars) for the page referenced above, optimised for the target keyword." :
+  s.type === "faq_schema" ? "Produce a JSON-LD FAQPage schema block with 4-6 question/answer pairs targeting the keyword, plus the visible HTML FAQ section to embed on the page." :
+  s.type === "internal_link" ? "Identify which existing pages should link to which, with anchor text suggestions targeting the keyword." :
+  "Produce the content addition (HTML snippet) that addresses the suggestion above."}
+`;
+            return (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Paste this into ChatGPT, Claude, Gemini, or any other AI tool to get a ready-to-use draft.
+                </p>
+                <Textarea
+                  value={prompt}
+                  readOnly
+                  className="font-mono text-xs h-[50vh] resize-none"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(prompt);
+                        toast.success("Prompt copied to clipboard");
+                      } catch {
+                        toast.error("Copy failed — select and copy manually");
+                      }
+                    }}
+                  >
+                    Copy prompt
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+
+
       <Dialog open={!!actionDialogKeyword} onOpenChange={(o) => !o && setActionDialogKeyword(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
