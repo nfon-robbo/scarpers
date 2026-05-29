@@ -286,9 +286,10 @@ const AdminSEO = () => {
         setActionedIndices(prev => new Set(prev).add(idx));
         const post = (data as any).post;
         toast.success("Draft blog post created", {
-          description: `"${post.slug}" saved as draft.`,
-          action: { label: "Edit", onClick: () => navigate(`/admin/blog/${post.id}`) },
+          description: `"${post.slug}" — opening editor…`,
         });
+        setSuggestionsOpen(false);
+        navigate(`/admin/blog?edit=${post.id}`);
       }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to apply suggestion");
