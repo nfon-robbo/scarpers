@@ -149,5 +149,141 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     updated++;
   }
 
-  return { metricsCount: updated, sleepCount: 0, sleepSupported: false as const };
+  // ---------- Sleep stages (SleepSession) ----------
+  // Mirror the google-fit-sleep shape: one row per stage segment, source
+  // 'health_connect', date = wake date (end of session). We delete existing
+  // health_connect rows for the affected dates first so re-syncs do not
+  // create duplicates. Data from other sources (e.g. google_fit) is left
+  // untouched because we scope deletes by source.
+  type SleepStageInsert = {
+    user_id: string;
+    date: string;
+    stage: string;
+    duration_seconds: number;
+    start_time: string;
+    end_time: string;
+    source: string;
+  };
+
+  const stageRows: SleepStageInsert[] = [];
+  const dailyTotals: Record<
+    string,
+    { deep: number; rem: number; light: number; awake: number; sleep: number }
+  > = {};
+  const nightDates = new Set<string>();
+  let sleepCount = 0;
+
+  for (const session of sleepRecs) {
+    const sessionStart = new Date(session.startTime);
+    const sessionEnd = new Date(session.endTime);
+    if (Number.isNaN(sessionStart.getTime()) || Number.isNaN(sessionEnd.getTime())) continue;
+    const wakeDate = dayBucket(sessionEnd);
+    nightDates.add(wakeDate);
+
+    const stages: any[] = Array.isArray(session.stages) ? session.stages : [];
+    let writtenForSession = 0;
+
+    for (const seg of stages) {
+      const segStart = new Date(seg.startTime);
+      const segEnd = new Date(seg.endTime);
+      if (Number.isNaN(segStart.getTime()) || Number.isNaN(segEnd.getTime())) continue;
+      const rawType = String(seg.stage ?? seg.type ?? "").toLowerCase();
+      const stageName = HC_STAGE_MAP[rawType];
+      if (!stageName || stageName === "out_of_bed") continue;
+      const durationSeconds = Math.max(
+        0,
+        Math.round((segEnd.getTime() - segStart.getTime()) / 1000)
+      );
+      if (durationSeconds <= 0) continue;
+
+      stageRows.push({
+        user_id: userId,
+        date: wakeDate,
+        stage: stageName,
+        duration_seconds: durationSeconds,
+        start_time: segStart.toISOString(),
+        end_time: segEnd.toISOString(),
+        source: "health_connect",
+      });
+      writtenForSession++;
+
+      if (!dailyTotals[wakeDate])
+        dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
+      (dailyTotals[wakeDate] as any)[stageName] += durationSeconds;
+    }
+
+    // Fallback: no per-stage breakdown — record one generic 'sleep' row so
+    // total sleep time is still captured.
+    if (writtenForSession === 0) {
+      const durationSeconds = Math.max(
+        0,
+        Math.round((sessionEnd.getTime() - sessionStart.getTime()) / 1000)
+      );
+      if (durationSeconds > 0) {
+        stageRows.push({
+          user_id: userId,
+          date: wakeDate,
+          stage: "sleep",
+          duration_seconds: durationSeconds,
+          start_time: sessionStart.toISOString(),
+          end_time: sessionEnd.toISOString(),
+          source: "health_connect",
+        });
+        if (!dailyTotals[wakeDate])
+          dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
+        dailyTotals[wakeDate].sleep += durationSeconds;
+      }
+    }
+  }
+
+  if (nightDates.size > 0) {
+    await supabase
+      .from("sleep_stages")
+      .delete()
+      .eq("user_id", userId)
+      .eq("source", "health_connect")
+      .in("date", Array.from(nightDates));
+  }
+
+  if (stageRows.length > 0) {
+    const { error: insertErr } = await supabase.from("sleep_stages").insert(stageRows);
+    if (insertErr) {
+      console.warn("HC sleep_stages insert failed", insertErr);
+    } else {
+      sleepCount = stageRows.length;
+    }
+  }
+
+  // Roll up per-night totals into daily_metrics so the sleep score
+  // recalculates immediately (same shape google-fit-sleep uses).
+  for (const [date, t] of Object.entries(dailyTotals)) {
+    const totalSecs = t.deep + t.rem + t.light + t.sleep;
+    if (totalSecs <= 0) continue;
+    const patch: any = {
+      user_id: userId,
+      date,
+      deep_sleep_minutes: Math.round(t.deep / 60),
+      rem_sleep_minutes: Math.round(t.rem / 60),
+      light_sleep_minutes: Math.round((t.light + t.sleep) / 60),
+      awake_during_night_minutes: Math.round(t.awake / 60),
+      sleep_duration_seconds: totalSecs,
+    };
+    const { data: existing } = await supabase
+      .from("daily_metrics")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("date", date)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from("daily_metrics").update(patch).eq("id", existing.id);
+    } else {
+      await supabase.from("daily_metrics").insert(patch);
+    }
+  }
+
+  return {
+    metricsCount: updated,
+    sleepCount,
+    sleepSupported: true as const,
+  };
 }
