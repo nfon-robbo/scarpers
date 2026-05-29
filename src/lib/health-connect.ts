@@ -10,7 +10,28 @@ const READ_TYPES = [
   "ActiveCaloriesBurned",
   "RestingHeartRate",
   "HeartRateSeries",
+  "SleepSession",
 ] as const;
+
+// Health Connect SleepSession stage types → our normalized stage names.
+// Matches the `sleep_stages` table shape used by google-fit-sleep.
+const HC_STAGE_MAP: Record<string, string> = {
+  awake: "awake",
+  awake_in_bed: "awake",
+  sleeping: "sleep",       // generic sleep, no breakdown
+  out_of_bed: "out_of_bed",
+  light: "light",
+  deep: "deep",
+  rem: "rem",
+  // Numeric fallbacks some plugin versions return
+  "1": "awake",
+  "2": "sleep",
+  "3": "out_of_bed",
+  "4": "light",
+  "5": "deep",
+  "6": "rem",
+  "7": "awake",
+};
 
 export async function ensureHealthConnectAvailable() {
   const status = await HealthConnect.checkAvailability();
