@@ -714,23 +714,25 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     const today = new Date();
 
     if (trendMode === "today") {
-      // Hourly view for the current calendar day — every snapshot, in order.
-      // Match snapshots by LOCAL calendar date so timezone offsets don't hide today's data.
-      const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-      const todays = trendSnapshots
-        .filter((s) => {
-          const d = new Date(s.recorded_at);
-          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return local === localToday;
-        })
+      // Rolling 7-day hourly view. Continuous x = dayOffset*24 + hourFloat,
+      // where dayOffset 0 = 6 days ago, 6 = today. Allows horizontal scrolling
+      // through the user's recent history.
+      const baseLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const startMs = baseLocal.getTime() - 6 * 86400000;
+      const snaps = trendSnapshots
+        .filter((s) => new Date(s.recorded_at).getTime() >= startMs)
         .slice()
         .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      const trendArr = todays.map((s) => {
+      const trendArr = snaps.map((s) => {
         const d = new Date(s.recorded_at);
+        const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const dayOffset = Math.round((localMidnight - startMs) / 86400000);
         const hourFloat = d.getHours() + d.getMinutes() / 60;
+        const dateLabel = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const timeLabel = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         return {
-          day: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-          hour: hourFloat,
+          day: `${dateLabel} ${timeLabel}`,
+          hour: dayOffset * 24 + hourFloat,
           score: s.score,
           sleepSynced: s.sleepSynced,
           isBackfilled: s.isBackfilled,
@@ -1357,7 +1359,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
               )}
               {trendMode === "today" && (
                 <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
-                  Hourly snapshots taken throughout today.
+                  Snapshots across the last 7 days · scroll horizontally to see history.
                 </p>
               )}
               {trendMode === "today" ? (() => {
@@ -1398,23 +1400,27 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                     </div>
                   );
                 }
-                // Wake-up time: prefer sleep_stages end_time, fall back to first sleep-synced
-                // snapshot of the day, then 06:00.
+                // 7-day continuous timeline. x is in hours since (today - 6 days) local midnight.
+                // Today occupies hours 144-168. Ticks placed at each day boundary (DD/MM labels).
                 const now = new Date();
-                const nowHour = now.getHours() + now.getMinutes() / 60;
-                const fallbackSynced = todayPts.find((p: any) => p.sleepSynced)?.hour;
-                const effectiveWake = wakeHour ?? fallbackSynced ?? 6;
-                const wakeLabel = `${String(Math.floor(effectiveWake)).padStart(2, "0")}:${String(Math.round((effectiveWake - Math.floor(effectiveWake)) * 60)).padStart(2, "0")}`;
-                const xMin = Math.max(0, Math.min(effectiveWake, first.hour));
-                const xMax = Math.min(23.99, Math.max(last.hour, nowHour));
-                // Evenly-spaced ticks anchored at xMin so the axis visibly extends back to wake-up time
-                const xTicks: number[] = (() => {
-                  const span = xMax - xMin;
-                  if (span <= 0) return [xMin];
-                  const target = 5;
-                  const step = span / (target - 1);
-                  return Array.from({ length: target }, (_, i) => xMin + step * i);
-                })();
+                const nowHourOffset = 6 * 24 + now.getHours() + now.getMinutes() / 60;
+                const xMin = 0;
+                const xMax = 7 * 24; // 168
+                const baseLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const startMs = baseLocal.getTime() - 6 * 86400000;
+                // Tick at midnight of each of the 7 days
+                const xTicks: number[] = Array.from({ length: 7 }, (_, i) => i * 24);
+                const tickLabel = (v: number) => {
+                  const dayIdx = Math.round(v / 24);
+                  const d = new Date(startMs + dayIdx * 86400000);
+                  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+                };
+                // Today's wake-up marker (only if we have one)
+                const effectiveWake = wakeHour ?? todayPts.find((p: any) => p.sleepSynced && p.hour >= 144)?.hour;
+                const wakeMarkerX = wakeHour != null ? 6 * 24 + wakeHour : (typeof effectiveWake === "number" ? effectiveWake : null);
+                const wakeLabel = wakeHour != null
+                  ? `${String(Math.floor(wakeHour)).padStart(2, "0")}:${String(Math.round((wakeHour - Math.floor(wakeHour)) * 60)).padStart(2, "0")}`
+                  : "";
                 const scores = todayPts.map((p: any) => p.score);
                 const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
                 const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
@@ -1430,86 +1436,106 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
                       </div>
                     </div>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <AreaChart data={todayPts} margin={{ top: 8, right: 40, bottom: 0, left: 4 }}>
-                        <defs>
-                          <linearGradient id="readinessTodayGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={z.color} stopOpacity={0.4} />
-                            <stop offset="100%" stopColor={z.color} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.25} vertical={false} />
-                        <XAxis
-                          dataKey="hour"
-                          type="number"
-                          domain={[xMin, xMax]}
-                          ticks={xTicks}
-                          interval={0}
-                          allowDataOverflow
-                          tick={{ fontSize: 10 }}
-                          className="fill-muted-foreground"
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(v: any) => {
-                            const h = Math.floor(Number(v));
-                            const m = Math.round((Number(v) - h) * 60);
-                            return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-                          }}
-                        />
-                        <YAxis domain={[yMin, yMax]} type="number" hide />
-                        <Tooltip
-                          contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
-                          itemStyle={{ color: "hsl(var(--foreground))" }}
-                          labelFormatter={(_l: any, payload: any) => {
-                            const d = payload?.[0]?.payload?.day;
-                            return d ? `Time: ${d}` : "";
-                          }}
-                          formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
-                        />
-                        <ReferenceLine
-                          y={last.score}
-                          stroke={z.color}
-                          strokeDasharray="3 3"
-                          strokeOpacity={0.7}
-                        />
-                        <ReferenceLine
-                          x={effectiveWake}
-                          stroke="hsl(var(--muted-foreground))"
-                          strokeDasharray="2 3"
-                          strokeOpacity={0.6}
-                          label={{ value: `↑ ${wakeLabel}`, position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 600 }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="score"
-                          stroke={z.color}
-                          fill="url(#readinessTodayGrad)"
-                          strokeWidth={2.5}
-                          dot={(props: any) => {
-                            const { cx, cy, payload, index } = props;
-                            const bf = !!payload?.isBackfilled;
-                            return (
-                              <circle
-                                key={index}
-                                cx={cx}
-                                cy={cy}
-                                r={bf ? 4 : 5}
-                                fill={z.color}
-                                fillOpacity={bf ? 0.35 : 1}
-                                stroke="hsl(var(--background))"
-                                strokeWidth={2}
-                                strokeOpacity={bf ? 0.5 : 1}
+                    <div
+                      className="overflow-x-auto overflow-y-hidden -mx-1 px-1"
+                      ref={(el) => {
+                        // Default scroll position to the far right (today) on first render
+                        if (el && el.dataset.scrolled !== "1") {
+                          el.scrollLeft = el.scrollWidth;
+                          el.dataset.scrolled = "1";
+                        }
+                      }}
+                    >
+                      <div style={{ width: 1400, height: 220 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={todayPts} margin={{ top: 8, right: 24, bottom: 0, left: 4 }}>
+                            <defs>
+                              <linearGradient id="readinessTodayGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={z.color} stopOpacity={0.4} />
+                                <stop offset="100%" stopColor={z.color} stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.25} vertical={false} />
+                            <XAxis
+                              dataKey="hour"
+                              type="number"
+                              domain={[xMin, xMax]}
+                              ticks={xTicks}
+                              interval={0}
+                              allowDataOverflow
+                              tick={{ fontSize: 10 }}
+                              className="fill-muted-foreground"
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={(v: any) => tickLabel(Number(v))}
+                            />
+                            <YAxis domain={[yMin, yMax]} type="number" hide />
+                            <Tooltip
+                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                              itemStyle={{ color: "hsl(var(--foreground))" }}
+                              labelFormatter={(_l: any, payload: any) => {
+                                const d = payload?.[0]?.payload?.day;
+                                return d ? d : "";
+                              }}
+                              formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
+                            />
+                            <ReferenceLine
+                              y={last.score}
+                              stroke={z.color}
+                              strokeDasharray="3 3"
+                              strokeOpacity={0.7}
+                            />
+                            {/* Day-boundary separators */}
+                            {xTicks.slice(1).map((tx) => (
+                              <ReferenceLine
+                                key={`sep-${tx}`}
+                                x={tx}
+                                stroke="hsl(var(--border))"
+                                strokeOpacity={0.4}
                               />
-                            );
-                          }}
-                          activeDot={{ r: 7 }}
-                          isAnimationActive={false}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                            ))}
+                            {wakeMarkerX != null && (
+                              <ReferenceLine
+                                x={wakeMarkerX}
+                                stroke="hsl(var(--muted-foreground))"
+                                strokeDasharray="2 3"
+                                strokeOpacity={0.6}
+                                label={{ value: wakeLabel ? `↑ ${wakeLabel}` : "↑", position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 600 }}
+                              />
+                            )}
+                            <Area
+                              type="monotone"
+                              dataKey="score"
+                              stroke={z.color}
+                              fill="url(#readinessTodayGrad)"
+                              strokeWidth={2.5}
+                              dot={(props: any) => {
+                                const { cx, cy, payload, index } = props;
+                                const bf = !!payload?.isBackfilled;
+                                return (
+                                  <circle
+                                    key={index}
+                                    cx={cx}
+                                    cy={cy}
+                                    r={bf ? 4 : 5}
+                                    fill={z.color}
+                                    fillOpacity={bf ? 0.35 : 1}
+                                    stroke="hsl(var(--background))"
+                                    strokeWidth={2}
+                                    strokeOpacity={bf ? 0.5 : 1}
+                                  />
+                                );
+                              }}
+                              activeDot={{ r: 7 }}
+                              isAnimationActive={false}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
                     <p className="mt-2 text-[10px] text-muted-foreground/80">
-                      {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} today · last at {last.day}
+                      {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} · last at {last.day}
                     </p>
                     {todayPts.some((p: any) => p.isBackfilled) && (
                       <p className="mt-1 text-[9px] italic text-muted-foreground/70">
