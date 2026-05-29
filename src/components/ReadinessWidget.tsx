@@ -714,23 +714,25 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
     const today = new Date();
 
     if (trendMode === "today") {
-      // Hourly view for the current calendar day — every snapshot, in order.
-      // Match snapshots by LOCAL calendar date so timezone offsets don't hide today's data.
-      const localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-      const todays = trendSnapshots
-        .filter((s) => {
-          const d = new Date(s.recorded_at);
-          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return local === localToday;
-        })
+      // Rolling 7-day hourly view. Continuous x = dayOffset*24 + hourFloat,
+      // where dayOffset 0 = 6 days ago, 6 = today. Allows horizontal scrolling
+      // through the user's recent history.
+      const baseLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const startMs = baseLocal.getTime() - 6 * 86400000;
+      const snaps = trendSnapshots
+        .filter((s) => new Date(s.recorded_at).getTime() >= startMs)
         .slice()
         .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-      const trendArr = todays.map((s) => {
+      const trendArr = snaps.map((s) => {
         const d = new Date(s.recorded_at);
+        const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const dayOffset = Math.round((localMidnight - startMs) / 86400000);
         const hourFloat = d.getHours() + d.getMinutes() / 60;
+        const dateLabel = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const timeLabel = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         return {
-          day: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-          hour: hourFloat,
+          day: `${dateLabel} ${timeLabel}`,
+          hour: dayOffset * 24 + hourFloat,
           score: s.score,
           sleepSynced: s.sleepSynced,
           isBackfilled: s.isBackfilled,
