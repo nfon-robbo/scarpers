@@ -1448,7 +1448,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <PopoverTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-muted-foreground/40 text-[8px] font-bold text-muted-foreground/60 hover:text-foreground hover:border-foreground/60 transition"
+                            className="relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-muted-foreground/40 text-[8px] font-bold text-muted-foreground/60 hover:text-foreground hover:border-foreground/60 transition before:absolute before:inset-[-14px] before:content-['']"
                             aria-label="About this chart"
                           >
                             ?
@@ -1476,7 +1476,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={series} margin={{ top: 10, right: 56, bottom: 4, left: 4 }}>
+                    <AreaChart data={series} margin={{ top: 10, right: 8, bottom: 4, left: 4 }}>
                       <defs>
                         <linearGradient id="readinessLineFill" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#ffffff" stopOpacity={0.15} />
@@ -1495,9 +1495,10 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                           ifOverflow="hidden"
                           label={{
                             value: b.label,
-                            position: "insideRight",
-                            fill: "hsl(var(--muted-foreground) / 0.5)",
+                            position: "insideTopRight",
+                            fill: "hsl(var(--muted-foreground) / 0.45)",
                             fontSize: 8,
+                            offset: 2,
                           }}
                         />
                       ))}
@@ -1540,7 +1541,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         strokeWidth={2.5}
                         fill="url(#readinessLineFill)"
                         dot={false}
-                        activeDot={{ r: 5, fill: "#ffffff", stroke: "#0b0f1a", strokeWidth: 2 }}
+                        activeDot={{ r: 7, fill: "#ffffff", stroke: "#0b0f1a", strokeWidth: 2 }}
                         isAnimationActive={false}
                         connectNulls
                       />
