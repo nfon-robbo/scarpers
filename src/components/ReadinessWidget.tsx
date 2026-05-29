@@ -313,7 +313,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sparklines, setSparklines] = useState<Record<string, SparkPoint[]>>({});
-  const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("end");
+  const [trendMode, setTrendMode] = useState<"end" | "morning" | "today">("today");
   const [trendSnapshots, setTrendSnapshots] = useState<TrendSnapshot[]>([]);
   const [wakeHour, setWakeHour] = useState<number | null>(null);
   const [trend, setTrend] = useState<{ day: string; score: number | null; hour?: number }[]>([]);
