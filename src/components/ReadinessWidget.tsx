@@ -1448,7 +1448,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         <PopoverTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-muted-foreground/40 text-[8px] font-bold text-muted-foreground/60 hover:text-foreground hover:border-foreground/60 transition"
+                            className="relative inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-muted-foreground/40 text-[8px] font-bold text-muted-foreground/60 hover:text-foreground hover:border-foreground/60 transition before:absolute before:inset-[-14px] before:content-['']"
                             aria-label="About this chart"
                           >
                             ?
