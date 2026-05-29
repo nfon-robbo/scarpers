@@ -29,13 +29,14 @@ const ReadinessHistoryChart = () => {
 
   useEffect(() => {
     if (!user) return;
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
     supabase
       .from("readiness_snapshots")
       .select("score, hour, recorded_at")
       .eq("user_id", user.id)
-      .gte("recorded_at", sevenDaysAgo)
+      .gte("recorded_at", startOfToday.toISOString())
       .order("recorded_at", { ascending: true })
       .then(({ data }) => {
         setSnapshots((data as Snapshot[]) || []);
@@ -66,9 +67,7 @@ const ReadinessHistoryChart = () => {
 
     // Chronological timeline
     const timeline = snapshots.map((s) => ({
-      time: new Date(s.recorded_at).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
+      time: new Date(s.recorded_at).toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
       }),
@@ -93,15 +92,15 @@ const ReadinessHistoryChart = () => {
   return (
     <div className="space-y-4">
       {/* Chronological timeline */}
-      {timeline.length >= 3 && (
+      {timeline.length >= 2 && (
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Gauge className="w-4 h-4 text-chart-2" />
-              Readiness Timeline
+              Readiness Today
             </CardTitle>
             <CardDescription className="text-xs">
-              Score snapshots over the last 7 days
+              Score snapshots throughout today
             </CardDescription>
           </CardHeader>
           <CardContent className="pr-2">
