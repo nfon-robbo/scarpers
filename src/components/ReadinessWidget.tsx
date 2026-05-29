@@ -1495,9 +1495,10 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                           ifOverflow="hidden"
                           label={{
                             value: b.label,
-                            position: "insideRight",
-                            fill: "hsl(var(--muted-foreground) / 0.5)",
+                            position: "insideTopRight",
+                            fill: "hsl(var(--muted-foreground) / 0.45)",
                             fontSize: 8,
+                            offset: 2,
                           }}
                         />
                       ))}
