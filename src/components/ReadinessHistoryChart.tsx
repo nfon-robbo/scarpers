@@ -67,9 +67,7 @@ const ReadinessHistoryChart = () => {
 
     // Chronological timeline
     const timeline = snapshots.map((s) => ({
-      time: new Date(s.recorded_at).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
+      time: new Date(s.recorded_at).toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
       }),
