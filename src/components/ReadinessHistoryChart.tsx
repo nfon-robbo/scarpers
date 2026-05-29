@@ -29,13 +29,14 @@ const ReadinessHistoryChart = () => {
 
   useEffect(() => {
     if (!user) return;
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
     supabase
       .from("readiness_snapshots")
       .select("score, hour, recorded_at")
       .eq("user_id", user.id)
-      .gte("recorded_at", sevenDaysAgo)
+      .gte("recorded_at", startOfToday.toISOString())
       .order("recorded_at", { ascending: true })
       .then(({ data }) => {
         setSnapshots((data as Snapshot[]) || []);
