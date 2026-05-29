@@ -92,15 +92,15 @@ const ReadinessHistoryChart = () => {
   return (
     <div className="space-y-4">
       {/* Chronological timeline */}
-      {timeline.length >= 3 && (
+      {timeline.length >= 2 && (
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Gauge className="w-4 h-4 text-chart-2" />
-              Readiness Timeline
+              Readiness Today
             </CardTitle>
             <CardDescription className="text-xs">
-              Score snapshots over the last 7 days
+              Score snapshots throughout today
             </CardDescription>
           </CardHeader>
           <CardContent className="pr-2">
