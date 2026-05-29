@@ -1541,7 +1541,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
                         strokeWidth={2.5}
                         fill="url(#readinessLineFill)"
                         dot={false}
-                        activeDot={{ r: 5, fill: "#ffffff", stroke: "#0b0f1a", strokeWidth: 2 }}
+                        activeDot={{ r: 7, fill: "#ffffff", stroke: "#0b0f1a", strokeWidth: 2 }}
                         isAnimationActive={false}
                         connectNulls
                       />
