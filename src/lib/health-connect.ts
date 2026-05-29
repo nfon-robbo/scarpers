@@ -64,11 +64,12 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     }
   };
 
-  const [stepsRecs, activeCalRecs, restingHrRecs, hrSeriesRecs] = await Promise.all([
+  const [stepsRecs, activeCalRecs, restingHrRecs, hrSeriesRecs, sleepRecs] = await Promise.all([
     safeRead("Steps"),
     safeRead("ActiveCaloriesBurned"),
     safeRead("RestingHeartRate"),
     safeRead("HeartRateSeries"),
+    safeRead("SleepSession"),
   ]);
 
   const dayBucket = (iso: string | Date) =>
