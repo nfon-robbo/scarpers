@@ -1323,264 +1323,231 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
           </div>
 
           {(hasTrend || trendMode === "today") && (() => {
-            // Use only valid (non-null) trend points for direction analysis
-            const validPts = visibleTrend.filter((t) => t.score != null) as { day: string; score: number }[];
-            const last3 = validPts.slice(-3).map((t) => t.score);
-            let trendLabel: "Recovering" | "Stable" | "Declining" | "At Risk" = "Stable";
-            let trendColor = "text-slate-300";
-            if (last3.length >= 3) {
-              const [a, b, c] = last3;
-              const delta = c - a;
-              const strictlyDown = a > b && b > c;
-              if (strictlyDown && c < 40) { trendLabel = "At Risk"; trendColor = "text-red-400"; }
-              else if (strictlyDown) { trendLabel = "Declining"; trendColor = "text-amber-400"; }
-              else if (delta >= 5 && c >= b) { trendLabel = "Recovering"; trendColor = "text-emerald-400"; }
-              else { trendLabel = "Stable"; trendColor = "text-slate-300"; }
+            // ── Zone bands (dark fills behind the line) ──
+            const BANDS = [
+              { y1: 85, y2: 100, fill: "#1a3a2a", label: "Excellent" },
+              { y1: 70, y2: 85,  fill: "#1a2e1a", label: "Good" },
+              { y1: 50, y2: 70,  fill: "#2a2a1a", label: "Fair" },
+              { y1: 30, y2: 50,  fill: "#2a1a1a", label: "Poor" },
+              { y1: 0,  y2: 30,  fill: "#1a0a0a", label: "Very Poor" },
+            ];
+            const zoneFor = (s: number) => {
+              if (s >= 85) return { label: "Excellent", text: "text-emerald-300" };
+              if (s >= 70) return { label: "Good",      text: "text-emerald-400" };
+              if (s >= 50) return { label: "Fair",      text: "text-amber-400" };
+              if (s >= 30) return { label: "Poor",      text: "text-red-400" };
+              return { label: "Very Poor", text: "text-red-500" };
+            };
+
+            // Build the series for the active mode (heavy data reduction)
+            let series: { x: number | string; score: number; label: string; context?: string }[] = [];
+            let xTicks: number[] = [];
+            let xDomain: [number, number] | undefined;
+            let xDataKey: string = "x";
+            let xType: "number" | "category" = "category";
+            let tickFormatter: ((v: any) => string) | undefined;
+            let wakeMarkerX: number | null = null;
+            let wakeLabel = "";
+
+            if (trendMode === "today") {
+              // One point per hour, keep latest snapshot in each hour bucket.
+              const raw = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
+              const byHour = new Map<number, any>();
+              for (const p of raw) {
+                const key = Math.floor((p as any).hour);
+                byHour.set(key, p); // last wins (raw is chronological)
+              }
+              series = Array.from(byHour.entries())
+                .sort((a, b) => a[0] - b[0])
+                .map(([key, p]: any) => ({
+                  x: key,
+                  score: p.score,
+                  label: p.day,
+                }));
+              xType = "number";
+              xDataKey = "x";
+              xDomain = [0, 7 * 24];
+              xTicks = Array.from({ length: 7 }, (_, i) => i * 24);
+              const now = new Date();
+              const baseLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const startMs = baseLocal.getTime() - 6 * 86400000;
+              tickFormatter = (v: any) => {
+                const dayIdx = Math.round(Number(v) / 24);
+                const d = new Date(startMs + dayIdx * 86400000);
+                return d.toLocaleDateString(undefined, { weekday: "short" });
+              };
+              if (wakeHour != null) {
+                wakeMarkerX = 6 * 24 + wakeHour;
+                wakeLabel = `Woke ${String(Math.floor(wakeHour)).padStart(2, "0")}:${String(Math.round((wakeHour - Math.floor(wakeHour)) * 60)).padStart(2, "0")}`;
+              }
+            } else {
+              // EOD / MORNING: 7 day labels, one point per day (already shaped that way).
+              series = visibleTrend.map((t: any) => ({
+                x: t.day,
+                score: t.score,
+                label: t.day,
+              })).filter((t) => t.score != null) as any;
             }
 
-            // Count consecutive declining days from the end
-            let declineStreak = 0;
-            for (let i = validPts.length - 1; i > 0; i--) {
-              if (validPts[i].score < validPts[i - 1].score) declineStreak++;
-              else break;
+            // Trend direction (Improving / Stable / Declining)
+            const scored = series.map((s) => s.score).filter((v) => typeof v === "number");
+            let trendLabel: "Improving" | "Stable" | "Declining" = "Stable";
+            let trendHex = "#90caf9";
+            if (scored.length >= 2) {
+              const delta = scored[scored.length - 1] - scored[0];
+              if (delta >= 5) { trendLabel = "Improving"; trendHex = "#00e676"; }
+              else if (delta <= -5) { trendLabel = "Declining"; trendHex = "#ff5252"; }
             }
-            const showDeclineTip = declineStreak >= 3;
+
+            const lastScore = scored.length ? scored[scored.length - 1] : null;
+            const lastZone = lastScore != null ? zoneFor(lastScore) : null;
+
+            // Last updated timestamp
+            const lastUpdatedLabel = (() => {
+              if (!trendSnapshots.length) return null;
+              const sorted = [...trendSnapshots].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+              const d = new Date(sorted[sorted.length - 1].recorded_at);
+              return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            })();
+
+            // Custom tooltip
+            const CustomTip = ({ active, payload }: any) => {
+              if (!active || !payload?.length) return null;
+              const p = payload[0].payload;
+              const z = zoneFor(p.score);
+              return (
+                <div style={{ background: "#0b0f1a", border: "1px solid hsl(var(--border))", borderRadius: 8, padding: "8px 10px", fontSize: 11, color: "#fff", boxShadow: "0 8px 24px hsla(0,0%,0%,0.4)" }}>
+                  <div style={{ opacity: 0.6, fontSize: 10, marginBottom: 2 }}>{p.label}</div>
+                  <div style={{ fontWeight: 600 }}>
+                    {Math.round(p.score)} — <span className={z.text}>{z.label}</span>
+                  </div>
+                  {p.context && <div style={{ opacity: 0.6, fontSize: 10, marginTop: 2 }}>{p.context}</div>}
+                </div>
+              );
+            };
+
+            const hasData = series.length > 0;
 
             return (
-            <div className="rounded-xl bg-[#111a2e] border border-border/30 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Readiness Trend</h4>
-                <span className={cn("text-[10px] font-bold uppercase tracking-[0.1em]", trendColor)}>{trendLabel}</span>
-              </div>
-              {trendMode === "morning" && (
-                <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
-                  Morning score is taken after sleep data has synced to ensure accuracy.
-                </p>
-              )}
-              {trendMode === "today" && (
-                <p className="text-[9px] text-muted-foreground/70 italic mb-2 -mt-1">
-                  Snapshots across the last 7 days · scroll horizontally to see history.
-                </p>
-              )}
-              {trendMode === "today" ? (() => {
-                const allTodayPts = visibleTrend.filter((t: any) => t.score != null && typeof t.hour === "number");
-                // Dedupe: if two snapshots are within 5 min (~0.0833h), keep the more recent one.
-                const todayPts = allTodayPts.filter((p: any, i: number) => {
-                  const next = allTodayPts[i + 1];
-                  return !next || (next.hour - p.hour) > (5 / 60);
-                });
-                const zoneFor = (s: number) => {
-                  if (s < 30) return { color: "hsl(0, 75%, 55%)", label: "Low", text: "text-red-400" };
-                  if (s < 55) return { color: "hsl(38, 95%, 55%)", label: "Fair", text: "text-amber-400" };
-                  if (s < 80) return { color: "hsl(142, 70%, 50%)", label: "Good", text: "text-emerald-400" };
-                  return { color: "hsl(210, 95%, 62%)", label: "Peak", text: "text-sky-400" };
-                };
-                if (todayPts.length === 0) {
-                  return (
-                    <div className="h-[220px] flex items-center justify-center text-center px-4">
-                      <p className="text-[11px] font-semibold lowercase text-muted-foreground/80 leading-snug">
-                        still waiting for data
-                      </p>
-                    </div>
-                  );
-                }
-                const first = todayPts[0];
-                const last = todayPts[todayPts.length - 1];
-                const z = zoneFor(last.score);
-                const delta = last.score - first.score;
-                const ArrowIcon = delta > 0 ? "▲" : delta < 0 ? "▼" : "■";
-                const arrowClass = delta > 0 ? "text-emerald-400" : delta < 0 ? "text-red-400" : "text-muted-foreground";
-                if (todayPts.length < 3) {
-                  return (
-                    <div className="rounded-xl border border-border/40 bg-card/30 px-4 py-5 text-center">
-                      <div className={cn("text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
-                      <p className="mt-3 text-[11px] text-muted-foreground leading-snug">
-                        Readiness recorded at {last.day} — check back later as more data builds throughout the day.
-                      </p>
-                    </div>
-                  );
-                }
-                // 7-day continuous timeline. x is in hours since (today - 6 days) local midnight.
-                // Today occupies hours 144-168. Ticks placed at each day boundary (DD/MM labels).
-                const now = new Date();
-                const nowHourOffset = 6 * 24 + now.getHours() + now.getMinutes() / 60;
-                const xMin = 0;
-                const xMax = 7 * 24; // 168
-                const baseLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const startMs = baseLocal.getTime() - 6 * 86400000;
-                // Tick at midnight of each of the 7 days
-                const xTicks: number[] = Array.from({ length: 7 }, (_, i) => i * 24);
-                const tickLabel = (v: number) => {
-                  const dayIdx = Math.round(v / 24);
-                  const d = new Date(startMs + dayIdx * 86400000);
-                  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-                };
-                // Today's wake-up marker (only if we have one)
-                const effectiveWake = wakeHour ?? todayPts.find((p: any) => p.sleepSynced && p.hour >= 144)?.hour;
-                const wakeMarkerX = wakeHour != null ? 6 * 24 + wakeHour : (typeof effectiveWake === "number" ? effectiveWake : null);
-                const wakeLabel = wakeHour != null
-                  ? `${String(Math.floor(wakeHour)).padStart(2, "0")}:${String(Math.round((wakeHour - Math.floor(wakeHour)) * 60)).padStart(2, "0")}`
-                  : "";
-                const scores = todayPts.map((p: any) => p.score);
-                const yMin = Math.max(0, Math.floor(Math.min(...scores) - 10));
-                const yMax = Math.min(100, Math.ceil(Math.max(...scores) + 10));
-                return (
-                  <>
-                    <div className="flex items-end justify-between mb-2 px-1">
-                      <div>
-                        <div className="flex items-baseline gap-2">
-                          <span className={cn("text-sm font-semibold", arrowClass)}>
-                            {ArrowIcon}
-                          </span>
-                        </div>
-                        <div className={cn("mt-1 text-[10px] font-semibold uppercase tracking-wider", z.text)}>{z.label}</div>
-                      </div>
-                    </div>
-                    <div
-                      className="overflow-x-auto overflow-y-hidden -mx-1 px-1"
-                      ref={(el) => {
-                        // Default scroll position to the far right (today) on first render
-                        if (el && el.dataset.scrolled !== "1") {
-                          el.scrollLeft = el.scrollWidth;
-                          el.dataset.scrolled = "1";
-                        }
-                      }}
-                    >
-                      <div style={{ width: 1400, height: 220 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={todayPts} margin={{ top: 8, right: 24, bottom: 0, left: 4 }}>
-                            <defs>
-                              <linearGradient id="readinessTodayGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={z.color} stopOpacity={0.4} />
-                                <stop offset="100%" stopColor={z.color} stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid stroke="hsl(var(--border))" strokeOpacity={0.25} vertical={false} />
-                            <XAxis
-                              dataKey="hour"
-                              type="number"
-                              domain={[xMin, xMax]}
-                              ticks={xTicks}
-                              interval={0}
-                              allowDataOverflow
-                              tick={{ fontSize: 10 }}
-                              className="fill-muted-foreground"
-                              axisLine={false}
-                              tickLine={false}
-                              tickFormatter={(v: any) => tickLabel(Number(v))}
-                            />
-                            <YAxis domain={[yMin, yMax]} type="number" hide />
-                            <Tooltip
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, color: "hsl(var(--foreground))" }}
-                              labelStyle={{ color: "hsl(var(--foreground))" }}
-                              itemStyle={{ color: "hsl(var(--foreground))" }}
-                              labelFormatter={(_l: any, payload: any) => {
-                                const d = payload?.[0]?.payload?.day;
-                                return d ? d : "";
-                              }}
-                              formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
-                            />
-                            <ReferenceLine
-                              y={last.score}
-                              stroke={z.color}
-                              strokeDasharray="3 3"
-                              strokeOpacity={0.7}
-                            />
-                            {/* Day-boundary separators */}
-                            {xTicks.slice(1).map((tx) => (
-                              <ReferenceLine
-                                key={`sep-${tx}`}
-                                x={tx}
-                                stroke="hsl(var(--border))"
-                                strokeOpacity={0.4}
-                              />
-                            ))}
-                            {wakeMarkerX != null && (
-                              <ReferenceLine
-                                x={wakeMarkerX}
-                                stroke="hsl(var(--muted-foreground))"
-                                strokeDasharray="2 3"
-                                strokeOpacity={0.6}
-                                label={{ value: wakeLabel ? `↑ ${wakeLabel}` : "↑", position: "insideTopLeft", fill: "hsl(var(--muted-foreground))", fontSize: 10, fontWeight: 600 }}
-                              />
-                            )}
-                            <Area
-                              type="monotone"
-                              dataKey="score"
-                              stroke={z.color}
-                              fill="url(#readinessTodayGrad)"
-                              strokeWidth={2.5}
-                              dot={(props: any) => {
-                                const { cx, cy, payload, index } = props;
-                                const bf = !!payload?.isBackfilled;
-                                return (
-                                  <circle
-                                    key={index}
-                                    cx={cx}
-                                    cy={cy}
-                                    r={bf ? 4 : 5}
-                                    fill={z.color}
-                                    fillOpacity={bf ? 0.35 : 1}
-                                    stroke="hsl(var(--background))"
-                                    strokeWidth={2}
-                                    strokeOpacity={bf ? 0.5 : 1}
-                                  />
-                                );
-                              }}
-                              activeDot={{ r: 7 }}
-                              isAnimationActive={false}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-[10px] text-muted-foreground/80">
-                      {todayPts.length} snapshot{todayPts.length === 1 ? "" : "s"} · last at {last.day}
-                    </p>
-                    {todayPts.some((p: any) => p.isBackfilled) && (
-                      <p className="mt-1 text-[9px] italic text-muted-foreground/70">
-                        Early morning scores estimated from sleep data.
-                      </p>
+              <div className="rounded-xl bg-[#0b0f1a] border border-border/30 p-3 relative">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-foreground">Readiness Trend</h4>
+                  {hasData && (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: trendHex }}>
+                      {trendLabel}
+                    </span>
+                  )}
+                </div>
+
+                {/* Subtitle line — single line, muted */}
+                <div className="flex items-center justify-between mb-2 min-h-[14px]">
+                  <div className="flex items-center gap-1.5">
+                    {trendMode === "today" && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-muted-foreground/40 text-[8px] font-bold text-muted-foreground/60 hover:text-foreground hover:border-foreground/60 transition"
+                            aria-label="About this chart"
+                          >
+                            ?
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent side="top" className="max-w-[240px] text-[11px] p-3">
+                          Early morning scores are estimated from sleep data before today’s snapshots arrive.
+                        </PopoverContent>
+                      </Popover>
                     )}
-                  </>
-                );
-              })() : (
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={visibleTrend} margin={{ top: 6, right: 8, bottom: 0, left: 4 }}>
-                  <defs>
-                    <linearGradient id="readinessTrendGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="hsl(180, 80%, 55%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <ReferenceArea y1={0} y2={30} fill="hsl(0, 70%, 50%)" fillOpacity={0.28} ifOverflow="hidden" />
-                  <ReferenceArea y1={30} y2={55} fill="hsl(38, 90%, 55%)" fillOpacity={0.25} ifOverflow="hidden" />
-                  <ReferenceArea y1={55} y2={80} fill="hsl(142, 70%, 45%)" fillOpacity={0.25} ifOverflow="hidden" />
-                  <ReferenceArea y1={80} y2={100} fill="hsl(210, 90%, 60%)" fillOpacity={0.28} ifOverflow="hidden" />
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fontSize: 10 }}
-                    className="fill-muted-foreground"
-                    axisLine={false}
-                    tickLine={false}
-                    interval={0}
-                  />
-                  <YAxis domain={[0, 100]} type="number" allowDataOverflow={false} hide />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value: any) => [Math.round(Number(value)), "Readiness"]}
-                  />
-                  <Area type="monotone" dataKey="score" stroke="hsl(180, 90%, 60%)" fill="url(#readinessTrendGrad)" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(180, 90%, 60%)" }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-              )}
-              {showDeclineTip && (
-                <p className="mt-2 text-[10px] leading-snug text-amber-300/90">
-                  Your readiness has been declining for {declineStreak} days. Check your sleep and consider an easy session today.
-                </p>
-              )}
-            </div>
+                    {lastUpdatedLabel && (
+                      <span className="text-[11px] text-foreground/50">Last updated {lastUpdatedLabel}</span>
+                    )}
+                  </div>
+                  {lastZone && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: trendHex === "#90caf9" ? undefined : trendHex }}>
+                      <span className={lastZone.text}>{lastZone.label}</span>
+                    </span>
+                  )}
+                </div>
+
+                {!hasData ? (
+                  <div className="h-[200px] flex items-center justify-center">
+                    <p className="text-[11px] text-muted-foreground/70">still waiting for data</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={series} margin={{ top: 10, right: 56, bottom: 4, left: 4 }}>
+                      <defs>
+                        <linearGradient id="readinessLineFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.15} />
+                          <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Zone bands */}
+                      {BANDS.map((b) => (
+                        <ReferenceArea
+                          key={b.label}
+                          y1={b.y1}
+                          y2={b.y2}
+                          fill={b.fill}
+                          fillOpacity={1}
+                          ifOverflow="hidden"
+                          label={{
+                            value: b.label,
+                            position: "insideRight",
+                            fill: "hsl(var(--muted-foreground) / 0.5)",
+                            fontSize: 8,
+                          }}
+                        />
+                      ))}
+
+                      <XAxis
+                        dataKey={xDataKey}
+                        type={xType as any}
+                        domain={xDomain as any}
+                        ticks={xType === "number" ? xTicks : undefined}
+                        interval={0}
+                        tickFormatter={tickFormatter}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDataOverflow
+                      />
+                      <YAxis domain={[0, 100]} type="number" hide />
+                      <Tooltip content={<CustomTip />} cursor={{ stroke: "#ffffff", strokeOpacity: 0.2, strokeDasharray: "3 3" }} />
+
+                      {wakeMarkerX != null && (
+                        <ReferenceLine
+                          x={wakeMarkerX}
+                          stroke="#ffffff"
+                          strokeOpacity={0.3}
+                          strokeDasharray="3 3"
+                          label={{
+                            value: wakeLabel,
+                            position: "insideTopRight",
+                            fill: "#ffffff",
+                            fontSize: 10,
+                            fontWeight: 400,
+                          }}
+                        />
+                      )}
+
+                      <Area
+                        type="monotone"
+                        dataKey="score"
+                        stroke="#ffffff"
+                        strokeWidth={2.5}
+                        fill="url(#readinessLineFill)"
+                        dot={false}
+                        activeDot={{ r: 5, fill: "#ffffff", stroke: "#0b0f1a", strokeWidth: 2 }}
+                        isAnimationActive={false}
+                        connectNulls
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
             );
           })()}
 
