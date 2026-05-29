@@ -1200,7 +1200,7 @@ const AdminSEO = () => {
                       </div>
                     )}
 
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 mt-2 flex-wrap">
                       {actionedIndices.has(i) ? (
                         <Button size="sm" className="h-7 text-xs" variant="outline" disabled>✓ Done</Button>
                       ) : (
@@ -1214,6 +1214,14 @@ const AdminSEO = () => {
                           {applyingIdx === i ? "Working…" : "Action this"}
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => setPromptSuggestion(sug)}
+                      >
+                        Prompt
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
