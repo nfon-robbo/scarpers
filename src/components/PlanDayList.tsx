@@ -597,6 +597,25 @@ export default function PlanDayList({
     });
   };
 
+  /** Clear ALL local edits (per-step overrides + user-added custom steps) for a workout. */
+  const resetAllEditsForWorkout = (w: ParsedWorkout) => {
+    const dateKey = workoutKey(w);
+    const contentKey = workoutContentKey(w);
+    setOverrides((prev) => {
+      if (!prev[dateKey] && !prev[contentKey]) return prev;
+      const next = { ...prev };
+      delete next[dateKey];
+      delete next[contentKey];
+      return next;
+    });
+    setCustomSteps((prev) => {
+      if (!prev[dateKey]) return prev;
+      const next = { ...prev };
+      delete next[dateKey];
+      return next;
+    });
+  };
+
   const workoutMap = useMemo(() => {
     const map = new Map<string, ParsedWorkout>();
     for (const w of workouts) {
