@@ -972,11 +972,33 @@ export default function PlanDayList({
                   const myCustom = customSteps[workoutKey(selectedWorkout)] || [];
                   const customExpanded = customToExpanded(myCustom);
                   const combined = [...aiExpanded, ...customExpanded];
+                  const dateKey = workoutKey(selectedWorkout);
+                  const contentKey = workoutContentKey(selectedWorkout);
+                  const hasOverrides = !!(overrides[contentKey] && Object.keys(overrides[contentKey]).length) || !!(overrides[dateKey] && Object.keys(overrides[dateKey]).length);
+                  const hasCustom = !!(customSteps[dateKey] && customSteps[dateKey].length);
+                  const hasAnyEdits = hasOverrides || hasCustom;
                   return (
                     <div className="relative mt-2 pl-2">
+                      {hasAnyEdits && (
+                        <div className="mb-3 -ml-2 flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                          <p className="text-xs text-foreground/80">
+                            You've edited this workout locally. Intervals.icu will use these edits on next sync.
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 shrink-0"
+                            onClick={() => resetAllEditsForWorkout(selectedWorkout)}
+                          >
+                            <RefreshCw className="w-3 h-3" /> Reset all
+                          </Button>
+                        </div>
+                      )}
                       {/* Vertical dotted spine */}
                       <div className="absolute left-[18px] top-3 bottom-3 border-l-2 border-dotted border-muted-foreground/30" />
                       <div className="space-y-3">
+
                         {combined.map((step, i) => {
                           const isWalk = step.intensity === "Recovery" || step.intensity === "Rest" || step.intensity === "Cooldown" || step.intensity === "Warmup";
                           const isWarmCool = isWalk;
