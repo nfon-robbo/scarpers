@@ -233,8 +233,12 @@ export function expandWorkoutSteps(
   const mainRows = segments.filter((s) => /main|interval|rep|work/i.test(s.segment));
   const mainAlreadyExpanded = mainRows.length >= 2;
 
-  const fallback = (!segHasOwnSpec && !mainAlreadyExpanded)
-    ? detectIntervalSpec(workoutTitle) || detectIntervalSpec(rawText)
+  // Only fall back to a title-derived interval spec when we genuinely have no
+  // body to work from (≤1 segment, typically just a warm-up). Scanning the
+  // full rawText is unsafe — Notes like "revert to 2×10min w/ walk break"
+  // would otherwise hijack a perfectly good continuous-run workout.
+  const fallback = (!segHasOwnSpec && !mainAlreadyExpanded && segments.length <= 1)
+    ? detectIntervalSpec(workoutTitle)
     : null;
   let mainInjected = false;
 
