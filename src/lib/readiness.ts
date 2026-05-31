@@ -355,14 +355,18 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
   let totalAdj = batteryPenalty;
   for (const m of modifiers) totalAdj += m.adj;
 
-  if (battery.hoursAwake > 0.5) {
-    const status: "good" | "warning" | "poor" =
-      battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
+  {
+    const warmingUp = battery.hoursAwake <= 0.5;
+    const status: "good" | "warning" | "poor" = warmingUp
+      ? "good"
+      : battery.percent >= 60 ? "good" : battery.percent >= 30 ? "warning" : "poor";
     const breakdown = `Started ${battery.startPercent}% · -${battery.drainAwake} awake${battery.drainActive > 0 ? ` · -${battery.drainActive} activity` : ""} (${battery.hoursAwake}h awake)`;
     factors.push({
       label: "Body Battery",
       status,
-      detail: `${battery.percent}% · ${battery.status} — ${breakdown}`,
+      detail: warmingUp
+        ? `UPDATING · Started ${battery.startPercent}% — fresh readings within the hour`
+        : `${battery.percent}% · ${battery.status} — ${breakdown}`,
     });
   }
 
