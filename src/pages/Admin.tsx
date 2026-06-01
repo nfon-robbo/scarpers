@@ -102,6 +102,58 @@ const AdminPage = () => {
   const [aiUsage, setAiUsage] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
   const [feedback, setFeedback] = useState<any | null>(null);
+  const [replyTarget, setReplyTarget] = useState<any | null>(null);
+  const [replyTitle, setReplyTitle] = useState("Reply from the Scarpers team");
+  const [replyBody, setReplyBody] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  const openReply = (item: any) => {
+    setReplyTarget(item);
+    setReplyTitle("Reply from the Scarpers team");
+    setReplyBody("");
+  };
+
+  const sendReply = async () => {
+    if (!replyTarget || !replyBody.trim()) return;
+    setSendingReply(true);
+    try {
+      const { error: insErr } = await supabase
+        .from("user_notifications" as any)
+        .insert({
+          user_id: replyTarget.user_id,
+          title: replyTitle.trim() || "Reply from the Scarpers team",
+          body: replyBody.trim(),
+          kind: "admin_reply",
+          related_feedback_id: replyTarget.id,
+        } as any);
+      if (insErr) throw insErr;
+      const { error: delErr } = await supabase
+        .from("user_feedback" as any)
+        .delete()
+        .eq("id", replyTarget.id);
+      if (delErr) throw delErr;
+      toast({ title: "Reply sent", description: "Feedback removed from queue." });
+      setReplyTarget(null);
+      setReplyBody("");
+      loadStats();
+    } catch (e: any) {
+      toast({ title: "Reply failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const dismissFeedback = async (item: any) => {
+    if (!confirm("Delete this feedback without replying?")) return;
+    try {
+      const { error } = await supabase.from("user_feedback" as any).delete().eq("id", item.id);
+      if (error) throw error;
+      toast({ title: "Feedback dismissed" });
+      loadStats();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
 
   const loadStats = async () => {
     setLoadingStats(true);
