@@ -15,7 +15,7 @@ type Notification = {
   created_at: string;
 };
 
-const NotificationBell = () => {
+const NotificationBell = ({ floating = false }: { floating?: boolean }) => {
   const { user } = useAuth();
   const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
@@ -110,9 +110,9 @@ const NotificationBell = () => {
     if (v) setTimeout(markAllRead, 800);
   };
 
-  if (!user) return null;
+  if (!user || items.length === 0) return null;
 
-  return (
+  const bell = (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
@@ -187,6 +187,18 @@ const NotificationBell = () => {
       </PopoverContent>
     </Popover>
   );
+
+  if (floating) {
+    return (
+      <div className="md:hidden fixed top-3 right-3 z-40" style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
+        <div className="glass-strong rounded-xl shadow-lg">
+          {bell}
+        </div>
+      </div>
+    );
+  }
+
+  return bell;
 };
 
 export default NotificationBell;
