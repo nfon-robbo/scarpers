@@ -145,9 +145,17 @@ const AppLayout = () => {
         {/* Footer */}
         <div className={cn("border-t border-border/50 space-y-0.5", collapsed ? "p-2" : "p-3")}>
           {!collapsed && profile?.name && (
-            <div className="px-3 py-2 mb-1">
-              <p className="text-xs text-muted-foreground truncate">Signed in as</p>
-              <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+            <div className="px-3 py-2 mb-1 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">Signed in as</p>
+                <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+              </div>
+              <NotificationBell />
+            </div>
+          )}
+          {(collapsed || !profile?.name) && (
+            <div className={cn("flex", collapsed ? "justify-center pb-1" : "px-3 pb-1")}>
+              <NotificationBell />
             </div>
           )}
           <Button
