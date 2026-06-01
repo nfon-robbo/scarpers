@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
 import EmailVerifyBanner from "@/components/EmailVerifyBanner";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
+import NotificationBell from "@/components/NotificationBell";
 import { useTheme } from "@/hooks/useTheme";
 import {
   ChevronLeft,
