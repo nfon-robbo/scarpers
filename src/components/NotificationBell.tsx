@@ -110,7 +110,7 @@ const NotificationBell = ({ floating = false }: { floating?: boolean }) => {
     if (v) setTimeout(markAllRead, 800);
   };
 
-  if (!user || items.length === 0) return null;
+  if (!user || (unread === 0 && !open)) return null;
 
   const bell = (
     <Popover open={open} onOpenChange={handleOpenChange}>
