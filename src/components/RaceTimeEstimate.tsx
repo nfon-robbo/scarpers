@@ -439,11 +439,10 @@ export default function RaceTimeEstimate({ workouts, linkedActivities, raceDista
         if (cancelled) return;
         const lastAgeMs = last ? Date.now() - new Date(last.calculated_at).getTime() : Infinity;
         const lastSec = last?.predicted_seconds ?? null;
-        const pctDiff = lastSec ? Math.abs(predicted_seconds - lastSec) / lastSec : 1;
-        // Skip only if prediction is essentially unchanged (<2%) AND last write <60min ago.
-        // Significant changes (e.g. algorithm fixes, new workouts) always write so the
-        // progress graph stays in sync with the live gauge.
-        if (lastAgeMs < 60 * 60_000 && pctDiff < 0.02) return;
+        const deltaSec = lastSec ? Math.abs(predicted_seconds - lastSec) : Infinity;
+        // Skip only if prediction is essentially unchanged (<10s) AND last write <60min ago.
+        // Any meaningful change always writes so the progress graph stays in sync with the gauge.
+        if (lastAgeMs < 60 * 60_000 && deltaSec < 10) return;
         await supabase.from("race_prediction_history").insert({
           user_id: user.id,
           distance: dist,
