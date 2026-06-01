@@ -611,6 +611,14 @@ const AdminPage = () => {
                           {f.rating && <span className="text-yellow-400">{"★".repeat(f.rating)}</span>}
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{f.message}</p>
+                        <div className="flex gap-2 mt-2 justify-end">
+                          <Button variant="ghost" size="sm" onClick={() => dismissFeedback(f)} className="text-muted-foreground hover:text-destructive h-8">
+                            <Trash2 className="w-3.5 h-3.5 mr-1" /> Dismiss
+                          </Button>
+                          <Button variant="default" size="sm" onClick={() => openReply(f)} className="h-8" disabled={!f.user_id}>
+                            <Reply className="w-3.5 h-3.5 mr-1" /> Reply
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
