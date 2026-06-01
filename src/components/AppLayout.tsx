@@ -221,11 +221,7 @@ const AppLayout = () => {
         mainMargin
       )} style={{ paddingTop: "env(safe-area-inset-top)" }}>
         {/* Mobile floating notification bell */}
-        <div className="md:hidden fixed top-3 right-3 z-40" style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
-          <div className="glass-strong rounded-xl shadow-lg">
-            <NotificationBell />
-          </div>
-        </div>
+        <NotificationBell floating />
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <EmailVerifyBanner />
           <Outlet />
