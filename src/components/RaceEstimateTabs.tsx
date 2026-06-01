@@ -75,7 +75,10 @@ export default function RaceEstimateTabs({
 
       {/* Content panel — styled like the body of a browser window */}
       <div className="rounded-xl rounded-tl-none border border-border/40 bg-card overflow-hidden [&>*]:!border-0 [&>*]:!bg-transparent [&>*]:!shadow-none [&>*]:!rounded-none">
-        {tab === "estimate" ? (
+        {/* Always mount RaceTimeEstimate so its persist effect runs and keeps
+            the progress graph in sync with the live gauge, even when the user
+            is viewing the Progress tab. */}
+        <div className={tab === "estimate" ? "" : "hidden"}>
           <RaceTimeEstimate
             workouts={workouts}
             linkedActivities={linkedActivities}
@@ -83,7 +86,8 @@ export default function RaceEstimateTabs({
             goalTime={goalTime}
             onPersisted={onPersisted}
           />
-        ) : (
+        </div>
+        {tab === "progress" && (
           <RacePredictionGraph
             raceDistance={raceDistance}
             goalSeconds={goalSeconds}
