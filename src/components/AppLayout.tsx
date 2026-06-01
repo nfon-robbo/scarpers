@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
 import EmailVerifyBanner from "@/components/EmailVerifyBanner";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
+import NotificationBell from "@/components/NotificationBell";
 import { useTheme } from "@/hooks/useTheme";
 import {
   ChevronLeft,
@@ -144,9 +145,17 @@ const AppLayout = () => {
         {/* Footer */}
         <div className={cn("border-t border-border/50 space-y-0.5", collapsed ? "p-2" : "p-3")}>
           {!collapsed && profile?.name && (
-            <div className="px-3 py-2 mb-1">
-              <p className="text-xs text-muted-foreground truncate">Signed in as</p>
-              <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+            <div className="px-3 py-2 mb-1 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground truncate">Signed in as</p>
+                <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
+              </div>
+              <NotificationBell />
+            </div>
+          )}
+          {(collapsed || !profile?.name) && (
+            <div className={cn("flex", collapsed ? "justify-center pb-1" : "px-3 pb-1")}>
+              <NotificationBell />
             </div>
           )}
           <Button
@@ -211,6 +220,12 @@ const AppLayout = () => {
         "flex-1 overflow-y-auto pt-0 pb-20 md:pb-0 flex flex-col min-h-0 transition-[margin] duration-300 ease-in-out",
         mainMargin
       )} style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        {/* Mobile floating notification bell */}
+        <div className="md:hidden fixed top-3 right-3 z-40" style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
+          <div className="glass-strong rounded-xl shadow-lg">
+            <NotificationBell />
+          </div>
+        </div>
         <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-1 w-full">
           <EmailVerifyBanner />
           <Outlet />

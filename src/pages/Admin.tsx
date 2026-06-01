@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, ArrowLeft, ExternalLink } from "lucide-react";
+import { Loader2, Shield, ArrowLeft, ExternalLink, Reply, Trash2 } from "lucide-react";
 
 type Stats = {
   total_users: number;
@@ -100,6 +102,58 @@ const AdminPage = () => {
   const [aiUsage, setAiUsage] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
   const [feedback, setFeedback] = useState<any | null>(null);
+  const [replyTarget, setReplyTarget] = useState<any | null>(null);
+  const [replyTitle, setReplyTitle] = useState("Reply from the Scarpers team");
+  const [replyBody, setReplyBody] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  const openReply = (item: any) => {
+    setReplyTarget(item);
+    setReplyTitle("Reply from the Scarpers team");
+    setReplyBody("");
+  };
+
+  const sendReply = async () => {
+    if (!replyTarget || !replyBody.trim()) return;
+    setSendingReply(true);
+    try {
+      const { error: insErr } = await supabase
+        .from("user_notifications" as any)
+        .insert({
+          user_id: replyTarget.user_id,
+          title: replyTitle.trim() || "Reply from the Scarpers team",
+          body: replyBody.trim(),
+          kind: "admin_reply",
+          related_feedback_id: replyTarget.id,
+        } as any);
+      if (insErr) throw insErr;
+      const { error: delErr } = await supabase
+        .from("user_feedback" as any)
+        .delete()
+        .eq("id", replyTarget.id);
+      if (delErr) throw delErr;
+      toast({ title: "Reply sent", description: "Feedback removed from queue." });
+      setReplyTarget(null);
+      setReplyBody("");
+      loadStats();
+    } catch (e: any) {
+      toast({ title: "Reply failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const dismissFeedback = async (item: any) => {
+    if (!confirm("Delete this feedback without replying?")) return;
+    try {
+      const { error } = await supabase.from("user_feedback" as any).delete().eq("id", item.id);
+      if (error) throw error;
+      toast({ title: "Feedback dismissed" });
+      loadStats();
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
 
   const loadStats = async () => {
     setLoadingStats(true);
@@ -557,6 +611,14 @@ const AdminPage = () => {
                           {f.rating && <span className="text-yellow-400">{"★".repeat(f.rating)}</span>}
                         </div>
                         <p className="text-sm whitespace-pre-wrap">{f.message}</p>
+                        <div className="flex gap-2 mt-2 justify-end">
+                          <Button variant="ghost" size="sm" onClick={() => dismissFeedback(f)} className="text-muted-foreground hover:text-destructive h-8">
+                            <Trash2 className="w-3.5 h-3.5 mr-1" /> Dismiss
+                          </Button>
+                          <Button variant="default" size="sm" onClick={() => openReply(f)} className="h-8" disabled={!f.user_id}>
+                            <Reply className="w-3.5 h-3.5 mr-1" /> Reply
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -613,6 +675,58 @@ const AdminPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!replyTarget} onOpenChange={(v) => !v && setReplyTarget(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reply to feedback</DialogTitle>
+            <DialogDescription>
+              The user will get an in-app notification. The original feedback will be removed once sent.
+            </DialogDescription>
+          </DialogHeader>
+          {replyTarget && (
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/30 text-sm">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                {replyTarget.category && (
+                  <Badge variant="outline" className="text-[10px] py-0">{replyTarget.category}</Badge>
+                )}
+                {replyTarget.rating && (
+                  <span className="text-yellow-400">{"★".repeat(replyTarget.rating)}</span>
+                )}
+              </div>
+              <p className="whitespace-pre-wrap">{replyTarget.message}</p>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="reply-title">Title</Label>
+            <Input
+              id="reply-title"
+              value={replyTitle}
+              onChange={(e) => setReplyTitle(e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reply-body">Message</Label>
+            <Textarea
+              id="reply-body"
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              rows={6}
+              placeholder="Write your reply to the user..."
+              maxLength={2000}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReplyTarget(null)} disabled={sendingReply}>
+              Cancel
+            </Button>
+            <Button onClick={sendReply} disabled={sendingReply || !replyBody.trim()}>
+              {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send reply"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
