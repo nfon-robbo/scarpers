@@ -31,6 +31,32 @@ const NotificationBell = () => {
     setItems((data ?? []) as unknown as Notification[]);
   }, [user]);
 
+  const playChime = useCallback(() => {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      const notes = [880, 1320]; // A5, E6 — short pleasant two-tone
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const start = now + i * 0.12;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.4);
+      });
+      setTimeout(() => ctx.close().catch(() => {}), 800);
+    } catch {
+      /* ignore audio errors */
+    }
+  }, []);
+
   useEffect(() => {
     load();
     if (!user) return;
@@ -38,7 +64,20 @@ const NotificationBell = () => {
       .channel(`notifications:${user.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "user_notifications", filter: `user_id=eq.${user.id}` },
+        { event: "INSERT", schema: "public", table: "user_notifications", filter: `user_id=eq.${user.id}` },
+        () => {
+          playChime();
+          load();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "user_notifications", filter: `user_id=eq.${user.id}` },
+        () => load(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "user_notifications", filter: `user_id=eq.${user.id}` },
         () => load(),
       )
       .subscribe();
@@ -47,7 +86,7 @@ const NotificationBell = () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [user, load]);
+  }, [user, load, playChime]);
 
   const unread = items.filter((i) => !i.read_at).length;
 
