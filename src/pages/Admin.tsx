@@ -675,6 +675,58 @@ const AdminPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!replyTarget} onOpenChange={(v) => !v && setReplyTarget(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reply to feedback</DialogTitle>
+            <DialogDescription>
+              The user will get an in-app notification. The original feedback will be removed once sent.
+            </DialogDescription>
+          </DialogHeader>
+          {replyTarget && (
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/30 text-sm">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                {replyTarget.category && (
+                  <Badge variant="outline" className="text-[10px] py-0">{replyTarget.category}</Badge>
+                )}
+                {replyTarget.rating && (
+                  <span className="text-yellow-400">{"★".repeat(replyTarget.rating)}</span>
+                )}
+              </div>
+              <p className="whitespace-pre-wrap">{replyTarget.message}</p>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="reply-title">Title</Label>
+            <Input
+              id="reply-title"
+              value={replyTitle}
+              onChange={(e) => setReplyTitle(e.target.value)}
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reply-body">Message</Label>
+            <Textarea
+              id="reply-body"
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              rows={6}
+              placeholder="Write your reply to the user..."
+              maxLength={2000}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReplyTarget(null)} disabled={sendingReply}>
+              Cancel
+            </Button>
+            <Button onClick={sendReply} disabled={sendingReply || !replyBody.trim()}>
+              {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send reply"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
