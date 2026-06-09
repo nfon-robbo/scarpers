@@ -50,8 +50,12 @@ async function refreshAccessToken(
     const err = await res.text();
     const normalized = err.toLowerCase();
 
-    // User revoked/expired refresh token
-    if (normalized.includes("invalid_grant") && normalized.includes("expired or revoked")) {
+    // User revoked/expired refresh token. Google sometimes returns just
+    // {"error":"invalid_grant","error_description":"Bad Request"} so match
+    // on invalid_grant alone — the refresh token is unusable either way.
+    if (normalized.includes("invalid_grant")) {
+      // Clear the dead token so the UI flips back to "Connect Google Fit".
+      await supabase.from("google_fit_tokens").delete().eq("user_id", userId);
       throw new Error("GOOGLE_FIT_USER_TOKEN_INVALID");
     }
 
