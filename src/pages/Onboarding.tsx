@@ -778,11 +778,12 @@ const Onboarding = () => {
                     size="sm"
                     onClick={() => fitInputRef.current?.click()}
                     disabled={fitParsing}
+                    className="w-full h-auto whitespace-normal text-center py-2"
                   >
                     {fitParsing ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading…</>
+                      <><Loader2 className="w-4 h-4 mr-2 shrink-0 animate-spin" /> Reading…</>
                     ) : (
-                      <><Upload className="w-4 h-4 mr-2" /> Upload .FIT or Garmin ZIP to auto-detect</>
+                      <><Upload className="w-4 h-4 mr-2 shrink-0" /> <span className="break-words">Upload .FIT / Garmin ZIP to auto-detect</span></>
                     )}
                   </Button>
                   {fitSummary && (
