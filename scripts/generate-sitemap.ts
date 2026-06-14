@@ -34,6 +34,10 @@ const staticEntries: SitemapEntry[] = [
   { path: "/5k-training-plan", lastmod: TODAY, changefreq: "monthly", priority: "0.9" },
   { path: "/10k-training-plan", lastmod: TODAY, changefreq: "monthly", priority: "0.9" },
   { path: "/blog", lastmod: TODAY, changefreq: "weekly", priority: "0.8" },
+  { path: "/compare/runna-alternative", lastmod: TODAY, changefreq: "monthly", priority: "0.7" },
+  { path: "/compare/scampr-alternative", lastmod: TODAY, changefreq: "monthly", priority: "0.7" },
+  { path: "/compare/strava-coach-alternative", lastmod: TODAY, changefreq: "monthly", priority: "0.7" },
+  { path: "/compare/ai-endurance-alternative", lastmod: TODAY, changefreq: "monthly", priority: "0.7" },
   { path: "/privacy", lastmod: TODAY, changefreq: "yearly", priority: "0.3" },
   { path: "/terms", lastmod: TODAY, changefreq: "yearly", priority: "0.3" },
 ];
