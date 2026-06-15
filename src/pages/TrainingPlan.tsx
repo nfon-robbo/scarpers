@@ -502,7 +502,7 @@ const TrainingPlanPage = () => {
   const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
-  const isPlanPaused = !!pausedAt && !!pausedUntil && pausedUntil.getTime() > Date.now() - 86_400_000;
+  const isPlanPaused = !!pausedAt && !!pausedUntil && new Date(pausedUntil).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
