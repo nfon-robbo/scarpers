@@ -11,6 +11,7 @@ import {
 import { Loader2, Plus, Pencil, Trash2, Upload, Sparkles } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
+import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
 type SourceKey = "google_fit" | "health_connect" | "manual";
@@ -26,6 +27,14 @@ const fmtH = (secs: number) => {
 
 const sourceLabel = (s: SourceKey) =>
   s === "google_fit" ? "Google Fit" : s === "health_connect" ? "Health Connect" : "Manual";
+
+const sleepScoreFor = (t: StageTotals) => calculateSleepScore({
+  deep: t.deep,
+  rem: t.rem,
+  light: t.light,
+  awake: t.awake,
+  sleep: t.sleep,
+});
 
 const parseHHMM = (v: string): number => {
   if (!v?.trim()) return 0;
@@ -402,6 +411,11 @@ const SleepSourcesPanel = () => {
       if (hrvTrend) payload.hrv_7d_trend = hrvTrend;
       if (bbChange != null && isFinite(bbChange)) payload.body_battery_change = bbChange;
 
+      payload.sleep_score = calculateSleepScore(
+        { deep, rem, light, awake, sleep: 0 },
+        { spo2_avg: spo2Avg, spo2_lowest: spo2Low, breathing_pattern: breath, restless_count: restl, skin_temp_deviation: skin }
+      );
+
       if (v) {
         const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
         payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
@@ -500,6 +514,7 @@ const SleepSourcesPanel = () => {
                 <tr className="text-left">
                   <th className="px-2 py-2">Date</th>
                   <th className="px-2 py-2">Source</th>
+                  <th className="px-2 py-2">Score</th>
                   <th className="px-2 py-2">Total</th>
                   <th className="px-2 py-2">Deep</th>
                   <th className="px-2 py-2">REM</th>
@@ -513,12 +528,14 @@ const SleepSourcesPanel = () => {
                   r.sources.map((s, i) => {
                     const t = s.totals;
                     const total = t.deep + t.rem + t.light + t.sleep;
+                    const score = sleepScoreFor(t);
                     return (
                       <tr key={`${r.date}-${s.source}`} className="border-t border-border/40">
                         <td className="px-2 py-2 font-mono">
                           {i === 0 ? format(parseISO(r.date), "dd/MM/yyyy") : ""}
                         </td>
                         <td className="px-2 py-2">{sourceLabel(s.source)}</td>
+                        <td className={`px-2 py-2 font-bold ${scoreLabel(score).color}`}>{score}</td>
                         <td className="px-2 py-2 font-semibold">{fmtH(total)}</td>
                         <td className="px-2 py-2">{fmtH(t.deep)}</td>
                         <td className="px-2 py-2">{fmtH(t.rem)}</td>
