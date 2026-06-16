@@ -11,11 +11,12 @@ import {
 import { Loader2, Plus, Pencil, Trash2, Upload, Sparkles } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { toast } from "sonner";
+import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
 type SourceKey = "google_fit" | "health_connect" | "manual";
 type SourceRow = { source: SourceKey; totals: StageTotals };
-type Row = { date: string; sources: SourceRow[] };
+type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
 
 const fmtH = (secs: number) => {
   if (!secs) return "—";
@@ -26,6 +27,14 @@ const fmtH = (secs: number) => {
 
 const sourceLabel = (s: SourceKey) =>
   s === "google_fit" ? "Google Fit" : s === "health_connect" ? "Health Connect" : "Manual";
+
+const sleepScoreFor = (t: StageTotals) => calculateSleepScore({
+  deep: t.deep,
+  rem: t.rem,
+  light: t.light,
+  awake: t.awake,
+  sleep: t.sleep,
+});
 
 const parseHHMM = (v: string): number => {
   if (!v?.trim()) return 0;
@@ -84,6 +93,8 @@ const emptyForm = (date?: string): FormState => ({
 });
 
 const cleanLabel = (value?: string | null) => value?.trim() ?? "";
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 const normaliseBreathingPattern = (value?: string | null) => {
   const label = cleanLabel(value);
@@ -140,12 +151,25 @@ const SleepSourcesPanel = () => {
     if (!user) return;
     setLoading(true);
     const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
-    const { data } = await supabase
-      .from("sleep_stages")
-      .select("date, stage, duration_seconds, source")
-      .eq("user_id", user.id)
-      .gte("date", since)
-      .in("source", ["google_fit", "health_connect", "manual"]);
+    const [{ data }, { data: scoreRows }] = await Promise.all([
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds, source")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .in("source", ["google_fit", "health_connect", "manual"]),
+      supabase
+        .from("daily_metrics")
+        .select("date, sleep_score, created_at")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const scoreByDate = new Map<string, number>();
+    for (const r of scoreRows ?? []) {
+      if (r.sleep_score != null && !scoreByDate.has(r.date)) scoreByDate.set(r.date, Math.round(Number(r.sleep_score)));
+    }
 
     const map = new Map<string, Map<SourceKey, StageTotals>>();
     for (const r of data ?? []) {
@@ -163,6 +187,7 @@ const SleepSourcesPanel = () => {
       .map(([date, sm]) => ({
         date,
         sources: Array.from(sm.entries()).map(([source, totals]) => ({ source, totals })),
+        sleepScore: scoreByDate.get(date) ?? null,
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -201,7 +226,7 @@ const SleepSourcesPanel = () => {
       .limit(10);
     for (const row of data ?? []) {
       const raw = row?.raw_data as Record<string, unknown> | null | undefined;
-      const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
+      const v = raw && typeof raw === "object" ? raw.garmin_sleep_vitals : null;
       if (v && typeof v === "object") return v as GarminVitals;
     }
     return null;
@@ -222,7 +247,7 @@ const SleepSourcesPanel = () => {
     const rows = existingRows ?? [];
     const existing = rows.find((row) => {
       const raw = row?.raw_data as Record<string, unknown> | null | undefined;
-      return raw && typeof raw === "object" && Boolean((raw as any).garmin_sleep_vitals);
+      return raw && typeof raw === "object" && Boolean(raw.garmin_sleep_vitals);
     }) ?? rows[0] ?? null;
 
     const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
@@ -402,6 +427,11 @@ const SleepSourcesPanel = () => {
       if (hrvTrend) payload.hrv_7d_trend = hrvTrend;
       if (bbChange != null && isFinite(bbChange)) payload.body_battery_change = bbChange;
 
+      payload.sleep_score = calculateSleepScore(
+        { deep, rem, light, awake, sleep: 0 },
+        { spo2_avg: spo2Avg, spo2_lowest: spo2Low, breathing_pattern: breath, restless_count: restl, skin_temp_deviation: skin }
+      );
+
       if (v) {
         const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
         payload.raw_data = { ...prevRaw, garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() } };
@@ -417,9 +447,9 @@ const SleepSourcesPanel = () => {
       toast.success("Sleep saved");
       setDialogOpen(false);
       await load();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e?.message ?? "Failed to save sleep");
+      toast.error(getErrorMessage(e, "Failed to save sleep"));
     } finally {
       setSaving(false);
     }
@@ -433,8 +463,8 @@ const SleepSourcesPanel = () => {
         .delete().eq("user_id", user.id).eq("date", date).eq("source", "manual");
       toast.success("Entry deleted");
       await load();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to delete");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Failed to delete"));
     }
   };
 
@@ -457,9 +487,9 @@ const SleepSourcesPanel = () => {
       await saveGarminVitals(form.date, v);
       setForm((f) => applyVitalsToForm(f, v));
       toast.success("Vitals extracted, shown below and saved");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e?.message ?? "Failed to parse screenshot");
+      toast.error(getErrorMessage(e, "Failed to parse screenshot"));
     } finally {
       setParsing(false);
     }
@@ -500,6 +530,7 @@ const SleepSourcesPanel = () => {
                 <tr className="text-left">
                   <th className="px-2 py-2">Date</th>
                   <th className="px-2 py-2">Source</th>
+                  <th className="px-2 py-2">Score</th>
                   <th className="px-2 py-2">Total</th>
                   <th className="px-2 py-2">Deep</th>
                   <th className="px-2 py-2">REM</th>
@@ -513,12 +544,14 @@ const SleepSourcesPanel = () => {
                   r.sources.map((s, i) => {
                     const t = s.totals;
                     const total = t.deep + t.rem + t.light + t.sleep;
+                    const score = sleepScoreFor(t);
                     return (
                       <tr key={`${r.date}-${s.source}`} className="border-t border-border/40">
                         <td className="px-2 py-2 font-mono">
                           {i === 0 ? format(parseISO(r.date), "dd/MM/yyyy") : ""}
                         </td>
                         <td className="px-2 py-2">{sourceLabel(s.source)}</td>
+                        <td className={`px-2 py-2 font-bold ${scoreLabel(r.sleepScore ?? score).color}`}>{i === 0 ? r.sleepScore ?? score : ""}</td>
                         <td className="px-2 py-2 font-semibold">{fmtH(total)}</td>
                         <td className="px-2 py-2">{fmtH(t.deep)}</td>
                         <td className="px-2 py-2">{fmtH(t.rem)}</td>
