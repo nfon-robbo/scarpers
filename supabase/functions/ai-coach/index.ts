@@ -14,6 +14,70 @@ const corsHeaders = {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+// Stream a fixed Markdown body back over SSE in the same shape day-adjust uses
+// for its SCHEDULED_WORKOUT_COMPLETED short-circuit, so the existing client
+// parser renders it without an LLM call.
+function streamFixedMarkdown(markdown: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      const chunk = { choices: [{ delta: { content: markdown } }] };
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+function fmtUkDate(iso: string | Date): string {
+  try {
+    const d = typeof iso === "string" ? new Date(iso) : iso;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  } catch { return String(iso); }
+}
+
+// Returns { paused: boolean, pausedUntil?: Date } for the user's active plan,
+// given a target ISO date (YYYY-MM-DD). Plan is "paused" when targetDate falls
+// inside [paused_at, paused_until).
+async function checkPlanPaused(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  targetDateStr: string,
+): Promise<{ paused: boolean; pausedUntil?: Date; pauseReason?: string | null }> {
+  try {
+    const { data } = await supabase
+      .from("training_plans")
+      .select("paused_at, paused_until, pause_reason")
+      .eq("user_id", userId)
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data?.paused_at || !data?.paused_until) return { paused: false };
+    const t = new Date(targetDateStr + "T00:00:00").getTime();
+    const s = new Date(data.paused_at).setHours(0, 0, 0, 0);
+    const e = new Date(data.paused_until).setHours(0, 0, 0, 0);
+    if (isNaN(t) || isNaN(s) || isNaN(e)) return { paused: false };
+    if (t >= s && t < e) {
+      return { paused: true, pausedUntil: new Date(data.paused_until), pauseReason: data.pause_reason };
+    }
+    return { paused: false };
+  } catch {
+    return { paused: false };
+  }
+}
+
 // ============================================================
 // Race Time Predictor — chatbot-only feature
 // ============================================================
@@ -627,6 +691,27 @@ ${sleepContext}`;
     if (type === "day-adjust") {
       // Fetch last night's sleep for the target date
       const targetDateStr = target_date || new Date().toISOString().split("T")[0];
+
+      // Plan-paused short-circuit: if target date sits inside the pause window,
+      // skip the LLM and stream a fixed rest recommendation.
+      {
+        const pauseCheck = await checkPlanPaused(supabase, user.id, targetDateStr);
+        if (pauseCheck.paused && pauseCheck.pausedUntil) {
+          const untilUk = fmtUkDate(pauseCheck.pausedUntil);
+          const targetUk = fmtUkDate(targetDateStr);
+          const md = `## 🛌 Plan paused
+
+Your plan is paused until **${untilUk}**. No scheduled workout for ${targetUk}.
+
+Rest, or do an easy activity of your choice — walk, gentle spin, mobility. We'll pick the plan back up automatically when the pause ends.
+
+<!-- DAY_ADJUST_STATUS: PLAN_PAUSED paused_until=${pauseCheck.pausedUntil.toISOString().slice(0,10)} -->
+`;
+          return streamFixedMarkdown(md);
+        }
+      }
+
+
 
       // Get yesterday's activity (fatigue indicator)
       const yesterday = new Date(targetDateStr);
@@ -1400,7 +1485,29 @@ ${chatExtraContext}`;
         : "";
       userPrompt = immediateDiaryCorrection + datePin + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
+      // Plan-paused short-circuit: suppress workout-focused readiness coaching
+      // while the plan is paused; stream a fixed recovery message instead.
+      {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const pauseCheck = await checkPlanPaused(supabase, user.id, todayStr);
+        if (pauseCheck.paused && pauseCheck.pausedUntil) {
+          const untilUk = fmtUkDate(pauseCheck.pausedUntil);
+          const md = `## 🛌 Plan paused
+
+Plan paused until **${untilUk}**.
+
+- Prioritise sleep and easy mobility
+- Stay hydrated, eat normally
+- Light walks or a gentle spin are fine if you feel like it
+
+Readiness scoring continues in the background. We'll resume coaching when the plan resumes.
+`;
+          return streamFixedMarkdown(md);
+        }
+      }
+
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
+
 
 Your analysis must cover these domains in separate sections:
 
