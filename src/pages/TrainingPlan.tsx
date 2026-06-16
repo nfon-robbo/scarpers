@@ -1124,10 +1124,37 @@ const TrainingPlanPage = () => {
           const deleted = (resp.data as any)?.deleted ?? 0;
           intervalsNote = ` Cleared ${deleted} workout${deleted === 1 ? "" : "s"} from Intervals.icu.`;
         }
+        // Also drop a multi-day marker event on Intervals.icu so the calendar
+        // visually shows Holiday / Sick / Injured / Note for the pause window.
+        const categoryMap = {
+          holiday: "HOLIDAY",
+          illness: "SICK",
+          injury: "INJURED",
+          other: "NOTE",
+        } as const;
+        const nameMap = {
+          holiday: "Holiday (Scarpers pause)",
+          illness: "Sick (Scarpers pause)",
+          injury: "Injured (Scarpers pause)",
+          other: "Training paused (Scarpers)",
+        } as const;
+        await supabase.functions.invoke("intervals-sync", {
+          body: {
+            pauseEvent: {
+              category: categoryMap[params.reason],
+              name: nameMap[params.reason],
+              start: startIso,
+              end: endIso,
+              planId: savedPlanId,
+            },
+          },
+        });
+        intervalsNote += ` ${categoryMap[params.reason].charAt(0) + categoryMap[params.reason].slice(1).toLowerCase()} block added to Intervals.icu.`;
       } catch {
         // silent — surfaced in description only when successful
       }
     }
+
 
     toast({
       title: "Plan paused",
@@ -1201,11 +1228,20 @@ const TrainingPlanPage = () => {
     // date range first, then bulk-upserts every workout with segments.
     if (await hasIntervalsConnected()) {
       try {
+        // Wipe the Holiday / Sick / Injured / Note marker we placed on pause.
+        await supabase.functions.invoke("intervals-sync", {
+          body: { clearPauseEvent: { planId: savedPlanId } },
+        });
+      } catch {
+        // silent
+      }
+      try {
         await handleSyncToIntervals(true, undefined, newContent);
       } catch {
         // sync errors are surfaced inside handleSyncToIntervals
       }
     }
+
   };
 
 

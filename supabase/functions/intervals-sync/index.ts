@@ -338,11 +338,14 @@ serve(async (req) => {
     const INTERVALS_ATHLETE_ID = creds.athlete_id;
 
     const body = await req.json();
-    const { workouts, clearRange, deleteRange } = body as {
+    const { workouts, clearRange, deleteRange, pauseEvent, clearPauseEvent } = body as {
       workouts?: WorkoutInput[];
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
+      pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
+      clearPauseEvent?: { planId: string; oldest?: string; newest?: string };
     };
+
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
     const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
@@ -372,6 +375,95 @@ serve(async (req) => {
       }
     } catch (e) {
       console.error("Failed to verify/set threshold_pace:", e);
+    }
+
+    // Clear pause marker events created previously for this plan.
+    // Used on resume/cancel to wipe the HOLIDAY/SICK/INJURED/NOTE block.
+    if (clearPauseEvent) {
+      try {
+        const oldest = clearPauseEvent.oldest ?? "2000-01-01";
+        const newest = clearPauseEvent.newest ?? "2100-01-01";
+        const eventsResp = await fetch(
+          `${baseUrl}/events?oldest=${oldest}&newest=${newest}`,
+          { headers: authHeaders }
+        );
+        if (eventsResp.ok) {
+          const events = await eventsResp.json();
+          const markerId = `lovable-pause-${clearPauseEvent.planId}`;
+          const markers = events.filter((e: { external_id?: string }) => e.external_id === markerId);
+          let deleted = 0;
+          for (const evt of markers) {
+            const delResp = await fetch(`${baseUrl}/events/${evt.id}`, {
+              method: "DELETE",
+              headers: authHeaders,
+            });
+            if (delResp.ok) deleted++;
+          }
+          return new Response(
+            JSON.stringify({ deleted, total: markers.length }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Create a multi-day pause marker event on Intervals.icu.
+    // Supported categories: HOLIDAY, SICK, INJURED, NOTE.
+    if (pauseEvent) {
+      try {
+        const markerId = `lovable-pause-${pauseEvent.planId}`;
+        // Clear any prior marker for this plan first so re-pauses don't stack.
+        try {
+          const existingResp = await fetch(
+            `${baseUrl}/events?oldest=2000-01-01&newest=2100-01-01`,
+            { headers: authHeaders }
+          );
+          if (existingResp.ok) {
+            const existing = await existingResp.json();
+            const stale = existing.filter((e: { external_id?: string }) => e.external_id === markerId);
+            for (const evt of stale) {
+              await fetch(`${baseUrl}/events/${evt.id}`, { method: "DELETE", headers: authHeaders });
+            }
+          }
+        } catch { /* ignore */ }
+
+        const payload = {
+          category: pauseEvent.category,
+          start_date_local: `${pauseEvent.start}T00:00:00`,
+          end_date_local: `${pauseEvent.end}T23:59:59`,
+          name: pauseEvent.name,
+          external_id: markerId,
+        };
+        const resp = await fetch(`${baseUrl}/events`, {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          return new Response(
+            JSON.stringify({ error: `Pause event create failed: ${resp.status} ${errText}` }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const created = await resp.json();
+        return new Response(
+          JSON.stringify({ created: true, id: created?.id, category: pauseEvent.category }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Delete-only mode: remove all planned workouts in range
