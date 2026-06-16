@@ -397,6 +397,8 @@ const Dashboard = () => {
               deltaDays: pauseResumeDeltaDays(pausedAt, pausedUntil),
               raceDateIso: loadedPlan.race_date,
               raceDateMode: loadedPlan.race_date_mode,
+              pausedUntil,
+              trainingDays: loadedPlan.training_days,
             });
             const nextPlan = { ...loadedPlan, content: resumed.content, race_date: resumed.raceDateIso, race_date_mode: null };
             setPlan(nextPlan);

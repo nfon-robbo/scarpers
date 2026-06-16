@@ -647,6 +647,8 @@ const TrainingPlanPage = () => {
             deltaDays: pauseResumeDeltaDays(loadedPausedAt, loadedPausedUntil),
             raceDateIso: effectiveRace,
             raceDateMode: loadedRaceDateMode,
+            pausedUntil: loadedPausedUntil,
+            trainingDays: loadedTrainingDays,
           });
           contentToUse = resumed.content;
           raceToUse = resumed.raceDateIso;
@@ -1113,6 +1115,8 @@ const TrainingPlanPage = () => {
         deltaDays: params.deltaDays,
         raceDateIso: newRaceIso,
         raceDateMode: pauseRaceDateMode,
+        pausedUntil,
+        trainingDays,
       });
       newContent = resumed.content;
       newRaceIso = resumed.raceDateIso;
