@@ -631,30 +631,52 @@ const TrainingPlanPage = () => {
           trainingDays: effectiveLoadDays,
           source: "active plan load",
         }).content;
-        setContent(validatedOnLoad);
+        const loadedPausedAt = anyData.paused_at ? new Date(anyData.paused_at) : null;
+        const loadedPausedUntil = anyData.paused_until ? new Date(anyData.paused_until) : null;
+        const loadedRaceDateMode = (anyData.race_date_mode as RaceDateMode | null) ?? null;
+        const derivedRace = extractRaceDateFromMarkdown(validatedOnLoad);
+        const storedRace = data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null;
+        const effectiveRace = derivedRace ?? storedRace;
+        let contentToUse = validatedOnLoad;
+        let raceToUse = effectiveRace;
+
+        if (loadedPausedAt && loadedPausedUntil && isPauseReadyToResume(loadedPausedUntil, loadedRaceDateMode)) {
+          const resumed = resumePlanAfterPause({
+            content: validatedOnLoad,
+            pausedAt: loadedPausedAt,
+            deltaDays: pauseResumeDeltaDays(loadedPausedAt, loadedPausedUntil),
+            raceDateIso: effectiveRace,
+            raceDateMode: loadedRaceDateMode,
+          });
+          contentToUse = resumed.content;
+          raceToUse = resumed.raceDateIso;
+        }
+
+        setContent(contentToUse);
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(loadedTrainingDays);
         setStartDate(parseLocalISODate(data.start_date));
-        const anyData = data as any;
-        setPausedAt(anyData.paused_at ? new Date(anyData.paused_at) : null);
-        setPausedUntil(anyData.paused_until ? new Date(anyData.paused_until) : null);
+        setPausedAt(loadedPausedAt);
+        setPausedUntil(loadedPausedUntil);
         setPauseReason(anyData.pause_reason ?? null);
-        setPauseRaceDateMode((anyData.race_date_mode as RaceDateMode | null) ?? null);
-        if (validatedOnLoad !== data.content) {
-          supabase.from("training_plans").update({ content: validatedOnLoad }).eq("id", data.id).then(({ error }) => {
+        setPauseRaceDateMode(loadedRaceDateMode);
+        if (contentToUse !== data.content || (raceToUse && raceToUse !== data.race_date)) {
+          const updatePayload: any = { content: contentToUse };
+          if (raceToUse && raceToUse !== data.race_date) updatePayload.race_date = raceToUse;
+          supabase.from("training_plans").update(updatePayload).eq("id", data.id).then(({ error }) => {
             if (error) console.error("plan validation self-heal failed:", error);
           });
         }
         // Markdown plan is the source of truth for race day. If the stored
         // race_date disagrees with the RACE DAY heading in content, self-heal.
-        const derived = extractRaceDateFromMarkdown(validatedOnLoad);
-        const effectiveRace = derived ?? (data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null);
-        if (effectiveRace) {
-          setRaceDate(parseLocalISODate(effectiveRace));
-          if (derived && derived !== data.race_date) {
-            supabase.from("training_plans").update({ race_date: derived } as any).eq("id", data.id).then(({ error }) => {
+        const finalDerived = extractRaceDateFromMarkdown(contentToUse);
+        const finalRace = finalDerived ?? raceToUse;
+        if (finalRace) {
+          setRaceDate(parseLocalISODate(finalRace));
+          if (finalDerived && finalDerived !== data.race_date) {
+            supabase.from("training_plans").update({ race_date: finalDerived } as any).eq("id", data.id).then(({ error }) => {
               if (error) console.error("race_date self-heal failed:", error);
             });
           }
