@@ -14,6 +14,70 @@ const corsHeaders = {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+// Stream a fixed Markdown body back over SSE in the same shape day-adjust uses
+// for its SCHEDULED_WORKOUT_COMPLETED short-circuit, so the existing client
+// parser renders it without an LLM call.
+function streamFixedMarkdown(markdown: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      const chunk = { choices: [{ delta: { content: markdown } }] };
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+function fmtUkDate(iso: string | Date): string {
+  try {
+    const d = typeof iso === "string" ? new Date(iso) : iso;
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  } catch { return String(iso); }
+}
+
+// Returns { paused: boolean, pausedUntil?: Date } for the user's active plan,
+// given a target ISO date (YYYY-MM-DD). Plan is "paused" when targetDate falls
+// inside [paused_at, paused_until).
+async function checkPlanPaused(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  targetDateStr: string,
+): Promise<{ paused: boolean; pausedUntil?: Date; pauseReason?: string | null }> {
+  try {
+    const { data } = await supabase
+      .from("training_plans")
+      .select("paused_at, paused_until, pause_reason")
+      .eq("user_id", userId)
+      .eq("archived", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data?.paused_at || !data?.paused_until) return { paused: false };
+    const t = new Date(targetDateStr + "T00:00:00").getTime();
+    const s = new Date(data.paused_at).setHours(0, 0, 0, 0);
+    const e = new Date(data.paused_until).setHours(0, 0, 0, 0);
+    if (isNaN(t) || isNaN(s) || isNaN(e)) return { paused: false };
+    if (t >= s && t < e) {
+      return { paused: true, pausedUntil: new Date(data.paused_until), pauseReason: data.pause_reason };
+    }
+    return { paused: false };
+  } catch {
+    return { paused: false };
+  }
+}
+
 // ============================================================
 // Race Time Predictor — chatbot-only feature
 // ============================================================
