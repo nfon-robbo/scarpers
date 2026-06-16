@@ -1485,7 +1485,29 @@ ${chatExtraContext}`;
         : "";
       userPrompt = immediateDiaryCorrection + datePin + resolveWeekdays(chatMessages || "Hello, I'd like some coaching advice.");
     } else if (type === "analysis") {
+      // Plan-paused short-circuit: suppress workout-focused readiness coaching
+      // while the plan is paused; stream a fixed recovery message instead.
+      {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const pauseCheck = await checkPlanPaused(supabase, user.id, todayStr);
+        if (pauseCheck.paused && pauseCheck.pausedUntil) {
+          const untilUk = fmtUkDate(pauseCheck.pausedUntil);
+          const md = `## 🛌 Plan paused
+
+Plan paused until **${untilUk}**.
+
+- Prioritise sleep and easy mobility
+- Stay hydrated, eat normally
+- Light walks or a gentle spin are fine if you feel like it
+
+Readiness scoring continues in the background. We'll resume coaching when the plan resumes.
+`;
+          return streamFixedMarkdown(md);
+        }
+      }
+
       systemPrompt = `You are an elite endurance coach AI, modeled after the garmin-ai-coach system. You perform multi-domain training analysis.
+
 
 Your analysis must cover these domains in separate sections:
 
