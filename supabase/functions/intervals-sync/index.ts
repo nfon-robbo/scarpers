@@ -343,7 +343,7 @@ serve(async (req) => {
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
       pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
-      clearPauseEvent?: { planId: string; oldest?: string; newest?: string };
+      clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
     };
 
 
