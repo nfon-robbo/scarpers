@@ -442,7 +442,7 @@ const Landing = () => {
             </div>
 
             {/* Integration row */}
-            <div className="mt-10 flex items-center gap-5 text-xs uppercase tracking-[0.2em] text-white/70">
+            <div className="mt-10 flex items-center gap-5 text-xs uppercase tracking-[0.2em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
               <span>Works with</span>
               <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/40 backdrop-blur border border-border/40">
                 <Watch className="w-3.5 h-3.5 text-primary" /> Garmin
