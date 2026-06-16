@@ -34,12 +34,16 @@ const SleepCalendar = () => {
     const since = subDays(new Date(), 365).toISOString().split("T")[0];
 
     // Include all sources (google_fit, health_connect, manual, etc.)
+    // Order DESC + explicit high limit so the most recent nights are never
+    // truncated by PostgREST's default 1000-row cap (users with >1000 stage
+    // rows would otherwise see the latest weeks vanish from the calendar).
     const { data } = await supabase
       .from("sleep_stages")
       .select("date, stage, duration_seconds, source")
       .eq("user_id", user.id)
       .gte("date", since)
-      .order("date", { ascending: true });
+      .order("date", { ascending: false })
+      .limit(10000);
 
     setRows(((data as SleepStageRow[]) || []).map(r => ({
       date: r.date,
