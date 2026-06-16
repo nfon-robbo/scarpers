@@ -1233,10 +1233,23 @@ const TrainingPlanPage = () => {
         // intervals.icu /events endpoint actually returns it.
         const pauseStart = pausedAt ? new Date(pausedAt) : new Date();
         const pauseEnd = pausedUntil ? new Date(pausedUntil) : pauseStart;
-        const oldest = toLocalISODate(new Date(pauseStart.getTime() - 60 * 86400000));
-        const newest = toLocalISODate(new Date(pauseEnd.getTime() + 60 * 86400000));
+        const pauseStartIso = toLocalISODate(pauseStart);
+        const pauseEndIso = toLocalISODate(pauseEnd);
+        // Lookup a small ±7d buffer so the /events query returns the marker,
+        // but the server only deletes events strictly overlapping THIS pause
+        // window — so earlier pauses (past holidays) remain untouched.
+        const oldest = toLocalISODate(new Date(pauseStart.getTime() - 7 * 86400000));
+        const newest = toLocalISODate(new Date(pauseEnd.getTime() + 7 * 86400000));
         const clearResp = await supabase.functions.invoke("intervals-sync", {
-          body: { clearPauseEvent: { planId: savedPlanId, oldest, newest } },
+          body: {
+            clearPauseEvent: {
+              planId: savedPlanId,
+              oldest,
+              newest,
+              pauseStart: pauseStartIso,
+              pauseEnd: pauseEndIso,
+            },
+          },
         });
         if (clearResp.error) {
           console.warn("[pause-resume] clearPauseEvent error:", clearResp.error);
