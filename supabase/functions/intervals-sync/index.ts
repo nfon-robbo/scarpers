@@ -343,7 +343,7 @@ serve(async (req) => {
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
       pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
-      clearPauseEvent?: { planId: string; oldest?: string; newest?: string };
+      clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
     };
 
 
@@ -391,16 +391,30 @@ serve(async (req) => {
           const events = await eventsResp.json();
           const markerId = `lovable-pause-${clearPauseEvent.planId}`;
           const pauseCategories = new Set(["HOLIDAY", "SICK", "INJURED", "NOTE"]);
-          // Primary match: our external_id stamp.
-          // Fallback match: any HOLIDAY/SICK/INJURED/NOTE event whose name
-          // contains "Scarpers pause" — covers events created before we had
-          // external_id, and any case where intervals.icu dropped the stamp.
-          const markers = events.filter((e: { external_id?: string; category?: string; name?: string }) => {
-            if (e.external_id === markerId) return true;
-            if (e.category && pauseCategories.has(e.category) && typeof e.name === "string" && /Scarpers/i.test(e.name)) return true;
+          // Restrict fallback matches to events overlapping the specific pause
+          // window the user is cancelling — never touch earlier pauses.
+          const winStart = clearPauseEvent.pauseStart ?? null;
+          const winEnd = clearPauseEvent.pauseEnd ?? null;
+          const overlapsWindow = (evStart?: string, evEnd?: string) => {
+            if (!winStart || !winEnd) return false;
+            const s = (evStart ?? "").slice(0, 10);
+            const e = (evEnd ?? evStart ?? "").slice(0, 10);
+            if (!s) return false;
+            // Overlap if event-start <= window-end AND event-end >= window-start
+            return s <= winEnd && e >= winStart;
+          };
+          // Primary match: our external_id stamp (unique per plan+window — safe).
+          // Fallback match: Scarpers-named pause event that overlaps THIS window only.
+          const markers = events.filter((e: { external_id?: string; category?: string; name?: string; start_date_local?: string; end_date_local?: string }) => {
+            if (e.external_id === markerId && overlapsWindow(e.start_date_local, e.end_date_local)) return true;
+            if (
+              e.category && pauseCategories.has(e.category) &&
+              typeof e.name === "string" && /Scarpers/i.test(e.name) &&
+              overlapsWindow(e.start_date_local, e.end_date_local)
+            ) return true;
             return false;
           });
-          console.log(`[clearPauseEvent] planId=${clearPauseEvent.planId} range=${oldest}..${newest} scanned=${events.length} matched=${markers.length}`);
+          console.log(`[clearPauseEvent] planId=${clearPauseEvent.planId} window=${winStart}..${winEnd} scanned=${events.length} matched=${markers.length}`);
           let deleted = 0;
           for (const evt of markers) {
             const delResp = await fetch(`${baseUrl}/events/${evt.id}`, {
