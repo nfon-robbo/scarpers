@@ -1070,6 +1070,21 @@ const TrainingPlanPage = () => {
   };
 
   // ─── Pause / Resume ───────────────────────────────────────────────
+  // Returns true if the user has Intervals.icu credentials configured.
+  const hasIntervalsConnected = async (): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { data } = await supabase
+        .from("intervals_credentials")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      return !!data;
+    } catch {
+      return false;
+    }
+  };
+
   const handleConfirmPause = async (params: {
     pausedAt: Date;
     pausedUntil: Date;
@@ -1094,9 +1109,29 @@ const TrainingPlanPage = () => {
     setPausedUntil(params.pausedUntil);
     setPauseReason(params.reason);
     setPauseRaceDateMode(params.raceDateMode);
+
+    // Mirror the pause to Intervals.icu: remove planned workouts that fall
+    // inside the pause window so they don't push to Garmin during the break.
+    let intervalsNote = "";
+    if (await hasIntervalsConnected()) {
+      try {
+        const startIso = toLocalISODate(params.pausedAt);
+        const endIso = toLocalISODate(params.pausedUntil);
+        const resp = await supabase.functions.invoke("intervals-sync", {
+          body: { deleteRange: { oldest: startIso, newest: endIso } },
+        });
+        if (!resp.error) {
+          const deleted = (resp.data as any)?.deleted ?? 0;
+          intervalsNote = ` Cleared ${deleted} workout${deleted === 1 ? "" : "s"} from Intervals.icu.`;
+        }
+      } catch {
+        // silent — surfaced in description only when successful
+      }
+    }
+
     toast({
       title: "Plan paused",
-      description: `Resume scheduled for ${format(params.pausedUntil, "dd MMM yyyy")}.`,
+      description: `Resume scheduled for ${format(params.pausedUntil, "dd MMM yyyy")}.${intervalsNote}`,
     });
   };
 
@@ -1127,7 +1162,7 @@ const TrainingPlanPage = () => {
 
     const updatePayload: any = isCancel
       ? { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent }
-      : { race_date_mode: null, content: newContent };
+      : { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent };
     if (!isCancel && newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
       updatePayload.race_date = newRaceIso;
     }
@@ -1139,11 +1174,9 @@ const TrainingPlanPage = () => {
     }
 
     setContent(newContent);
-    if (isCancel) {
-      setPausedAt(null);
-      setPausedUntil(null);
-      setPauseReason(null);
-    }
+    setPausedAt(null);
+    setPausedUntil(null);
+    setPauseReason(null);
     setPauseRaceDateMode(null);
     if (updatePayload.race_date) {
       setRaceDate(parseLocalISODate(updatePayload.race_date));
@@ -1151,13 +1184,26 @@ const TrainingPlanPage = () => {
     if (previousContent !== newContent) {
       pushUndoEntry(savedPlanId, previousContent, "resume from pause");
     }
+
     toast({
       title: isCancel ? "Pause cancelled" : "Training resumed",
       description: isCancel
-        ? "Original plan restored — all workouts back on schedule."
-        : `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-sync your watch / Intervals.icu to update scheduled sessions.`,
+        ? "Original plan restored — re-pushing workouts to Intervals.icu…"
+        : `Workouts shifted by ${params.deltaDays} day${params.deltaDays === 1 ? "" : "s"}.${trimmedNote} Re-pushing to Intervals.icu…`,
     });
+
+    // Re-push the (possibly shifted) plan to Intervals.icu so Garmin reflects
+    // the resumed schedule. handleSyncToIntervals(refresh=true) clears the
+    // date range first, then bulk-upserts every workout with segments.
+    if (await hasIntervalsConnected()) {
+      try {
+        await handleSyncToIntervals(true, undefined, newContent);
+      } catch {
+        // sync errors are surfaced inside handleSyncToIntervals
+      }
+    }
   };
+
 
   const regenerateForNewEndDate = async (newStart: Date, newEnd: Date) => {
     if (!user) return;
