@@ -1175,10 +1175,13 @@ const TrainingPlanPage = () => {
     }
 
     setContent(newContent);
-    setPausedAt(null);
-    setPausedUntil(null);
-    setPauseReason(null);
+    if (isCancel) {
+      setPausedAt(null);
+      setPausedUntil(null);
+      setPauseReason(null);
+    }
     setPauseRaceDateMode(null);
+
     if (updatePayload.race_date) {
       setRaceDate(parseLocalISODate(updatePayload.race_date));
     }
