@@ -16,7 +16,7 @@ import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
 type SourceKey = "google_fit" | "health_connect" | "manual";
 type SourceRow = { source: SourceKey; totals: StageTotals };
-type Row = { date: string; sources: SourceRow[] };
+type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
 
 const fmtH = (secs: number) => {
   if (!secs) return "—";
@@ -149,12 +149,25 @@ const SleepSourcesPanel = () => {
     if (!user) return;
     setLoading(true);
     const since = format(subDays(new Date(), 6), "yyyy-MM-dd");
-    const { data } = await supabase
-      .from("sleep_stages")
-      .select("date, stage, duration_seconds, source")
-      .eq("user_id", user.id)
-      .gte("date", since)
-      .in("source", ["google_fit", "health_connect", "manual"]);
+    const [{ data }, { data: scoreRows }] = await Promise.all([
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds, source")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .in("source", ["google_fit", "health_connect", "manual"]),
+      supabase
+        .from("daily_metrics")
+        .select("date, sleep_score, created_at")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const scoreByDate = new Map<string, number>();
+    for (const r of scoreRows ?? []) {
+      if (r.sleep_score != null && !scoreByDate.has(r.date)) scoreByDate.set(r.date, Math.round(Number(r.sleep_score)));
+    }
 
     const map = new Map<string, Map<SourceKey, StageTotals>>();
     for (const r of data ?? []) {
@@ -172,6 +185,7 @@ const SleepSourcesPanel = () => {
       .map(([date, sm]) => ({
         date,
         sources: Array.from(sm.entries()).map(([source, totals]) => ({ source, totals })),
+        sleepScore: scoreByDate.get(date) ?? null,
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
 
