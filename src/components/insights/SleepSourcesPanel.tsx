@@ -93,6 +93,8 @@ const emptyForm = (date?: string): FormState => ({
 });
 
 const cleanLabel = (value?: string | null) => value?.trim() ?? "";
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 const normaliseBreathingPattern = (value?: string | null) => {
   const label = cleanLabel(value);
@@ -224,7 +226,7 @@ const SleepSourcesPanel = () => {
       .limit(10);
     for (const row of data ?? []) {
       const raw = row?.raw_data as Record<string, unknown> | null | undefined;
-      const v = raw && typeof raw === "object" ? (raw as any).garmin_sleep_vitals : null;
+      const v = raw && typeof raw === "object" ? raw.garmin_sleep_vitals : null;
       if (v && typeof v === "object") return v as GarminVitals;
     }
     return null;
@@ -245,7 +247,7 @@ const SleepSourcesPanel = () => {
     const rows = existingRows ?? [];
     const existing = rows.find((row) => {
       const raw = row?.raw_data as Record<string, unknown> | null | undefined;
-      return raw && typeof raw === "object" && Boolean((raw as any).garmin_sleep_vitals);
+      return raw && typeof raw === "object" && Boolean(raw.garmin_sleep_vitals);
     }) ?? rows[0] ?? null;
 
     const prevRaw = (existing?.raw_data && typeof existing.raw_data === "object" ? existing.raw_data : {}) as Record<string, unknown>;
@@ -445,9 +447,9 @@ const SleepSourcesPanel = () => {
       toast.success("Sleep saved");
       setDialogOpen(false);
       await load();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e?.message ?? "Failed to save sleep");
+      toast.error(getErrorMessage(e, "Failed to save sleep"));
     } finally {
       setSaving(false);
     }
@@ -461,8 +463,8 @@ const SleepSourcesPanel = () => {
         .delete().eq("user_id", user.id).eq("date", date).eq("source", "manual");
       toast.success("Entry deleted");
       await load();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to delete");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Failed to delete"));
     }
   };
 
@@ -485,9 +487,9 @@ const SleepSourcesPanel = () => {
       await saveGarminVitals(form.date, v);
       setForm((f) => applyVitalsToForm(f, v));
       toast.success("Vitals extracted, shown below and saved");
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e?.message ?? "Failed to parse screenshot");
+      toast.error(getErrorMessage(e, "Failed to parse screenshot"));
     } finally {
       setParsing(false);
     }
