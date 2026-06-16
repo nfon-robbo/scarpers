@@ -692,6 +692,27 @@ ${sleepContext}`;
       // Fetch last night's sleep for the target date
       const targetDateStr = target_date || new Date().toISOString().split("T")[0];
 
+      // Plan-paused short-circuit: if target date sits inside the pause window,
+      // skip the LLM and stream a fixed rest recommendation.
+      {
+        const pauseCheck = await checkPlanPaused(supabase, user.id, targetDateStr);
+        if (pauseCheck.paused && pauseCheck.pausedUntil) {
+          const untilUk = fmtUkDate(pauseCheck.pausedUntil);
+          const targetUk = fmtUkDate(targetDateStr);
+          const md = `## 🛌 Plan paused
+
+Your plan is paused until **${untilUk}**. No scheduled workout for ${targetUk}.
+
+Rest, or do an easy activity of your choice — walk, gentle spin, mobility. We'll pick the plan back up automatically when the pause ends.
+
+<!-- DAY_ADJUST_STATUS: PLAN_PAUSED paused_until=${pauseCheck.pausedUntil.toISOString().slice(0,10)} -->
+`;
+          return streamFixedMarkdown(md);
+        }
+      }
+
+
+
       // Get yesterday's activity (fatigue indicator)
       const yesterday = new Date(targetDateStr);
       yesterday.setDate(yesterday.getDate() - 1);
