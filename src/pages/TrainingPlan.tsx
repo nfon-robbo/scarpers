@@ -1229,11 +1229,22 @@ const TrainingPlanPage = () => {
     if (await hasIntervalsConnected()) {
       try {
         // Wipe the Holiday / Sick / Injured / Note marker we placed on pause.
-        await supabase.functions.invoke("intervals-sync", {
-          body: { clearPauseEvent: { planId: savedPlanId } },
+        // Narrow the lookup range to ±60 days around the pause window so the
+        // intervals.icu /events endpoint actually returns it.
+        const pauseStart = pausedAt ? new Date(pausedAt) : new Date();
+        const pauseEnd = pausedUntil ? new Date(pausedUntil) : pauseStart;
+        const oldest = toLocalISODate(new Date(pauseStart.getTime() - 60 * 86400000));
+        const newest = toLocalISODate(new Date(pauseEnd.getTime() + 60 * 86400000));
+        const clearResp = await supabase.functions.invoke("intervals-sync", {
+          body: { clearPauseEvent: { planId: savedPlanId, oldest, newest } },
         });
-      } catch {
-        // silent
+        if (clearResp.error) {
+          console.warn("[pause-resume] clearPauseEvent error:", clearResp.error);
+        } else {
+          console.log("[pause-resume] cleared pause marker:", clearResp.data);
+        }
+      } catch (e) {
+        console.warn("[pause-resume] clearPauseEvent threw:", e);
       }
       try {
         await handleSyncToIntervals(true, undefined, newContent);
@@ -1241,6 +1252,7 @@ const TrainingPlanPage = () => {
         // sync errors are surfaced inside handleSyncToIntervals
       }
     }
+
 
   };
 

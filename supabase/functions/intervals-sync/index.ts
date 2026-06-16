@@ -390,7 +390,17 @@ serve(async (req) => {
         if (eventsResp.ok) {
           const events = await eventsResp.json();
           const markerId = `lovable-pause-${clearPauseEvent.planId}`;
-          const markers = events.filter((e: { external_id?: string }) => e.external_id === markerId);
+          const pauseCategories = new Set(["HOLIDAY", "SICK", "INJURED", "NOTE"]);
+          // Primary match: our external_id stamp.
+          // Fallback match: any HOLIDAY/SICK/INJURED/NOTE event whose name
+          // contains "Scarpers pause" — covers events created before we had
+          // external_id, and any case where intervals.icu dropped the stamp.
+          const markers = events.filter((e: { external_id?: string; category?: string; name?: string }) => {
+            if (e.external_id === markerId) return true;
+            if (e.category && pauseCategories.has(e.category) && typeof e.name === "string" && /Scarpers/i.test(e.name)) return true;
+            return false;
+          });
+          console.log(`[clearPauseEvent] planId=${clearPauseEvent.planId} range=${oldest}..${newest} scanned=${events.length} matched=${markers.length}`);
           let deleted = 0;
           for (const evt of markers) {
             const delResp = await fetch(`${baseUrl}/events/${evt.id}`, {
@@ -398,12 +408,20 @@ serve(async (req) => {
               headers: authHeaders,
             });
             if (delResp.ok) deleted++;
+            else console.warn(`[clearPauseEvent] DELETE failed for ${evt.id}: ${delResp.status}`);
           }
           return new Response(
-            JSON.stringify({ deleted, total: markers.length }),
+            JSON.stringify({ deleted, total: markers.length, scanned: events.length }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        const errText = await eventsResp.text();
+        console.warn(`[clearPauseEvent] events fetch failed ${eventsResp.status}: ${errText}`);
+        return new Response(
+          JSON.stringify({ error: `events fetch failed ${eventsResp.status}`, detail: errText }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Unknown error";
         return new Response(
