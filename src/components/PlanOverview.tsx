@@ -134,7 +134,7 @@ export default function PlanOverview({
     const inPauseWindow = (d: Date) => {
       if (!pauseWindow) return false;
       const t = d.getTime();
-      return t >= pauseWindow.start.getTime() && t <= pauseWindow.end.getTime();
+      return t >= pauseWindow.start.getTime() && t < pauseWindow.end.getTime();
     };
     const total = workouts.filter(w => w.dateObj && !/rest/i.test(w.title) && !inPauseWindow(w.dateObj)).length;
     // Past = strictly before today. Today only counts as "past" if already completed.

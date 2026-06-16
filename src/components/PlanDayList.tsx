@@ -694,7 +694,7 @@ export default function PlanDayList({
                 const draggable = !!workout && !!onMoveWorkout;
                 const inPauseWindow = !!(pauseWindow &&
                   day.getTime() >= new Date(pauseWindow.start).setHours(0, 0, 0, 0) &&
-                  day.getTime() <= new Date(pauseWindow.end).setHours(23, 59, 59, 999));
+                  day.getTime() < new Date(pauseWindow.end).setHours(0, 0, 0, 0));
                 const pauseMeta = pauseReasonMeta(pauseReason);
 
                 return (
