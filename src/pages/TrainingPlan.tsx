@@ -1228,11 +1228,20 @@ const TrainingPlanPage = () => {
     // date range first, then bulk-upserts every workout with segments.
     if (await hasIntervalsConnected()) {
       try {
+        // Wipe the Holiday / Sick / Injured / Note marker we placed on pause.
+        await supabase.functions.invoke("intervals-sync", {
+          body: { clearPauseEvent: { planId: savedPlanId } },
+        });
+      } catch {
+        // silent
+      }
+      try {
         await handleSyncToIntervals(true, undefined, newContent);
       } catch {
         // sync errors are surfaced inside handleSyncToIntervals
       }
     }
+
   };
 
 
