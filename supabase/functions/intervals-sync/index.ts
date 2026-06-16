@@ -338,11 +338,14 @@ serve(async (req) => {
     const INTERVALS_ATHLETE_ID = creds.athlete_id;
 
     const body = await req.json();
-    const { workouts, clearRange, deleteRange } = body as {
+    const { workouts, clearRange, deleteRange, pauseEvent, clearPauseEvent } = body as {
       workouts?: WorkoutInput[];
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
+      pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
+      clearPauseEvent?: { planId: string; oldest?: string; newest?: string };
     };
+
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
     const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
