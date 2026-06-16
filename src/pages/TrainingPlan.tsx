@@ -2172,6 +2172,52 @@ const TrainingPlanPage = () => {
     }
   };
 
+  // ─── Auto-sync to Intervals.icu on any plan change ──────────────────
+  // Whenever the plan content changes (workout edit, AI adaptation, day-ahead
+  // replacement, regeneration, start-date shift, etc.) silently re-push the
+  // whole plan to Intervals.icu so the watch always reflects what's in-app.
+  // Debounced so streaming generations don't spam the API.
+  const lastAutoSyncedContentRef = useRef<string | null>(null);
+  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!savedPlanId || !user) return;
+    if (loading || syncing) return;
+    if (isPlanPaused) return; // skip while paused — pause/resume handlers manage it
+    if (!content || content.length < 20) return;
+    if (lastAutoSyncedContentRef.current === null) {
+      // Mark the initial loaded content as already-synced so we don't push
+      // immediately on page load.
+      lastAutoSyncedContentRef.current = content;
+      return;
+    }
+    if (lastAutoSyncedContentRef.current === content) return;
+
+    if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current);
+    autoSyncTimerRef.current = setTimeout(async () => {
+      const snapshot = content;
+      if (!(await hasIntervalsConnected())) {
+        lastAutoSyncedContentRef.current = snapshot;
+        return;
+      }
+      try {
+        await handleSyncToIntervals(true, undefined, snapshot);
+        lastAutoSyncedContentRef.current = snapshot;
+      } catch {
+        // silent — surfaced inside handleSyncToIntervals
+      }
+    }, 4000);
+
+    return () => {
+      if (autoSyncTimerRef.current) {
+        clearTimeout(autoSyncTimerRef.current);
+        autoSyncTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, savedPlanId, user, loading, syncing, isPlanPaused]);
+
+
+
   const handleDeleteFromIntervals = async () => {
     const workouts = parseWorkoutsFromPlan(content);
     const withDates = workouts.filter(w => w.dateObj);
