@@ -502,7 +502,10 @@ const TrainingPlanPage = () => {
   const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
-  const isPlanPaused = !!pausedAt && !!pausedUntil && new Date(pausedUntil).setHours(0, 0, 0, 0) > new Date().setHours(0, 0, 0, 0);
+  // Stay "paused" until the user explicitly taps Resume — even after the
+  // resume date passes — so holiday workouts aren't flipped to "missed"
+  // and the banner keeps prompting them to resume.
+  const isPlanPaused = !!pausedAt && !!pausedUntil;
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

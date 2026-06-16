@@ -745,7 +745,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {plan?.paused_at && plan?.paused_until && new Date(new Date(plan.paused_until).setHours(0, 0, 0, 0)).getTime() > new Date(new Date().setHours(0, 0, 0, 0)).getTime() && (
+      {plan?.paused_at && plan?.paused_until && (
         <PlanPausedBanner
           pausedUntil={new Date(plan.paused_until)}
           reason={plan.pause_reason}
