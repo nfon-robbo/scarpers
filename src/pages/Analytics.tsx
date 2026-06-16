@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { parseWorkoutsFromPlan, ParsedWorkout } from "@/lib/plan-export";
+import { isPauseActive } from "@/lib/plan-utils";
 import {
   Loader2, RefreshCw, Trophy, Activity as ActivityIcon, Heart, Gauge,
   Flame, Moon, Brain, Timer, Sparkles, CheckCircle2, AlertTriangle, ArrowLeft,
@@ -37,6 +38,10 @@ interface PlanRow {
   race_date: string | null;
   race_distance: string;
   goal_time: string | null;
+  paused_at?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  race_date_mode?: string | null;
 }
 interface Activity {
   id: string;

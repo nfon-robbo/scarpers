@@ -28,6 +28,7 @@ import CoachClaireCard from "@/components/CoachClaireCard";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
+import { isPauseActive } from "@/lib/plan-utils";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import {
   evaluateAdaptation,
@@ -745,7 +746,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {plan?.paused_at && plan?.paused_until && (
+      {plan?.paused_until && isPauseActive(new Date(plan.paused_until), plan.race_date_mode) && (
         <PlanPausedBanner
           pausedUntil={new Date(plan.paused_until)}
           reason={plan.pause_reason}

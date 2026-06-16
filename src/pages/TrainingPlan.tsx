@@ -24,7 +24,14 @@ import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
-import { shiftPlanDatesFrom, trimPlanAfterRaceDate } from "@/lib/plan-utils";
+import {
+  isPauseActive,
+  isPauseReadyToResume,
+  pauseResumeDeltaDays,
+  resumePlanAfterPause,
+  shiftPlanDatesFrom,
+  trimPlanAfterRaceDate,
+} from "@/lib/plan-utils";
 import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
 
 import RaceEstimateTabs from "@/components/RaceEstimateTabs";
@@ -502,10 +509,8 @@ const TrainingPlanPage = () => {
   const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
-  // Stay "paused" until the user explicitly taps Resume — even after the
-  // resume date passes — so holiday workouts aren't flipped to "missed"
-  // and the banner keeps prompting them to resume.
-  const isPlanPaused = !!pausedAt && !!pausedUntil;
+  const isPlanPaused = isPauseActive(pausedUntil, pauseRaceDateMode);
+  const pauseWindow = pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null;
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
