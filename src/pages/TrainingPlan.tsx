@@ -29,8 +29,6 @@ import {
   isPauseReadyToResume,
   pauseResumeDeltaDays,
   resumePlanAfterPause,
-  shiftPlanDatesFrom,
-  trimPlanAfterRaceDate,
 } from "@/lib/plan-utils";
 import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
 
@@ -641,7 +639,8 @@ const TrainingPlanPage = () => {
         let contentToUse = validatedOnLoad;
         let raceToUse = effectiveRace;
 
-        if (loadedPausedAt && loadedPausedUntil && isPauseReadyToResume(loadedPausedUntil, loadedRaceDateMode)) {
+        const shouldAutoResume = loadedPausedAt && loadedPausedUntil && isPauseReadyToResume(loadedPausedUntil, loadedRaceDateMode);
+        if (shouldAutoResume) {
           const resumed = resumePlanAfterPause({
             content: validatedOnLoad,
             pausedAt: loadedPausedAt,
@@ -662,10 +661,11 @@ const TrainingPlanPage = () => {
         setPausedAt(loadedPausedAt);
         setPausedUntil(loadedPausedUntil);
         setPauseReason(anyData.pause_reason ?? null);
-        setPauseRaceDateMode(loadedRaceDateMode);
-        if (contentToUse !== data.content || (raceToUse && raceToUse !== data.race_date)) {
+        setPauseRaceDateMode(shouldAutoResume ? null : loadedRaceDateMode);
+        if (contentToUse !== data.content || (raceToUse && raceToUse !== data.race_date) || shouldAutoResume) {
           const updatePayload: any = { content: contentToUse };
           if (raceToUse && raceToUse !== data.race_date) updatePayload.race_date = raceToUse;
+          if (shouldAutoResume) updatePayload.race_date_mode = null;
           supabase.from("training_plans").update(updatePayload).eq("id", data.id).then(({ error }) => {
             if (error) console.error("plan validation self-heal failed:", error);
           });
@@ -1121,13 +1121,9 @@ const TrainingPlanPage = () => {
       }
     }
 
-    const updatePayload: any = {
-      paused_at: null,
-      paused_until: null,
-      pause_reason: null,
-      race_date_mode: null,
-      content: newContent,
-    };
+    const updatePayload: any = isCancel
+      ? { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent }
+      : { race_date_mode: null, content: newContent };
     if (!isCancel && newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
       updatePayload.race_date = newRaceIso;
     }
@@ -1139,9 +1135,11 @@ const TrainingPlanPage = () => {
     }
 
     setContent(newContent);
-    setPausedAt(null);
-    setPausedUntil(null);
-    setPauseReason(null);
+    if (isCancel) {
+      setPausedAt(null);
+      setPausedUntil(null);
+      setPauseReason(null);
+    }
     setPauseRaceDateMode(null);
     if (updatePayload.race_date) {
       setRaceDate(parseLocalISODate(updatePayload.race_date));
@@ -2745,7 +2743,7 @@ const TrainingPlanPage = () => {
               completedDates={completedDates}
               linkedActivities={linkedActivities}
               isPaused={isPlanPaused}
-              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
+              pauseWindow={pauseWindow}
               headerAction={
                 <div className="flex flex-wrap gap-2">
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
@@ -2845,7 +2843,7 @@ const TrainingPlanPage = () => {
               raceDistance={raceDistance}
               onEditWorkout={(w) => setEditingWorkout(w)}
               isPaused={isPlanPaused}
-              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
+              pauseWindow={pauseWindow}
               pauseReason={pauseReason}
             />
             <WorkoutEditDialog
