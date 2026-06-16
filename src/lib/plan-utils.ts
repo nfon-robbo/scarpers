@@ -18,6 +18,68 @@ function formatDmy(date: Date): string {
   return `${dd}/${mm}/${date.getFullYear()}`;
 }
 
+export type PauseRaceDateMode = "fixed" | "shift";
+
+export function toLocalISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function parseIsoDateLocal(value: string | null | undefined): Date | null {
+  if (!value || value === "ai-recommend") return null;
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  const parsed = new Date(y, (m || 1) - 1, d || 1);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function startOfLocalDayMs(value: Date): number {
+  const d = new Date(value);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+export function isPauseActive(pausedUntil: Date | null | undefined, mode: string | null | undefined, today = new Date()): boolean {
+  return !!pausedUntil && !!mode && startOfLocalDayMs(pausedUntil) > startOfLocalDayMs(today);
+}
+
+export function isPauseReadyToResume(pausedUntil: Date | null | undefined, mode: string | null | undefined, today = new Date()): boolean {
+  return !!pausedUntil && !!mode && startOfLocalDayMs(pausedUntil) <= startOfLocalDayMs(today);
+}
+
+export function pauseResumeDeltaDays(pausedAt: Date, pausedUntil: Date, today = new Date()): number {
+  const targetMs = Math.max(startOfLocalDayMs(pausedUntil), startOfLocalDayMs(today));
+  return Math.max(0, Math.round((targetMs - startOfLocalDayMs(pausedAt)) / 86_400_000));
+}
+
+export function resumePlanAfterPause(params: {
+  content: string;
+  pausedAt: Date;
+  deltaDays: number;
+  raceDateIso?: string | null;
+  raceDateMode?: PauseRaceDateMode | string | null;
+}): { content: string; raceDateIso: string | null; trimmedDays: number } {
+  const fromIso = toLocalISODate(params.pausedAt);
+  let content = params.deltaDays > 0 ? shiftPlanDatesFrom(params.content, fromIso, params.deltaDays) : params.content;
+  let raceDateIso = params.raceDateIso && params.raceDateIso !== "ai-recommend" ? params.raceDateIso : null;
+  let trimmedDays = 0;
+
+  if (params.deltaDays > 0 && params.raceDateMode === "fixed" && raceDateIso) {
+    const trimResult = trimPlanAfterRaceDate(content, raceDateIso);
+    content = trimResult.content;
+    trimmedDays = trimResult.trimmedDays;
+  } else if (params.deltaDays > 0 && params.raceDateMode === "shift" && raceDateIso) {
+    const raceDate = parseIsoDateLocal(raceDateIso);
+    if (raceDate) {
+      raceDate.setDate(raceDate.getDate() + params.deltaDays);
+      raceDateIso = toLocalISODate(raceDate);
+    }
+  }
+
+  return { content, raceDateIso, trimmedDays };
+}
+
 /** Shift every DD/MM/YYYY in the markdown by deltaDays (positive or negative). */
 export function shiftPlanDates(markdown: string, deltaDays: number): string {
   if (!deltaDays) return markdown;

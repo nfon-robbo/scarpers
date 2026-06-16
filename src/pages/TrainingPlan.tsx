@@ -24,7 +24,12 @@ import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
-import { shiftPlanDatesFrom, trimPlanAfterRaceDate } from "@/lib/plan-utils";
+import {
+  isPauseActive,
+  isPauseReadyToResume,
+  pauseResumeDeltaDays,
+  resumePlanAfterPause,
+} from "@/lib/plan-utils";
 import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
 
 import RaceEstimateTabs from "@/components/RaceEstimateTabs";
@@ -502,10 +507,8 @@ const TrainingPlanPage = () => {
   const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
-  // Stay "paused" until the user explicitly taps Resume — even after the
-  // resume date passes — so holiday workouts aren't flipped to "missed"
-  // and the banner keeps prompting them to resume.
-  const isPlanPaused = !!pausedAt && !!pausedUntil;
+  const isPlanPaused = isPauseActive(pausedUntil, pauseRaceDateMode);
+  const pauseWindow = pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null;
   useEffect(() => { raceDateRef.current = raceDate; }, [raceDate]);
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -617,6 +620,7 @@ const TrainingPlanPage = () => {
         .maybeSingle();
 
       if (data) {
+        const anyData = data as any;
         const loadedTrainingDays = data.training_days || [];
         // Union with weekdays of any dated session already in the saved
         // content so user-initiated moves to off-schedule days (e.g.
@@ -626,30 +630,54 @@ const TrainingPlanPage = () => {
           trainingDays: effectiveLoadDays,
           source: "active plan load",
         }).content;
-        setContent(validatedOnLoad);
+        const loadedPausedAt = anyData.paused_at ? new Date(anyData.paused_at) : null;
+        const loadedPausedUntil = anyData.paused_until ? new Date(anyData.paused_until) : null;
+        const loadedRaceDateMode = (anyData.race_date_mode as RaceDateMode | null) ?? null;
+        const derivedRace = extractRaceDateFromMarkdown(validatedOnLoad);
+        const storedRace = data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null;
+        const effectiveRace = derivedRace ?? storedRace;
+        let contentToUse = validatedOnLoad;
+        let raceToUse = effectiveRace;
+
+        const shouldAutoResume = loadedPausedAt && loadedPausedUntil && isPauseReadyToResume(loadedPausedUntil, loadedRaceDateMode);
+        if (shouldAutoResume) {
+          const resumed = resumePlanAfterPause({
+            content: validatedOnLoad,
+            pausedAt: loadedPausedAt,
+            deltaDays: pauseResumeDeltaDays(loadedPausedAt, loadedPausedUntil),
+            raceDateIso: effectiveRace,
+            raceDateMode: loadedRaceDateMode,
+          });
+          contentToUse = resumed.content;
+          raceToUse = resumed.raceDateIso;
+        }
+
+        setContent(contentToUse);
         setSavedPlanId(data.id);
         setRaceDistance(data.race_distance);
         setGoalTime((data as any).goal_time || "");
         setTrainingDays(loadedTrainingDays);
         setStartDate(parseLocalISODate(data.start_date));
-        const anyData = data as any;
-        setPausedAt(anyData.paused_at ? new Date(anyData.paused_at) : null);
-        setPausedUntil(anyData.paused_until ? new Date(anyData.paused_until) : null);
+        setPausedAt(loadedPausedAt);
+        setPausedUntil(loadedPausedUntil);
         setPauseReason(anyData.pause_reason ?? null);
-        setPauseRaceDateMode((anyData.race_date_mode as RaceDateMode | null) ?? null);
-        if (validatedOnLoad !== data.content) {
-          supabase.from("training_plans").update({ content: validatedOnLoad }).eq("id", data.id).then(({ error }) => {
+        setPauseRaceDateMode(shouldAutoResume ? null : loadedRaceDateMode);
+        if (contentToUse !== data.content || (raceToUse && raceToUse !== data.race_date) || shouldAutoResume) {
+          const updatePayload: any = { content: contentToUse };
+          if (raceToUse && raceToUse !== data.race_date) updatePayload.race_date = raceToUse;
+          if (shouldAutoResume) updatePayload.race_date_mode = null;
+          supabase.from("training_plans").update(updatePayload).eq("id", data.id).then(({ error }) => {
             if (error) console.error("plan validation self-heal failed:", error);
           });
         }
         // Markdown plan is the source of truth for race day. If the stored
         // race_date disagrees with the RACE DAY heading in content, self-heal.
-        const derived = extractRaceDateFromMarkdown(validatedOnLoad);
-        const effectiveRace = derived ?? (data.race_date && data.race_date !== "ai-recommend" ? data.race_date : null);
-        if (effectiveRace) {
-          setRaceDate(parseLocalISODate(effectiveRace));
-          if (derived && derived !== data.race_date) {
-            supabase.from("training_plans").update({ race_date: derived } as any).eq("id", data.id).then(({ error }) => {
+        const finalDerived = extractRaceDateFromMarkdown(contentToUse);
+        const finalRace = finalDerived ?? raceToUse;
+        if (finalRace) {
+          setRaceDate(parseLocalISODate(finalRace));
+          if (finalDerived && finalDerived !== data.race_date) {
+            supabase.from("training_plans").update({ race_date: finalDerived } as any).eq("id", data.id).then(({ error }) => {
               if (error) console.error("race_date self-heal failed:", error);
             });
           }
@@ -1073,37 +1101,29 @@ const TrainingPlanPage = () => {
   const handleConfirmResume = async (params: { resumeMode: "cancel" | "skip-next-week" | "continue-paused-week"; deltaDays: number }) => {
     if (!savedPlanId || !user || !pausedAt) return;
     const previousContent = content;
-    const fromIso = toLocalISODate(pausedAt);
     let newContent = previousContent;
     let trimmedNote = "";
     let newRaceIso: string | null = raceDate ? toLocalISODate(raceDate) : null;
     const isCancel = params.resumeMode === "cancel" || params.deltaDays === 0;
 
     if (!isCancel && params.deltaDays > 0) {
-      newContent = shiftPlanDatesFrom(previousContent, fromIso, params.deltaDays);
-
-      if (pauseRaceDateMode === "fixed" && newRaceIso) {
-        // Keep race date fixed: trim anything that now lands past race day.
-        const trimResult = trimPlanAfterRaceDate(newContent, newRaceIso);
-        newContent = trimResult.content;
-        if (trimResult.trimmedDays > 0) {
-          trimmedNote = ` ${trimResult.trimmedDays} workout${trimResult.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
-        }
-      } else if (pauseRaceDateMode === "shift" && newRaceIso) {
-        // Race day moves with everything else.
-        const r = new Date(raceDate!);
-        r.setDate(r.getDate() + params.deltaDays);
-        newRaceIso = toLocalISODate(r);
+      const resumed = resumePlanAfterPause({
+        content: previousContent,
+        pausedAt,
+        deltaDays: params.deltaDays,
+        raceDateIso: newRaceIso,
+        raceDateMode: pauseRaceDateMode,
+      });
+      newContent = resumed.content;
+      newRaceIso = resumed.raceDateIso;
+      if (resumed.trimmedDays > 0) {
+        trimmedNote = ` ${resumed.trimmedDays} workout${resumed.trimmedDays === 1 ? "" : "s"} trimmed to keep race day.`;
       }
     }
 
-    const updatePayload: any = {
-      paused_at: null,
-      paused_until: null,
-      pause_reason: null,
-      race_date_mode: null,
-      content: newContent,
-    };
+    const updatePayload: any = isCancel
+      ? { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent }
+      : { race_date_mode: null, content: newContent };
     if (!isCancel && newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
       updatePayload.race_date = newRaceIso;
     }
@@ -1115,9 +1135,11 @@ const TrainingPlanPage = () => {
     }
 
     setContent(newContent);
-    setPausedAt(null);
-    setPausedUntil(null);
-    setPauseReason(null);
+    if (isCancel) {
+      setPausedAt(null);
+      setPausedUntil(null);
+      setPauseReason(null);
+    }
     setPauseRaceDateMode(null);
     if (updatePayload.race_date) {
       setRaceDate(parseLocalISODate(updatePayload.race_date));
@@ -2721,7 +2743,7 @@ const TrainingPlanPage = () => {
               completedDates={completedDates}
               linkedActivities={linkedActivities}
               isPaused={isPlanPaused}
-              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
+              pauseWindow={pauseWindow}
               headerAction={
                 <div className="flex flex-wrap gap-2">
                   <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
@@ -2821,7 +2843,7 @@ const TrainingPlanPage = () => {
               raceDistance={raceDistance}
               onEditWorkout={(w) => setEditingWorkout(w)}
               isPaused={isPlanPaused}
-              pauseWindow={isPlanPaused && pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null}
+              pauseWindow={pauseWindow}
               pauseReason={pauseReason}
             />
             <WorkoutEditDialog

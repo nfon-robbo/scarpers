@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { parseWorkoutsFromPlan, ParsedWorkout } from "@/lib/plan-export";
+import { startOfLocalDayMs } from "@/lib/plan-utils";
 import {
   Loader2, RefreshCw, Trophy, Activity as ActivityIcon, Heart, Gauge,
   Flame, Moon, Brain, Timer, Sparkles, CheckCircle2, AlertTriangle, ArrowLeft,
@@ -37,6 +38,10 @@ interface PlanRow {
   race_date: string | null;
   race_distance: string;
   goal_time: string | null;
+  paused_at?: string | null;
+  paused_until?: string | null;
+  pause_reason?: string | null;
+  race_date_mode?: string | null;
 }
 interface Activity {
   id: string;
@@ -235,7 +240,7 @@ export default function Analytics() {
       const [{ data: planData }, { data: profileData }] = await Promise.all([
         supabase
           .from("training_plans")
-          .select("id, user_id, content, start_date, race_date, race_distance, goal_time")
+          .select("id, user_id, content, start_date, race_date, race_distance, goal_time, paused_at, paused_until, pause_reason, race_date_mode")
           .eq("user_id", user.id)
           .eq("archived", false)
           .order("created_at", { ascending: false })
@@ -355,15 +360,19 @@ export default function Analytics() {
       activities.filter(isCredibleCompletedActivity).map((a) => isoDay(new Date(a.start_time))),
     );
     let completed = 0, upcoming = 0, skipped = 0, rest = 0, total = 0;
+    const pauseStart = plan.paused_at ? startOfLocalDayMs(new Date(plan.paused_at)) : null;
+    const pauseEnd = plan.paused_until ? startOfLocalDayMs(new Date(plan.paused_until)) : null;
     const days = planWorkouts.map((w, index) => {
       if (!w.dateObj) return null;
       const day = isoDay(w.dateObj);
       const isRest = /rest/i.test(w.title);
+      const inPauseWindow = pauseStart !== null && pauseEnd !== null &&
+        startOfLocalDayMs(w.dateObj) >= pauseStart && startOfLocalDayMs(w.dateObj) < pauseEnd;
       let status: "completed" | "upcoming" | "skipped" | "rest";
       const hasCompletion = activities.some((a) => activityCompletesSession(a, w, plan.id, day));
       if (hasCompletion) {
         status = "completed"; completed++; total++;
-      } else if (isRest) {
+      } else if (isRest || inPauseWindow) {
         status = "rest"; rest++;
       } else {
         total++;

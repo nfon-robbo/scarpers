@@ -28,6 +28,7 @@ import CoachClaireCard from "@/components/CoachClaireCard";
 import WorkoutReviewDialog from "@/components/WorkoutReviewDialog";
 import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
+import { isPauseActive, isPauseReadyToResume, pauseResumeDeltaDays, resumePlanAfterPause } from "@/lib/plan-utils";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import {
   evaluateAdaptation,
@@ -69,6 +70,7 @@ interface MetricsRow {
 }
 
 interface PlanRow {
+  id: string;
   content: string;
   start_date: string;
   training_days: string[];
@@ -378,13 +380,37 @@ const Dashboard = () => {
     // Get latest training plan for "Today's Workout" card
     supabase
       .from("training_plans")
-      .select("content, start_date, training_days, race_distance, paused_at, paused_until, pause_reason, race_date_mode, race_date")
+      .select("id, content, start_date, training_days, race_distance, paused_at, paused_until, pause_reason, race_date_mode, race_date")
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
       .limit(1)
       .then(({ data }) => {
-        if (data && data.length > 0) setPlan(data[0] as PlanRow);
+        if (data && data.length > 0) {
+          const loadedPlan = data[0] as PlanRow;
+          const pausedAt = loadedPlan.paused_at ? new Date(loadedPlan.paused_at) : null;
+          const pausedUntil = loadedPlan.paused_until ? new Date(loadedPlan.paused_until) : null;
+          if (pausedAt && pausedUntil && isPauseReadyToResume(pausedUntil, loadedPlan.race_date_mode)) {
+            const resumed = resumePlanAfterPause({
+              content: loadedPlan.content,
+              pausedAt,
+              deltaDays: pauseResumeDeltaDays(pausedAt, pausedUntil),
+              raceDateIso: loadedPlan.race_date,
+              raceDateMode: loadedPlan.race_date_mode,
+            });
+            const nextPlan = { ...loadedPlan, content: resumed.content, race_date: resumed.raceDateIso, race_date_mode: null };
+            setPlan(nextPlan);
+            supabase.from("training_plans").update({
+              content: resumed.content,
+              race_date: resumed.raceDateIso,
+              race_date_mode: null,
+            } as any).eq("id", loadedPlan.id).then(({ error }) => {
+              if (error) console.error("pause auto-resume failed:", error);
+            });
+          } else {
+            setPlan(loadedPlan);
+          }
+        }
       });
 
     // One-time cleanup: delete any Strava activities that overlap a FIT
@@ -745,7 +771,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {plan?.paused_at && plan?.paused_until && (
+      {plan?.paused_until && isPauseActive(new Date(plan.paused_until), plan.race_date_mode) && (
         <PlanPausedBanner
           pausedUntil={new Date(plan.paused_until)}
           reason={plan.pause_reason}
