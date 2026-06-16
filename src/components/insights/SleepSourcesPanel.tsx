@@ -133,6 +133,8 @@ const SleepSourcesPanel = () => {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [latestAnyDate, setLatestAnyDate] = useState<string | null>(null);
+  const [totalNights, setTotalNights] = useState<number>(0);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -165,6 +167,24 @@ const SleepSourcesPanel = () => {
       .sort((a, b) => b.date.localeCompare(a.date));
 
     setRows(built);
+
+    // Always surface the user's historical coverage so the empty state
+    // doesn't make it look like older data has been wiped.
+    const { data: latest } = await supabase
+      .from("sleep_stages")
+      .select("date")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(1);
+    setLatestAnyDate(latest?.[0]?.date ?? null);
+
+    const { data: distinctDates } = await supabase
+      .from("sleep_stages")
+      .select("date")
+      .eq("user_id", user.id);
+    const uniq = new Set((distinctDates ?? []).map((r) => r.date));
+    setTotalNights(uniq.size);
+
     setLoading(false);
   }, [user]);
 
@@ -462,9 +482,15 @@ const SleepSourcesPanel = () => {
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>No sleep data in the last 7 days.</p>
+            {latestAnyDate ? (
+              <p>
+                No sleep data in the last 7 days. Your {totalNights.toLocaleString()} historical nights are still on file — most recent: <span className="text-foreground font-medium">{format(parseISO(latestAnyDate), "dd/MM/yyyy")}</span>. See the Sleep Calendar and Sleep Stages chart below for the full history.
+              </p>
+            ) : (
+              <p>No sleep data yet.</p>
+            )}
             <Button size="sm" variant="outline" onClick={openAdd}>
-              <Plus className="w-4 h-4 mr-1" /> Add your first night
+              <Plus className="w-4 h-4 mr-1" /> Add a night
             </Button>
           </div>
         ) : (
