@@ -133,6 +133,8 @@ const SleepSourcesPanel = () => {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [latestAnyDate, setLatestAnyDate] = useState<string | null>(null);
+  const [totalNights, setTotalNights] = useState<number>(0);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -165,6 +167,24 @@ const SleepSourcesPanel = () => {
       .sort((a, b) => b.date.localeCompare(a.date));
 
     setRows(built);
+
+    // Always surface the user's historical coverage so the empty state
+    // doesn't make it look like older data has been wiped.
+    const { data: latest } = await supabase
+      .from("sleep_stages")
+      .select("date")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(1);
+    setLatestAnyDate(latest?.[0]?.date ?? null);
+
+    const { data: distinctDates } = await supabase
+      .from("sleep_stages")
+      .select("date")
+      .eq("user_id", user.id);
+    const uniq = new Set((distinctDates ?? []).map((r) => r.date));
+    setTotalNights(uniq.size);
+
     setLoading(false);
   }, [user]);
 
