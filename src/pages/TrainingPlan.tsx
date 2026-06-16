@@ -1162,10 +1162,11 @@ const TrainingPlanPage = () => {
 
     const updatePayload: any = isCancel
       ? { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent }
-      : { paused_at: null, paused_until: null, pause_reason: null, race_date_mode: null, content: newContent };
+      : { race_date_mode: null, content: newContent };
     if (!isCancel && newRaceIso && newRaceIso !== (raceDate ? toLocalISODate(raceDate) : null)) {
       updatePayload.race_date = newRaceIso;
     }
+
 
     const { error } = await supabase.from("training_plans").update(updatePayload).eq("id", savedPlanId);
     if (error) {
