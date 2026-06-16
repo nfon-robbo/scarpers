@@ -297,6 +297,20 @@ serve(async (req) => {
       }
     }
 
+    // Guard: plan is currently paused — exit silently, no adaptation while paused.
+    if (plan.paused_at && plan.paused_until) {
+      const now = Date.now();
+      const start = new Date(plan.paused_at).getTime();
+      const end = new Date(plan.paused_until).getTime();
+      if (!isNaN(start) && !isNaN(end) && now >= start && now < end) {
+        return new Response(JSON.stringify({ ok: false, reason: "plan_paused" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+
     // Guard: skip taper / race week (last 14 days of plan)
     if (plan.race_date && plan.race_date !== "ai-recommend") {
       const raceMs = new Date(plan.race_date).getTime();
