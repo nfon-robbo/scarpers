@@ -63,9 +63,10 @@ export function resumePlanAfterPause(params: {
   trainingDays?: string[] | null;
 }): { content: string; raceDateIso: string | null; trimmedDays: number } {
   const fromIso = toLocalISODate(params.pausedAt);
-  let content = params.deltaDays > 0
-    ? reschedulePlanDatesFrom(params.content, fromIso, params.pausedUntil, params.trainingDays) ?? shiftPlanDatesFrom(params.content, fromIso, params.deltaDays)
-    : params.content;
+  const rescheduledContent = params.deltaDays > 0
+    ? reschedulePlanDatesFrom(params.content, fromIso, params.pausedUntil, params.trainingDays)
+    : null;
+  let content = rescheduledContent ?? (params.deltaDays > 0 ? shiftPlanDatesFrom(params.content, fromIso, params.deltaDays) : params.content);
   let raceDateIso = params.raceDateIso && params.raceDateIso !== "ai-recommend" ? params.raceDateIso : null;
   let trimmedDays = 0;
 
@@ -74,10 +75,15 @@ export function resumePlanAfterPause(params: {
     content = trimResult.content;
     trimmedDays = trimResult.trimmedDays;
   } else if (params.deltaDays > 0 && params.raceDateMode === "shift" && raceDateIso) {
+    const rescheduledRaceIso = rescheduledContent ? extractRaceDateIso(content) : null;
+    if (rescheduledRaceIso) {
+      raceDateIso = rescheduledRaceIso;
+    } else {
     const raceDate = parseIsoDateLocal(raceDateIso);
     if (raceDate) {
       raceDate.setDate(raceDate.getDate() + params.deltaDays);
       raceDateIso = toLocalISODate(raceDate);
+    }
     }
   }
 
@@ -119,29 +125,32 @@ function reschedulePlanDatesFrom(
   let cursor = new Date(resumeDate);
   cursor.setHours(0, 0, 0, 0);
 
-  return markdown.replace(DATE_RE, (m, d, mo, y, offset, fullText) => {
+  const lines = markdown.split("\n");
+  return lines.map((line) => {
+    const heading = line.match(/^(###\s+\*\*)([A-Za-z]+)\s+(\d{1,2})\/(\d{1,2})\/(\d{4})(\*\*.*)$/);
+    if (!heading || /week\s+of/i.test(line)) return line;
+    const [, prefix, _weekday, d, mo, y, suffix] = heading;
     const date = parseDmy(d, mo, y);
-    if (!date || startOfLocalDayMs(date) < fromMs) return m;
-    const lineStart = fullText.lastIndexOf("\n", offset) + 1;
-    const lineEnd = fullText.indexOf("\n", offset);
-    const line = fullText.slice(lineStart, lineEnd === -1 ? fullText.length : lineEnd);
-    const isWorkoutHeading = /^###\s+\*\*/.test(line) && !/week\s+of/i.test(line);
+    if (!date || startOfLocalDayMs(date) < fromMs) return line;
     const isRaceDay = /race\s*day/i.test(line);
-    if (!isWorkoutHeading && !isRaceDay) return m;
-
     const originalKey = `${String(d).padStart(2, "0")}/${String(mo).padStart(2, "0")}/${y}`;
     if (!dateMap.has(originalKey)) {
-      if (isRaceDay) {
-        dateMap.set(originalKey, nextAllowedTrainingDate(cursor, [date.getDay()]));
-      } else {
-        const next = nextAllowedTrainingDate(cursor, allowedDays);
-        dateMap.set(originalKey, next);
-        cursor = new Date(next);
-        cursor.setDate(cursor.getDate() + 1);
-      }
+      const next = isRaceDay ? nextAllowedTrainingDate(cursor, [date.getDay()]) : nextAllowedTrainingDate(cursor, allowedDays);
+      dateMap.set(originalKey, next);
+      cursor = new Date(next);
+      cursor.setDate(cursor.getDate() + 1);
     }
-    return formatDmy(dateMap.get(originalKey)!);
-  });
+    const nextDate = dateMap.get(originalKey)!;
+    return `${prefix}${WEEKDAY_NAMES[nextDate.getDay()]} ${formatDmy(nextDate)}${suffix}`;
+  }).join("\n");
+}
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function extractRaceDateIso(markdown: string): string | null {
+  const line = markdown.split("\n").find((l) => /race\s*day/i.test(l) && /\d{1,2}\/\d{1,2}\/\d{4}/.test(l));
+  const m = line?.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}` : null;
 }
 
 /** Shift every DD/MM/YYYY in the markdown by deltaDays (positive or negative). */
