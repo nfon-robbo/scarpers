@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { HealthConnect } from "capacitor-health-connect";
+import type { RecordType as HealthRecordType, TimeRangeFilter } from "capacitor-health-connect";
 import { supabase } from "@/integrations/supabase/client";
 
 export const isHealthConnectPlatform = () =>
@@ -9,9 +10,55 @@ const READ_TYPES = [
   "Steps",
   "ActiveCaloriesBurned",
   "RestingHeartRate",
-] as const;
+] as const satisfies readonly HealthRecordType[];
 
-const PERMISSION_BY_TYPE: Record<(typeof READ_TYPES)[number], string> = {
+type SupportedReadType = (typeof READ_TYPES)[number];
+type HealthReadRecord = Record<string, unknown>;
+type PermissionCheckResponse = { grantedPermissions?: string[]; hasAllPermissions?: boolean };
+type HealthConnectWithPermissions = typeof HealthConnect & {
+  checkHealthPermissions?: (options: {
+    read: HealthRecordType[];
+    write: HealthRecordType[];
+  }) => Promise<PermissionCheckResponse>;
+};
+
+type HealthStepsRecord = { startTime: string | Date; count?: number | string };
+type HealthCaloriesRecord = {
+  startTime: string | Date;
+  energy?: { inKilocalories?: number | string; value?: number | string };
+};
+type HealthRestingHrRecord = { time: string | Date; beatsPerMinute?: number | string };
+type HealthHeartRateSeriesRecord = {
+  samples?: { time: string | Date; beatsPerMinute?: number | string }[];
+};
+type SleepStageName = "deep" | "rem" | "light" | "awake" | "sleep";
+type SleepStageTotals = Record<SleepStageName, number>;
+type HealthSleepStageSegment = {
+  startTime?: string | Date;
+  endTime?: string | Date;
+  stage?: string | number;
+  type?: string | number;
+};
+type HealthSleepSession = {
+  startTime?: string | Date;
+  endTime?: string | Date;
+  stages?: HealthSleepStageSegment[];
+};
+type DailyMetricPatch = {
+  user_id: string;
+  date: string;
+  source_file?: string;
+  steps?: number;
+  active_calories?: number;
+  resting_heart_rate?: number;
+  deep_sleep_minutes?: number;
+  rem_sleep_minutes?: number;
+  light_sleep_minutes?: number;
+  awake_during_night_minutes?: number;
+  sleep_duration_seconds?: number;
+};
+
+const PERMISSION_BY_TYPE: Record<SupportedReadType, string> = {
   Steps: "android.permission.health.READ_STEPS",
   ActiveCaloriesBurned: "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
   RestingHeartRate: "android.permission.health.READ_RESTING_HEART_RATE",
