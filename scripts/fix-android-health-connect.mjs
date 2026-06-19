@@ -4,6 +4,19 @@ import { join } from "node:path";
 const androidDir = join(process.cwd(), "android");
 const variablesPath = join(androidDir, "variables.gradle");
 const buildGradlePath = join(androidDir, "build.gradle");
+const gradlePropertiesPath = join(androidDir, "gradle.properties");
+
+const upsertGradleProperty = (contents, key, value) => {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^\\s*${escapedKey}\\s*=.*$`, "m");
+  const replacement = `${key}=${value}`;
+
+  if (pattern.test(contents)) {
+    return contents.replace(pattern, replacement);
+  }
+
+  return `${contents.trimEnd()}\n${replacement}\n`;
+};
 
 if (!existsSync(androidDir)) {
   console.error("No android folder found. Run `npx cap add android` first.");
@@ -49,4 +62,8 @@ if (!buildGradle.includes("Health Connect's Kotlin plugin")) {
   writeFileSync(buildGradlePath, buildGradle);
 }
 
-console.log("Android Health Connect build settings fixed: minSdkVersion 26, Kotlin JVM target 17.");
+let gradleProperties = existsSync(gradlePropertiesPath) ? readFileSync(gradlePropertiesPath, "utf8") : "";
+gradleProperties = upsertGradleProperty(gradleProperties, "android.useFullClasspathForDexingTransform", "true");
+writeFileSync(gradlePropertiesPath, gradleProperties);
+
+console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled.");
