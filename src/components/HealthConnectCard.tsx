@@ -8,6 +8,7 @@ import {
   isHealthConnectPlatform,
   ensureHealthConnectAvailable,
   requestHealthConnectPermissions,
+  getGrantedHealthConnectPermissions,
   syncHealthConnect,
 } from "@/lib/health-connect";
 
@@ -19,11 +20,19 @@ const HealthConnectCard = () => {
   const [granted, setGranted] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const refreshGranted = async () => {
+    const list = await getGrantedHealthConnectPermissions();
+    setGranted(list.length > 0);
+  };
+
   useEffect(() => {
     if (!isHealthConnectPlatform()) return;
     setSupported(true);
     ensureHealthConnectAvailable()
-      .then((a) => setAvailability(a))
+      .then((a) => {
+        setAvailability(a);
+        if (a === "Available") refreshGranted();
+      })
       .catch(() => setAvailability("NotSupported"));
   }, []);
 
@@ -31,10 +40,10 @@ const HealthConnectCard = () => {
 
   const handleConnect = async () => {
     try {
-      const res: any = await requestHealthConnectPermissions();
-      const ok = res?.grantedPermissions?.length > 0 || res?.hasAllPermissions;
-      setGranted(!!ok);
-      if (ok) toast({ title: "Health Connect granted" });
+      await requestHealthConnectPermissions();
+      await refreshGranted();
+      const list = await getGrantedHealthConnectPermissions();
+      if (list.length > 0) toast({ title: `Health Connect granted (${list.length} permissions)` });
       else toast({ title: "Permissions denied", variant: "destructive" });
     } catch (e: any) {
       toast({ title: "Permission error", description: e?.message, variant: "destructive" });
