@@ -9,7 +9,7 @@ const READ_TYPES = [
   "Steps",
   "ActiveCaloriesBurned",
   "RestingHeartRate",
-  "HeartRateSeries",
+  "HeartRate",
   "SleepSession",
 ] as const;
 
