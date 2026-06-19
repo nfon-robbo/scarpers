@@ -9,9 +9,26 @@ const READ_TYPES = [
   "Steps",
   "ActiveCaloriesBurned",
   "RestingHeartRate",
-  "HeartRate",
-  "SleepSession",
 ] as const;
+
+const PERMISSION_BY_TYPE: Record<(typeof READ_TYPES)[number], string> = {
+  Steps: "android.permission.health.READ_STEPS",
+  ActiveCaloriesBurned: "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+  RestingHeartRate: "android.permission.health.READ_RESTING_HEART_RATE",
+};
+
+const UNSUPPORTED_NATIVE_READ_ERRORS = [
+  {
+    type: "SleepSession",
+    message:
+      "Skipped before native sync: capacitor-health-connect 0.7.0 does not support SleepSession records, and requesting it crashes the Android plugin instead of returning an error.",
+  },
+  {
+    type: "HeartRateSeries",
+    message:
+      "Skipped before native sync: high-volume HeartRateSeries reads can crash this Android plugin. RestingHeartRate is used instead.",
+  },
+];
 
 // Health Connect SleepSession stage types → our normalized stage names.
 // Matches the `sleep_stages` table shape used by google-fit-sleep.
@@ -47,10 +64,15 @@ export async function requestHealthConnectPermissions() {
 
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   try {
-    const res: any = await (HealthConnect as any).getGrantedPermissions?.();
-    // Plugin variants: { grantedPermissions: string[] } or { readTypes: string[] }
-    const list: string[] = res?.grantedPermissions ?? res?.readTypes ?? [];
-    return Array.isArray(list) ? list : [];
+    const res: any = await (HealthConnect as any).checkHealthPermissions?.({
+      read: READ_TYPES as unknown as any,
+      write: [],
+    });
+    const grantedPermissions: string[] = Array.isArray(res?.grantedPermissions)
+      ? res.grantedPermissions
+      : [];
+    if (res?.hasAllPermissions) return [...READ_TYPES];
+    return READ_TYPES.filter((type) => grantedPermissions.includes(PERMISSION_BY_TYPE[type]));
   } catch {
     return [];
   }
@@ -65,13 +87,26 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     endTime: end,
   };
 
-  const readErrors: { type: string; message: string }[] = [];
+  const grantedTypes = new Set(await getGrantedHealthConnectPermissions());
+  const readErrors: { type: string; message: string }[] = [...UNSUPPORTED_NATIVE_READ_ERRORS];
 
   const safeReadAll = async () => {
     const results: Record<string, any[]> = {};
     for (const t of READ_TYPES) {
+      if (!grantedTypes.has(t)) {
+        readErrors.push({
+          type: t,
+          message: `Skipped before native sync: ${PERMISSION_BY_TYPE[t]} is not currently granted to this app.`,
+        });
+        results[t] = [];
+        continue;
+      }
       try {
-        const res: any = await HealthConnect.readRecords({ type: t as any, timeRangeFilter });
+        const res: any = await HealthConnect.readRecords({
+          type: t as any,
+          timeRangeFilter,
+          pageSize: 200,
+        });
         results[t] = res?.records ?? [];
       } catch (e: any) {
         const msg =
