@@ -45,10 +45,10 @@ const HealthConnectCard = () => {
     if (!user) return;
     setSyncing(true);
     try {
-      const { metricsCount } = await syncHealthConnect(user.id, 7);
+      const { metricsCount, sleepCount } = await syncHealthConnect(user.id, 7);
       toast({
         title: "Health Connect synced",
-        description: `${metricsCount} days updated (steps, calories, resting HR)`,
+        description: `${metricsCount} days updated · ${sleepCount} sleep segments`,
       });
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
     } catch (e: any) {
@@ -68,7 +68,7 @@ const HealthConnectCard = () => {
         </CardTitle>
         <CardDescription>
           {availability === "Available"
-            ? "Sync resting HR, steps and active calories from your phone (sleep stages coming soon)"
+            ? "Sync sleep stages, resting HR, steps and active calories from Garmin Connect (via Health Connect)."
             : availability === "NotInstalled"
             ? "Install Health Connect from the Play Store first"
             : availability === "NotSupported"
@@ -86,6 +86,9 @@ const HealthConnectCard = () => {
             Sync now
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Tip: open Garmin Connect → Settings → Health Connect → enable Sleep (plus Heart Rate, Steps, Active Calories) to share Garmin data automatically.
+        </p>
       </CardContent>
     </Card>
   );
