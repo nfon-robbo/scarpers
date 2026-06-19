@@ -50,18 +50,28 @@ const HealthConnectCard = () => {
     }
   };
 
+  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
+  const [fatalError, setFatalError] = useState<string | null>(null);
+
   const handleSync = async () => {
     if (!user) return;
     setSyncing(true);
+    setErrors([]);
+    setFatalError(null);
     try {
-      const { metricsCount, sleepCount } = await syncHealthConnect(user.id, 7);
+      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(user.id, 7);
+      setErrors(readErrors ?? []);
       toast({
         title: "Health Connect synced",
-        description: `${metricsCount} days updated · ${sleepCount} sleep segments`,
+        description: `${metricsCount} days updated · ${sleepCount} sleep segments${
+          readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
+        }`,
       });
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
     } catch (e: any) {
-      toast({ title: "Sync failed", description: e?.message, variant: "destructive" });
+      const msg = e?.message ?? e?.errorMessage ?? (typeof e === "string" ? e : JSON.stringify(e));
+      setFatalError(String(msg));
+      toast({ title: "Sync failed", description: msg, variant: "destructive" });
     } finally {
       setSyncing(false);
     }
@@ -95,6 +105,31 @@ const HealthConnectCard = () => {
             Sync now
           </Button>
         </div>
+
+        {(fatalError || errors.length > 0) && (
+          <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+            <div className="text-xs font-semibold text-destructive">
+              Health Connect sync errors
+            </div>
+            {fatalError && (
+              <div className="text-xs">
+                <div className="font-medium">Fatal:</div>
+                <pre className="whitespace-pre-wrap break-all text-[11px] text-muted-foreground">
+                  {fatalError}
+                </pre>
+              </div>
+            )}
+            {errors.map((er, i) => (
+              <div key={i} className="text-xs">
+                <div className="font-medium">{er.type}</div>
+                <pre className="whitespace-pre-wrap break-all text-[11px] text-muted-foreground">
+                  {er.message}
+                </pre>
+              </div>
+            ))}
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground mt-3">
           Tip: open Garmin Connect → Settings → Health Connect → enable Sleep (plus Heart Rate, Steps, Active Calories) to share Garmin data automatically.
         </p>
