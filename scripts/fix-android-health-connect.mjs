@@ -6,6 +6,7 @@ const variablesPath = join(androidDir, "variables.gradle");
 const buildGradlePath = join(androidDir, "build.gradle");
 const gradlePropertiesPath = join(androidDir, "gradle.properties");
 const stringsPath = join(androidDir, "app", "src", "main", "res", "values", "strings.xml");
+const manifestPath = join(androidDir, "app", "src", "main", "AndroidManifest.xml");
 
 const upsertGradleProperty = (contents, key, value) => {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -74,4 +75,73 @@ if (existsSync(stringsPath)) {
   writeFileSync(stringsPath, strings);
 }
 
-console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers.");
+// ---------- AndroidManifest: Health Connect permissions + rationale intent ----------
+if (existsSync(manifestPath)) {
+  let manifest = readFileSync(manifestPath, "utf8");
+
+  const hcPermissions = [
+    "android.permission.health.READ_STEPS",
+    "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+    "android.permission.health.READ_HEART_RATE",
+    "android.permission.health.READ_RESTING_HEART_RATE",
+    "android.permission.health.READ_SLEEP",
+  ];
+
+  for (const perm of hcPermissions) {
+    if (!manifest.includes(`"${perm}"`)) {
+      manifest = manifest.replace(
+        /<manifest([^>]*)>/,
+        `<manifest$1>\n    <uses-permission android:name="${perm}" />`
+      );
+    }
+  }
+
+  // Queries block so the app can detect the Health Connect package on Android 13-.
+  if (!manifest.includes("androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE") || !manifest.includes("<queries>")) {
+    const queriesBlock = `
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
+`;
+    if (!manifest.includes("<queries>")) {
+      manifest = manifest.replace(/<\/manifest>/, `${queriesBlock}</manifest>`);
+    }
+  }
+
+  // Permission-usage rationale activity — Health Connect requires the app to
+  // expose an activity that handles the rationale intent, otherwise permission
+  // grants are auto-denied on Android 14+.
+  const rationaleActivity = `
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+`;
+  if (!manifest.includes("ViewPermissionUsageActivity")) {
+    manifest = manifest.replace(/<\/application>/, `${rationaleActivity}    </application>`);
+  }
+
+  writeFileSync(manifestPath, manifest);
+  console.log("AndroidManifest patched with Health Connect permissions + rationale activity.");
+} else {
+  console.warn("AndroidManifest.xml not found — run `npx cap sync android` first.");
+}
+
+console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers, Health Connect permissions declared.");
