@@ -19,6 +19,8 @@ const HealthConnectCard = () => {
   const [availability, setAvailability] = useState<string>("");
   const [granted, setGranted] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
+  const [fatalError, setFatalError] = useState<string | null>(null);
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
@@ -49,9 +51,6 @@ const HealthConnectCard = () => {
       toast({ title: "Permission error", description: e?.message, variant: "destructive" });
     }
   };
-
-  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
-  const [fatalError, setFatalError] = useState<string | null>(null);
 
   const handleSync = async () => {
     if (!user) return;
