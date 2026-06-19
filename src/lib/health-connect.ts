@@ -9,7 +9,7 @@ const READ_TYPES = [
   "Steps",
   "ActiveCaloriesBurned",
   "RestingHeartRate",
-  "HeartRateSeries",
+  "HeartRate",
   "SleepSession",
 ] as const;
 
@@ -68,7 +68,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     safeRead("Steps"),
     safeRead("ActiveCaloriesBurned"),
     safeRead("RestingHeartRate"),
-    safeRead("HeartRateSeries"),
+    safeRead("HeartRate"),
     safeRead("SleepSession"),
   ]);
 
