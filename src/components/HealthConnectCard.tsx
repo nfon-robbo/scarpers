@@ -12,6 +12,21 @@ import {
   syncHealthConnect,
 } from "@/lib/health-connect";
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const message = (error as { message?: unknown; errorMessage?: unknown }).message ??
+      (error as { message?: unknown; errorMessage?: unknown }).errorMessage;
+    if (typeof message === "string") return message;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 const HealthConnectCard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -19,6 +34,8 @@ const HealthConnectCard = () => {
   const [availability, setAvailability] = useState<string>("");
   const [granted, setGranted] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
+  const [fatalError, setFatalError] = useState<string | null>(null);
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
@@ -45,13 +62,10 @@ const HealthConnectCard = () => {
       const list = await getGrantedHealthConnectPermissions();
       if (list.length > 0) toast({ title: `Health Connect granted (${list.length} permissions)` });
       else toast({ title: "Permissions denied", variant: "destructive" });
-    } catch (e: any) {
-      toast({ title: "Permission error", description: e?.message, variant: "destructive" });
+    } catch (e: unknown) {
+      toast({ title: "Permission error", description: getErrorMessage(e), variant: "destructive" });
     }
   };
-
-  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
-  const [fatalError, setFatalError] = useState<string | null>(null);
 
   const handleSync = async () => {
     if (!user) return;
@@ -68,8 +82,8 @@ const HealthConnectCard = () => {
         }`,
       });
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
-    } catch (e: any) {
-      const msg = e?.message ?? e?.errorMessage ?? (typeof e === "string" ? e : JSON.stringify(e));
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e);
       setFatalError(String(msg));
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
     } finally {

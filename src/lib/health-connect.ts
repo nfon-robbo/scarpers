@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { HealthConnect } from "capacitor-health-connect";
+import type { RecordType as HealthRecordType, TimeRangeFilter } from "capacitor-health-connect";
 import { supabase } from "@/integrations/supabase/client";
 
 export const isHealthConnectPlatform = () =>
@@ -9,9 +10,72 @@ const READ_TYPES = [
   "Steps",
   "ActiveCaloriesBurned",
   "RestingHeartRate",
-  "HeartRate",
-  "SleepSession",
-] as const;
+] as const satisfies readonly HealthRecordType[];
+
+type SupportedReadType = (typeof READ_TYPES)[number];
+type HealthReadRecord = Record<string, unknown>;
+type PermissionCheckResponse = { grantedPermissions?: string[]; hasAllPermissions?: boolean };
+type HealthConnectWithPermissions = typeof HealthConnect & {
+  checkHealthPermissions?: (options: {
+    read: HealthRecordType[];
+    write: HealthRecordType[];
+  }) => Promise<PermissionCheckResponse>;
+};
+
+type HealthStepsRecord = { startTime: string | Date; count?: number | string };
+type HealthCaloriesRecord = {
+  startTime: string | Date;
+  energy?: { inKilocalories?: number | string; value?: number | string };
+};
+type HealthRestingHrRecord = { time: string | Date; beatsPerMinute?: number | string };
+type HealthHeartRateSeriesRecord = {
+  samples?: { time: string | Date; beatsPerMinute?: number | string }[];
+};
+type SleepStageName = "deep" | "rem" | "light" | "awake" | "sleep";
+type SleepStageTotals = Record<SleepStageName, number>;
+type HealthSleepStageSegment = {
+  startTime?: string | Date;
+  endTime?: string | Date;
+  stage?: string | number;
+  type?: string | number;
+};
+type HealthSleepSession = {
+  startTime?: string | Date;
+  endTime?: string | Date;
+  stages?: HealthSleepStageSegment[];
+};
+type DailyMetricPatch = {
+  user_id: string;
+  date: string;
+  source_file?: string;
+  steps?: number;
+  active_calories?: number;
+  resting_heart_rate?: number;
+  deep_sleep_minutes?: number;
+  rem_sleep_minutes?: number;
+  light_sleep_minutes?: number;
+  awake_during_night_minutes?: number;
+  sleep_duration_seconds?: number;
+};
+
+const PERMISSION_BY_TYPE: Record<SupportedReadType, string> = {
+  Steps: "android.permission.health.READ_STEPS",
+  ActiveCaloriesBurned: "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+  RestingHeartRate: "android.permission.health.READ_RESTING_HEART_RATE",
+};
+
+const UNSUPPORTED_NATIVE_READ_ERRORS = [
+  {
+    type: "SleepSession",
+    message:
+      "Skipped before native sync: capacitor-health-connect 0.7.0 does not support SleepSession records, and requesting it crashes the Android plugin instead of returning an error.",
+  },
+  {
+    type: "HeartRateSeries",
+    message:
+      "Skipped before native sync: high-volume HeartRateSeries reads can crash this Android plugin. RestingHeartRate is used instead.",
+  },
+];
 
 // Health Connect SleepSession stage types → our normalized stage names.
 // Matches the `sleep_stages` table shape used by google-fit-sleep.
@@ -40,44 +104,74 @@ export async function ensureHealthConnectAvailable() {
 
 export async function requestHealthConnectPermissions() {
   return HealthConnect.requestHealthPermissions({
-    read: READ_TYPES as unknown as any,
+    read: [...READ_TYPES],
     write: [],
   });
 }
 
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   try {
-    const res: any = await (HealthConnect as any).getGrantedPermissions?.();
-    // Plugin variants: { grantedPermissions: string[] } or { readTypes: string[] }
-    const list: string[] = res?.grantedPermissions ?? res?.readTypes ?? [];
-    return Array.isArray(list) ? list : [];
+    const res = await (HealthConnect as HealthConnectWithPermissions).checkHealthPermissions?.({
+      read: [...READ_TYPES],
+      write: [],
+    });
+    const grantedPermissions: string[] = Array.isArray(res?.grantedPermissions)
+      ? res.grantedPermissions
+      : [];
+    if (res?.hasAllPermissions) return [...READ_TYPES];
+    return READ_TYPES.filter((type) => grantedPermissions.includes(PERMISSION_BY_TYPE[type]));
   } catch {
     return [];
   }
 }
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const maybeMessage = (error as { message?: unknown; errorMessage?: unknown }).message ??
+      (error as { message?: unknown; errorMessage?: unknown }).errorMessage;
+    if (typeof maybeMessage === "string") return maybeMessage;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
+
 export async function syncHealthConnect(userId: string, daysBack = 7) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
-  const timeRangeFilter = {
-    type: "between" as const,
+  const timeRangeFilter: TimeRangeFilter = {
+    type: "between",
     startTime: start,
     endTime: end,
   };
 
-  const readErrors: { type: string; message: string }[] = [];
+  const grantedTypes = new Set(await getGrantedHealthConnectPermissions());
+  const readErrors: { type: string; message: string }[] = [...UNSUPPORTED_NATIVE_READ_ERRORS];
 
   const safeReadAll = async () => {
-    const results: Record<string, any[]> = {};
+    const results: Partial<Record<SupportedReadType, HealthReadRecord[]>> = {};
     for (const t of READ_TYPES) {
+      if (!grantedTypes.has(t)) {
+        readErrors.push({
+          type: t,
+          message: `Skipped before native sync: ${PERMISSION_BY_TYPE[t]} is not currently granted to this app.`,
+        });
+        results[t] = [];
+        continue;
+      }
       try {
-        const res: any = await HealthConnect.readRecords({ type: t as any, timeRangeFilter });
+        const res = await HealthConnect.readRecords({
+          type: t,
+          timeRangeFilter,
+          pageSize: 200,
+        });
         results[t] = res?.records ?? [];
-      } catch (e: any) {
-        const msg =
-          e?.message ??
-          e?.errorMessage ??
-          (typeof e === "string" ? e : JSON.stringify(e));
+      } catch (e: unknown) {
+        const msg = getErrorMessage(e);
         console.warn(`[HC] read ${t} failed:`, msg);
         readErrors.push({ type: t, message: String(msg) });
         results[t] = [];
@@ -87,11 +181,11 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   };
 
   const all = await safeReadAll();
-  const stepsRecs = all["Steps"];
-  const activeCalRecs = all["ActiveCaloriesBurned"];
-  const restingHrRecs = all["RestingHeartRate"];
-  const hrSeriesRecs = all["HeartRate"];
-  const sleepRecs = all["SleepSession"];
+  const stepsRecs = (all["Steps"] ?? []) as HealthStepsRecord[];
+  const activeCalRecs = (all["ActiveCaloriesBurned"] ?? []) as HealthCaloriesRecord[];
+  const restingHrRecs = (all["RestingHeartRate"] ?? []) as HealthRestingHrRecord[];
+  const hrSeriesRecs: HealthHeartRateSeriesRecord[] = [];
+  const sleepRecs: HealthSleepSession[] = [];
 
   const dayBucket = (iso: string | Date) =>
     new Date(iso).toISOString().split("T")[0];
@@ -150,7 +244,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
 
     if (steps == null && activeCal == null && restingHr == null) continue;
 
-    const patch: any = { user_id: userId, date, source_file: "health_connect" };
+    const patch: DailyMetricPatch = { user_id: userId, date, source_file: "health_connect" };
     if (steps != null) patch.steps = Math.round(steps);
     if (activeCal != null) patch.active_calories = Math.round(activeCal);
     if (restingHr != null) patch.resting_heart_rate = restingHr;
@@ -187,10 +281,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   };
 
   const stageRows: SleepStageInsert[] = [];
-  const dailyTotals: Record<
-    string,
-    { deep: number; rem: number; light: number; awake: number; sleep: number }
-  > = {};
+  const dailyTotals: Record<string, SleepStageTotals> = {};
   const nightDates = new Set<string>();
   let sleepCount = 0;
 
@@ -201,7 +292,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     const wakeDate = dayBucket(sessionEnd);
     nightDates.add(wakeDate);
 
-    const stages: any[] = Array.isArray(session.stages) ? session.stages : [];
+    const stages = Array.isArray(session.stages) ? session.stages : [];
     let writtenForSession = 0;
 
     for (const seg of stages) {
@@ -230,7 +321,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
 
       if (!dailyTotals[wakeDate])
         dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
-      (dailyTotals[wakeDate] as any)[stageName] += durationSeconds;
+      dailyTotals[wakeDate][stageName as SleepStageName] += durationSeconds;
     }
 
     // Fallback: no per-stage breakdown — record one generic 'sleep' row so
@@ -280,7 +371,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   for (const [date, t] of Object.entries(dailyTotals)) {
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
-    const patch: any = {
+    const patch: DailyMetricPatch = {
       user_id: userId,
       date,
       deep_sleep_minutes: Math.round(t.deep / 60),
