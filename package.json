@@ -9,12 +9,16 @@
     "prebuild": "bunx tsx scripts/generate-sitemap.ts",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "android:fix-health-connect": "node scripts/fix-android-health-connect.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/core": "^5.7.8",
+    "@capacitor/ios": "^5.7.8",
     "@garmin/fitsdk": "^21.194.0",
     "@hookform/resolvers": "^3.10.0",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
@@ -89,6 +93,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/cli": "^5.7.8",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
