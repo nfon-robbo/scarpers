@@ -45,6 +45,17 @@ export async function requestHealthConnectPermissions() {
   });
 }
 
+export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
+  try {
+    const res: any = await (HealthConnect as any).getGrantedPermissions?.();
+    // Plugin variants: { grantedPermissions: string[] } or { readTypes: string[] }
+    const list: string[] = res?.grantedPermissions ?? res?.readTypes ?? [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function syncHealthConnect(userId: string, daysBack = 7) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
