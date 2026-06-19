@@ -104,15 +104,15 @@ export async function ensureHealthConnectAvailable() {
 
 export async function requestHealthConnectPermissions() {
   return HealthConnect.requestHealthPermissions({
-    read: READ_TYPES as unknown as any,
+    read: [...READ_TYPES],
     write: [],
   });
 }
 
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   try {
-    const res: any = await (HealthConnect as any).checkHealthPermissions?.({
-      read: READ_TYPES as unknown as any,
+    const res = await (HealthConnect as HealthConnectWithPermissions).checkHealthPermissions?.({
+      read: [...READ_TYPES],
       write: [],
     });
     const grantedPermissions: string[] = Array.isArray(res?.grantedPermissions)
@@ -124,6 +124,21 @@ export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
     return [];
   }
 }
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const maybeMessage = (error as { message?: unknown; errorMessage?: unknown }).message ??
+      (error as { message?: unknown; errorMessage?: unknown }).errorMessage;
+    if (typeof maybeMessage === "string") return maybeMessage;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+};
 
 export async function syncHealthConnect(userId: string, daysBack = 7) {
   const end = new Date();
