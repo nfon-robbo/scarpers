@@ -5,6 +5,7 @@ const androidDir = join(process.cwd(), "android");
 const variablesPath = join(androidDir, "variables.gradle");
 const buildGradlePath = join(androidDir, "build.gradle");
 const gradlePropertiesPath = join(androidDir, "gradle.properties");
+const stringsPath = join(androidDir, "app", "src", "main", "res", "values", "strings.xml");
 
 const upsertGradleProperty = (contents, key, value) => {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -66,4 +67,11 @@ let gradleProperties = existsSync(gradlePropertiesPath) ? readFileSync(gradlePro
 gradleProperties = upsertGradleProperty(gradleProperties, "android.useFullClasspathForDexingTransform", "true");
 writeFileSync(gradlePropertiesPath, gradleProperties);
 
-console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled.");
+if (existsSync(stringsPath)) {
+  let strings = readFileSync(stringsPath, "utf8");
+  strings = strings.replace(/<string name="app_name">[^<]*<\/string>/, '<string name="app_name">scarpers</string>');
+  strings = strings.replace(/<string name="title_activity_main">[^<]*<\/string>/, '<string name="title_activity_main">scarpers</string>');
+  writeFileSync(stringsPath, strings);
+}
+
+console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers.");
