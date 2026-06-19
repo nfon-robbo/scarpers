@@ -125,8 +125,8 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   const stepsRecs = all["Steps"];
   const activeCalRecs = all["ActiveCaloriesBurned"];
   const restingHrRecs = all["RestingHeartRate"];
-  const hrSeriesRecs = all["HeartRate"];
-  const sleepRecs = all["SleepSession"];
+  const hrSeriesRecs: any[] = [];
+  const sleepRecs: any[] = [];
 
   const dayBucket = (iso: string | Date) =>
     new Date(iso).toISOString().split("T")[0];
