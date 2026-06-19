@@ -306,5 +306,6 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     metricsCount: updated,
     sleepCount,
     sleepSupported: true as const,
+    readErrors,
   };
 }
