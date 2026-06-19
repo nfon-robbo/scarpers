@@ -496,16 +496,69 @@ const SleepSourcesPanel = () => {
   };
 
 
+  const handleTopLevelScreenshot = async (file: File) => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    setEditingDate(null);
+    setForm(emptyForm(today));
+    setDialogOpen(true);
+    if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+    setParsing(true);
+    try {
+      const dataUrl: string = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result as string);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("parse-garmin-sleep", { body: { imageDataUrl: dataUrl } });
+      if (error) throw error;
+      const v = data?.vitals as GarminVitals | undefined;
+      if (!v) throw new Error("No vitals returned");
+      await saveGarminVitals(today, v);
+      setForm((f) => applyVitalsToForm(f, v));
+      toast.success("Vitals extracted — review stages and save");
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(getErrorMessage(e, "Failed to parse screenshot"));
+    } finally {
+      setParsing(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
         <div>
           <CardTitle className="text-base">Sleep — Google Fit & Health Connect</CardTitle>
-          <CardDescription>Last 7 nights · per-source duration & stage breakdown</CardDescription>
+          <CardDescription>
+            Last 7 nights · per-source duration & stage breakdown.
+            <span className="block mt-1">Works with Garmin, Whoop, Oura, Fitbit screenshots — we'll auto-fill stages + vitals.</span>
+          </CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={openAdd} className="shrink-0">
-          <Plus className="w-4 h-4 mr-1" /> Add night
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <label className="inline-flex">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleTopLevelScreenshot(f);
+                e.currentTarget.value = "";
+              }}
+            />
+            <Button asChild size="sm">
+              <span className="cursor-pointer">
+                {parsing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                Upload screenshot
+              </span>
+            </Button>
+          </label>
+          <Button size="sm" variant="outline" onClick={openAdd}>
+            <Plus className="w-4 h-4 mr-1" /> Add night
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
