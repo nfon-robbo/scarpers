@@ -143,8 +143,8 @@ const getErrorMessage = (error: unknown) => {
 export async function syncHealthConnect(userId: string, daysBack = 7) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
-  const timeRangeFilter = {
-    type: "between" as const,
+  const timeRangeFilter: TimeRangeFilter = {
+    type: "between",
     startTime: start,
     endTime: end,
   };
@@ -153,7 +153,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   const readErrors: { type: string; message: string }[] = [...UNSUPPORTED_NATIVE_READ_ERRORS];
 
   const safeReadAll = async () => {
-    const results: Record<string, any[]> = {};
+    const results: Partial<Record<SupportedReadType, HealthReadRecord[]>> = {};
     for (const t of READ_TYPES) {
       if (!grantedTypes.has(t)) {
         readErrors.push({
@@ -164,17 +164,14 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
         continue;
       }
       try {
-        const res: any = await HealthConnect.readRecords({
-          type: t as any,
+        const res = await HealthConnect.readRecords({
+          type: t,
           timeRangeFilter,
           pageSize: 200,
         });
         results[t] = res?.records ?? [];
-      } catch (e: any) {
-        const msg =
-          e?.message ??
-          e?.errorMessage ??
-          (typeof e === "string" ? e : JSON.stringify(e));
+      } catch (e: unknown) {
+        const msg = getErrorMessage(e);
         console.warn(`[HC] read ${t} failed:`, msg);
         readErrors.push({ type: t, message: String(msg) });
         results[t] = [];
@@ -184,11 +181,11 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   };
 
   const all = await safeReadAll();
-  const stepsRecs = all["Steps"];
-  const activeCalRecs = all["ActiveCaloriesBurned"];
-  const restingHrRecs = all["RestingHeartRate"];
-  const hrSeriesRecs: any[] = [];
-  const sleepRecs: any[] = [];
+  const stepsRecs = (all["Steps"] ?? []) as HealthStepsRecord[];
+  const activeCalRecs = (all["ActiveCaloriesBurned"] ?? []) as HealthCaloriesRecord[];
+  const restingHrRecs = (all["RestingHeartRate"] ?? []) as HealthRestingHrRecord[];
+  const hrSeriesRecs: HealthHeartRateSeriesRecord[] = [];
+  const sleepRecs: HealthSleepSession[] = [];
 
   const dayBucket = (iso: string | Date) =>
     new Date(iso).toISOString().split("T")[0];
