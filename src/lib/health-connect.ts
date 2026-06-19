@@ -65,6 +65,8 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     endTime: end,
   };
 
+  const readErrors: { type: string; message: string }[] = [];
+
   const safeReadAll = async () => {
     const results: Record<string, any[]> = {};
     for (const t of READ_TYPES) {
@@ -72,7 +74,12 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
         const res: any = await HealthConnect.readRecords({ type: t as any, timeRangeFilter });
         results[t] = res?.records ?? [];
       } catch (e: any) {
-        console.warn(`[HC] read ${t} failed:`, e?.message ?? e);
+        const msg =
+          e?.message ??
+          e?.errorMessage ??
+          (typeof e === "string" ? e : JSON.stringify(e));
+        console.warn(`[HC] read ${t} failed:`, msg);
+        readErrors.push({ type: t, message: String(msg) });
         results[t] = [];
       }
     }
