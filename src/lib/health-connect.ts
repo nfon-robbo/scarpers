@@ -65,23 +65,26 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     endTime: end,
   };
 
-  const safeRead = async (type: any): Promise<any[]> => {
-    try {
-      const res: any = await HealthConnect.readRecords({ type, timeRangeFilter });
-      return res?.records ?? [];
-    } catch (e) {
-      console.warn(`HC read ${type} failed`, e);
-      return [];
+  const safeReadAll = async () => {
+    const results: Record<string, any[]> = {};
+    for (const t of READ_TYPES) {
+      try {
+        const res: any = await HealthConnect.readRecords({ type: t as any, timeRangeFilter });
+        results[t] = res?.records ?? [];
+      } catch (e: any) {
+        console.warn(`[HC] read ${t} failed:`, e?.message ?? e);
+        results[t] = [];
+      }
     }
+    return results;
   };
 
-  const [stepsRecs, activeCalRecs, restingHrRecs, hrSeriesRecs, sleepRecs] = await Promise.all([
-    safeRead("Steps"),
-    safeRead("ActiveCaloriesBurned"),
-    safeRead("RestingHeartRate"),
-    safeRead("HeartRate"),
-    safeRead("SleepSession"),
-  ]);
+  const all = await safeReadAll();
+  const stepsRecs = all["Steps"];
+  const activeCalRecs = all["ActiveCaloriesBurned"];
+  const restingHrRecs = all["RestingHeartRate"];
+  const hrSeriesRecs = all["HeartRate"];
+  const sleepRecs = all["SleepSession"];
 
   const dayBucket = (iso: string | Date) =>
     new Date(iso).toISOString().split("T")[0];
