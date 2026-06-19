@@ -244,7 +244,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
 
     if (steps == null && activeCal == null && restingHr == null) continue;
 
-    const patch: any = { user_id: userId, date, source_file: "health_connect" };
+    const patch: DailyMetricPatch = { user_id: userId, date, source_file: "health_connect" };
     if (steps != null) patch.steps = Math.round(steps);
     if (activeCal != null) patch.active_calories = Math.round(activeCal);
     if (restingHr != null) patch.resting_heart_rate = restingHr;
@@ -281,10 +281,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   };
 
   const stageRows: SleepStageInsert[] = [];
-  const dailyTotals: Record<
-    string,
-    { deep: number; rem: number; light: number; awake: number; sleep: number }
-  > = {};
+  const dailyTotals: Record<string, SleepStageTotals> = {};
   const nightDates = new Set<string>();
   let sleepCount = 0;
 
@@ -295,7 +292,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
     const wakeDate = dayBucket(sessionEnd);
     nightDates.add(wakeDate);
 
-    const stages: any[] = Array.isArray(session.stages) ? session.stages : [];
+    const stages = Array.isArray(session.stages) ? session.stages : [];
     let writtenForSession = 0;
 
     for (const seg of stages) {
@@ -324,7 +321,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
 
       if (!dailyTotals[wakeDate])
         dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
-      (dailyTotals[wakeDate] as any)[stageName] += durationSeconds;
+      dailyTotals[wakeDate][stageName as SleepStageName] += durationSeconds;
     }
 
     // Fallback: no per-stage breakdown — record one generic 'sleep' row so
@@ -374,7 +371,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   for (const [date, t] of Object.entries(dailyTotals)) {
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
-    const patch: any = {
+    const patch: DailyMetricPatch = {
       user_id: userId,
       date,
       deep_sleep_minutes: Math.round(t.deep / 60),
