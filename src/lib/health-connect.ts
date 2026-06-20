@@ -64,19 +64,6 @@ const PERMISSION_BY_TYPE: Record<SupportedReadType, string> = {
   RestingHeartRate: "android.permission.health.READ_RESTING_HEART_RATE",
 };
 
-const UNSUPPORTED_NATIVE_READ_ERRORS = [
-  {
-    type: "SleepSession",
-    message:
-      "Skipped before native sync: capacitor-health-connect 0.7.0 does not support SleepSession records, and requesting it crashes the Android plugin instead of returning an error.",
-  },
-  {
-    type: "HeartRateSeries",
-    message:
-      "Skipped before native sync: high-volume HeartRateSeries reads can crash this Android plugin. RestingHeartRate is used instead.",
-  },
-];
-
 // Health Connect SleepSession stage types → our normalized stage names.
 // Matches the `sleep_stages` table shape used by google-fit-sleep.
 const HC_STAGE_MAP: Record<string, string> = {
@@ -150,7 +137,7 @@ export async function syncHealthConnect(userId: string, daysBack = 7) {
   };
 
   const grantedTypes = new Set(await getGrantedHealthConnectPermissions());
-  const readErrors: { type: string; message: string }[] = [...UNSUPPORTED_NATIVE_READ_ERRORS];
+  const readErrors: { type: string; message: string }[] = [];
 
   const safeReadAll = async () => {
     const results: Partial<Record<SupportedReadType, HealthReadRecord[]>> = {};
