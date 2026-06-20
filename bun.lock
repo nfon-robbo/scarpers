@@ -8,6 +8,7 @@
         "@capacitor/android": "^5.7.8",
         "@capacitor/core": "^5.7.8",
         "@capacitor/ios": "^5.7.8",
+        "@devmaxime/capacitor-health-connect": "^1.1.0",
         "@garmin/fitsdk": "^21.194.0",
         "@hookform/resolvers": "^3.10.0",
         "@lovable.dev/cloud-auth-js": "^1.1.2",
@@ -52,7 +53,6 @@
         "@tiptap/react": "^3.23.1",
         "@tiptap/starter-kit": "^3.23.1",
         "@types/leaflet": "^1.9.21",
-        "capacitor-health-connect": "^0.7.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -122,6 +122,8 @@
     "@capacitor/core": ["@capacitor/core@5.7.8", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor/core/-/core-5.7.8.tgz", { "dependencies": { "tslib": "^2.1.0" } }, "sha512-rrZcm/2vJM0WdWRQup1TUidbjQV9PfIadSkV4rAGLD7R6PuzZSMPGT0gmoZzCRlXkqrazrWWDkurei3ozU02FA=="],
 
     "@capacitor/ios": ["@capacitor/ios@5.7.8", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@capacitor/ios/-/ios-5.7.8.tgz", { "peerDependencies": { "@capacitor/core": "^5.7.0" } }, "sha512-XhGrziBnlRmCJ97LdPXOJquHPpYTwSJZIxYSXuPl7SDDuAEve8vs2wY76gLdaaFH2Z6ctdugUX+jR6VNu+ds+w=="],
+
+    "@devmaxime/capacitor-health-connect": ["@devmaxime/capacitor-health-connect@1.1.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@devmaxime/capacitor-health-connect/-/capacitor-health-connect-1.1.0.tgz", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-cMFynzs3CyZyBjzyj2to5umuovFk/VhjPLIvWVccn2x7E7wN9d+J3raULP2aL1hbZU27t9nIq4HM4ylg5wUJ3A=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.0", "", { "os": "aix", "cpu": "ppc64" }, "sha512-O7vun9Sf8DFjH2UtqK8Ku3LkquL9SZL8OLY1T5NZkA34+wG3OQF7cl4Ql8vdNzM6fzBbYfLaiRLIOZ+2FOCgBQ=="],
 
@@ -678,8 +680,6 @@
     "camelcase-css": ["camelcase-css@2.0.1", "", {}, "sha512-QOSvevhslijgYwRx6Rv7zKdMF8lbRmx+uQGx2+vDc+KI/eBnsy9kit5aj23AgGu3pa4t9AgwbnXWqS+iOY+2aA=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001727", "", {}, "sha512-pB68nIHmbN6L/4C6MH1DokyR3bYqFwjaSs/sWDHGj4CTcFtQUQMuJftVwWkXq7mNWOybD3KhUv3oWHoGxgP14Q=="],
-
-    "capacitor-health-connect": ["capacitor-health-connect@0.7.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/capacitor-health-connect/-/capacitor-health-connect-0.7.0.tgz", { "peerDependencies": { "@capacitor/core": "^5.0.0" } }, "sha512-QQJpnCoFU9x4A9//PgbVT1kqpiFFiGWoiEl/+oprR03YXDTHi9BjCqotIwgVl0HT9fxVqEfkyrFXhcBsSNIZrA=="],
 
     "chai": ["chai@5.3.3", "", { "dependencies": { "assertion-error": "^2.0.1", "check-error": "^2.1.1", "deep-eql": "^5.0.1", "loupe": "^3.1.0", "pathval": "^2.0.0" } }, "sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw=="],
 
