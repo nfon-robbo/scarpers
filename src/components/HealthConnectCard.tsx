@@ -145,7 +145,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Sync requests 90 days. For older than the last week, grant Health Connect history access when prompted, then open Garmin Connect → Settings → Health Connect → enable Sleep, Heart Rate, Steps and Active Calories.
+          Pulls all available history. For data older than the last week, grant Health Connect history access when prompted, then open Garmin Connect → Settings → Health Connect → enable Sleep, Heart Rate, Steps and Active Calories.
         </p>
       </CardContent>
     </Card>
