@@ -46,9 +46,9 @@ function normalise(p: any): OffFood | null {
 export async function searchFoods(query: string, signal?: AbortSignal): Promise<OffFood[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  const url = `${SEARCH_URL}&search_terms=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`Open Food Facts search failed: ${res.status}`);
+  const url = `${PROXY_BASE}?q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, { signal, headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
+  if (!res.ok) throw new Error(`Food search failed: ${res.status}`);
   const data = await res.json();
   const products: any[] = data.products ?? [];
   const items = products.map(normalise).filter((x): x is OffFood => !!x);
@@ -62,7 +62,9 @@ export async function searchFoods(query: string, signal?: AbortSignal): Promise<
 }
 
 export async function getProductByBarcode(code: string): Promise<OffFood | null> {
-  const res = await fetch(PRODUCT_URL(code));
+  const res = await fetch(`${PROXY_BASE}?barcode=${encodeURIComponent(code)}`, {
+    headers: { apikey: ANON, Authorization: `Bearer ${ANON}` },
+  });
   if (!res.ok) return null;
   const data = await res.json();
   if (data.status !== 1) return null;
