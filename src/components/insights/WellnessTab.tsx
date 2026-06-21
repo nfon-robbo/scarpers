@@ -93,7 +93,7 @@ const WellnessTab = () => {
       }
 
       const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST", headers, body: JSON.stringify({ days: 30 }),
+        method: "POST", headers, body: JSON.stringify({ days: 90 }),
       }).catch(() => null);
       if (gfRes?.ok) {
         const d = await gfRes.json();

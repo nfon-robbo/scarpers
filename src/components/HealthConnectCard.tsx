@@ -116,7 +116,7 @@ const HealthConnectCard = () => {
           </Button>
           <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing || availability !== "Available"}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            Sync now
+            Sync 90 days
           </Button>
         </div>
 
@@ -145,7 +145,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Tip: open Garmin Connect → Settings → Health Connect → enable Sleep (plus Heart Rate, Steps, Active Calories) to share Garmin data automatically.
+          Sync requests 90 days. For older than the last week, grant Health Connect history access when prompted, then open Garmin Connect → Settings → Health Connect → enable Sleep, Heart Rate, Steps and Active Calories.
         </p>
       </CardContent>
     </Card>

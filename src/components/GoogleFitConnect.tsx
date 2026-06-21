@@ -109,7 +109,7 @@ const GoogleFitConnect = () => {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ days: 30 }),
+          body: JSON.stringify({ days: 90 }),
         }
       );
       const data = await res.json();
