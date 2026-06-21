@@ -73,7 +73,7 @@ const HealthConnectCard = () => {
     setErrors([]);
     setFatalError(null);
     try {
-      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(user.id, 90);
+      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(user.id, 3650);
       setErrors(readErrors ?? []);
       toast({
         title: "Health Connect synced",
