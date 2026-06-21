@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,12 +6,49 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Moon, Loader2, CalendarDays, Search } from "lucide-react";
+import { Moon, Loader2, CalendarDays, Search, Upload } from "lucide-react";
 import { format, parseISO, subDays, isValid } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { toast } from "sonner";
+import { AUTO_SYNC_DONE } from "@/lib/auto-sync";
 
 import { dedupeSleepRowsByPrecedence } from "@/lib/sleep-source-precedence";
+
+type GarminVitals = {
+  breathing_variations?: string | null;
+  restless_moments?: number | null;
+  avg_overnight_hr?: number | null;
+  resting_heart_rate?: number | null;
+  body_battery_change?: number | null;
+  avg_spo2?: number | null;
+  lowest_spo2?: number | null;
+  avg_respiration?: number | null;
+  lowest_respiration?: number | null;
+  avg_overnight_hrv?: number | null;
+  hrv_7d_avg?: number | null;
+  hrv_7d_status?: string | null;
+  skin_temp_change_c?: number | null;
+};
+
+const normaliseBreathingPattern = (value?: string | null) => {
+  const v = (value ?? "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes("balanced")) return "Balanced";
+  if (v.includes("few")) return "Few";
+  if (v.includes("some")) return "Some";
+  if (v.includes("many")) return "Many";
+  return value!.trim();
+};
+const normaliseHrvStatus = (value?: string | null) => {
+  const v = (value ?? "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes("unbalanced")) return "Unbalanced";
+  if (v.includes("balanced")) return "Balanced";
+  if (v.includes("low")) return "Low";
+  if (v.includes("high")) return "High";
+  return value!.trim();
+};
 
 interface SleepStageRow {
   date: string;
