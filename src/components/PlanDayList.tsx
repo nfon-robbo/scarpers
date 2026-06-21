@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -673,8 +673,35 @@ export default function PlanDayList({
     }
   };
 
+  const scrollToToday = () => {
+    const key = format(new Date(), "yyyy-MM-dd");
+    const el = document.querySelector(`[data-plan-date="${key}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      // Today might be outside plan window — scroll to nearest available date.
+      const all = Array.from(document.querySelectorAll<HTMLElement>("[data-plan-date]"));
+      const todayMs = new Date(key).getTime();
+      let nearest: HTMLElement | null = null;
+      let bestDiff = Infinity;
+      for (const node of all) {
+        const d = node.getAttribute("data-plan-date");
+        if (!d) continue;
+        const diff = Math.abs(new Date(d).getTime() - todayMs);
+        if (diff < bestDiff) { bestDiff = diff; nearest = node; }
+      }
+      nearest?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
+      <div className="sticky top-0 z-10 flex justify-end px-3 py-2 bg-background/95 backdrop-blur border-b">
+        <Button size="sm" variant="outline" className="h-8 gap-1" onClick={scrollToToday}>
+          <CalendarDays className="w-4 h-4" />
+          Today
+        </Button>
+      </div>
       <div className="divide-y">
         {weekGroups.map((group) => (
           <div key={group.weekNumber}>
@@ -700,6 +727,7 @@ export default function PlanDayList({
                 return (
                   <div
                     key={key}
+                    data-plan-date={key}
                     onDragOver={(e) => handleDragOver(e, key)}
                     onDragLeave={() => setDragOverDate((d) => (d === key ? null : d))}
                     onDrop={(e) => handleDrop(e, key)}
