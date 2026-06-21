@@ -214,7 +214,12 @@ export async function syncHealthConnect(
   ]);
 
   let updated = 0;
-  for (const date of allDates) {
+  const allDatesArr = Array.from(allDates);
+  for (let i = 0; i < allDatesArr.length; i++) {
+    const date = allDatesArr[i];
+    if (i % 25 === 0) {
+      report(`Saving daily metrics… (${i + 1}/${allDatesArr.length})`, 55 + Math.round((i / Math.max(1, allDatesArr.length)) * 20));
+    }
     const steps = aggDaily.Steps[date];
     const activeCal = aggDaily.ActiveCaloriesBurned[date];
     const restingArr = restingByDay[date];
@@ -240,6 +245,8 @@ export async function syncHealthConnect(
     else await supabase.from("daily_metrics").insert(patch);
     updated++;
   }
+
+  report("Processing sleep stages…", 78);
 
   // ----- Sleep stages → sleep_stages + daily_metrics rollup -----
   type SleepStageInsert = {
