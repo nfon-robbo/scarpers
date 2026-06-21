@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import {
   Moon, Footprints, Heart, Activity,
-  Loader2, RefreshCw, Weight as WeightIcon,
+  Loader2, RefreshCw, Weight as WeightIcon, Apple,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -160,7 +161,12 @@ const WellnessTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center gap-2">
+        <Link to="/nutrition">
+          <Button variant="outline" size="sm">
+            <Apple className="w-4 h-4 mr-2" /> Nutrition
+          </Button>
+        </Link>
         <Button variant="outline" size="sm" onClick={syncWellness} disabled={syncing}>
           {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Sync
