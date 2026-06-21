@@ -7,6 +7,9 @@ const buildGradlePath = join(androidDir, "build.gradle");
 const gradlePropertiesPath = join(androidDir, "gradle.properties");
 const stringsPath = join(androidDir, "app", "src", "main", "res", "values", "strings.xml");
 const manifestPath = join(androidDir, "app", "src", "main", "AndroidManifest.xml");
+const healthConnectPluginDir = join(process.cwd(), "node_modules", "@devmaxime", "capacitor-health-connect", "android", "src", "main", "java", "com", "devmaxime", "capacitor", "health", "connect");
+const healthConnectKtPath = join(healthConnectPluginDir, "AndroidHealthConnect.kt");
+const healthConnectPluginKtPath = join(healthConnectPluginDir, "AndroidHealthConnectPlugin.kt");
 
 const upsertGradleProperty = (contents, key, value) => {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -99,6 +102,7 @@ if (existsSync(manifestPath)) {
     "android.permission.health.READ_HEART_RATE",
     "android.permission.health.READ_RESTING_HEART_RATE",
     "android.permission.health.READ_SLEEP",
+    "android.permission.health.READ_HEALTH_DATA_HISTORY",
   ];
 
   for (const perm of hcPermissions) {
