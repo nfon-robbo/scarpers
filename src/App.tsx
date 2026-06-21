@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import Activities from "./pages/Activities";
 import InsightsPage from "./pages/Insights";
+import NutritionPage from "./pages/Nutrition";
 import TrainingPlanPage from "./pages/TrainingPlan";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
@@ -92,6 +93,7 @@ const App = () => (
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/activities" element={<Activities />} />
               <Route path="/insights" element={<InsightsPage />} />
+              <Route path="/nutrition" element={<NutritionPage />} />
               <Route path="/training-plan" element={<TrainingPlanPage />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
