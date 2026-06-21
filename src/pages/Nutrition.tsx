@@ -21,6 +21,7 @@ interface NutritionLog {
   protein_g: number;
   fat_g: number;
   calories: number;
+  alcohol_units: number;
   source: string;
 }
 
@@ -31,12 +32,23 @@ const MEAL_LABELS: Record<MealType, string> = {
   snack: "Snacks",
 };
 
-const QUICK_ADDS: { name: string; meal: MealType; grams: number; carbs: number; protein: number; fat: number; kcal: number }[] = [
+type QuickAdd = { name: string; meal: MealType; grams: number; carbs: number; protein: number; fat: number; kcal: number; alcohol?: number };
+
+const QUICK_ADDS: QuickAdd[] = [
   { name: "Banana", meal: "snack", grams: 120, carbs: 27, protein: 1.3, fat: 0.4, kcal: 107 },
   { name: "Slice of toast", meal: "breakfast", grams: 35, carbs: 17, protein: 3, fat: 1, kcal: 90 },
   { name: "SIS energy gel", meal: "snack", grams: 60, carbs: 22, protein: 0, fat: 0, kcal: 87 },
   { name: "Porridge (dry)", meal: "breakfast", grams: 50, carbs: 30, protein: 6, fat: 4, kcal: 184 },
   { name: "Whey scoop", meal: "snack", grams: 30, carbs: 2, protein: 24, fat: 1.5, kcal: 120 },
+];
+
+const DRINK_ADDS: QuickAdd[] = [
+  { name: "Pint of lager (4%)", meal: "snack", grams: 568, carbs: 15, protein: 1.5, fat: 0, kcal: 180, alcohol: 2.3 },
+  { name: "Pint of beer (5%)", meal: "snack", grams: 568, carbs: 18, protein: 1.5, fat: 0, kcal: 215, alcohol: 2.8 },
+  { name: "Bottle of beer 330ml (5%)", meal: "snack", grams: 330, carbs: 11, protein: 1, fat: 0, kcal: 140, alcohol: 1.7 },
+  { name: "Glass of wine 175ml (12%)", meal: "snack", grams: 175, carbs: 3, protein: 0, fat: 0, kcal: 160, alcohol: 2.1 },
+  { name: "Single spirit 25ml (40%)", meal: "snack", grams: 25, carbs: 0, protein: 0, fat: 0, kcal: 55, alcohol: 1 },
+  { name: "G&T (single)", meal: "snack", grams: 200, carbs: 16, protein: 0, fat: 0, kcal: 120, alcohol: 1 },
 ];
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
@@ -56,7 +68,7 @@ export default function NutritionPage() {
     setLoading(true);
     const { data } = await supabase
       .from("nutrition_logs")
-      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, calories, source")
+      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, calories, alcohol_units, source")
       .eq("user_id", user.id)
       .eq("log_date", date)
       .order("created_at", { ascending: true });
@@ -79,15 +91,16 @@ export default function NutritionPage() {
         protein: acc.protein + (l.protein_g || 0),
         fat: acc.fat + (l.fat_g || 0),
         kcal: acc.kcal + (l.calories || 0),
+        alcohol: acc.alcohol + (l.alcohol_units || 0),
       }),
-      { carbs: 0, protein: 0, fat: 0, kcal: 0 },
+      { carbs: 0, protein: 0, fat: 0, kcal: 0, alcohol: 0 },
     );
   }, [logs]);
 
   const carbsTarget = weightKg ? Math.round(weightKg * 5) : 250;
   const proteinTarget = weightKg ? Math.round(weightKg * 1.6) : 110;
 
-  async function quickAdd(q: typeof QUICK_ADDS[number]) {
+  async function quickAdd(q: QuickAdd) {
     if (!user) return;
     const { error } = await supabase.from("nutrition_logs").insert({
       user_id: user.id,
@@ -99,6 +112,7 @@ export default function NutritionPage() {
       protein_g: q.protein,
       fat_g: q.fat,
       calories: q.kcal,
+      alcohol_units: q.alcohol ?? 0,
       source: "quick_add",
     });
     if (error) {
