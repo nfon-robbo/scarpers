@@ -38,6 +38,8 @@ const SleepCalendar = () => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [insight, setInsight] = useState("");
   const [insightLoading, setInsightLoading] = useState(false);
+  const [displayMonth, setDisplayMonth] = useState<Date>(new Date());
+  const [searchValue, setSearchValue] = useState("");
 
   const fetchSleepData = useCallback(async () => {
     if (!user) return;
