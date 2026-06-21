@@ -150,14 +150,14 @@ const SleepSourcesPanel = () => {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const since = format(subDays(new Date(), 3650), "yyyy-MM-dd");
+    const since = format(subDays(new Date(), 7), "yyyy-MM-dd");
     const [{ data }, { data: scoreRows }] = await Promise.all([
       supabase
         .from("sleep_stages")
         .select("date, stage, duration_seconds, source")
         .eq("user_id", user.id)
         .gte("date", since)
-        .in("source", ["google_fit", "health_connect", "manual"]),
+        .in("source", ["health_connect", "manual"]),
       supabase
         .from("daily_metrics")
         .select("date, sleep_score, created_at")
@@ -173,8 +173,8 @@ const SleepSourcesPanel = () => {
 
     const map = new Map<string, Map<SourceKey, StageTotals>>();
     for (const r of data ?? []) {
-      const src = (r.source ?? "google_fit") as SourceKey;
-      if (!["google_fit", "health_connect", "manual"].includes(src)) continue;
+      const src = (r.source ?? "health_connect") as SourceKey;
+      if (!["health_connect", "manual"].includes(src)) continue;
       if (!map.has(r.date)) map.set(r.date, new Map());
       const sm = map.get(r.date)!;
       if (!sm.has(src)) sm.set(src, { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 });
@@ -530,7 +530,7 @@ const SleepSourcesPanel = () => {
     <Card>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
         <div>
-          <CardTitle className="text-base">Sleep — Google Fit & Health Connect</CardTitle>
+          <CardTitle className="text-base">Sleep — Health Connect</CardTitle>
           <CardDescription>
             Last 7 nights · per-source duration & stage breakdown.
             <span className="block mt-1">Works with Garmin, Whoop, Oura, Fitbit screenshots — we'll auto-fill stages + vitals.</span>

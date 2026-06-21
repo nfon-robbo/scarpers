@@ -34,7 +34,8 @@ const SleepCalendar = () => {
 
   const fetchSleepData = useCallback(async () => {
     if (!user) return;
-    const since = subDays(new Date(), 365).toISOString().split("T")[0];
+    // Pull the user's full sleep history so every night with data shows a score on the calendar.
+    const since = "2015-01-01";
 
     // Pull every source, then keep only the highest-precedence source per date
     // (manual > health_connect > google_fit > garmin-export) so the bars never

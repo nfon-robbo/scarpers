@@ -96,7 +96,7 @@ const SleepStagesChart = () => {
           Sleep Stages
         </CardTitle>
         <CardDescription>
-          Deep, Light, REM & Awake breakdown from Google Fit
+          Deep, Light, REM & Awake breakdown
           {latestSummary && (
             <span className="ml-2 text-foreground font-medium">
               — Last night: {latestSummary.fmtTotal} (Deep {latestSummary.fmtDeep}, REM {latestSummary.fmtRem}, Light {latestSummary.fmtLight})
