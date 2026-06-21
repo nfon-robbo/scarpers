@@ -122,7 +122,16 @@ const getErrorMessage = (error: unknown) => {
 
 const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")[0];
 
-export async function syncHealthConnect(userId: string, daysBack = 3650) {
+export async function syncHealthConnect(
+  userId: string,
+  daysBack = 3650,
+  onProgress?: HealthConnectProgressCallback,
+) {
+  const report = (phase: string, percent: number) => {
+    try { onProgress?.({ phase, percent: Math.max(0, Math.min(100, Math.round(percent))) }); } catch { /* noop */ }
+  };
+  report("Starting…", 1);
+
   const end = new Date();
   const requestedStart = new Date(end.getTime() - daysBack * 86400000);
   const allHistoryStart = new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO);
@@ -130,6 +139,7 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
   const startIso = start.toISOString();
   const endIso = end.toISOString();
 
+  report("Checking permissions…", 3);
   const grantedSet = new Set(await getGrantedHealthConnectPermissions());
   const readErrors: { type: string; message: string }[] = [];
 
