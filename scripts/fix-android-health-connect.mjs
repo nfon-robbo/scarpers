@@ -162,4 +162,26 @@ if (existsSync(manifestPath)) {
   console.warn("AndroidManifest.xml not found — run `npx cap sync android` first.");
 }
 
+// ---------- Patch plugin to request Health Connect history access ----------
+if (existsSync(healthConnectPluginKtPath)) {
+  let pluginKt = readFileSync(healthConnectPluginKtPath, "utf8");
+
+  if (!pluginKt.includes("PERMISSION_READ_HEALTH_DATA_HISTORY")) {
+    pluginKt = pluginKt.replace(
+      "import androidx.health.connect.client.HealthConnectClient\n",
+      "import androidx.health.connect.client.HealthConnectClient\nimport androidx.health.connect.client.permission.HealthPermission.Companion.PERMISSION_READ_HEALTH_DATA_HISTORY\n"
+    );
+  }
+
+  pluginKt = pluginKt.replace(
+    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions\n",
+    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet()\n"
+  );
+
+  writeFileSync(healthConnectPluginKtPath, pluginKt);
+  console.log("Health Connect plugin patched to request read-history permission.");
+} else {
+  console.warn("Health Connect plugin source not found — run `npm install --legacy-peer-deps` first.");
+}
+
 console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers, Health Connect permissions declared.");
