@@ -609,6 +609,8 @@ const SleepSourcesPanel = () => {
                   <th className="px-2 py-2">Date</th>
                   <th className="px-2 py-2">Source</th>
                   <th className="px-2 py-2">Score</th>
+                  <th className="px-2 py-2">Bedtime</th>
+                  <th className="px-2 py-2">Wake</th>
                   <th className="px-2 py-2">Total</th>
                   <th className="px-2 py-2">Deep</th>
                   <th className="px-2 py-2">REM</th>
