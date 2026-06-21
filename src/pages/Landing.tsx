@@ -274,10 +274,8 @@ const Landing = () => {
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia?.("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && isStandalone) navigate("/dashboard", { replace: true });
+      if (session) navigate("/dashboard", { replace: true });
     });
   }, [navigate]);
 
