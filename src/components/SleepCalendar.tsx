@@ -521,6 +521,29 @@ const SleepCalendar = () => {
                 Go
               </Button>
             </form>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => topFileRef.current?.click()}
+              disabled={uploading}
+              className="gap-1"
+              title="Attach a Garmin vitals screenshot to your most recent sleep night"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Garmin screenshot
+            </Button>
+            <input
+              ref={topFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) attachGarminScreenshot(f);
+              }}
+            />
           </div>
           <Calendar
             mode="single"
