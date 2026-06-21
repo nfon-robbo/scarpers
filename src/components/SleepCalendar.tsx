@@ -24,6 +24,11 @@ interface DailyData {
   score: number;
 }
 
+interface DailyMetricSleepRow {
+  date: string;
+  sleep_duration_seconds: number | null;
+}
+
 const SleepCalendar = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState<SleepStageRow[]>([]);
@@ -37,19 +42,38 @@ const SleepCalendar = () => {
     // Pull the user's full sleep history so every night with data shows a score on the calendar.
     const since = "2015-01-01";
 
-    // Pull every source, then keep only the highest-precedence source per date
-    // (manual > health_connect > google_fit > garmin-export) so the bars never
-    // double up when the same night exists in multiple sources.
-    const { data } = await supabase
-      .from("sleep_stages")
-      .select("date, stage, duration_seconds, source")
-      .eq("user_id", user.id)
-      .gte("date", since)
-      .order("date", { ascending: false })
-      .limit(10000);
+    // Pull staged sleep plus legacy duration-only sleep. Manual/staged data wins;
+    // daily_metrics is only used where no sleep_stages row exists for that date.
+    const [{ data: stageData }, { data: metricData }] = await Promise.all([
+      supabase
+        .from("sleep_stages")
+        .select("date, stage, duration_seconds, source")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .order("date", { ascending: false })
+        .limit(10000),
+      supabase
+        .from("daily_metrics")
+        .select("date, sleep_duration_seconds")
+        .eq("user_id", user.id)
+        .gte("date", since)
+        .not("sleep_duration_seconds", "is", null)
+        .order("date", { ascending: false })
+        .limit(10000),
+    ]);
 
-    const deduped = dedupeSleepRowsByPrecedence((data as SleepStageRow[]) || []);
-    setRows(deduped.map(r => ({
+    const deduped = dedupeSleepRowsByPrecedence((stageData as SleepStageRow[]) || []);
+    const stageDates = new Set(deduped.map((r) => r.date));
+    const fallbackRows = ((metricData as DailyMetricSleepRow[]) || [])
+      .filter((r) => !stageDates.has(r.date) && Number(r.sleep_duration_seconds) > 0)
+      .map((r) => ({
+        date: r.date,
+        stage: "sleep",
+        duration_seconds: Number(r.sleep_duration_seconds),
+        source: "daily_metrics",
+      }));
+
+    setRows([...deduped, ...fallbackRows].map(r => ({
       date: r.date,
       stage: r.stage,
       duration_seconds: r.duration_seconds,
