@@ -535,12 +535,24 @@ const SleepSourcesPanel = () => {
 
 
   const handleTopLevelScreenshot = async (file: File) => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    setEditingDate(null);
-    setForm(emptyForm(today));
-    setDialogOpen(true);
     if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
     if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+    if (!user) { toast.error("Not signed in"); return; }
+
+    // Find the most recent existing sleep night (Health Connect or manual) and
+    // attach vitals there — never create a brand-new night from a screenshot.
+    const { data: latest } = await supabase
+      .from("sleep_stages")
+      .select("date")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(1);
+    const targetDate = latest?.[0]?.date;
+    if (!targetDate) {
+      toast.error("No existing sleep night to attach vitals to. Sync sleep data first.");
+      return;
+    }
+
     setParsing(true);
     try {
       const dataUrl: string = await new Promise((res, rej) => {
@@ -553,9 +565,9 @@ const SleepSourcesPanel = () => {
       if (error) throw error;
       const v = data?.vitals as GarminVitals | undefined;
       if (!v) throw new Error("No vitals returned");
-      await saveGarminVitals(today, v);
-      setForm((f) => applyVitalsToForm(f, v));
-      toast.success("Vitals extracted — review stages and save");
+      await saveGarminVitals(targetDate, v);
+      toast.success(`Vitals attached to ${format(parseISO(targetDate), "dd/MM/yyyy")}`);
+      await load();
     } catch (e: unknown) {
       console.error(e);
       toast.error(getErrorMessage(e, "Failed to parse screenshot"));
