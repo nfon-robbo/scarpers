@@ -40,6 +40,7 @@ const HealthConnectCard = () => {
   const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [hasHistoryAccess, setHasHistoryAccess] = useState(false);
+  const [progress, setProgress] = useState<{ phase: string; percent: number } | null>(null);
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
