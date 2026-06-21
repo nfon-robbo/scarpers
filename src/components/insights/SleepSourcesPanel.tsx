@@ -161,7 +161,7 @@ const SleepSourcesPanel = () => {
     const [{ data }, { data: scoreRows }] = await Promise.all([
       supabase
         .from("sleep_stages")
-        .select("date, stage, duration_seconds, source")
+        .select("date, stage, duration_seconds, source, start_time, end_time")
         .eq("user_id", user.id)
         .gte("date", since)
         .in("source", ["health_connect", "manual"]),
