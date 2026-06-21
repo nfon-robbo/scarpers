@@ -514,6 +514,39 @@ export type Database = {
           },
         ]
       }
+      daily_nutrition_summary: {
+        Row: {
+          date: string
+          hydration_cups: number
+          total_calories: number
+          total_carbs_g: number
+          total_fat_g: number
+          total_protein_g: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          date: string
+          hydration_cups?: number
+          total_calories?: number
+          total_carbs_g?: number
+          total_fat_g?: number
+          total_protein_g?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          date?: string
+          hydration_cups?: number
+          total_calories?: number
+          total_carbs_g?: number
+          total_fat_g?: number
+          total_protein_g?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -724,6 +757,63 @@ export type Database = {
           keyword?: string
           next_review_at?: string
           notes?: string | null
+        }
+        Relationships: []
+      }
+      nutrition_logs: {
+        Row: {
+          barcode: string | null
+          brand: string | null
+          calories: number
+          carbs_g: number
+          created_at: string
+          fat_g: number
+          food_name: string
+          id: string
+          log_date: string
+          meal_type: string
+          off_product_id: string | null
+          protein_g: number
+          quantity_g: number
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          brand?: string | null
+          calories?: number
+          carbs_g?: number
+          created_at?: string
+          fat_g?: number
+          food_name: string
+          id?: string
+          log_date: string
+          meal_type: string
+          off_product_id?: string | null
+          protein_g?: number
+          quantity_g?: number
+          source?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          brand?: string | null
+          calories?: number
+          carbs_g?: number
+          created_at?: string
+          fat_g?: number
+          food_name?: string
+          id?: string
+          log_date?: string
+          meal_type?: string
+          off_product_id?: string | null
+          protein_g?: number
+          quantity_g?: number
+          source?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1424,6 +1514,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      recalc_daily_nutrition: {
+        Args: { _date: string; _user_id: string }
+        Returns: undefined
       }
     }
     Enums: {
