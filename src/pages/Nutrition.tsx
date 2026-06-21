@@ -253,6 +253,7 @@ export default function NutritionPage() {
                             <div className="text-sm font-medium truncate">{l.food_name}</div>
                             <div className="text-xs text-muted-foreground">
                               {Math.round(l.quantity_g)}g · {Math.round(l.carbs_g)}g C · {Math.round(l.protein_g)}g P · {Math.round(l.calories)} kcal
+                              {l.alcohol_units > 0 ? ` · ${l.alcohol_units} u alcohol` : ""}
                             </div>
                           </div>
                           <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
