@@ -18,6 +18,7 @@ import {
   CalendarDays,
   ListChecks,
   Brain,
+  Apple,
   Upload,
   Settings,
   Sun,
@@ -33,6 +34,7 @@ const navItems: { to: string; icon: LucideIcon; label: string }[] = [
   { to: "/training-plan", icon: CalendarDays, label: "Plan" },
   { to: "/activities", icon: ListChecks, label: "Activities" },
   { to: "/insights", icon: Brain, label: "Insights" },
+  { to: "/nutrition", icon: Apple, label: "Nutrition" },
   { to: "/upload", icon: Upload, label: "Import" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
@@ -194,7 +196,7 @@ const AppLayout = () => {
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-border/50"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="grid grid-cols-6 h-16">
+        <div className="grid grid-cols-7 h-16">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
