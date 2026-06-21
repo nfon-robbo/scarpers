@@ -245,8 +245,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <div>
                   <Label className="text-xs">kcal</Label>
                   <Input type="number" value={kcal} onChange={(e) => setKcal(parseFloat(e.target.value) || 0)} />
-                </div>
               </div>
+              <div>
+                <Label className="text-xs">Alcohol (UK units)</Label>
+                <Input type="number" step="0.1" value={alcohol} onChange={(e) => setAlcohol(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
             </div>
           )}
         </div>
