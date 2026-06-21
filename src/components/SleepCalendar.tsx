@@ -341,15 +341,62 @@ const SleepCalendar = () => {
           <CardDescription>Tap a date with sleep data to see your score & AI insights</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const today = new Date();
+                setDisplayMonth(today);
+                const todayStr = format(today, "yyyy-MM-dd");
+                if (byDate[todayStr]) {
+                  setSelectedDate(todayStr);
+                  fetchInsight(todayStr);
+                }
+              }}
+              className="gap-1"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Today
+            </Button>
+            <form
+              className="flex gap-2 flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const parsed = parseISO(searchValue);
+                if (!isValid(parsed)) return;
+                setDisplayMonth(parsed);
+                const dateStr = format(parsed, "yyyy-MM-dd");
+                if (byDate[dateStr]) {
+                  setSelectedDate(dateStr);
+                  fetchInsight(dateStr);
+                }
+              }}
+            >
+              <Input
+                type="date"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                className="h-9"
+              />
+              <Button type="submit" variant="outline" size="sm" className="gap-1">
+                <Search className="w-4 h-4" />
+                Go
+              </Button>
+            </form>
+          </div>
           <Calendar
             mode="single"
+            month={displayMonth}
+            onMonthChange={setDisplayMonth}
             selected={selectedDate ? parseISO(selectedDate) : undefined}
             onSelect={(day) => day && handleDayClick(day)}
             modifiers={{ hasSleep: sleepDates }}
             modifiersClassNames={{
               hasSleep: "ring-2 ring-primary/50 rounded-md",
             }}
-            className="mx-auto"
+            className="mx-auto pointer-events-auto"
             components={{
               DayContent: ({ date }) => {
                 const dateStr = format(date, "yyyy-MM-dd");
