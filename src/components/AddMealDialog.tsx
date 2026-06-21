@@ -211,23 +211,43 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <Label>Food</Label>
                 <Input value={foodName} onChange={(e) => setFoodName(e.target.value)} />
               </div>
-              <div>
-                <Label>Quantity (grams): {grams}g</Label>
-                <Slider
-                  value={[grams]}
-                  min={5}
-                  max={500}
-                  step={5}
-                  onValueChange={([v]) => setGrams(v)}
-                />
-                {selected?.servingG ? (
-                  <button
-                    className="text-xs text-primary mt-1 underline"
-                    onClick={() => setGrams(selected.servingG!)}
-                  >
-                    Set to 1 serving ({selected.servingG}g)
-                  </button>
-                ) : null}
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={grams}
+                    onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">grams</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {(() => {
+                    const s = selected?.servingG && selected.servingG > 0 ? selected.servingG : null;
+                    const chips: { label: string; g: number }[] = [];
+                    if (s) {
+                      chips.push({ label: `½ pack (${Math.round(s / 2)}g)`, g: Math.round(s / 2) });
+                      chips.push({ label: `1 pack (${s}g)`, g: s });
+                      chips.push({ label: `2 packs (${s * 2}g)`, g: s * 2 });
+                    }
+                    chips.push({ label: "30g", g: 30 });
+                    chips.push({ label: "50g", g: 50 });
+                    chips.push({ label: "100g", g: 100 });
+                    return chips.map((c) => (
+                      <button
+                        key={c.label}
+                        type="button"
+                        onClick={() => setGrams(c.g)}
+                        className={`text-xs px-2 py-1 rounded border ${grams === c.g ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {c.label}
+                      </button>
+                    ));
+                  })()}
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <div>
