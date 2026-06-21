@@ -9,10 +9,13 @@ import { format, parseISO, subDays } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
+import { dedupeSleepRowsByPrecedence } from "@/lib/sleep-source-precedence";
+
 interface SleepStageRow {
   date: string;
   stage: string;
   duration_seconds: number;
+  source: string;
 }
 
 interface DailyData {
@@ -33,10 +36,9 @@ const SleepCalendar = () => {
     if (!user) return;
     const since = subDays(new Date(), 365).toISOString().split("T")[0];
 
-    // Include all sources (google_fit, health_connect, manual, etc.)
-    // Order DESC + explicit high limit so the most recent nights are never
-    // truncated by PostgREST's default 1000-row cap (users with >1000 stage
-    // rows would otherwise see the latest weeks vanish from the calendar).
+    // Pull every source, then keep only the highest-precedence source per date
+    // (manual > health_connect > google_fit > garmin-export) so the bars never
+    // double up when the same night exists in multiple sources.
     const { data } = await supabase
       .from("sleep_stages")
       .select("date, stage, duration_seconds, source")
@@ -45,10 +47,12 @@ const SleepCalendar = () => {
       .order("date", { ascending: false })
       .limit(10000);
 
-    setRows(((data as SleepStageRow[]) || []).map(r => ({
+    const deduped = dedupeSleepRowsByPrecedence((data as SleepStageRow[]) || []);
+    setRows(deduped.map(r => ({
       date: r.date,
       stage: r.stage,
       duration_seconds: r.duration_seconds,
+      source: r.source,
     })));
     setLoading(false);
   }, [user]);
