@@ -82,7 +82,7 @@ const HealthConnectCard = () => {
     if (!user) return;
     try {
       const result = await startHealthConnectSync(user.id, 3650);
-      if ("skipped" in result && result.skipped) return;
+      if ("skipped" in result) return;
       const { metricsCount, sleepCount, readErrors } = result;
       toast({
         title: "Health Connect synced",
