@@ -317,6 +317,7 @@ export async function syncHealthConnect(
   }
 
   if (nightDates.size > 0) {
+    report("Saving sleep stages…", 85);
     await supabase
       .from("sleep_stages")
       .delete()
@@ -331,7 +332,12 @@ export async function syncHealthConnect(
     else sleepCount = stageRows.length;
   }
 
-  for (const [date, t] of Object.entries(dailyTotals)) {
+  const dailyEntries = Object.entries(dailyTotals);
+  for (let i = 0; i < dailyEntries.length; i++) {
+    const [date, t] = dailyEntries[i];
+    if (i % 25 === 0) {
+      report(`Saving sleep totals… (${i + 1}/${dailyEntries.length})`, 90 + Math.round((i / Math.max(1, dailyEntries.length)) * 8));
+    }
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
     const patch: DailyMetricPatch = {
@@ -352,6 +358,9 @@ export async function syncHealthConnect(
     if (existing) await supabase.from("daily_metrics").update(patch).eq("id", existing.id);
     else await supabase.from("daily_metrics").insert(patch);
   }
+
+  report("Finishing up…", 99);
+
 
   return { metricsCount: updated, sleepCount, sleepSupported: true as const, readErrors };
 }
