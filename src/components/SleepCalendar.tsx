@@ -83,6 +83,82 @@ const SleepCalendar = () => {
     return map;
   }, [rows]);
 
+  // One-shot backfill: every night with sleep_stages data should have a
+  // corresponding daily_metrics.sleep_score, so historical Garmin/Health
+  // Connect nights show a score everywhere (KPI, sources panel, etc.).
+  useEffect(() => {
+    if (!user) return;
+    if (loading) return;
+    const dates = Object.keys(byDate);
+    if (dates.length === 0) return;
+    const flagKey = `sleep-score-backfill:${user.id}`;
+    if (sessionStorage.getItem(flagKey)) return;
+
+    (async () => {
+      try {
+        const { data: existing } = await supabase
+          .from("daily_metrics")
+          .select("id, date, sleep_score")
+          .eq("user_id", user.id)
+          .in("date", dates);
+
+        // Pick the first row per date that already has a score; otherwise
+        // remember any row id we can update in place.
+        const scoredDates = new Set<string>();
+        const updatableIdByDate = new Map<string, string>();
+        for (const r of existing ?? []) {
+          if (r.sleep_score != null) scoredDates.add(r.date);
+          if (!updatableIdByDate.has(r.date)) updatableIdByDate.set(r.date, r.id as string);
+        }
+
+        const missing = dates.filter((d) => !scoredDates.has(d));
+        if (missing.length === 0) {
+          sessionStorage.setItem(flagKey, "1");
+          return;
+        }
+
+        const updates: Promise<unknown>[] = [];
+        const inserts: Record<string, unknown>[] = [];
+        for (const d of missing) {
+          const data = byDate[d];
+          if (!data) continue;
+          const total =
+            data.stages.deep + data.stages.light + data.stages.rem + data.stages.sleep;
+          const id = updatableIdByDate.get(d);
+          if (id) {
+            updates.push(
+              supabase
+                .from("daily_metrics")
+                .update({ sleep_score: data.score, sleep_duration_seconds: total })
+                .eq("id", id)
+            );
+          } else {
+            inserts.push({
+              user_id: user.id,
+              date: d,
+              sleep_score: data.score,
+              sleep_duration_seconds: total,
+            });
+          }
+        }
+
+        if (inserts.length > 0) {
+          // Chunk inserts to keep requests small
+          for (let i = 0; i < inserts.length; i += 200) {
+            updates.push(
+              supabase.from("daily_metrics").insert(inserts.slice(i, i + 200) as never)
+            );
+          }
+        }
+        await Promise.allSettled(updates);
+        sessionStorage.setItem(flagKey, "1");
+      } catch {
+        // Silent — backfill will retry next session.
+      }
+    })();
+  }, [user, loading, byDate]);
+
+
   const sleepDates = useMemo(() => Object.keys(byDate).map(d => parseISO(d)), [byDate]);
 
   const getScoreColor = (score: number) => {
