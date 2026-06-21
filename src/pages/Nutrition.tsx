@@ -179,23 +179,45 @@ export default function NutritionPage() {
       </Card>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />
         <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />
         <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />
         <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />
+        <MacroCard
+          label="Alcohol"
+          value={`${totals.alcohol.toFixed(1)} units`}
+          target="≤ 2/day"
+          pct={totals.alcohol / 2}
+          color={totals.alcohol > 4 ? "bg-destructive" : "bg-purple-500"}
+        />
       </div>
 
       {/* Quick adds */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick add</CardTitle>
+          <CardTitle className="text-base">Quick add — food</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {QUICK_ADDS.map((q) => (
               <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
                 + {q.name} <span className="text-muted-foreground ml-1">{q.carbs}g C</span>
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Quick add — drinks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {DRINK_ADDS.map((q) => (
+              <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
+                + {q.name} <span className="text-muted-foreground ml-1">{q.alcohol} u</span>
               </Button>
             ))}
           </div>
