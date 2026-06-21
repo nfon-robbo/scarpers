@@ -148,7 +148,13 @@ export async function syncHealthConnect(
     Steps: {},
     ActiveCaloriesBurned: {},
   };
-  for (const t of AGGREGATE_TYPES) {
+  const aggLabels: Record<AggregateType, string> = {
+    Steps: "Reading steps…",
+    ActiveCaloriesBurned: "Reading calories…",
+  };
+  for (let i = 0; i < AGGREGATE_TYPES.length; i++) {
+    const t = AGGREGATE_TYPES[i];
+    report(aggLabels[t], 5 + (i * 10));
     if (!grantedSet.has(t)) continue;
     try {
       const res = await HC.aggregateRecords({ start: startIso, end: endIso, type: t, groupBy: "day" });
@@ -166,7 +172,13 @@ export async function syncHealthConnect(
   // ----- Per-record reads: RestingHeartRate + SleepSession -----
   const restingHrRecs: RestingHrRecord[] = [];
   const sleepRecs: SleepSessionRecord[] = [];
-  for (const t of READ_RECORD_TYPES) {
+  const readLabels: Record<ReadRecordType, string> = {
+    RestingHeartRate: "Reading resting heart rate…",
+    SleepSession: "Reading sleep sessions…",
+  };
+  for (let i = 0; i < READ_RECORD_TYPES.length; i++) {
+    const t = READ_RECORD_TYPES[i];
+    report(readLabels[t], 25 + (i * 15));
     if (!grantedSet.has(t)) {
       readErrors.push({ type: t, message: `Permission not granted for ${t}.` });
       continue;
