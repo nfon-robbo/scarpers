@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -6,12 +6,49 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Moon, Loader2, CalendarDays, Search } from "lucide-react";
+import { Moon, Loader2, CalendarDays, Search, Upload } from "lucide-react";
 import { format, parseISO, subDays, isValid } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { toast } from "sonner";
+import { AUTO_SYNC_DONE } from "@/lib/auto-sync";
 
 import { dedupeSleepRowsByPrecedence } from "@/lib/sleep-source-precedence";
+
+type GarminVitals = {
+  breathing_variations?: string | null;
+  restless_moments?: number | null;
+  avg_overnight_hr?: number | null;
+  resting_heart_rate?: number | null;
+  body_battery_change?: number | null;
+  avg_spo2?: number | null;
+  lowest_spo2?: number | null;
+  avg_respiration?: number | null;
+  lowest_respiration?: number | null;
+  avg_overnight_hrv?: number | null;
+  hrv_7d_avg?: number | null;
+  hrv_7d_status?: string | null;
+  skin_temp_change_c?: number | null;
+};
+
+const normaliseBreathingPattern = (value?: string | null) => {
+  const v = (value ?? "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes("balanced")) return "Balanced";
+  if (v.includes("few")) return "Few";
+  if (v.includes("some")) return "Some";
+  if (v.includes("many")) return "Many";
+  return value!.trim();
+};
+const normaliseHrvStatus = (value?: string | null) => {
+  const v = (value ?? "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes("unbalanced")) return "Unbalanced";
+  if (v.includes("balanced")) return "Balanced";
+  if (v.includes("low")) return "Low";
+  if (v.includes("high")) return "High";
+  return value!.trim();
+};
 
 interface SleepStageRow {
   date: string;
@@ -40,6 +77,9 @@ const SleepCalendar = () => {
   const [insightLoading, setInsightLoading] = useState(false);
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date());
   const [searchValue, setSearchValue] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const topFileRef = useRef<HTMLInputElement>(null);
+  const dialogFileRef = useRef<HTMLInputElement>(null);
 
   const fetchSleepData = useCallback(async () => {
     if (!user) return;
@@ -295,6 +335,110 @@ const SleepCalendar = () => {
     }
   };
 
+  const fileToDataUrl = (file: File) => new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+
+  const attachGarminScreenshot = useCallback(async (file: File, targetDate?: string) => {
+    if (!user) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+
+    // Default target = most recent night we have stage data for.
+    const dates = Object.keys(byDate).sort();
+    const date = targetDate ?? dates[dates.length - 1];
+    if (!date) { toast.error("No sleep night to attach to"); return; }
+
+    // Check for existing vitals → ask before overwriting.
+    const { data: existingRows } = await supabase
+      .from("daily_metrics")
+      .select("id, raw_data, created_at")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const existingWithVitals = (existingRows ?? []).find((r) => {
+      const raw = r?.raw_data as Record<string, unknown> | null | undefined;
+      return raw && typeof raw === "object" && Boolean(raw.garmin_sleep_vitals);
+    });
+    if (existingWithVitals) {
+      const ok = window.confirm(
+        `Garmin vitals already exist for ${format(parseISO(date), "dd/MM/yyyy")}. Overwrite with this screenshot?`
+      );
+      if (!ok) return;
+    }
+
+    setUploading(true);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const { data, error } = await supabase.functions.invoke("parse-garmin-sleep", {
+        body: { imageDataUrl: dataUrl },
+      });
+      if (error) throw error;
+      const v = data?.vitals as GarminVitals | undefined;
+      if (!v) throw new Error("No vitals returned");
+
+      const target = (existingRows ?? [])[0] ?? null;
+      const prevRaw = (target?.raw_data && typeof target.raw_data === "object" ? target.raw_data : {}) as Record<string, unknown>;
+
+      const payload: Record<string, unknown> = {
+        user_id: user.id,
+        date,
+        raw_data: {
+          ...prevRaw,
+          garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() },
+        },
+      };
+
+      const rhr = v.resting_heart_rate;
+      const hrv = v.avg_overnight_hrv ?? v.hrv_7d_avg;
+      if (rhr != null && isFinite(rhr) && rhr > 0) payload.resting_heart_rate = rhr;
+      if (hrv != null && isFinite(hrv) && hrv > 0) payload.hrv = hrv;
+      if (v.avg_spo2 != null && isFinite(v.avg_spo2)) { payload.spo2 = v.avg_spo2; payload.spo2_avg = v.avg_spo2; }
+      if (v.lowest_spo2 != null && isFinite(v.lowest_spo2)) payload.spo2_lowest = v.lowest_spo2;
+      if (v.avg_respiration != null && isFinite(v.avg_respiration)) payload.respiration_avg = v.avg_respiration;
+      const bp = normaliseBreathingPattern(v.breathing_variations);
+      if (bp) payload.breathing_pattern = bp;
+      if (v.skin_temp_change_c != null && isFinite(v.skin_temp_change_c)) payload.skin_temp_deviation = v.skin_temp_change_c;
+      if (v.restless_moments != null && isFinite(v.restless_moments)) payload.restless_count = v.restless_moments;
+      const hrvStatus = normaliseHrvStatus(v.hrv_7d_status);
+      if (hrvStatus) payload.hrv_7d_trend = hrvStatus;
+      if (v.body_battery_change != null && isFinite(v.body_battery_change)) payload.body_battery_change = v.body_battery_change;
+
+      // Recompute sleep score with the new advanced vitals applied to that night's stages.
+      const stages = byDate[date]?.stages;
+      if (stages) {
+        payload.sleep_score = calculateSleepScore(stages, {
+          spo2_avg: v.avg_spo2 ?? null,
+          spo2_lowest: v.lowest_spo2 ?? null,
+          breathing_pattern: bp,
+          restless_count: v.restless_moments ?? null,
+          skin_temp_deviation: v.skin_temp_change_c ?? null,
+        });
+      }
+
+      const { error: writeErr } = target?.id
+        ? await supabase.from("daily_metrics").update(payload as never).eq("id", target.id)
+        : await supabase.from("daily_metrics").insert(payload as never);
+      if (writeErr) throw writeErr;
+
+      toast.success(`Vitals attached to ${format(parseISO(date), "dd/MM/yyyy")} — scores updated`);
+
+      // Refresh calendar + nudge readiness/IQ widgets to recompute.
+      await fetchSleepData();
+      window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
+      window.dispatchEvent(new CustomEvent(AUTO_SYNC_DONE));
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Failed to parse screenshot");
+    } finally {
+      setUploading(false);
+    }
+  }, [user, byDate, fetchSleepData]);
+
   const selected = selectedDate ? byDate[selectedDate] : null;
 
   if (loading) return null;
@@ -377,6 +521,29 @@ const SleepCalendar = () => {
                 Go
               </Button>
             </form>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => topFileRef.current?.click()}
+              disabled={uploading}
+              className="gap-1"
+              title="Attach a Garmin vitals screenshot to your most recent sleep night"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Garmin screenshot
+            </Button>
+            <input
+              ref={topFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) attachGarminScreenshot(f);
+              }}
+            />
           </div>
           <Calendar
             mode="single"
@@ -420,6 +587,32 @@ const SleepCalendar = () => {
               </DialogTitle>
               <DialogDescription>Sleep analysis & AI insights</DialogDescription>
             </DialogHeader>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => dialogFileRef.current?.click()}
+                disabled={uploading}
+                className="gap-1"
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Attach Garmin screenshot
+              </Button>
+              <input
+                ref={dialogFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f && selectedDate) attachGarminScreenshot(f, selectedDate);
+                }}
+              />
+            </div>
+
 
             <div className="space-y-4">
               {/* Score badge */}
