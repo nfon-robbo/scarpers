@@ -24,7 +24,7 @@ const ALL_READ_TYPES = [
   "SleepSession",
 ] as const;
 
-type HealthConnectAny = typeof HealthConnect & {
+type HealthConnectAny = {
   readRecords: (o: {
     start: string;
     end: string;
@@ -41,7 +41,7 @@ type HealthConnectAny = typeof HealthConnect & {
   getGrantedPermissions: () => Promise<{ read: string[]; write: string[] }>;
 };
 
-const HC = HealthConnect as HealthConnectAny;
+const HC = HealthConnect as unknown as HealthConnectAny;
 
 type DailyMetricPatch = {
   user_id: string;
