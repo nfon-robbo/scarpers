@@ -15,8 +15,15 @@ import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
 type SourceKey = "health_connect" | "manual";
-type SourceRow = { source: SourceKey; totals: StageTotals };
+type SourceRow = { source: SourceKey; totals: StageTotals; bedtime: string | null; wake: string | null };
 type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
+
+const fmtTime = (iso: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return format(d, "HH:mm");
+};
 
 const fmtH = (secs: number) => {
   if (!secs) return "—";
@@ -154,7 +161,7 @@ const SleepSourcesPanel = () => {
     const [{ data }, { data: scoreRows }] = await Promise.all([
       supabase
         .from("sleep_stages")
-        .select("date, stage, duration_seconds, source")
+        .select("date, stage, duration_seconds, source, start_time, end_time")
         .eq("user_id", user.id)
         .gte("date", since)
         .in("source", ["health_connect", "manual"]),
@@ -172,6 +179,7 @@ const SleepSourcesPanel = () => {
     }
 
     const map = new Map<string, Map<SourceKey, StageTotals>>();
+    const timeMap = new Map<string, Map<SourceKey, { start: number | null; end: number | null }>>();
     for (const r of data ?? []) {
       const src = (r.source ?? "health_connect") as SourceKey;
       if (!["health_connect", "manual"].includes(src)) continue;
@@ -181,12 +189,29 @@ const SleepSourcesPanel = () => {
       const t = sm.get(src)!;
       const key = r.stage as keyof StageTotals;
       if (key in t) t[key] += r.duration_seconds || 0;
+
+      if (!timeMap.has(r.date)) timeMap.set(r.date, new Map());
+      const tm = timeMap.get(r.date)!;
+      if (!tm.has(src)) tm.set(src, { start: null, end: null });
+      const cur = tm.get(src)!;
+      const st = (r as { start_time?: string | null }).start_time ? new Date((r as { start_time?: string | null }).start_time as string).getTime() : NaN;
+      const en = (r as { end_time?: string | null }).end_time ? new Date((r as { end_time?: string | null }).end_time as string).getTime() : NaN;
+      if (!isNaN(st)) cur.start = cur.start == null ? st : Math.min(cur.start, st);
+      if (!isNaN(en)) cur.end = cur.end == null ? en : Math.max(cur.end, en);
     }
 
     const built: Row[] = Array.from(map.entries())
       .map(([date, sm]) => ({
         date,
-        sources: Array.from(sm.entries()).map(([source, totals]) => ({ source, totals })),
+        sources: Array.from(sm.entries()).map(([source, totals]) => {
+          const tm = timeMap.get(date)?.get(source);
+          return {
+            source,
+            totals,
+            bedtime: tm?.start != null ? new Date(tm.start).toISOString() : null,
+            wake: tm?.end != null ? new Date(tm.end).toISOString() : null,
+          };
+        }),
         sleepScore: scoreByDate.get(date) ?? null,
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
@@ -584,6 +609,8 @@ const SleepSourcesPanel = () => {
                   <th className="px-2 py-2">Date</th>
                   <th className="px-2 py-2">Source</th>
                   <th className="px-2 py-2">Score</th>
+                  <th className="px-2 py-2">Bedtime</th>
+                  <th className="px-2 py-2">Wake</th>
                   <th className="px-2 py-2">Total</th>
                   <th className="px-2 py-2">Deep</th>
                   <th className="px-2 py-2">REM</th>
@@ -605,6 +632,8 @@ const SleepSourcesPanel = () => {
                         </td>
                         <td className="px-2 py-2">{sourceLabel(s.source)}</td>
                         <td className={`px-2 py-2 font-bold ${scoreLabel(r.sleepScore ?? score).color}`}>{i === 0 ? r.sleepScore ?? score : ""}</td>
+                        <td className="px-2 py-2 font-mono">{fmtTime(s.bedtime)}</td>
+                        <td className="px-2 py-2 font-mono">{fmtTime(s.wake)}</td>
                         <td className="px-2 py-2 font-semibold">{fmtH(total)}</td>
                         <td className="px-2 py-2">{fmtH(t.deep)}</td>
                         <td className="px-2 py-2">{fmtH(t.rem)}</td>
