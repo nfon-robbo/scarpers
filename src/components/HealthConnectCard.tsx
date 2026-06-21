@@ -174,7 +174,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Pulls all available history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
+          Pulls history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
         </p>
       </CardContent>
     </Card>
