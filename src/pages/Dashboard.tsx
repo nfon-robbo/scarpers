@@ -259,25 +259,6 @@ const Dashboard = () => {
       results.push({ source: "Intervals.icu", status: "error", detail: "Not connected" });
     }
 
-    // Google Fit sleep
-    try {
-      const res = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST", headers, body: JSON.stringify({ days: 3650 }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        results.push({
-          source: "Google Fit",
-          status: d.synced > 0 ? "success" : "skipped",
-          detail: d.synced > 0 ? `${d.synced} sleep segments` : "No new sleep data",
-        });
-      } else {
-        const errBody = await res.json().catch(() => ({ error: res.statusText }));
-        results.push({ source: "Google Fit", status: "error", detail: errBody.error || `HTTP ${res.status}` });
-      }
-    } catch {
-      results.push({ source: "Google Fit", status: "error", detail: "Not connected" });
-    }
 
     // Build detailed toast
     const successCount = results.filter(r => r.status === "success").length;

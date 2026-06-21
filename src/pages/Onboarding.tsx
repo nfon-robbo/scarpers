@@ -19,7 +19,7 @@ import {
   Activity, ChevronRight, ChevronLeft, ChevronDown,
   Upload, Loader2, Calendar as CalendarIcon, Sparkles,
 } from "lucide-react";
-import GoogleFitConnect from "@/components/GoogleFitConnect";
+
 import StravaConnect from "@/components/StravaConnect";
 import { parseFitBuffer, parseZipFile, type ParsedActivity } from "@/lib/fit-parser";
 import { streamAICoach } from "@/lib/ai-stream";
@@ -890,7 +890,7 @@ const Onboarding = () => {
               <p className="text-sm text-muted-foreground">
                 Connect your accounts to pull in runs and sleep data automatically. You can skip and add these later in Settings.
               </p>
-              <GoogleFitConnect />
+              
               <StravaConnect />
             </div>
           )}

@@ -5,7 +5,6 @@
 export const SLEEP_SOURCE_PRIORITY: Record<string, number> = {
   manual: 4,
   health_connect: 3,
-  google_fit: 2,
   "garmin-export": 1,
 };
 

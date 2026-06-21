@@ -54,11 +54,6 @@ export async function runAutoSyncOnce(
         method: "POST",
         headers,
       }).catch(() => null),
-      fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ days: 3650 }),
-      }).catch(() => null),
     ]);
 
     markAutoSyncDone(userId);

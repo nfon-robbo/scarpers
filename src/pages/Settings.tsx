@@ -1006,47 +1006,6 @@ const Settings = () => {
           </Select>
         </div>
 
-        {/* Google Fit */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3 flex-1">
-            <div className="mt-0.5">
-              <Switch
-                checked={schedule.google_fit_enabled}
-                onCheckedChange={(v) => setSchedule((s) => ({ ...s, google_fit_enabled: v }))}
-                disabled={!googleFitConnected}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">Google Fit Sleep</p>
-                {!googleFitConnected && (
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <AlertCircle className="w-3 h-3" /> Not connected
-                  </Badge>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">Sync sleep stages once daily</p>
-            </div>
-          </div>
-          <Select
-            value={String(schedule.google_fit_hour_utc)}
-            onValueChange={(v) => setSchedule((s) => ({ ...s, google_fit_hour_utc: Number(v) }))}
-            disabled={!schedule.google_fit_enabled}
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Time">
-                {formatHourUtc(schedule.google_fit_hour_utc)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {[5, 6, 7, 8, 9, 10, 11, 12].map((h) => (
-                <SelectItem key={h} value={String(h)}>
-                  {formatHourUtc(h)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
         <div className="pt-2 flex items-center justify-between">
           <p className="text-xs text-muted-foreground">

@@ -34,21 +34,6 @@ async function syncStrava(accessToken: string, apikey: string, baseUrl: string) 
   }
 }
 
-async function syncGoogleFit(accessToken: string, apikey: string, baseUrl: string) {
-  if (!shouldRun("google-fit")) return;
-  try {
-    await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ days: 3650 }),
-    });
-  } catch { /* silent */ }
-}
-
 async function syncIntervals(accessToken: string, apikey: string, baseUrl: string) {
   if (!shouldRun("intervals")) return;
   try {
@@ -76,15 +61,13 @@ export async function runAllSyncs(): Promise<void> {
     const userId = session.user.id;
 
     // Check which integrations are connected before firing requests.
-    const [stravaTok, gfitTok, intervalsCreds] = await Promise.all([
+    const [stravaTok, intervalsCreds] = await Promise.all([
       supabase.from("strava_tokens").select("user_id").eq("user_id", userId).maybeSingle(),
-      supabase.from("google_fit_tokens").select("user_id").eq("user_id", userId).maybeSingle(),
       supabase.from("intervals_credentials").select("user_id").eq("user_id", userId).maybeSingle(),
     ]);
 
     const tasks: Promise<void>[] = [];
     if (stravaTok.data) tasks.push(syncStrava(accessToken, apikey, baseUrl));
-    if (gfitTok.data) tasks.push(syncGoogleFit(accessToken, apikey, baseUrl));
     if (intervalsCreds.data) tasks.push(syncIntervals(accessToken, apikey, baseUrl));
 
     await Promise.allSettled(tasks);
