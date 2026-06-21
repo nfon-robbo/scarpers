@@ -24,7 +24,7 @@ const ALL_READ_TYPES = [
   "SleepSession",
 ] as const;
 
-type HealthConnectAny = typeof HealthConnect & {
+type HealthConnectAny = {
   readRecords: (o: {
     start: string;
     end: string;
@@ -37,11 +37,11 @@ type HealthConnectAny = typeof HealthConnect & {
     type: string;
     groupBy?: "day" | "hour" | "week" | "month";
   }) => Promise<{ aggregates: { startTime: string; endTime: string; value: number; unit?: string }[] }>;
-  requestPermissions: (o: { read: string[]; write: string[] }) => Promise<{ read: string[]; write: string[] }>;
+  requestPermissions: (o: { read: string[]; write: string[]; readHistory?: boolean }) => Promise<{ read: string[]; write: string[] }>;
   getGrantedPermissions: () => Promise<{ read: string[]; write: string[] }>;
 };
 
-const HC = HealthConnect as HealthConnectAny;
+const HC = HealthConnect as unknown as HealthConnectAny;
 
 type DailyMetricPatch = {
   user_id: string;
@@ -86,7 +86,7 @@ export async function ensureHealthConnectAvailable() {
 }
 
 export async function requestHealthConnectPermissions() {
-  return HC.requestPermissions({ read: [...ALL_READ_TYPES], write: [] });
+  return HC.requestPermissions({ read: [...ALL_READ_TYPES], write: [], readHistory: true });
 }
 
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
@@ -111,7 +111,7 @@ const getErrorMessage = (error: unknown) => {
 
 const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")[0];
 
-export async function syncHealthConnect(userId: string, daysBack = 7) {
+export async function syncHealthConnect(userId: string, daysBack = 90) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
   const startIso = start.toISOString();
