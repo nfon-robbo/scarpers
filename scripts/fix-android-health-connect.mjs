@@ -47,7 +47,7 @@ let buildGradle = readFileSync(buildGradlePath, "utf8");
 const kotlinJvmTargetBlock = `
 
 // Health Connect's Kotlin plugin does not understand Java 21 as a JVM target.
-// Keep Kotlin bytecode at Java 17 even when Android Studio runs Gradle on JDK 21.
+// Keep both Java and Kotlin bytecode at Java 17 even when Android Studio runs Gradle on JDK 21.
 subprojects { subproject ->
     afterEvaluate {
         tasks.matching { task -> task.class.name.contains("KotlinCompile") }.configureEach { task ->
@@ -55,14 +55,28 @@ subprojects { subproject ->
                 task.kotlinOptions.jvmTarget = "17"
             }
         }
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = "17"
+            targetCompatibility = "17"
+        }
+        if (subproject.hasProperty("android")) {
+            subproject.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
     }
 }
 `;
 
-if (!buildGradle.includes("Health Connect's Kotlin plugin")) {
-  buildGradle = `${buildGradle.trimEnd()}${kotlinJvmTargetBlock}`;
-  writeFileSync(buildGradlePath, buildGradle);
+if (buildGradle.includes("Health Connect's Kotlin plugin")) {
+  // Replace any prior version of the block with the latest one.
+  buildGradle = buildGradle.replace(/\n\n\/\/ Health Connect's Kotlin plugin[\s\S]*$/m, "");
 }
+buildGradle = `${buildGradle.trimEnd()}${kotlinJvmTargetBlock}`;
+writeFileSync(buildGradlePath, buildGradle);
 
 let gradleProperties = existsSync(gradlePropertiesPath) ? readFileSync(gradlePropertiesPath, "utf8") : "";
 gradleProperties = upsertGradleProperty(gradleProperties, "android.useFullClasspathForDexingTransform", "true");
