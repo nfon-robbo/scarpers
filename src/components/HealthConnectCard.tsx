@@ -10,10 +10,14 @@ import {
   ensureHealthConnectAvailable,
   requestHealthConnectPermissions,
   getGrantedHealthConnectPermissions,
-  syncHealthConnect,
   HEALTH_CONNECT_ALL_HISTORY_START_ISO,
   HEALTH_CONNECT_HISTORY_PERMISSION,
 } from "@/lib/health-connect";
+import {
+  getHealthConnectSyncState,
+  subscribeHealthConnectSync,
+  startHealthConnectSync,
+} from "@/lib/health-connect-sync-store";
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -36,11 +40,12 @@ const HealthConnectCard = () => {
   const [supported, setSupported] = useState(false);
   const [availability, setAvailability] = useState<string>("");
   const [granted, setGranted] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
-  const [fatalError, setFatalError] = useState<string | null>(null);
   const [hasHistoryAccess, setHasHistoryAccess] = useState(false);
-  const [progress, setProgress] = useState<{ phase: string; percent: number } | null>(null);
+  const [syncState, setSyncState] = useState(getHealthConnectSyncState());
+
+  useEffect(() => subscribeHealthConnectSync(setSyncState), []);
+
+  const { syncing, progress, errors, fatalError } = syncState;
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
@@ -75,36 +80,18 @@ const HealthConnectCard = () => {
 
   const handleSync = async () => {
     if (!user) return;
-    setSyncing(true);
-    setErrors([]);
-    setFatalError(null);
-    setProgress({ phase: "Starting…", percent: 1 });
     try {
-      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(
-        user.id,
-        3650,
-        (p) => setProgress(p),
-      );
-      setErrors(readErrors ?? []);
-      setProgress({ phase: "Done", percent: 100 });
+      const result = await startHealthConnectSync(user.id, 3650);
+      if ("skipped" in result && result.skipped) return;
+      const { metricsCount, sleepCount, readErrors } = result;
       toast({
         title: "Health Connect synced",
         description: `From 01/01/2024 · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
-      // Refresh sleep calendar and other listeners
-      window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
-      window.dispatchEvent(new CustomEvent("daily-metrics-synced"));
-      // Clear progress bar after a beat so the user sees 100%
-      setTimeout(() => setProgress(null), 1500);
     } catch (e: unknown) {
-      const msg = getErrorMessage(e);
-      setFatalError(String(msg));
-      toast({ title: "Sync failed", description: msg, variant: "destructive" });
-      setProgress(null);
-    } finally {
-      setSyncing(false);
+      toast({ title: "Sync failed", description: getErrorMessage(e), variant: "destructive" });
     }
   };
 
