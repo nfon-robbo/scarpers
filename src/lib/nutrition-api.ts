@@ -14,12 +14,8 @@ export interface OffFood {
   servingG: number | null;
 }
 
-const SEARCH_URL =
-  "https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=15" +
-  "&fields=code,product_name,brands,nutriments,serving_size,serving_quantity";
-
-const PRODUCT_URL = (code: string) =>
-  `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,brands,nutriments,serving_size,serving_quantity`;
+const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/food-search`;
+const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v) : NaN;
