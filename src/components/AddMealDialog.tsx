@@ -56,7 +56,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setSelected(null);
       setManual(false);
       setGrams(100);
-      setCarbs(0); setProtein(0); setFat(0); setKcal(0);
+      setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
     }
   }, [open, defaultMeal]);
@@ -123,6 +123,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         protein_g: protein,
         fat_g: fat,
         calories: kcal,
+        alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
         off_product_id: selected?.id ?? null,
       });
