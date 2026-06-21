@@ -127,10 +127,12 @@ const SleepCalendar = () => {
           const id = updatableIdByDate.get(d);
           if (id) {
             updates.push(
-              supabase
-                .from("daily_metrics")
-                .update({ sleep_score: data.score, sleep_duration_seconds: total })
-                .eq("id", id)
+              Promise.resolve(
+                supabase
+                  .from("daily_metrics")
+                  .update({ sleep_score: data.score, sleep_duration_seconds: total })
+                  .eq("id", id)
+              )
             );
           } else {
             inserts.push({
@@ -143,10 +145,11 @@ const SleepCalendar = () => {
         }
 
         if (inserts.length > 0) {
-          // Chunk inserts to keep requests small
           for (let i = 0; i < inserts.length; i += 200) {
             updates.push(
-              supabase.from("daily_metrics").insert(inserts.slice(i, i + 200) as never)
+              Promise.resolve(
+                supabase.from("daily_metrics").insert(inserts.slice(i, i + 200) as never)
+              )
             );
           }
         }
