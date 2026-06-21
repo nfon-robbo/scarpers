@@ -137,6 +137,18 @@ const HealthConnectCard = () => {
           </Button>
         </div>
 
+        {progress && (
+          <div className="mt-3 space-y-1">
+            <Progress value={progress.percent} className="h-2" />
+            <div className="flex justify-between text-[11px] text-muted-foreground">
+              <span>{progress.phase}</span>
+              <span>{progress.percent}%</span>
+            </div>
+          </div>
+        )}
+
+
+
         {(fatalError || errors.length > 0) && (
           <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
             <div className="text-xs font-semibold text-destructive">
