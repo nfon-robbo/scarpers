@@ -335,6 +335,110 @@ const SleepCalendar = () => {
     }
   };
 
+  const fileToDataUrl = (file: File) => new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+
+  const attachGarminScreenshot = useCallback(async (file: File, targetDate?: string) => {
+    if (!user) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please upload an image"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
+
+    // Default target = most recent night we have stage data for.
+    const dates = Object.keys(byDate).sort();
+    const date = targetDate ?? dates[dates.length - 1];
+    if (!date) { toast.error("No sleep night to attach to"); return; }
+
+    // Check for existing vitals → ask before overwriting.
+    const { data: existingRows } = await supabase
+      .from("daily_metrics")
+      .select("id, raw_data, created_at")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const existingWithVitals = (existingRows ?? []).find((r) => {
+      const raw = r?.raw_data as Record<string, unknown> | null | undefined;
+      return raw && typeof raw === "object" && Boolean(raw.garmin_sleep_vitals);
+    });
+    if (existingWithVitals) {
+      const ok = window.confirm(
+        `Garmin vitals already exist for ${format(parseISO(date), "dd/MM/yyyy")}. Overwrite with this screenshot?`
+      );
+      if (!ok) return;
+    }
+
+    setUploading(true);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const { data, error } = await supabase.functions.invoke("parse-garmin-sleep", {
+        body: { imageDataUrl: dataUrl },
+      });
+      if (error) throw error;
+      const v = data?.vitals as GarminVitals | undefined;
+      if (!v) throw new Error("No vitals returned");
+
+      const target = (existingRows ?? [])[0] ?? null;
+      const prevRaw = (target?.raw_data && typeof target.raw_data === "object" ? target.raw_data : {}) as Record<string, unknown>;
+
+      const payload: Record<string, unknown> = {
+        user_id: user.id,
+        date,
+        raw_data: {
+          ...prevRaw,
+          garmin_sleep_vitals: { ...v, source: "garmin_screenshot", captured_at: new Date().toISOString() },
+        },
+      };
+
+      const rhr = v.resting_heart_rate;
+      const hrv = v.avg_overnight_hrv ?? v.hrv_7d_avg;
+      if (rhr != null && isFinite(rhr) && rhr > 0) payload.resting_heart_rate = rhr;
+      if (hrv != null && isFinite(hrv) && hrv > 0) payload.hrv = hrv;
+      if (v.avg_spo2 != null && isFinite(v.avg_spo2)) { payload.spo2 = v.avg_spo2; payload.spo2_avg = v.avg_spo2; }
+      if (v.lowest_spo2 != null && isFinite(v.lowest_spo2)) payload.spo2_lowest = v.lowest_spo2;
+      if (v.avg_respiration != null && isFinite(v.avg_respiration)) payload.respiration_avg = v.avg_respiration;
+      const bp = normaliseBreathingPattern(v.breathing_variations);
+      if (bp) payload.breathing_pattern = bp;
+      if (v.skin_temp_change_c != null && isFinite(v.skin_temp_change_c)) payload.skin_temp_deviation = v.skin_temp_change_c;
+      if (v.restless_moments != null && isFinite(v.restless_moments)) payload.restless_count = v.restless_moments;
+      const hrvStatus = normaliseHrvStatus(v.hrv_7d_status);
+      if (hrvStatus) payload.hrv_7d_trend = hrvStatus;
+      if (v.body_battery_change != null && isFinite(v.body_battery_change)) payload.body_battery_change = v.body_battery_change;
+
+      // Recompute sleep score with the new advanced vitals applied to that night's stages.
+      const stages = byDate[date]?.stages;
+      if (stages) {
+        payload.sleep_score = calculateSleepScore(stages, {
+          spo2_avg: v.avg_spo2 ?? null,
+          spo2_lowest: v.lowest_spo2 ?? null,
+          breathing_pattern: bp,
+          restless_count: v.restless_moments ?? null,
+          skin_temp_deviation: v.skin_temp_change_c ?? null,
+        });
+      }
+
+      const { error: writeErr } = target?.id
+        ? await supabase.from("daily_metrics").update(payload as never).eq("id", target.id)
+        : await supabase.from("daily_metrics").insert(payload as never);
+      if (writeErr) throw writeErr;
+
+      toast.success(`Vitals attached to ${format(parseISO(date), "dd/MM/yyyy")} — scores updated`);
+
+      // Refresh calendar + nudge readiness/IQ widgets to recompute.
+      await fetchSleepData();
+      window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
+      window.dispatchEvent(new CustomEvent(AUTO_SYNC_DONE));
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "Failed to parse screenshot");
+    } finally {
+      setUploading(false);
+    }
+  }, [user, byDate, fetchSleepData]);
+
   const selected = selectedDate ? byDate[selectedDate] : null;
 
   if (loading) return null;
