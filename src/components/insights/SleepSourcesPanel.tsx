@@ -654,7 +654,7 @@ const SleepSourcesPanel = () => {
                         <td className="px-2 py-2">{fmtH(t.awake)}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="inline-flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(r.date, t)} title={s.source === "manual" ? "Edit" : "Override with manual entry"}>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(r.date, t, s.bedtime, s.wake)} title={s.source === "manual" ? "Edit" : "Override with manual entry"}>
                               <Pencil className="w-3 h-3" />
                             </Button>
                             {s.source === "manual" && (
