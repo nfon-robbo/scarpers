@@ -43,6 +43,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
   const [kcal, setKcal] = useState(0);
+  const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
   const [saving, setSaving] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -55,7 +56,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setSelected(null);
       setManual(false);
       setGrams(100);
-      setCarbs(0); setProtein(0); setFat(0); setKcal(0);
+      setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
     }
   }, [open, defaultMeal]);
@@ -122,6 +123,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         protein_g: protein,
         fat_g: fat,
         calories: kcal,
+        alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
         off_product_id: selected?.id ?? null,
       });
@@ -243,8 +245,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <div>
                   <Label className="text-xs">kcal</Label>
                   <Input type="number" value={kcal} onChange={(e) => setKcal(parseFloat(e.target.value) || 0)} />
-                </div>
               </div>
+              <div>
+                <Label className="text-xs">Alcohol (UK units)</Label>
+                <Input type="number" step="0.1" value={alcohol} onChange={(e) => setAlcohol(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
             </div>
           )}
         </div>

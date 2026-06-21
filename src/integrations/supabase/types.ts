@@ -518,6 +518,7 @@ export type Database = {
         Row: {
           date: string
           hydration_cups: number
+          total_alcohol_units: number
           total_calories: number
           total_carbs_g: number
           total_fat_g: number
@@ -528,6 +529,7 @@ export type Database = {
         Insert: {
           date: string
           hydration_cups?: number
+          total_alcohol_units?: number
           total_calories?: number
           total_carbs_g?: number
           total_fat_g?: number
@@ -538,6 +540,7 @@ export type Database = {
         Update: {
           date?: string
           hydration_cups?: number
+          total_alcohol_units?: number
           total_calories?: number
           total_carbs_g?: number
           total_fat_g?: number
@@ -762,6 +765,7 @@ export type Database = {
       }
       nutrition_logs: {
         Row: {
+          alcohol_units: number
           barcode: string | null
           brand: string | null
           calories: number
@@ -780,6 +784,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alcohol_units?: number
           barcode?: string | null
           brand?: string | null
           calories?: number
@@ -798,6 +803,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          alcohol_units?: number
           barcode?: string | null
           brand?: string | null
           calories?: number
