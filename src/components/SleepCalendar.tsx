@@ -346,15 +346,7 @@ const SleepCalendar = () => {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                const today = new Date();
-                setDisplayMonth(today);
-                const todayStr = format(today, "yyyy-MM-dd");
-                if (byDate[todayStr]) {
-                  setSelectedDate(todayStr);
-                  fetchInsight(todayStr);
-                }
-              }}
+              onClick={() => setDisplayMonth(new Date())}
               className="gap-1"
             >
               <CalendarDays className="w-4 h-4" />
