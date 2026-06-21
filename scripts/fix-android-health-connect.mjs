@@ -174,7 +174,7 @@ if (existsSync(healthConnectPluginKtPath)) {
 
   pluginKt = pluginKt.replace(
     "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions\n",
-    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet()\n"
+    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet<String>()\n"
   );
 
   writeFileSync(healthConnectPluginKtPath, pluginKt);
