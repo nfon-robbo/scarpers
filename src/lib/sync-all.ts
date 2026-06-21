@@ -44,7 +44,7 @@ async function syncGoogleFit(accessToken: string, apikey: string, baseUrl: strin
         apikey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ days: 30 }),
+      body: JSON.stringify({ days: 90 }),
     });
   } catch { /* silent */ }
 }
