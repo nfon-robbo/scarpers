@@ -77,6 +77,9 @@ const SleepCalendar = () => {
   const [insightLoading, setInsightLoading] = useState(false);
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date());
   const [searchValue, setSearchValue] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const topFileRef = useRef<HTMLInputElement>(null);
+  const dialogFileRef = useRef<HTMLInputElement>(null);
 
   const fetchSleepData = useCallback(async () => {
     if (!user) return;
