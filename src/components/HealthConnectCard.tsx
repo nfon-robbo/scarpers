@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, RefreshCw, CheckCircle2, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +40,7 @@ const HealthConnectCard = () => {
   const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [hasHistoryAccess, setHasHistoryAccess] = useState(false);
+  const [progress, setProgress] = useState<{ phase: string; percent: number } | null>(null);
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
@@ -76,20 +78,31 @@ const HealthConnectCard = () => {
     setSyncing(true);
     setErrors([]);
     setFatalError(null);
+    setProgress({ phase: "Starting…", percent: 1 });
     try {
-      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(user.id, 3650);
+      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(
+        user.id,
+        3650,
+        (p) => setProgress(p),
+      );
       setErrors(readErrors ?? []);
+      setProgress({ phase: "Done", percent: 100 });
       toast({
         title: "Health Connect synced",
-        description: `From 01/01/2016 · ${metricsCount} days updated · ${sleepCount} sleep segments${
+        description: `From 01/01/2024 · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
+      // Refresh sleep calendar and other listeners
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
+      window.dispatchEvent(new CustomEvent("daily-metrics-synced"));
+      // Clear progress bar after a beat so the user sees 100%
+      setTimeout(() => setProgress(null), 1500);
     } catch (e: unknown) {
       const msg = getErrorMessage(e);
       setFatalError(String(msg));
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
+      setProgress(null);
     } finally {
       setSyncing(false);
     }
@@ -124,6 +137,18 @@ const HealthConnectCard = () => {
           </Button>
         </div>
 
+        {progress && (
+          <div className="mt-3 space-y-1">
+            <Progress value={progress.percent} className="h-2" />
+            <div className="flex justify-between text-[11px] text-muted-foreground">
+              <span>{progress.phase}</span>
+              <span>{progress.percent}%</span>
+            </div>
+          </div>
+        )}
+
+
+
         {(fatalError || errors.length > 0) && (
           <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
             <div className="text-xs font-semibold text-destructive">
@@ -149,7 +174,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Pulls all available history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
+          Pulls history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
         </p>
       </CardContent>
     </Card>

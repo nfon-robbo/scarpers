@@ -100,8 +100,14 @@ export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   }
 }
 
-export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2016-01-01T00:00:00.000Z";
+export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2024-01-01T00:00:00.000Z";
 export const HEALTH_CONNECT_HISTORY_PERMISSION = "android.permission.health.READ_HEALTH_DATA_HISTORY";
+
+export type HealthConnectProgress = {
+  phase: string;
+  percent: number; // 0-100
+};
+export type HealthConnectProgressCallback = (p: HealthConnectProgress) => void;
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -116,7 +122,16 @@ const getErrorMessage = (error: unknown) => {
 
 const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")[0];
 
-export async function syncHealthConnect(userId: string, daysBack = 3650) {
+export async function syncHealthConnect(
+  userId: string,
+  daysBack = 3650,
+  onProgress?: HealthConnectProgressCallback,
+) {
+  const report = (phase: string, percent: number) => {
+    try { onProgress?.({ phase, percent: Math.max(0, Math.min(100, Math.round(percent))) }); } catch { /* noop */ }
+  };
+  report("Starting…", 1);
+
   const end = new Date();
   const requestedStart = new Date(end.getTime() - daysBack * 86400000);
   const allHistoryStart = new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO);
@@ -124,6 +139,7 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
   const startIso = start.toISOString();
   const endIso = end.toISOString();
 
+  report("Checking permissions…", 3);
   const grantedSet = new Set(await getGrantedHealthConnectPermissions());
   const readErrors: { type: string; message: string }[] = [];
 
@@ -132,7 +148,13 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
     Steps: {},
     ActiveCaloriesBurned: {},
   };
-  for (const t of AGGREGATE_TYPES) {
+  const aggLabels: Record<AggregateType, string> = {
+    Steps: "Reading steps…",
+    ActiveCaloriesBurned: "Reading calories…",
+  };
+  for (let i = 0; i < AGGREGATE_TYPES.length; i++) {
+    const t = AGGREGATE_TYPES[i];
+    report(aggLabels[t], 5 + (i * 10));
     if (!grantedSet.has(t)) continue;
     try {
       const res = await HC.aggregateRecords({ start: startIso, end: endIso, type: t, groupBy: "day" });
@@ -150,7 +172,13 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
   // ----- Per-record reads: RestingHeartRate + SleepSession -----
   const restingHrRecs: RestingHrRecord[] = [];
   const sleepRecs: SleepSessionRecord[] = [];
-  for (const t of READ_RECORD_TYPES) {
+  const readLabels: Record<ReadRecordType, string> = {
+    RestingHeartRate: "Reading resting heart rate…",
+    SleepSession: "Reading sleep sessions…",
+  };
+  for (let i = 0; i < READ_RECORD_TYPES.length; i++) {
+    const t = READ_RECORD_TYPES[i];
+    report(readLabels[t], 25 + (i * 15));
     if (!grantedSet.has(t)) {
       readErrors.push({ type: t, message: `Permission not granted for ${t}.` });
       continue;
@@ -186,7 +214,12 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
   ]);
 
   let updated = 0;
-  for (const date of allDates) {
+  const allDatesArr = Array.from(allDates);
+  for (let i = 0; i < allDatesArr.length; i++) {
+    const date = allDatesArr[i];
+    if (i % 25 === 0) {
+      report(`Saving daily metrics… (${i + 1}/${allDatesArr.length})`, 55 + Math.round((i / Math.max(1, allDatesArr.length)) * 20));
+    }
     const steps = aggDaily.Steps[date];
     const activeCal = aggDaily.ActiveCaloriesBurned[date];
     const restingArr = restingByDay[date];
@@ -212,6 +245,8 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
     else await supabase.from("daily_metrics").insert(patch);
     updated++;
   }
+
+  report("Processing sleep stages…", 78);
 
   // ----- Sleep stages → sleep_stages + daily_metrics rollup -----
   type SleepStageInsert = {
@@ -282,6 +317,7 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
   }
 
   if (nightDates.size > 0) {
+    report("Saving sleep stages…", 85);
     await supabase
       .from("sleep_stages")
       .delete()
@@ -296,7 +332,12 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
     else sleepCount = stageRows.length;
   }
 
-  for (const [date, t] of Object.entries(dailyTotals)) {
+  const dailyEntries = Object.entries(dailyTotals);
+  for (let i = 0; i < dailyEntries.length; i++) {
+    const [date, t] = dailyEntries[i];
+    if (i % 25 === 0) {
+      report(`Saving sleep totals… (${i + 1}/${dailyEntries.length})`, 90 + Math.round((i / Math.max(1, dailyEntries.length)) * 8));
+    }
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
     const patch: DailyMetricPatch = {
@@ -317,6 +358,9 @@ export async function syncHealthConnect(userId: string, daysBack = 3650) {
     if (existing) await supabase.from("daily_metrics").update(patch).eq("id", existing.id);
     else await supabase.from("daily_metrics").insert(patch);
   }
+
+  report("Finishing up…", 99);
+
 
   return { metricsCount: updated, sleepCount, sleepSupported: true as const, readErrors };
 }
