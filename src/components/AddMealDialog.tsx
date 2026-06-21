@@ -43,6 +43,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
   const [kcal, setKcal] = useState(0);
+  const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
   const [saving, setSaving] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
