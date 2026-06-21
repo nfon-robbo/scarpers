@@ -150,7 +150,7 @@ const SleepSourcesPanel = () => {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const since = format(subDays(new Date(), 89), "yyyy-MM-dd");
+    const since = format(subDays(new Date(), 3650), "yyyy-MM-dd");
     const [{ data }, { data: scoreRows }] = await Promise.all([
       supabase
         .from("sleep_stages")

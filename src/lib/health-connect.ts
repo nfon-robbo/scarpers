@@ -111,7 +111,7 @@ const getErrorMessage = (error: unknown) => {
 
 const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")[0];
 
-export async function syncHealthConnect(userId: string, daysBack = 90) {
+export async function syncHealthConnect(userId: string, daysBack = 3650) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
   const startIso = start.toISOString();
