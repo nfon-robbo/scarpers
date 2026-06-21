@@ -100,8 +100,14 @@ export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   }
 }
 
-export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2016-01-01T00:00:00.000Z";
+export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2024-01-01T00:00:00.000Z";
 export const HEALTH_CONNECT_HISTORY_PERMISSION = "android.permission.health.READ_HEALTH_DATA_HISTORY";
+
+export type HealthConnectProgress = {
+  phase: string;
+  percent: number; // 0-100
+};
+export type HealthConnectProgressCallback = (p: HealthConnectProgress) => void;
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
