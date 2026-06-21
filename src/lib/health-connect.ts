@@ -37,7 +37,7 @@ type HealthConnectAny = typeof HealthConnect & {
     type: string;
     groupBy?: "day" | "hour" | "week" | "month";
   }) => Promise<{ aggregates: { startTime: string; endTime: string; value: number; unit?: string }[] }>;
-  requestPermissions: (o: { read: string[]; write: string[] }) => Promise<{ read: string[]; write: string[] }>;
+  requestPermissions: (o: { read: string[]; write: string[]; readHistory?: boolean }) => Promise<{ read: string[]; write: string[] }>;
   getGrantedPermissions: () => Promise<{ read: string[]; write: string[] }>;
 };
 
