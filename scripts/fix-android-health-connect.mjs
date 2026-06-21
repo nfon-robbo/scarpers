@@ -9,6 +9,7 @@ const stringsPath = join(androidDir, "app", "src", "main", "res", "values", "str
 const manifestPath = join(androidDir, "app", "src", "main", "AndroidManifest.xml");
 const healthConnectPluginDir = join(process.cwd(), "node_modules", "@devmaxime", "capacitor-health-connect", "android", "src", "main", "java", "com", "devmaxime", "capacitor", "health", "connect");
 const healthConnectPluginKtPath = join(healthConnectPluginDir, "AndroidHealthConnectPlugin.kt");
+const healthConnectKtPath = join(healthConnectPluginDir, "AndroidHealthConnect.kt");
 
 const upsertGradleProperty = (contents, key, value) => {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -172,15 +173,46 @@ if (existsSync(healthConnectPluginKtPath)) {
     );
   }
 
-  pluginKt = pluginKt.replace(
-    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions\n",
-    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet<String>()\n"
-  );
+  if (!pluginKt.includes("includeHistoryPermission")) {
+    pluginKt = pluginKt.replace(
+      /\s*val result = implementation\.buildPermissionSet\(readPermissionsArray, writePermissionsArray\)\n\s*\/\/ Store both valid permissions and invalid records\.\n\s*requestedPermissions = result\.validPermissions\n/,
+      "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet<String>()\n"
+    );
+  }
+
+  if (!pluginKt.includes("Log.d(\"HealthConnect\", \"Requesting permissions:")) {
+    pluginKt = pluginKt.replace(
+      "        permissionCall = call\n        permissionLauncher.launch(requestedPermissions)\n",
+      "        permissionCall = call\n        Log.d(\"HealthConnect\", \"Requesting permissions: $requestedPermissions\")\n        permissionLauncher.launch(requestedPermissions)\n"
+    );
+  }
 
   writeFileSync(healthConnectPluginKtPath, pluginKt);
   console.log("Health Connect plugin patched to request read-history permission.");
 } else {
   console.warn("Health Connect plugin source not found — run `npm install --legacy-peer-deps` first.");
+}
+
+if (existsSync(healthConnectKtPath)) {
+  let healthConnectKt = readFileSync(healthConnectKtPath, "utf8");
+  if (!healthConnectKt.includes('result.put("raw", rawArray)')) {
+    healthConnectKt = healthConnectKt.replace(
+      "        val writeArray = JSArray()\n",
+      "        val writeArray = JSArray()\n        val rawArray = JSArray()\n"
+    );
+    healthConnectKt = healthConnectKt.replace(
+      "        for (perm in granted) {\n            // Use reversePermission to convert the raw permission string.\n",
+      "        for (perm in granted) {\n            rawArray.put(perm)\n            // Use reversePermission to convert the raw permission string.\n"
+    );
+    healthConnectKt = healthConnectKt.replace(
+      "        result.put(\"read\", readArray)\n        result.put(\"write\", writeArray)\n",
+      "        result.put(\"read\", readArray)\n        result.put(\"write\", writeArray)\n        result.put(\"raw\", rawArray)\n"
+    );
+    writeFileSync(healthConnectKtPath, healthConnectKt);
+    console.log("Health Connect plugin patched to expose raw granted permissions.");
+  }
+} else {
+  console.warn("Health Connect implementation source not found — run `npm install --legacy-peer-deps` first.");
 }
 
 console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers, Health Connect permissions/history access declared.");

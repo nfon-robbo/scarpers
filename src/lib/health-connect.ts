@@ -37,8 +37,8 @@ type HealthConnectAny = {
     type: string;
     groupBy?: "day" | "hour" | "week" | "month";
   }) => Promise<{ aggregates: { startTime: string; endTime: string; value: number; unit?: string }[] }>;
-  requestPermissions: (o: { read: string[]; write: string[]; readHistory?: boolean }) => Promise<{ read: string[]; write: string[] }>;
-  getGrantedPermissions: () => Promise<{ read: string[]; write: string[] }>;
+  requestPermissions: (o: { read: string[]; write: string[]; readHistory?: boolean }) => Promise<{ read: string[]; write: string[]; raw?: string[] }>;
+  getGrantedPermissions: () => Promise<{ read: string[]; write: string[]; raw?: string[] }>;
 };
 
 const HC = HealthConnect as unknown as HealthConnectAny;
@@ -92,11 +92,16 @@ export async function requestHealthConnectPermissions() {
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   try {
     const res = await HC.getGrantedPermissions();
-    return Array.isArray(res?.read) ? res.read : [];
+    const read = Array.isArray(res?.read) ? res.read : [];
+    const raw = Array.isArray(res?.raw) ? res.raw : [];
+    return [...read, ...raw];
   } catch {
     return [];
   }
 }
+
+export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2016-01-01T00:00:00.000Z";
+export const HEALTH_CONNECT_HISTORY_PERMISSION = "android.permission.health.READ_HEALTH_DATA_HISTORY";
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -113,7 +118,9 @@ const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")
 
 export async function syncHealthConnect(userId: string, daysBack = 3650) {
   const end = new Date();
-  const start = new Date(end.getTime() - daysBack * 86400000);
+  const requestedStart = new Date(end.getTime() - daysBack * 86400000);
+  const allHistoryStart = new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO);
+  const start = requestedStart < allHistoryStart ? requestedStart : allHistoryStart;
   const startIso = start.toISOString();
   const endIso = end.toISOString();
 
