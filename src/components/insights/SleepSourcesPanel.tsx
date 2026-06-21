@@ -632,6 +632,8 @@ const SleepSourcesPanel = () => {
                         </td>
                         <td className="px-2 py-2">{sourceLabel(s.source)}</td>
                         <td className={`px-2 py-2 font-bold ${scoreLabel(r.sleepScore ?? score).color}`}>{i === 0 ? r.sleepScore ?? score : ""}</td>
+                        <td className="px-2 py-2 font-mono">{fmtTime(s.bedtime)}</td>
+                        <td className="px-2 py-2 font-mono">{fmtTime(s.wake)}</td>
                         <td className="px-2 py-2 font-semibold">{fmtH(total)}</td>
                         <td className="px-2 py-2">{fmtH(t.deep)}</td>
                         <td className="px-2 py-2">{fmtH(t.rem)}</td>
