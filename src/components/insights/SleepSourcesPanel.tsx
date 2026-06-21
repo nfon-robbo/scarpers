@@ -15,8 +15,15 @@ import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
 type SourceKey = "health_connect" | "manual";
-type SourceRow = { source: SourceKey; totals: StageTotals };
+type SourceRow = { source: SourceKey; totals: StageTotals; bedtime: string | null; wake: string | null };
 type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
+
+const fmtTime = (iso: string | null) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return format(d, "HH:mm");
+};
 
 const fmtH = (secs: number) => {
   if (!secs) return "—";
