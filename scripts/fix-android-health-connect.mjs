@@ -8,7 +8,6 @@ const gradlePropertiesPath = join(androidDir, "gradle.properties");
 const stringsPath = join(androidDir, "app", "src", "main", "res", "values", "strings.xml");
 const manifestPath = join(androidDir, "app", "src", "main", "AndroidManifest.xml");
 const healthConnectPluginDir = join(process.cwd(), "node_modules", "@devmaxime", "capacitor-health-connect", "android", "src", "main", "java", "com", "devmaxime", "capacitor", "health", "connect");
-const healthConnectKtPath = join(healthConnectPluginDir, "AndroidHealthConnect.kt");
 const healthConnectPluginKtPath = join(healthConnectPluginDir, "AndroidHealthConnectPlugin.kt");
 
 const upsertGradleProperty = (contents, key, value) => {
@@ -184,4 +183,4 @@ if (existsSync(healthConnectPluginKtPath)) {
   console.warn("Health Connect plugin source not found — run `npm install --legacy-peer-deps` first.");
 }
 
-console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers, Health Connect permissions declared.");
+console.log("Android build settings fixed: minSdkVersion 26, Kotlin JVM target 17, full classpath dexing enabled, app label set to scarpers, Health Connect permissions/history access declared.");
