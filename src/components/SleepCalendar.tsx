@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { Moon, Loader2 } from "lucide-react";
-import { format, parseISO, subDays } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Moon, Loader2, CalendarDays, Search } from "lucide-react";
+import { format, parseISO, subDays, isValid } from "date-fns";
 import { calculateSleepScore, scoreLabel, type SleepStageData } from "@/lib/sleep-score";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
