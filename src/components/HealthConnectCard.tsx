@@ -78,20 +78,31 @@ const HealthConnectCard = () => {
     setSyncing(true);
     setErrors([]);
     setFatalError(null);
+    setProgress({ phase: "Starting…", percent: 1 });
     try {
-      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(user.id, 3650);
+      const { metricsCount, sleepCount, readErrors } = await syncHealthConnect(
+        user.id,
+        3650,
+        (p) => setProgress(p),
+      );
       setErrors(readErrors ?? []);
+      setProgress({ phase: "Done", percent: 100 });
       toast({
         title: "Health Connect synced",
-        description: `From 01/01/2016 · ${metricsCount} days updated · ${sleepCount} sleep segments${
+        description: `From 01/01/2024 · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
+      // Refresh sleep calendar and other listeners
       window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
+      window.dispatchEvent(new CustomEvent("daily-metrics-synced"));
+      // Clear progress bar after a beat so the user sees 100%
+      setTimeout(() => setProgress(null), 1500);
     } catch (e: unknown) {
       const msg = getErrorMessage(e);
       setFatalError(String(msg));
       toast({ title: "Sync failed", description: msg, variant: "destructive" });
+      setProgress(null);
     } finally {
       setSyncing(false);
     }
