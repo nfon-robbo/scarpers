@@ -7,11 +7,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { format, parseISO, subDays } from "date-fns";
+import { dedupeSleepRowsByPrecedence } from "@/lib/sleep-source-precedence";
 
 interface SleepStageRow {
   date: string;
   stage: string;
   duration_seconds: number;
+  source: string;
 }
 
 interface DailyStages {
@@ -32,13 +34,16 @@ const SleepStagesChart = () => {
     const since = subDays(new Date(), 30).toISOString().split("T")[0];
     const { data } = await supabase
       .from("sleep_stages")
-      .select("date, stage, duration_seconds")
+      .select("date, stage, duration_seconds, source")
       .eq("user_id", user.id)
       .gte("date", since)
-      .order("date", { ascending: true });
-    setStages((data as SleepStageRow[]) || []);
+      .order("date", { ascending: true })
+      .limit(10000);
+    // Manual > health_connect > google_fit — only keep highest-precedence source per date
+    setStages(dedupeSleepRowsByPrecedence((data as SleepStageRow[]) || []));
     setLoading(false);
   };
+
 
   useEffect(() => {
     fetchStages();
