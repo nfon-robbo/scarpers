@@ -179,6 +179,7 @@ const SleepSourcesPanel = () => {
     }
 
     const map = new Map<string, Map<SourceKey, StageTotals>>();
+    const timeMap = new Map<string, Map<SourceKey, { start: number | null; end: number | null }>>();
     for (const r of data ?? []) {
       const src = (r.source ?? "health_connect") as SourceKey;
       if (!["health_connect", "manual"].includes(src)) continue;
@@ -188,12 +189,29 @@ const SleepSourcesPanel = () => {
       const t = sm.get(src)!;
       const key = r.stage as keyof StageTotals;
       if (key in t) t[key] += r.duration_seconds || 0;
+
+      if (!timeMap.has(r.date)) timeMap.set(r.date, new Map());
+      const tm = timeMap.get(r.date)!;
+      if (!tm.has(src)) tm.set(src, { start: null, end: null });
+      const cur = tm.get(src)!;
+      const st = (r as { start_time?: string | null }).start_time ? new Date((r as { start_time?: string | null }).start_time as string).getTime() : NaN;
+      const en = (r as { end_time?: string | null }).end_time ? new Date((r as { end_time?: string | null }).end_time as string).getTime() : NaN;
+      if (!isNaN(st)) cur.start = cur.start == null ? st : Math.min(cur.start, st);
+      if (!isNaN(en)) cur.end = cur.end == null ? en : Math.max(cur.end, en);
     }
 
     const built: Row[] = Array.from(map.entries())
       .map(([date, sm]) => ({
         date,
-        sources: Array.from(sm.entries()).map(([source, totals]) => ({ source, totals })),
+        sources: Array.from(sm.entries()).map(([source, totals]) => {
+          const tm = timeMap.get(date)?.get(source);
+          return {
+            source,
+            totals,
+            bedtime: tm?.start != null ? new Date(tm.start).toISOString() : null,
+            wake: tm?.end != null ? new Date(tm.end).toISOString() : null,
+          };
+        }),
         sleepScore: scoreByDate.get(date) ?? null,
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
