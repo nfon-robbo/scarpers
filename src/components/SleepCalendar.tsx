@@ -588,6 +588,32 @@ const SleepCalendar = () => {
               <DialogDescription>Sleep analysis & AI insights</DialogDescription>
             </DialogHeader>
 
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => dialogFileRef.current?.click()}
+                disabled={uploading}
+                className="gap-1"
+              >
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Attach Garmin screenshot
+              </Button>
+              <input
+                ref={dialogFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f && selectedDate) attachGarminScreenshot(f, selectedDate);
+                }}
+              />
+            </div>
+
+
             <div className="space-y-4">
               {/* Score badge */}
               <div className="flex items-center gap-3">
