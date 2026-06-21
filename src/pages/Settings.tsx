@@ -230,7 +230,7 @@ const Settings = () => {
   const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [stravaConnected, setStravaConnected] = useState(false);
-  const [googleFitConnected, setGoogleFitConnected] = useState(false);
+  
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const navigate = useNavigate();
 
@@ -424,10 +424,9 @@ const Settings = () => {
     if (!user) return;
     // Load schedule and connection status in parallel
     const load = async () => {
-      const [schedRes, stravaRes, gfRes] = await Promise.all([
+      const [schedRes, stravaRes] = await Promise.all([
         supabase.from("sync_schedules").select("*").eq("user_id", user.id).maybeSingle(),
         supabase.from("strava_tokens").select("id").eq("user_id", user.id).maybeSingle(),
-        supabase.from("google_fit_tokens").select("id").eq("user_id", user.id).maybeSingle(),
       ]);
       if (schedRes.data) {
         setSchedule({
@@ -440,7 +439,6 @@ const Settings = () => {
         });
       }
       setStravaConnected(!!stravaRes.data);
-      setGoogleFitConnected(!!gfRes.data);
       setScheduleLoaded(true);
     };
     load();
