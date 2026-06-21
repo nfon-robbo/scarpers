@@ -727,6 +727,7 @@ export default function PlanDayList({
                 return (
                   <div
                     key={key}
+                    data-plan-date={key}
                     onDragOver={(e) => handleDragOver(e, key)}
                     onDragLeave={() => setDragOverDate((d) => (d === key ? null : d))}
                     onDrop={(e) => handleDrop(e, key)}
