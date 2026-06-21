@@ -83,11 +83,11 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let daysBack = 90; // default
+  let daysBack = 3650; // default: all available history (~10 years)
   let debug = false;
   try {
     const body = await req.clone().json();
-    if (body?.days) daysBack = Math.min(body.days, 90);
+    if (body?.days) daysBack = Math.min(body.days, 3650);
     debug = body?.debug === true;
   } catch { /* no body, use default */ }
 
