@@ -10,6 +10,8 @@ import {
   requestHealthConnectPermissions,
   getGrantedHealthConnectPermissions,
   syncHealthConnect,
+  HEALTH_CONNECT_ALL_HISTORY_START_ISO,
+  HEALTH_CONNECT_HISTORY_PERMISSION,
 } from "@/lib/health-connect";
 
 const getErrorMessage = (error: unknown) => {
@@ -36,10 +38,12 @@ const HealthConnectCard = () => {
   const [syncing, setSyncing] = useState(false);
   const [errors, setErrors] = useState<{ type: string; message: string }[]>([]);
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [hasHistoryAccess, setHasHistoryAccess] = useState(false);
 
   const refreshGranted = async () => {
     const list = await getGrantedHealthConnectPermissions();
     setGranted(list.length > 0);
+    setHasHistoryAccess(list.includes(HEALTH_CONNECT_HISTORY_PERMISSION));
   };
 
   useEffect(() => {
@@ -77,7 +81,7 @@ const HealthConnectCard = () => {
       setErrors(readErrors ?? []);
       toast({
         title: "Health Connect synced",
-        description: `${metricsCount} days updated · ${sleepCount} sleep segments${
+        description: `From 01/01/2016 · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
@@ -145,7 +149,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Pulls all available history. For data older than the last week, grant Health Connect history access when prompted, then open Garmin Connect → Settings → Health Connect → enable Sleep, Heart Rate, Steps and Active Calories.
+          Pulls all available history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
         </p>
       </CardContent>
     </Card>

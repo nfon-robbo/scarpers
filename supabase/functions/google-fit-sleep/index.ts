@@ -83,11 +83,15 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  let daysBack = 3650; // default: all available history (~10 years)
+  const ALL_HISTORY_DAYS = 3650; // effectively unlimited available Google Fit history (~10 years)
+  let daysBack = ALL_HISTORY_DAYS;
   let debug = false;
   try {
     const body = await req.clone().json();
-    if (body?.days) daysBack = Math.min(body.days, 3650);
+    // Always sync all available sleep history. Older mobile bundles may still
+    // send { days: 7 }; ignore that so the backend can no longer be capped by
+    // stale clients.
+    if (body?.days) daysBack = ALL_HISTORY_DAYS;
     debug = body?.debug === true;
   } catch { /* no body, use default */ }
 

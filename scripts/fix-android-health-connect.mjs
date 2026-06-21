@@ -172,10 +172,19 @@ if (existsSync(healthConnectPluginKtPath)) {
     );
   }
 
-  pluginKt = pluginKt.replace(
-    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions\n",
-    "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet<String>()\n"
-  );
+  if (!pluginKt.includes("includeHistoryPermission")) {
+    pluginKt = pluginKt.replace(
+      /\s*val result = implementation\.buildPermissionSet\(readPermissionsArray, writePermissionsArray\)\n\s*\/\/ Store both valid permissions and invalid records\.\n\s*requestedPermissions = result\.validPermissions\n/,
+      "        val result = implementation.buildPermissionSet(readPermissionsArray, writePermissionsArray)\n        val includeHistoryPermission = call.getBoolean(\"readHistory\", false) == true\n        // Store both valid permissions and invalid records.\n        requestedPermissions = result.validPermissions + if (includeHistoryPermission) setOf(PERMISSION_READ_HEALTH_DATA_HISTORY) else emptySet<String>()\n"
+    );
+  }
+
+  if (!pluginKt.includes("Log.d(\"HealthConnect\", \"Requesting permissions:")) {
+    pluginKt = pluginKt.replace(
+      "        permissionCall = call\n        permissionLauncher.launch(requestedPermissions)\n",
+      "        permissionCall = call\n        Log.d(\"HealthConnect\", \"Requesting permissions: $requestedPermissions\")\n        permissionLauncher.launch(requestedPermissions)\n"
+    );
+  }
 
   writeFileSync(healthConnectPluginKtPath, pluginKt);
   console.log("Health Connect plugin patched to request read-history permission.");
