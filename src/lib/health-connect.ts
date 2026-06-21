@@ -86,7 +86,7 @@ export async function ensureHealthConnectAvailable() {
 }
 
 export async function requestHealthConnectPermissions() {
-  return HC.requestPermissions({ read: [...ALL_READ_TYPES], write: [] });
+  return HC.requestPermissions({ read: [...ALL_READ_TYPES], write: [], readHistory: true });
 }
 
 export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
@@ -111,7 +111,7 @@ const getErrorMessage = (error: unknown) => {
 
 const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")[0];
 
-export async function syncHealthConnect(userId: string, daysBack = 7) {
+export async function syncHealthConnect(userId: string, daysBack = 90) {
   const end = new Date();
   const start = new Date(end.getTime() - daysBack * 86400000);
   const startIso = start.toISOString();
