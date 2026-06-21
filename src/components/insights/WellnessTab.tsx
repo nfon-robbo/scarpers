@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
-import GoogleFitConnect from "@/components/GoogleFitConnect";
+
 import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
@@ -92,14 +92,6 @@ const WellnessTab = () => {
         if (d.synced > 0) results.push(`${d.synced} wellness days`);
       }
 
-      const gfRes = await fetch(`${baseUrl}/functions/v1/google-fit-sleep`, {
-        method: "POST", headers, body: JSON.stringify({ days: 3650 }),
-      }).catch(() => null);
-      if (gfRes?.ok) {
-        const d = await gfRes.json();
-        if (d.synced > 0) results.push(`${d.synced} sleep segments`);
-        window.dispatchEvent(new CustomEvent("sleep-stages-synced"));
-      }
 
       toast({
         title: results.length > 0 ? "Sync complete" : "Everything up to date",
@@ -183,7 +175,6 @@ const WellnessTab = () => {
       )}
 
       <SleepSourcesPanel />
-      <GoogleFitConnect />
       <SleepCalendar />
       <SleepHealthMetrics />
       <SleepStagesChart />

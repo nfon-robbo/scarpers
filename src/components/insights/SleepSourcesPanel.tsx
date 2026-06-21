@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
-type SourceKey = "google_fit" | "health_connect" | "manual";
+type SourceKey = "health_connect" | "manual";
 type SourceRow = { source: SourceKey; totals: StageTotals };
 type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
 
@@ -26,7 +26,7 @@ const fmtH = (secs: number) => {
 };
 
 const sourceLabel = (s: SourceKey) =>
-  s === "google_fit" ? "Google Fit" : s === "health_connect" ? "Health Connect" : "Manual";
+  s === "health_connect" ? "Health Connect" : "Manual";
 
 const sleepScoreFor = (t: StageTotals) => calculateSleepScore({
   deep: t.deep,
