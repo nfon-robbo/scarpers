@@ -318,21 +318,34 @@ const SleepSourcesPanel = () => {
     setDialogOpen(true);
   };
 
-  const openEdit = async (date: string, totals: StageTotals) => {
+  const openEdit = async (date: string, totals: StageTotals, bedtimeIso?: string | null, wakeIso?: string | null) => {
     setEditingDate(date);
     const totalAll = totals.deep + totals.rem + totals.light + totals.sleep + totals.awake;
-    // Derive bedtime from default 07:00 wake when we don't know real times
-    const wakeDefault = "07:00";
-    const wakeH = 7, wakeM = 0;
-    const bedTotalMin = wakeH * 60 + wakeM - Math.round(totalAll / 60);
-    const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
-    const bh = Math.floor(normMin / 60), bm = normMin % 60;
+
+    let bedtimeStr: string;
+    let wakeStr: string;
+    if (bedtimeIso && wakeIso) {
+      bedtimeStr = format(new Date(bedtimeIso), "HH:mm");
+      wakeStr = format(new Date(wakeIso), "HH:mm");
+    } else if (wakeIso) {
+      wakeStr = format(new Date(wakeIso), "HH:mm");
+      const [wH, wM] = wakeStr.split(":").map((n) => parseInt(n, 10) || 0);
+      const bedTotalMin = wH * 60 + wM - Math.round(totalAll / 60);
+      const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
+      bedtimeStr = `${String(Math.floor(normMin / 60)).padStart(2, "0")}:${String(normMin % 60).padStart(2, "0")}`;
+    } else {
+      wakeStr = "07:00";
+      const bedTotalMin = 7 * 60 - Math.round(totalAll / 60);
+      const normMin = ((bedTotalMin % 1440) + 1440) % 1440;
+      bedtimeStr = `${String(Math.floor(normMin / 60)).padStart(2, "0")}:${String(normMin % 60).padStart(2, "0")}`;
+    }
+
     const existing = await fetchExistingVitals(date);
     const baseForm = {
       ...emptyForm(date),
       date,
-      bedtime: `${String(bh).padStart(2, "0")}:${String(bm).padStart(2, "0")}`,
-      wakeTime: wakeDefault,
+      bedtime: bedtimeStr,
+      wakeTime: wakeStr,
       deep: secsToHHMM(totals.deep),
       rem: secsToHHMM(totals.rem),
       light: secsToHHMM(totals.light || totals.sleep),
@@ -641,7 +654,7 @@ const SleepSourcesPanel = () => {
                         <td className="px-2 py-2">{fmtH(t.awake)}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="inline-flex gap-1">
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(r.date, t)} title={s.source === "manual" ? "Edit" : "Override with manual entry"}>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEdit(r.date, t, s.bedtime, s.wake)} title={s.source === "manual" ? "Edit" : "Override with manual entry"}>
                               <Pencil className="w-3 h-3" />
                             </Button>
                             {s.source === "manual" && (
