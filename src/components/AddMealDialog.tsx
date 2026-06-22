@@ -113,15 +113,16 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
     const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
     const pG = f.productG && f.productG > 0 ? f.productG : null;
-    if (sG) {
-      setUnit("serving");
-      setQty(1);
-    } else if (pG) {
-      setUnit("pack");
-      setQty(1);
+    // Scanned items default to the WHOLE pack/tin/bottle (what the user
+    // actually picked up). Text-search picks default to a single serving.
+    if (f.fromBarcode) {
+      if (pG) { setUnit("pack"); setQty(1); }
+      else if (sG) { setUnit("serving"); setQty(1); }
+      else { setUnit("g"); setQty(100); }
     } else {
-      setUnit("g");
-      setQty(30);
+      if (sG) { setUnit("serving"); setQty(1); }
+      else if (pG) { setUnit("pack"); setQty(1); }
+      else { setUnit("g"); setQty(30); }
     }
   }
 
@@ -330,7 +331,9 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
                 const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
                 const showServing = !!sG;
-                const showPack = !!pG && (!sG || pG > sG * 1.5);
+                // Always show the whole-pack option for scanned items (a 330ml
+                // tin has pG≈sG, but the user usually drinks the whole thing).
+                const showPack = !!pG && (selected.fromBarcode || !sG || pG > sG * 1.5);
                 return (
                   <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                     <Label className="text-xs">Portion</Label>
