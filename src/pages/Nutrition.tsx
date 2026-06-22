@@ -229,8 +229,8 @@ export default function NutritionPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add">
-                              <Heart className="w-4 h-4 text-muted-foreground" />
+                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add" disabled={favNames.has(l.food_name.toLowerCase())}>
+                              <Heart className={`w-4 h-4 ${favNames.has(l.food_name.toLowerCase()) ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
                               <Trash2 className="w-4 h-4 text-muted-foreground" />
