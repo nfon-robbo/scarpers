@@ -86,25 +86,48 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     return () => { clearTimeout(t); ctl.abort(); };
   }, [query, manual, selected]);
 
-  // Recompute macros when grams or food changes
+  // Derive grams from qty + unit, then macros
   useEffect(() => {
     if (!selected) return;
-    const scaled = scaleFood(selected, grams);
+    const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
+    const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
+    const unitG = unit === "g" ? 1 : unit === "serving" ? (sG ?? 1) : (pG ?? sG ?? 1);
+    const g = Math.max(1, Math.round((qty || 0) * unitG));
+    setGrams(g);
+    const scaled = scaleFood(selected, g);
     setCarbs(scaled.carbs_g);
     setProtein(scaled.protein_g);
     setFat(scaled.fat_g);
     setKcal(scaled.calories);
-  }, [selected, grams]);
+  }, [selected, qty, unit]);
 
   function pickFood(f: OffFood) {
     setSelected(f);
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
-    setGrams(f.servingG && f.servingG > 0 ? f.servingG : 100);
+    const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
+    const pG = f.productG && f.productG > 0 ? f.productG : null;
+    if (sG) {
+      setUnit("serving");
+      setQty(1);
+    } else if (pG) {
+      setUnit("pack");
+      setQty(1);
+    } else {
+      setUnit("g");
+      setQty(30);
+    }
   }
 
   function goBack() {
     setSelected(null);
     setManual(false);
+  }
+
+  function buildPortionLabel(): string {
+    if (!selected) return `${grams}g`;
+    if (unit === "g") return `${grams}g`;
+    if (unit === "serving") return `${qty} ${qty === 1 ? "bag/serving" : "bags/servings"} (~${grams}g)`;
+    return `${qty} ${qty === 1 ? "pack" : "packs"} (~${grams}g)`;
   }
 
   async function save() {
@@ -130,6 +153,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
         off_product_id: selected?.id ?? null,
+        portion_label: buildPortionLabel(),
       });
       if (error) throw error;
       toast({ title: "Logged", description: `${foodName} added to ${meal}` });
