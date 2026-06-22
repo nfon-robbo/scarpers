@@ -186,12 +186,15 @@ Deno.serve(async (req) => {
     const barcode = (url.searchParams.get('barcode') || '').trim();
 
     if (barcode) {
+      const BARCODE_FIELDS = 'code,product_name,brands,nutriments,serving_quantity,serving_size,product_quantity,countries_tags,lang';
       const hosts = ['https://world.openfoodfacts.org', 'https://uk.openfoodfacts.org'];
       for (const h of hosts) {
-        const r = await fetchJson(`${h}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`);
-        if (r.ok) return new Response(JSON.stringify(r.body), { headers });
+        const r = await fetchJson(`${h}/api/v2/product/${encodeURIComponent(barcode)}.json?lc=en&fields=${BARCODE_FIELDS}`);
+        if (r.ok && r.body && r.body.status === 1) {
+          return new Response(JSON.stringify(r.body), { headers });
+        }
       }
-      return new Response(JSON.stringify({ status: 0, status_verbose: 'unavailable' }), { headers });
+      return new Response(JSON.stringify({ status: 0, status_verbose: 'not_found' }), { headers });
     }
 
     if (q.length < 2) {
