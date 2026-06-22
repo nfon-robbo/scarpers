@@ -12,6 +12,9 @@ export interface OffFood {
     kcal: number;
   };
   servingG: number | null;
+  productG: number | null;
+  servingSize: string | null;
+  entriesMerged?: number;
 }
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/food-search`;
@@ -25,7 +28,6 @@ function num(v: unknown): number {
 function normalise(p: any): OffFood | null {
   const nutr = p?.nutriments ?? {};
   const carbs = num(nutr.carbohydrates_100g);
-  // Drop items without basic macros — unusable for tracking
   if (!nutr.carbohydrates_100g && !nutr.proteins_100g && !nutr["energy-kcal_100g"]) return null;
   const name = (p.product_name || "").trim();
   if (!name) return null;
@@ -40,6 +42,9 @@ function normalise(p: any): OffFood | null {
       kcal: num(nutr["energy-kcal_100g"]),
     },
     servingG: num(p.serving_quantity) || null,
+    productG: num(p.product_quantity) || null,
+    servingSize: (p.serving_size || "").trim() || null,
+    entriesMerged: typeof p.entries_merged === "number" ? p.entries_merged : undefined,
   };
 }
 
