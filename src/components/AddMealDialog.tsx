@@ -460,8 +460,6 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 // and surface drink-size shortcuts when the pack size is missing.
                 const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(selected.servingSize || "");
                 const unitWord = isLiquid ? "ml" : "g";
-                const _showSizeChips = false; // user-managed quick adds replace presets
-                const chips: number[] = [];
                 return (
                   <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                     <Label className="text-xs">Portion</Label>
