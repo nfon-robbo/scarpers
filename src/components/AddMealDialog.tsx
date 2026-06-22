@@ -89,8 +89,21 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setScanning(false);
       setScanLookup(false);
       setScanMiss(null);
+      void loadQuickFoods();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultMeal]);
+
+  async function loadQuickFoods() {
+    if (!user) return;
+    const { data, error } = await (supabase as any)
+      .from("quick_foods")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("last_used_at", { ascending: false })
+      .limit(20);
+    if (!error && Array.isArray(data)) setQuickFoods(data as QuickFood[]);
+  }
 
   // Debounced search
   useEffect(() => {
