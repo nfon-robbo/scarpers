@@ -128,6 +128,34 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   function goBack() {
     setSelected(null);
     setManual(false);
+    setScanMiss(null);
+  }
+
+  async function handleScanResult(code: string) {
+    setScanning(false);
+    setScanLookup(true);
+    try {
+      const f = await lookupByBarcode(code);
+      if (f) {
+        pickFood(f);
+        setScanMiss(null);
+      } else {
+        setScanMiss(code);
+      }
+    } catch {
+      setScanMiss(code);
+    } finally {
+      setScanLookup(false);
+    }
+  }
+
+  function handleScanError(reason: "camera_unavailable" | "scanner_unavailable") {
+    setScanning(false);
+    toast({
+      title: reason === "camera_unavailable" ? "Camera unavailable" : "Scanner unavailable",
+      description: "Use search instead.",
+      variant: "destructive",
+    });
   }
 
   function buildPortionLabel(): string {
