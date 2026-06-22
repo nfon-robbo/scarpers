@@ -216,9 +216,14 @@ export default function NutritionPage() {
                               {l.alcohol_units > 0 ? ` · ${l.alcohol_units} u alcohol` : ""}
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
-                            <Trash2 className="w-4 h-4 text-muted-foreground" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add">
+                              <Heart className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
+                              <Trash2 className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          </div>
                         </li>
                       ))}
                     </ul>
