@@ -3,7 +3,7 @@
 // to avoid hammering Health Connect. No user action required.
 
 import { useEffect } from "react";
-import { App as CapApp } from "@capacitor/app";
+
 import {
   isHealthConnectPlatform,
   ensureHealthConnectAvailable,
@@ -54,17 +54,16 @@ export const useAutoHealthConnectSync = () => {
     // Run on mount / login.
     tryAutoSync(uid);
 
-    // Run again whenever the app comes back to the foreground (e.g. user
-    // wakes up, glances at the watch, then opens Scarpers).
-    let remove: (() => void) | undefined;
-    if (isHealthConnectPlatform()) {
-      CapApp.addListener("appStateChange", ({ isActive }) => {
-        if (isActive) tryAutoSync(uid);
-      }).then((handle) => {
-        remove = () => handle.remove();
-      }).catch(() => { /* noop */ });
-    }
-
-    return () => { remove?.(); };
+    // Run again whenever the app/tab regains focus (e.g. user wakes up,
+    // glances at the watch, then opens Scarpers).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tryAutoSync(uid);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [user]);
 };
