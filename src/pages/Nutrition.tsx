@@ -92,6 +92,35 @@ export default function NutritionPage() {
     load();
   }
 
+  async function favouriteLog(l: NutritionLog) {
+    if (!user) return;
+    const g = l.quantity_g > 0 ? l.quantity_g : 100;
+    const f = 100 / g;
+    const payload = {
+      user_id: user.id,
+      food_name: l.food_name,
+      brand: l.brand ?? null,
+      carbs_100g: +(l.carbs_g * f).toFixed(2),
+      protein_100g: +(l.protein_g * f).toFixed(2),
+      fat_100g: +(l.fat_g * f).toFixed(2),
+      kcal_100g: Math.round(l.calories * f),
+      serving_g: null,
+      product_g: null,
+      serving_size: null,
+      default_qty: g,
+      default_unit: "g",
+      default_grams: g,
+      off_product_id: null,
+      source: l.source || "manual",
+    };
+    const { error } = await (supabase as any).from("quick_foods").insert(payload);
+    if (error) {
+      toast({ title: "Couldn't favourite", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Added to quick adds", description: l.food_name });
+  }
+
   function openAdd(meal?: MealType) {
     setDefaultMeal(meal);
     setDialogOpen(true);
