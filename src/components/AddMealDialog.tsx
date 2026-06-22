@@ -227,17 +227,64 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
             </TabsList>
           </Tabs>
 
-          {!showForm && (
+          {!showForm && scanning && (
+            <BarcodeScanner
+              onDetected={handleScanResult}
+              onCancel={() => setScanning(false)}
+              onError={handleScanError}
+            />
+          )}
+
+          {!showForm && scanLookup && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Looking up barcode…
+            </div>
+          )}
+
+          {!showForm && scanMiss && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <p className="text-sm">Product not found for barcode <span className="font-mono">{scanMiss}</span>.</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setQuery(""); setScanMiss(null); }}
+                >
+                  Search by name instead
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setScanMiss(null); setManual(true); setFoodName(""); }}
+                >
+                  Enter manually
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!showForm && !scanning && (
             <>
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  autoFocus
-                  className="pl-9"
-                  placeholder="Search e.g. banana, porridge, Tesco granola"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    className="pl-9"
+                    placeholder="Search e.g. banana, porridge, Tesco granola"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Scan barcode"
+                  onClick={() => { setScanMiss(null); setScanning(true); }}
+                >
+                  <ScanLine className="w-4 h-4" />
+                </Button>
               </div>
               {searching && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
