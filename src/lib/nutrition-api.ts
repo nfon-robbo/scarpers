@@ -15,6 +15,7 @@ export interface OffFood {
   productG: number | null;
   servingSize: string | null;
   entriesMerged?: number;
+  fromBarcode?: boolean;
 }
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/food-search`;
@@ -73,8 +74,12 @@ export async function getProductByBarcode(code: string): Promise<OffFood | null>
   if (!res.ok) return null;
   const data = await res.json();
   if (data.status !== 1) return null;
-  return normalise(data.product);
+  const f = normalise(data.product);
+  if (!f) return null;
+  return { ...f, id: f.id || code, fromBarcode: true };
 }
+
+export const lookupByBarcode = getProductByBarcode;
 
 /** Scale per-100g macros to an arbitrary gram quantity. */
 export function scaleFood(food: OffFood, grams: number) {

@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, ArrowLeft } from "lucide-react";
-import { searchFoods, scaleFood, type OffFood } from "@/lib/nutrition-api";
+import { Loader2, Search, ArrowLeft, ScanLine } from "lucide-react";
+import { searchFoods, scaleFood, lookupByBarcode, type OffFood } from "@/lib/nutrition-api";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -48,6 +49,9 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanLookup, setScanLookup] = useState(false);
+  const [scanMiss, setScanMiss] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -62,6 +66,9 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setUnit("g");
       setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
+      setScanning(false);
+      setScanLookup(false);
+      setScanMiss(null);
     }
   }, [open, defaultMeal]);
 
@@ -121,6 +128,34 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   function goBack() {
     setSelected(null);
     setManual(false);
+    setScanMiss(null);
+  }
+
+  async function handleScanResult(code: string) {
+    setScanning(false);
+    setScanLookup(true);
+    try {
+      const f = await lookupByBarcode(code);
+      if (f) {
+        pickFood(f);
+        setScanMiss(null);
+      } else {
+        setScanMiss(code);
+      }
+    } catch {
+      setScanMiss(code);
+    } finally {
+      setScanLookup(false);
+    }
+  }
+
+  function handleScanError(reason: "camera_unavailable" | "scanner_unavailable") {
+    setScanning(false);
+    toast({
+      title: reason === "camera_unavailable" ? "Camera unavailable" : "Scanner unavailable",
+      description: "Use search instead.",
+      variant: "destructive",
+    });
   }
 
   function buildPortionLabel(): string {
@@ -192,17 +227,64 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
             </TabsList>
           </Tabs>
 
-          {!showForm && (
+          {!showForm && scanning && (
+            <BarcodeScanner
+              onDetected={handleScanResult}
+              onCancel={() => setScanning(false)}
+              onError={handleScanError}
+            />
+          )}
+
+          {!showForm && scanLookup && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Looking up barcode…
+            </div>
+          )}
+
+          {!showForm && scanMiss && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <p className="text-sm">Product not found for barcode <span className="font-mono">{scanMiss}</span>.</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setQuery(""); setScanMiss(null); }}
+                >
+                  Search by name instead
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setScanMiss(null); setManual(true); setFoodName(""); }}
+                >
+                  Enter manually
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!showForm && !scanning && (
             <>
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  autoFocus
-                  className="pl-9"
-                  placeholder="Search e.g. banana, porridge, Tesco granola"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    className="pl-9"
+                    placeholder="Search e.g. banana, porridge, Tesco granola"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Scan barcode"
+                  onClick={() => { setScanMiss(null); setScanning(true); }}
+                >
+                  <ScanLine className="w-4 h-4" />
+                </Button>
               </div>
               {searching && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
