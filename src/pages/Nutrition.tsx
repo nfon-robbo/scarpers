@@ -129,6 +129,7 @@ export default function NutritionPage() {
       toast({ title: "Couldn't favourite", description: error.message, variant: "destructive" });
       return;
     }
+    setFavNames((prev) => new Set(prev).add(l.food_name.toLowerCase()));
     toast({ title: "Added to quick adds", description: l.food_name });
   }
 
