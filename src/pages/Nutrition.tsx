@@ -193,36 +193,7 @@ export default function NutritionPage() {
         />
       </div>
 
-      {/* Quick adds */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick add — food</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_ADDS.map((q) => (
-              <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
-                + {q.name} <span className="text-muted-foreground ml-1">{q.carbs}g C</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick add — drinks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {DRINK_ADDS.map((q) => (
-              <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
-                + {q.name} <span className="text-muted-foreground ml-1">{q.alcohol} u</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Quick adds are now user-managed inside the Add meal dialog */}
 
       {/* Meals */}
       {loading ? (
