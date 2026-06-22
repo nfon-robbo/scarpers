@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Heart } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import AddMealDialog from "@/components/AddMealDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -90,6 +90,35 @@ export default function NutritionPage() {
       return;
     }
     load();
+  }
+
+  async function favouriteLog(l: NutritionLog) {
+    if (!user) return;
+    const g = l.quantity_g > 0 ? l.quantity_g : 100;
+    const f = 100 / g;
+    const payload = {
+      user_id: user.id,
+      food_name: l.food_name,
+      brand: l.brand ?? null,
+      carbs_100g: +(l.carbs_g * f).toFixed(2),
+      protein_100g: +(l.protein_g * f).toFixed(2),
+      fat_100g: +(l.fat_g * f).toFixed(2),
+      kcal_100g: Math.round(l.calories * f),
+      serving_g: null,
+      product_g: null,
+      serving_size: null,
+      default_qty: g,
+      default_unit: "g",
+      default_grams: g,
+      off_product_id: null,
+      source: l.source || "manual",
+    };
+    const { error } = await (supabase as any).from("quick_foods").insert(payload);
+    if (error) {
+      toast({ title: "Couldn't favourite", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Added to quick adds", description: l.food_name });
   }
 
   function openAdd(meal?: MealType) {
@@ -187,9 +216,14 @@ export default function NutritionPage() {
                               {l.alcohol_units > 0 ? ` · ${l.alcohol_units} u alcohol` : ""}
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
-                            <Trash2 className="w-4 h-4 text-muted-foreground" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add">
+                              <Heart className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
+                              <Trash2 className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          </div>
                         </li>
                       ))}
                     </ul>
