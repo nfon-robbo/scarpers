@@ -388,6 +388,36 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
 
           {!showForm && !scanning && (
             <>
+              {quickFoods.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3" /> Your quick adds
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickFoods.map((q) => (
+                      <div key={q.id} className="group flex items-center rounded-full border border-border bg-muted/40 hover:bg-muted text-xs">
+                        <button
+                          type="button"
+                          onClick={() => pickQuick(q)}
+                          className="pl-3 pr-2 py-1 text-left"
+                          title={`${Math.round(Number(q.kcal_100g))} kcal / 100g`}
+                        >
+                          {q.food_name}
+                          <span className="ml-1 text-muted-foreground">· {q.default_unit === "g" ? `${q.default_grams}g` : `${q.default_qty} ${q.default_unit}`}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeQuick(q.id)}
+                          aria-label="Remove quick add"
+                          className="pr-2 pl-1 py-1 opacity-50 hover:opacity-100"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
