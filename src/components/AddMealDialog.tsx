@@ -334,6 +334,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 // Always show the whole-pack option for scanned items (a 330ml
                 // tin has pG≈sG, but the user usually drinks the whole thing).
                 const showPack = !!pG && (selected.fromBarcode || !sG || pG > sG * 1.5);
+                // Best-effort liquid detection so we label "ml" instead of "g"
+                // and surface drink-size shortcuts when the pack size is missing.
+                const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(selected.servingSize || "");
+                const unitWord = isLiquid ? "ml" : "g";
+                const showSizeChips = selected.fromBarcode && !pG && unit === "g";
+                const chips = isLiquid ? [250, 330, 440, 500, 750] : [50, 100, 200, 330];
                 return (
                   <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                     <Label className="text-xs">Portion</Label>
@@ -351,21 +357,35 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                         onChange={(e) => {
                           const u = e.target.value as "g" | "serving" | "pack";
                           setUnit(u);
-                          setQty(u === "g" ? (sG || 30) : 1);
+                          setQty(u === "g" ? (sG || (isLiquid ? 330 : 30)) : 1);
                         }}
                         className="h-10 rounded-md border border-input bg-background px-2 text-sm"
                       >
-                        <option value="g">grams</option>
+                        <option value="g">{unitWord === "ml" ? "ml" : "grams"}</option>
                         {showServing && (
                           <option value="serving">
-                            bag / serving{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}g)`}
+                            {isLiquid ? "serving" : "bag / serving"}{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}${unitWord})`}
                           </option>
                         )}
-                        {showPack && <option value="pack">whole pack ({pG}g)</option>}
+                        {showPack && <option value="pack">whole pack ({pG}{unitWord})</option>}
                       </select>
                     </div>
+                    {showSizeChips && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {chips.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => { setUnit("g"); setQty(n); }}
+                            className="px-2 py-0.5 text-xs rounded-full border border-border bg-background hover:bg-muted"
+                          >
+                            {n}{unitWord}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
-                      = {grams}g · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
                     </div>
                   </div>
                 );
