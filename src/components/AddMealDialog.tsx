@@ -163,6 +163,91 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     }
   }
 
+  function pickQuick(q: QuickFood) {
+    const f: OffFood = {
+      id: q.off_product_id || `quick:${q.id}`,
+      name: q.food_name,
+      brand: q.brand,
+      per100g: {
+        carbs: Number(q.carbs_100g) || 0,
+        protein: Number(q.protein_100g) || 0,
+        fat: Number(q.fat_100g) || 0,
+        kcal: Number(q.kcal_100g) || 0,
+      },
+      servingG: q.serving_g ? Number(q.serving_g) : null,
+      productG: q.product_g ? Number(q.product_g) : null,
+      servingSize: q.serving_size,
+    };
+    setSelected(f);
+    setFoodName(q.food_name);
+    setUnit(q.default_unit);
+    setQty(Number(q.default_qty) || 1);
+    // grams + macros recompute via effect; if unit=g, the effect uses qty*1.
+    if (q.default_unit === "g") setQty(Number(q.default_grams) || Number(q.default_qty) || 100);
+  }
+
+  async function saveAsQuick() {
+    if (!user) return;
+    const name = foodName.trim();
+    if (!name) {
+      toast({ title: "Add a food name first", variant: "destructive" });
+      return;
+    }
+    setSavingQuick(true);
+    try {
+      // Derive per-100g from current form: if a food was selected, reuse its
+      // per100g; otherwise back-compute from current grams + macros.
+      const per100 = selected
+        ? {
+            carbs_100g: selected.per100g.carbs,
+            protein_100g: selected.per100g.protein,
+            fat_100g: selected.per100g.fat,
+            kcal_100g: selected.per100g.kcal,
+          }
+        : (() => {
+            const f = grams > 0 ? 100 / grams : 0;
+            return {
+              carbs_100g: +(carbs * f).toFixed(2),
+              protein_100g: +(protein * f).toFixed(2),
+              fat_100g: +(fat * f).toFixed(2),
+              kcal_100g: Math.round(kcal * f),
+            };
+          })();
+      const payload = {
+        user_id: user.id,
+        food_name: name,
+        brand: selected?.brand ?? null,
+        ...per100,
+        serving_g: selected?.servingG ?? null,
+        product_g: selected?.productG ?? null,
+        serving_size: selected?.servingSize ?? null,
+        default_qty: qty,
+        default_unit: unit,
+        default_grams: grams,
+        off_product_id: selected?.id ?? null,
+        source: selected ? "open_food_facts" : "manual",
+      };
+      const { error } = await (supabase as any).from("quick_foods").insert(payload);
+      if (error) throw error;
+      toast({ title: "Saved as quick add" });
+      void loadQuickFoods();
+    } catch (e: any) {
+      toast({ title: "Couldn't save quick add", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingQuick(false);
+    }
+  }
+
+  async function removeQuick(id: string) {
+    if (!user) return;
+    const { error } = await (supabase as any).from("quick_foods").delete().eq("id", id).eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Couldn't remove", description: error.message, variant: "destructive" });
+      return;
+    }
+    setQuickFoods((prev) => prev.filter((q) => q.id !== id));
+  }
+
   function goBack() {
     setSelected(null);
     setManual(false);
