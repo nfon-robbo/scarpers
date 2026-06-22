@@ -113,15 +113,16 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
     const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
     const pG = f.productG && f.productG > 0 ? f.productG : null;
-    if (sG) {
-      setUnit("serving");
-      setQty(1);
-    } else if (pG) {
-      setUnit("pack");
-      setQty(1);
+    // Scanned items default to the WHOLE pack/tin/bottle (what the user
+    // actually picked up). Text-search picks default to a single serving.
+    if (f.fromBarcode) {
+      if (pG) { setUnit("pack"); setQty(1); }
+      else if (sG) { setUnit("serving"); setQty(1); }
+      else { setUnit("g"); setQty(100); }
     } else {
-      setUnit("g");
-      setQty(30);
+      if (sG) { setUnit("serving"); setQty(1); }
+      else if (pG) { setUnit("pack"); setQty(1); }
+      else { setUnit("g"); setQty(30); }
     }
   }
 
