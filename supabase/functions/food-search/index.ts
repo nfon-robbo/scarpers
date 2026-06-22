@@ -40,6 +40,7 @@ function mapHit(h: any) {
     },
     serving_size: h.serving_size,
     serving_quantity: h.serving_quantity,
+    product_quantity: h.product_quantity,
     countries_tags: h.countries_tags ?? [],
     lang: h.lang ?? '',
     unique_scans_n: h.unique_scans_n,
