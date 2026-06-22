@@ -3,7 +3,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const UA = 'Scarpers/1.0 (https://scarpers.co.uk; contact@scarpers.co.uk)';
-const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,countries_tags,lang,unique_scans_n,popularity_key';
+const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,product_quantity,countries_tags,lang,unique_scans_n,popularity_key';
 const PAGE_SIZE = 50;
 const RETURN_LIMIT = 15;
 
