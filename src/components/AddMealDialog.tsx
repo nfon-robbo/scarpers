@@ -39,6 +39,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [selected, setSelected] = useState<OffFood | null>(null);
   const [manual, setManual] = useState(false);
   const [grams, setGrams] = useState(100);
+  const [qty, setQty] = useState<number>(1);
+  const [unit, setUnit] = useState<"g" | "serving" | "pack">("g");
   const [carbs, setCarbs] = useState(0);
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
@@ -56,6 +58,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setSelected(null);
       setManual(false);
       setGrams(100);
+      setQty(1);
+      setUnit("g");
       setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
     }
@@ -82,25 +86,48 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     return () => { clearTimeout(t); ctl.abort(); };
   }, [query, manual, selected]);
 
-  // Recompute macros when grams or food changes
+  // Derive grams from qty + unit, then macros
   useEffect(() => {
     if (!selected) return;
-    const scaled = scaleFood(selected, grams);
+    const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
+    const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
+    const unitG = unit === "g" ? 1 : unit === "serving" ? (sG ?? 1) : (pG ?? sG ?? 1);
+    const g = Math.max(1, Math.round((qty || 0) * unitG));
+    setGrams(g);
+    const scaled = scaleFood(selected, g);
     setCarbs(scaled.carbs_g);
     setProtein(scaled.protein_g);
     setFat(scaled.fat_g);
     setKcal(scaled.calories);
-  }, [selected, grams]);
+  }, [selected, qty, unit]);
 
   function pickFood(f: OffFood) {
     setSelected(f);
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
-    setGrams(f.servingG && f.servingG > 0 ? f.servingG : 100);
+    const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
+    const pG = f.productG && f.productG > 0 ? f.productG : null;
+    if (sG) {
+      setUnit("serving");
+      setQty(1);
+    } else if (pG) {
+      setUnit("pack");
+      setQty(1);
+    } else {
+      setUnit("g");
+      setQty(30);
+    }
   }
 
   function goBack() {
     setSelected(null);
     setManual(false);
+  }
+
+  function buildPortionLabel(): string {
+    if (!selected) return `${grams}g`;
+    if (unit === "g") return `${grams}g`;
+    if (unit === "serving") return `${qty} ${qty === 1 ? "bag/serving" : "bags/servings"} (~${grams}g)`;
+    return `${qty} ${qty === 1 ? "pack" : "packs"} (~${grams}g)`;
   }
 
   async function save() {
@@ -126,6 +153,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
         off_product_id: selected?.id ?? null,
+        portion_label: buildPortionLabel(),
       });
       if (error) throw error;
       toast({ title: "Logged", description: `${foodName} added to ${meal}` });
@@ -191,7 +219,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     onClick={() => pickFood(f)}
                     className="w-full text-left p-2 rounded hover:bg-muted/60 border border-border"
                   >
-                    <div className="text-sm font-medium line-clamp-1">{f.name}</div>
+                    <div className="text-sm font-medium line-clamp-1">
+                      {f.name}
+                      {f.entriesMerged && f.entriesMerged > 1 ? (
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">({f.entriesMerged} entries)</span>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-muted-foreground line-clamp-1">
                       {f.brand ? `${f.brand} · ` : ""}
                       {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P / 100g
@@ -211,9 +244,50 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <Label>Food</Label>
                 <Input value={foodName} onChange={(e) => setFoodName(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Quantity</Label>
-                <div className="flex items-center gap-2">
+              {selected && (() => {
+                const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
+                const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
+                const showServing = !!sG;
+                const showPack = !!pG && (!sG || pG > sG * 1.5);
+                return (
+                  <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                    <Label className="text-xs">Portion</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={unit === "g" ? 1 : 0.5}
+                        step={unit === "g" ? 1 : 0.5}
+                        value={qty}
+                        onChange={(e) => setQty(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-24"
+                      />
+                      <select
+                        value={unit}
+                        onChange={(e) => {
+                          const u = e.target.value as "g" | "serving" | "pack";
+                          setUnit(u);
+                          setQty(u === "g" ? (sG || 30) : 1);
+                        }}
+                        className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="g">grams</option>
+                        {showServing && (
+                          <option value="serving">
+                            bag / serving{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}g)`}
+                          </option>
+                        )}
+                        {showPack && <option value="pack">whole pack ({pG}g)</option>}
+                      </select>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      = {grams}g · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                    </div>
+                  </div>
+                );
+              })()}
+              {!selected && (
+                <div className="space-y-2">
+                  <Label>Quantity (g)</Label>
                   <Input
                     type="number"
                     min={1}
@@ -222,33 +296,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
                     className="w-24"
                   />
-                  <span className="text-sm text-muted-foreground">grams</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(() => {
-                    const s = selected?.servingG && selected.servingG > 0 ? selected.servingG : null;
-                    const chips: { label: string; g: number }[] = [];
-                    if (s) {
-                      chips.push({ label: `½ pack (${Math.round(s / 2)}g)`, g: Math.round(s / 2) });
-                      chips.push({ label: `1 pack (${s}g)`, g: s });
-                      chips.push({ label: `2 packs (${s * 2}g)`, g: s * 2 });
-                    }
-                    chips.push({ label: "30g", g: 30 });
-                    chips.push({ label: "50g", g: 50 });
-                    chips.push({ label: "100g", g: 100 });
-                    return chips.map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => setGrams(c.g)}
-                        className={`text-xs px-2 py-1 rounded border ${grams === c.g ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:text-foreground"}`}
-                      >
-                        {c.label}
-                      </button>
-                    ));
-                  })()}
-                </div>
-              </div>
+              )}
               <div className="grid grid-cols-4 gap-2">
                 <div>
                   <Label className="text-xs">Carbs (g)</Label>

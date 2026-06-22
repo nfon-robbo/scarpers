@@ -3,7 +3,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const UA = 'Scarpers/1.0 (https://scarpers.co.uk; contact@scarpers.co.uk)';
-const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,countries_tags,lang,unique_scans_n,popularity_key';
+const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,product_quantity,countries_tags,lang,unique_scans_n,popularity_key';
 const PAGE_SIZE = 50;
 const RETURN_LIMIT = 15;
 
@@ -40,6 +40,7 @@ function mapHit(h: any) {
     },
     serving_size: h.serving_size,
     serving_quantity: h.serving_quantity,
+    product_quantity: h.product_quantity,
     countries_tags: h.countries_tags ?? [],
     lang: h.lang ?? '',
     unique_scans_n: h.unique_scans_n,
@@ -116,22 +117,62 @@ function score(item: Normalised, query: string): number {
   return s;
 }
 
+function normNameKey(s: string): string {
+  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function macroCompleteness(n: Normalised): number {
+  return (n.kcal > 0 ? 1 : 0) + (n.carbs ? 1 : 0) + (n.protein ? 1 : 0) + (n.fat ? 1 : 0);
+}
+
 function rankAndShape(rawProducts: any[], query: string): any[] {
   const normalised = rawProducts.map(normalise).filter((x): x is Normalised => !!x);
   const scored = normalised
     .map((n) => ({ n, s: score(n, query) }))
     .filter((x) => x.s > -Infinity);
 
-  // Dedupe by name+brand, keep highest score
-  const byKey = new Map<string, { n: Normalised; s: number }>();
+  // Step 1: dedupe by name+brand (exact identical rows), keep highest score
+  const byNameBrand = new Map<string, { n: Normalised; s: number }>();
   for (const item of scored) {
     const key = `${item.n.name.toLowerCase().trim()}|${item.n.brand.toLowerCase().trim()}`;
-    const prev = byKey.get(key);
-    if (!prev || item.s > prev.s) byKey.set(key, item);
+    const prev = byNameBrand.get(key);
+    if (!prev || item.s > prev.s) byNameBrand.set(key, item);
   }
 
-  const sorted = [...byKey.values()].sort((a, b) => b.s - a.s).slice(0, RETURN_LIMIT);
-  return sorted.map((x) => x.n.raw);
+  // Step 2: collapse by normalised name (IGNORING brand)
+  // Prefer brand-present > complete macros > popularity. Track merge count.
+  const byName = new Map<string, { item: { n: Normalised; s: number }; count: number }>();
+  for (const item of byNameBrand.values()) {
+    const key = normNameKey(item.n.name);
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, { item, count: 1 });
+      continue;
+    }
+    existing.count += 1;
+    const a = item.n;
+    const b = existing.item.n;
+    const aHasBrand = a.brand ? 1 : 0;
+    const bHasBrand = b.brand ? 1 : 0;
+    let pickNew = false;
+    if (aHasBrand !== bHasBrand) pickNew = aHasBrand > bHasBrand;
+    else {
+      const ac = macroCompleteness(a);
+      const bc = macroCompleteness(b);
+      if (ac !== bc) pickNew = ac > bc;
+      else pickNew = a.popularity > b.popularity;
+    }
+    if (pickNew) existing.item = item;
+  }
+
+  const sorted = [...byName.values()]
+    .sort((a, b) => b.item.s - a.item.s)
+    .slice(0, RETURN_LIMIT);
+
+  return sorted.map(({ item, count }) => ({
+    ...item.n.raw,
+    entries_merged: count > 1 ? count : undefined,
+  }));
 }
 
 Deno.serve(async (req) => {
