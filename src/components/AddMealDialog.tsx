@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, ArrowLeft } from "lucide-react";
-import { searchFoods, scaleFood, type OffFood } from "@/lib/nutrition-api";
+import { Loader2, Search, ArrowLeft, ScanLine } from "lucide-react";
+import { searchFoods, scaleFood, lookupByBarcode, type OffFood } from "@/lib/nutrition-api";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
