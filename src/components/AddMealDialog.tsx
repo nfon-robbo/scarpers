@@ -5,12 +5,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, ArrowLeft, ScanLine } from "lucide-react";
+import { Loader2, Search, ArrowLeft, ScanLine, Star, Trash2 } from "lucide-react";
 import { searchFoods, scaleFood, lookupByBarcode, type OffFood } from "@/lib/nutrition-api";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import BarcodeScanner from "@/components/BarcodeScanner";
+
+interface QuickFood {
+  id: string;
+  food_name: string;
+  brand: string | null;
+  carbs_100g: number;
+  protein_100g: number;
+  fat_100g: number;
+  kcal_100g: number;
+  serving_g: number | null;
+  product_g: number | null;
+  serving_size: string | null;
+  default_qty: number;
+  default_unit: "g" | "serving" | "pack";
+  default_grams: number;
+  off_product_id: string | null;
+  source: string | null;
+}
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
