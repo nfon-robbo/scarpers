@@ -219,7 +219,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     onClick={() => pickFood(f)}
                     className="w-full text-left p-2 rounded hover:bg-muted/60 border border-border"
                   >
-                    <div className="text-sm font-medium line-clamp-1">{f.name}</div>
+                    <div className="text-sm font-medium line-clamp-1">
+                      {f.name}
+                      {f.entriesMerged && f.entriesMerged > 1 ? (
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">({f.entriesMerged} entries)</span>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-muted-foreground line-clamp-1">
                       {f.brand ? `${f.brand} · ` : ""}
                       {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P / 100g
