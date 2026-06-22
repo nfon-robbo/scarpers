@@ -5,12 +5,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, ArrowLeft, ScanLine } from "lucide-react";
+import { Loader2, Search, ArrowLeft, ScanLine, Star, Trash2 } from "lucide-react";
 import { searchFoods, scaleFood, lookupByBarcode, type OffFood } from "@/lib/nutrition-api";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import BarcodeScanner from "@/components/BarcodeScanner";
+
+interface QuickFood {
+  id: string;
+  food_name: string;
+  brand: string | null;
+  carbs_100g: number;
+  protein_100g: number;
+  fat_100g: number;
+  kcal_100g: number;
+  serving_g: number | null;
+  product_g: number | null;
+  serving_size: string | null;
+  default_qty: number;
+  default_unit: "g" | "serving" | "pack";
+  default_grams: number;
+  off_product_id: string | null;
+  source: string | null;
+}
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -52,6 +70,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [scanning, setScanning] = useState(false);
   const [scanLookup, setScanLookup] = useState(false);
   const [scanMiss, setScanMiss] = useState<string | null>(null);
+  const [quickFoods, setQuickFoods] = useState<QuickFood[]>([]);
+  const [savingQuick, setSavingQuick] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -69,8 +89,21 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setScanning(false);
       setScanLookup(false);
       setScanMiss(null);
+      void loadQuickFoods();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultMeal]);
+
+  async function loadQuickFoods() {
+    if (!user) return;
+    const { data, error } = await (supabase as any)
+      .from("quick_foods")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("last_used_at", { ascending: false })
+      .limit(20);
+    if (!error && Array.isArray(data)) setQuickFoods(data as QuickFood[]);
+  }
 
   // Debounced search
   useEffect(() => {
@@ -128,6 +161,91 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       else if (pG) { setUnit("pack"); setQty(1); }
       else { setUnit("g"); setQty(30); }
     }
+  }
+
+  function pickQuick(q: QuickFood) {
+    const f: OffFood = {
+      id: q.off_product_id || `quick:${q.id}`,
+      name: q.food_name,
+      brand: q.brand,
+      per100g: {
+        carbs: Number(q.carbs_100g) || 0,
+        protein: Number(q.protein_100g) || 0,
+        fat: Number(q.fat_100g) || 0,
+        kcal: Number(q.kcal_100g) || 0,
+      },
+      servingG: q.serving_g ? Number(q.serving_g) : null,
+      productG: q.product_g ? Number(q.product_g) : null,
+      servingSize: q.serving_size,
+    };
+    setSelected(f);
+    setFoodName(q.food_name);
+    setUnit(q.default_unit);
+    setQty(Number(q.default_qty) || 1);
+    // grams + macros recompute via effect; if unit=g, the effect uses qty*1.
+    if (q.default_unit === "g") setQty(Number(q.default_grams) || Number(q.default_qty) || 100);
+  }
+
+  async function saveAsQuick() {
+    if (!user) return;
+    const name = foodName.trim();
+    if (!name) {
+      toast({ title: "Add a food name first", variant: "destructive" });
+      return;
+    }
+    setSavingQuick(true);
+    try {
+      // Derive per-100g from current form: if a food was selected, reuse its
+      // per100g; otherwise back-compute from current grams + macros.
+      const per100 = selected
+        ? {
+            carbs_100g: selected.per100g.carbs,
+            protein_100g: selected.per100g.protein,
+            fat_100g: selected.per100g.fat,
+            kcal_100g: selected.per100g.kcal,
+          }
+        : (() => {
+            const f = grams > 0 ? 100 / grams : 0;
+            return {
+              carbs_100g: +(carbs * f).toFixed(2),
+              protein_100g: +(protein * f).toFixed(2),
+              fat_100g: +(fat * f).toFixed(2),
+              kcal_100g: Math.round(kcal * f),
+            };
+          })();
+      const payload = {
+        user_id: user.id,
+        food_name: name,
+        brand: selected?.brand ?? null,
+        ...per100,
+        serving_g: selected?.servingG ?? null,
+        product_g: selected?.productG ?? null,
+        serving_size: selected?.servingSize ?? null,
+        default_qty: qty,
+        default_unit: unit,
+        default_grams: grams,
+        off_product_id: selected?.id ?? null,
+        source: selected ? "open_food_facts" : "manual",
+      };
+      const { error } = await (supabase as any).from("quick_foods").insert(payload);
+      if (error) throw error;
+      toast({ title: "Saved as quick add" });
+      void loadQuickFoods();
+    } catch (e: any) {
+      toast({ title: "Couldn't save quick add", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingQuick(false);
+    }
+  }
+
+  async function removeQuick(id: string) {
+    if (!user) return;
+    const { error } = await (supabase as any).from("quick_foods").delete().eq("id", id).eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Couldn't remove", description: error.message, variant: "destructive" });
+      return;
+    }
+    setQuickFoods((prev) => prev.filter((q) => q.id !== id));
   }
 
   function goBack() {
@@ -270,6 +388,36 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
 
           {!showForm && !scanning && (
             <>
+              {quickFoods.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                    <Star className="w-3 h-3" /> Your quick adds
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickFoods.map((q) => (
+                      <div key={q.id} className="group flex items-center rounded-full border border-border bg-muted/40 hover:bg-muted text-xs">
+                        <button
+                          type="button"
+                          onClick={() => pickQuick(q)}
+                          className="pl-3 pr-2 py-1 text-left"
+                          title={`${Math.round(Number(q.kcal_100g))} kcal / 100g`}
+                        >
+                          {q.food_name}
+                          <span className="ml-1 text-muted-foreground">· {q.default_unit === "g" ? `${q.default_grams}g` : `${q.default_qty} ${q.default_unit}`}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeQuick(q.id)}
+                          aria-label="Remove quick add"
+                          className="pr-2 pl-1 py-1 opacity-50 hover:opacity-100"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -342,8 +490,6 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 // and surface drink-size shortcuts when the pack size is missing.
                 const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(selected.servingSize || "");
                 const unitWord = isLiquid ? "ml" : "g";
-                const showSizeChips = selected.fromBarcode && !pG && unit === "g";
-                const chips = isLiquid ? [250, 330, 440, 500, 750] : [50, 100, 200, 330];
                 return (
                   <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                     <Label className="text-xs">Portion</Label>
@@ -374,20 +520,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                         {showPack && <option value="pack">whole pack ({pG}{unitWord})</option>}
                       </select>
                     </div>
-                    {showSizeChips && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {chips.map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => { setUnit("g"); setQty(n); }}
-                            className="px-2 py-0.5 text-xs rounded-full border border-border bg-background hover:bg-muted"
-                          >
-                            {n}{unitWord}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* size chips removed; users save their own quick adds */}
                     <div className="text-xs text-muted-foreground">
                       = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
                     </div>
@@ -435,10 +568,22 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
 
         <DialogFooter>
           {showForm && (
-            <Button onClick={save} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Save
-            </Button>
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={saveAsQuick}
+                disabled={savingQuick || !foodName.trim()}
+                title="Save as quick add"
+              >
+                {savingQuick ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+                <span className="ml-1 hidden sm:inline">Quick add</span>
+              </Button>
+              <Button onClick={save} disabled={saving} className="flex-1">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>

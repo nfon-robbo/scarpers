@@ -970,6 +970,69 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_foods: {
+        Row: {
+          brand: string | null
+          carbs_100g: number
+          created_at: string
+          default_grams: number
+          default_qty: number
+          default_unit: string
+          fat_100g: number
+          food_name: string
+          id: string
+          kcal_100g: number
+          last_used_at: string
+          off_product_id: string | null
+          product_g: number | null
+          protein_100g: number
+          serving_g: number | null
+          serving_size: string | null
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          carbs_100g?: number
+          created_at?: string
+          default_grams?: number
+          default_qty?: number
+          default_unit?: string
+          fat_100g?: number
+          food_name: string
+          id?: string
+          kcal_100g?: number
+          last_used_at?: string
+          off_product_id?: string | null
+          product_g?: number | null
+          protein_100g?: number
+          serving_g?: number | null
+          serving_size?: string | null
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          carbs_100g?: number
+          created_at?: string
+          default_grams?: number
+          default_qty?: number
+          default_unit?: string
+          fat_100g?: number
+          food_name?: string
+          id?: string
+          kcal_100g?: number
+          last_used_at?: string
+          off_product_id?: string | null
+          product_g?: number | null
+          protein_100g?: number
+          serving_g?: number | null
+          serving_size?: string | null
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       race_prediction_history: {
         Row: {
           activity_id: string | null
