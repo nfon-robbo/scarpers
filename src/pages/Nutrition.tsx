@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Heart } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import AddMealDialog from "@/components/AddMealDialog";
 import { useToast } from "@/hooks/use-toast";
