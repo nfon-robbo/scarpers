@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { runAllSyncs } from "@/lib/sync-all";
+import { useAutoHealthConnectSync } from "@/hooks/useAutoHealthConnectSync";
 import scarpersIcon from "@/assets/scarpers-icon.png";
 import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +48,10 @@ const AppLayout = () => {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Auto-sync Health Connect on Android — runs on app open and on resume,
+  // throttled hourly, so new Garmin sleep lands without any manual action.
+  useAutoHealthConnectSync();
 
   // Sync all connected services whenever the user navigates within the app.
   // Each service is throttled internally so this is safe to fire on every route change.
