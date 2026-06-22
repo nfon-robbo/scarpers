@@ -39,6 +39,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [selected, setSelected] = useState<OffFood | null>(null);
   const [manual, setManual] = useState(false);
   const [grams, setGrams] = useState(100);
+  const [qty, setQty] = useState<number>(1);
+  const [unit, setUnit] = useState<"g" | "serving" | "pack">("g");
   const [carbs, setCarbs] = useState(0);
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
@@ -56,6 +58,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setSelected(null);
       setManual(false);
       setGrams(100);
+      setQty(1);
+      setUnit("g");
       setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
     }
