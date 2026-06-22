@@ -44,6 +44,16 @@ export default function NutritionPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [defaultMeal, setDefaultMeal] = useState<MealType | undefined>();
+  const [favNames, setFavNames] = useState<Set<string>>(new Set());
+
+  async function loadFavs() {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from("quick_foods")
+      .select("food_name")
+      .eq("user_id", user.id);
+    setFavNames(new Set(((data as any[]) || []).map((r) => (r.food_name || "").toLowerCase())));
+  }
 
   async function load() {
     if (!user) return;
@@ -56,6 +66,7 @@ export default function NutritionPage() {
       .order("created_at", { ascending: true });
     setLogs((data as NutritionLog[]) || []);
     setLoading(false);
+    void loadFavs();
   }
 
   useEffect(() => {
