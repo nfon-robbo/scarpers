@@ -100,28 +100,6 @@ export default function NutritionPage() {
   const carbsTarget = weightKg ? Math.round(weightKg * 5) : 250;
   const proteinTarget = weightKg ? Math.round(weightKg * 1.6) : 110;
 
-  async function quickAdd(q: QuickAdd) {
-    if (!user) return;
-    const { error } = await supabase.from("nutrition_logs").insert({
-      user_id: user.id,
-      log_date: date,
-      meal_type: q.meal,
-      food_name: q.name,
-      quantity_g: q.grams,
-      carbs_g: q.carbs,
-      protein_g: q.protein,
-      fat_g: q.fat,
-      calories: q.kcal,
-      alcohol_units: q.alcohol ?? 0,
-      source: "quick_add",
-    });
-    if (error) {
-      toast({ title: "Failed", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Added", description: `${q.name} logged` });
-    load();
-  }
 
   async function deleteLog(id: string) {
     const { error } = await supabase.from("nutrition_logs").delete().eq("id", id);
