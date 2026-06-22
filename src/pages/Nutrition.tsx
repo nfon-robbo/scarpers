@@ -32,24 +32,6 @@ const MEAL_LABELS: Record<MealType, string> = {
   snack: "Snacks",
 };
 
-type QuickAdd = { name: string; meal: MealType; grams: number; carbs: number; protein: number; fat: number; kcal: number; alcohol?: number };
-
-const QUICK_ADDS: QuickAdd[] = [
-  { name: "Banana", meal: "snack", grams: 120, carbs: 27, protein: 1.3, fat: 0.4, kcal: 107 },
-  { name: "Slice of toast", meal: "breakfast", grams: 35, carbs: 17, protein: 3, fat: 1, kcal: 90 },
-  { name: "SIS energy gel", meal: "snack", grams: 60, carbs: 22, protein: 0, fat: 0, kcal: 87 },
-  { name: "Porridge (dry)", meal: "breakfast", grams: 50, carbs: 30, protein: 6, fat: 4, kcal: 184 },
-  { name: "Whey scoop", meal: "snack", grams: 30, carbs: 2, protein: 24, fat: 1.5, kcal: 120 },
-];
-
-const DRINK_ADDS: QuickAdd[] = [
-  { name: "Pint of lager (4%)", meal: "snack", grams: 568, carbs: 15, protein: 1.5, fat: 0, kcal: 180, alcohol: 2.3 },
-  { name: "Pint of beer (5%)", meal: "snack", grams: 568, carbs: 18, protein: 1.5, fat: 0, kcal: 215, alcohol: 2.8 },
-  { name: "Bottle of beer 330ml (5%)", meal: "snack", grams: 330, carbs: 11, protein: 1, fat: 0, kcal: 140, alcohol: 1.7 },
-  { name: "Glass of wine 175ml (12%)", meal: "snack", grams: 175, carbs: 3, protein: 0, fat: 0, kcal: 160, alcohol: 2.1 },
-  { name: "Single spirit 25ml (40%)", meal: "snack", grams: 25, carbs: 0, protein: 0, fat: 0, kcal: 55, alcohol: 1 },
-  { name: "G&T (single)", meal: "snack", grams: 200, carbs: 16, protein: 0, fat: 0, kcal: 120, alcohol: 1 },
-];
 
 function todayStr() { return format(new Date(), "yyyy-MM-dd"); }
 
@@ -100,28 +82,6 @@ export default function NutritionPage() {
   const carbsTarget = weightKg ? Math.round(weightKg * 5) : 250;
   const proteinTarget = weightKg ? Math.round(weightKg * 1.6) : 110;
 
-  async function quickAdd(q: QuickAdd) {
-    if (!user) return;
-    const { error } = await supabase.from("nutrition_logs").insert({
-      user_id: user.id,
-      log_date: date,
-      meal_type: q.meal,
-      food_name: q.name,
-      quantity_g: q.grams,
-      carbs_g: q.carbs,
-      protein_g: q.protein,
-      fat_g: q.fat,
-      calories: q.kcal,
-      alcohol_units: q.alcohol ?? 0,
-      source: "quick_add",
-    });
-    if (error) {
-      toast({ title: "Failed", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Added", description: `${q.name} logged` });
-    load();
-  }
 
   async function deleteLog(id: string) {
     const { error } = await supabase.from("nutrition_logs").delete().eq("id", id);
@@ -193,36 +153,7 @@ export default function NutritionPage() {
         />
       </div>
 
-      {/* Quick adds */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick add — food</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_ADDS.map((q) => (
-              <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
-                + {q.name} <span className="text-muted-foreground ml-1">{q.carbs}g C</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick add — drinks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {DRINK_ADDS.map((q) => (
-              <Button key={q.name} variant="outline" size="sm" onClick={() => quickAdd(q)}>
-                + {q.name} <span className="text-muted-foreground ml-1">{q.alcohol} u</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Quick adds are now user-managed inside the Add meal dialog */}
 
       {/* Meals */}
       {loading ? (
