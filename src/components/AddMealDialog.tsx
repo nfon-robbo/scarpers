@@ -113,10 +113,14 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
     const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
     const pG = f.productG && f.productG > 0 ? f.productG : null;
+    const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(f.servingSize || "");
     // Scanned items default to the WHOLE pack/tin/bottle (what the user
-    // actually picked up). Text-search picks default to a single serving.
+    // actually picked up). When OFF has no product size, fall back to a
+    // sensible default (330ml for drinks, 1 serving / 100g otherwise) so
+    // the user only has to tap a chip to correct it.
     if (f.fromBarcode) {
       if (pG) { setUnit("pack"); setQty(1); }
+      else if (isLiquid) { setUnit("g"); setQty(330); }
       else if (sG) { setUnit("serving"); setQty(1); }
       else { setUnit("g"); setQty(100); }
     } else {
@@ -334,6 +338,12 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 // Always show the whole-pack option for scanned items (a 330ml
                 // tin has pG≈sG, but the user usually drinks the whole thing).
                 const showPack = !!pG && (selected.fromBarcode || !sG || pG > sG * 1.5);
+                // Best-effort liquid detection so we label "ml" instead of "g"
+                // and surface drink-size shortcuts when the pack size is missing.
+                const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(selected.servingSize || "");
+                const unitWord = isLiquid ? "ml" : "g";
+                const showSizeChips = selected.fromBarcode && !pG && unit === "g";
+                const chips = isLiquid ? [250, 330, 440, 500, 750] : [50, 100, 200, 330];
                 return (
                   <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
                     <Label className="text-xs">Portion</Label>
@@ -351,21 +361,35 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                         onChange={(e) => {
                           const u = e.target.value as "g" | "serving" | "pack";
                           setUnit(u);
-                          setQty(u === "g" ? (sG || 30) : 1);
+                          setQty(u === "g" ? (sG || (isLiquid ? 330 : 30)) : 1);
                         }}
                         className="h-10 rounded-md border border-input bg-background px-2 text-sm"
                       >
-                        <option value="g">grams</option>
+                        <option value="g">{unitWord === "ml" ? "ml" : "grams"}</option>
                         {showServing && (
                           <option value="serving">
-                            bag / serving{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}g)`}
+                            {isLiquid ? "serving" : "bag / serving"}{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}${unitWord})`}
                           </option>
                         )}
-                        {showPack && <option value="pack">whole pack ({pG}g)</option>}
+                        {showPack && <option value="pack">whole pack ({pG}{unitWord})</option>}
                       </select>
                     </div>
+                    {showSizeChips && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {chips.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => { setUnit("g"); setQty(n); }}
+                            className="px-2 py-0.5 text-xs rounded-full border border-border bg-background hover:bg-muted"
+                          >
+                            {n}{unitWord}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
-                      = {grams}g · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
                     </div>
                   </div>
                 );
