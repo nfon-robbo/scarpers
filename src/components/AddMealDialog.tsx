@@ -568,10 +568,22 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
 
         <DialogFooter>
           {showForm && (
-            <Button onClick={save} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Save
-            </Button>
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={saveAsQuick}
+                disabled={savingQuick || !foodName.trim()}
+                title="Save as quick add"
+              >
+                {savingQuick ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+                <span className="ml-1 hidden sm:inline">Quick add</span>
+              </Button>
+              <Button onClick={save} disabled={saving} className="flex-1">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
