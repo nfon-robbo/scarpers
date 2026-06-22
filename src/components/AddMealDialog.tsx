@@ -492,20 +492,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                         {showPack && <option value="pack">whole pack ({pG}{unitWord})</option>}
                       </select>
                     </div>
-                    {showSizeChips && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {chips.map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => { setUnit("g"); setQty(n); }}
-                            className="px-2 py-0.5 text-xs rounded-full border border-border bg-background hover:bg-muted"
-                          >
-                            {n}{unitWord}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {/* size chips removed; users save their own quick adds */}
                     <div className="text-xs text-muted-foreground">
                       = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
                     </div>
