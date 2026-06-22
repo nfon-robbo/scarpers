@@ -44,6 +44,16 @@ export default function NutritionPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [defaultMeal, setDefaultMeal] = useState<MealType | undefined>();
+  const [favNames, setFavNames] = useState<Set<string>>(new Set());
+
+  async function loadFavs() {
+    if (!user) return;
+    const { data } = await (supabase as any)
+      .from("quick_foods")
+      .select("food_name")
+      .eq("user_id", user.id);
+    setFavNames(new Set(((data as any[]) || []).map((r) => (r.food_name || "").toLowerCase())));
+  }
 
   async function load() {
     if (!user) return;
@@ -56,6 +66,7 @@ export default function NutritionPage() {
       .order("created_at", { ascending: true });
     setLogs((data as NutritionLog[]) || []);
     setLoading(false);
+    void loadFavs();
   }
 
   useEffect(() => {
@@ -118,6 +129,7 @@ export default function NutritionPage() {
       toast({ title: "Couldn't favourite", description: error.message, variant: "destructive" });
       return;
     }
+    setFavNames((prev) => new Set(prev).add(l.food_name.toLowerCase()));
     toast({ title: "Added to quick adds", description: l.food_name });
   }
 
@@ -217,8 +229,8 @@ export default function NutritionPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add">
-                              <Heart className="w-4 h-4 text-muted-foreground" />
+                            <Button variant="ghost" size="icon" onClick={() => favouriteLog(l)} aria-label="Favourite" title="Save as quick add" disabled={favNames.has(l.food_name.toLowerCase())}>
+                              <Heart className={`w-4 h-4 ${favNames.has(l.food_name.toLowerCase()) ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => deleteLog(l.id)} aria-label="Delete">
                               <Trash2 className="w-4 h-4 text-muted-foreground" />
