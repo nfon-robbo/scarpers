@@ -777,6 +777,7 @@ export type Database = {
           log_date: string
           meal_type: string
           off_product_id: string | null
+          portion_label: string | null
           protein_g: number
           quantity_g: number
           source: string
@@ -796,6 +797,7 @@ export type Database = {
           log_date: string
           meal_type: string
           off_product_id?: string | null
+          portion_label?: string | null
           protein_g?: number
           quantity_g?: number
           source?: string
@@ -815,6 +817,7 @@ export type Database = {
           log_date?: string
           meal_type?: string
           off_product_id?: string | null
+          portion_label?: string | null
           protein_g?: number
           quantity_g?: number
           source?: string
