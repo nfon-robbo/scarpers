@@ -49,6 +49,9 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanLookup, setScanLookup] = useState(false);
+  const [scanMiss, setScanMiss] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
