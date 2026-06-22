@@ -244,9 +244,50 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <Label>Food</Label>
                 <Input value={foodName} onChange={(e) => setFoodName(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Quantity</Label>
-                <div className="flex items-center gap-2">
+              {selected && (() => {
+                const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
+                const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
+                const showServing = !!sG;
+                const showPack = !!pG && (!sG || pG > sG * 1.5);
+                return (
+                  <div className="space-y-2 rounded-md border border-border p-3 bg-muted/30">
+                    <Label className="text-xs">Portion</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={unit === "g" ? 1 : 0.5}
+                        step={unit === "g" ? 1 : 0.5}
+                        value={qty}
+                        onChange={(e) => setQty(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-24"
+                      />
+                      <select
+                        value={unit}
+                        onChange={(e) => {
+                          const u = e.target.value as "g" | "serving" | "pack";
+                          setUnit(u);
+                          setQty(u === "g" ? (sG || 30) : 1);
+                        }}
+                        className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="g">grams</option>
+                        {showServing && (
+                          <option value="serving">
+                            bag / serving{selected.servingSize ? ` (${selected.servingSize})` : ` (${sG}g)`}
+                          </option>
+                        )}
+                        {showPack && <option value="pack">whole pack ({pG}g)</option>}
+                      </select>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      = {grams}g · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                    </div>
+                  </div>
+                );
+              })()}
+              {!selected && (
+                <div className="space-y-2">
+                  <Label>Quantity (g)</Label>
                   <Input
                     type="number"
                     min={1}
@@ -255,33 +296,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
                     className="w-24"
                   />
-                  <span className="text-sm text-muted-foreground">grams</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(() => {
-                    const s = selected?.servingG && selected.servingG > 0 ? selected.servingG : null;
-                    const chips: { label: string; g: number }[] = [];
-                    if (s) {
-                      chips.push({ label: `½ pack (${Math.round(s / 2)}g)`, g: Math.round(s / 2) });
-                      chips.push({ label: `1 pack (${s}g)`, g: s });
-                      chips.push({ label: `2 packs (${s * 2}g)`, g: s * 2 });
-                    }
-                    chips.push({ label: "30g", g: 30 });
-                    chips.push({ label: "50g", g: 50 });
-                    chips.push({ label: "100g", g: 100 });
-                    return chips.map((c) => (
-                      <button
-                        key={c.label}
-                        type="button"
-                        onClick={() => setGrams(c.g)}
-                        className={`text-xs px-2 py-1 rounded border ${grams === c.g ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground hover:text-foreground"}`}
-                      >
-                        {c.label}
-                      </button>
-                    ));
-                  })()}
-                </div>
-              </div>
+              )}
               <div className="grid grid-cols-4 gap-2">
                 <div>
                   <Label className="text-xs">Carbs (g)</Label>
