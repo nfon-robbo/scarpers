@@ -66,6 +66,9 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setUnit("g");
       setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
       setFoodName("");
+      setScanning(false);
+      setScanLookup(false);
+      setScanMiss(null);
     }
   }, [open, defaultMeal]);
 
