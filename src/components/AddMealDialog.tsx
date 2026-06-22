@@ -113,10 +113,14 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setFoodName(f.brand ? `${f.name} (${f.brand})` : f.name);
     const sG = f.servingG && f.servingG > 0 ? f.servingG : null;
     const pG = f.productG && f.productG > 0 ? f.productG : null;
+    const isLiquid = /\bml\b|\bcl\b|\bl\b/i.test(f.servingSize || "");
     // Scanned items default to the WHOLE pack/tin/bottle (what the user
-    // actually picked up). Text-search picks default to a single serving.
+    // actually picked up). When OFF has no product size, fall back to a
+    // sensible default (330ml for drinks, 1 serving / 100g otherwise) so
+    // the user only has to tap a chip to correct it.
     if (f.fromBarcode) {
       if (pG) { setUnit("pack"); setQty(1); }
+      else if (isLiquid) { setUnit("g"); setQty(330); }
       else if (sG) { setUnit("serving"); setQty(1); }
       else { setUnit("g"); setQty(100); }
     } else {
