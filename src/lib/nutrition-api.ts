@@ -15,6 +15,7 @@ export interface OffFood {
   productG: number | null;
   servingSize: string | null;
   entriesMerged?: number;
+  fromBarcode?: boolean;
 }
 
 const PROXY_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/food-search`;
