@@ -979,6 +979,55 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       else if (/tempo|interval|threshold|race pace|vo2|hill repeat|hill repeats/.test(todayWorkoutText)) plannedIntensity = "hard";
       const intensityContext = `\nTODAY PLANNED INTENSITY: ${plannedIntensity}\n`;
 
+      // ── Layoff context: detect return-from-break so Day Ahead can ramp back ──
+      const _layoffStart = performance.now();
+      const { data: lastRunRow } = await supabase
+        .from("activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .or("activity_type.ilike.%run%,activity_type.ilike.%jog%,activity_type.ilike.%treadmill%")
+        .order("start_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const since14 = new Date(targetDateStr);
+      since14.setDate(since14.getDate() - 14);
+      const { count: runsLast14d } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .or("activity_type.ilike.%run%,activity_type.ilike.%jog%,activity_type.ilike.%treadmill%")
+        .gte("start_time", since14.toISOString());
+      const daysSinceLastRun = lastRunRow?.start_time
+        ? Math.floor((new Date(targetDateStr).getTime() - new Date(lastRunRow.start_time).getTime()) / 86400000)
+        : 9999;
+      console.log(`[PERF] layoff query: ${(performance.now() - _layoffStart).toFixed(0)}ms (daysSinceLastRun=${daysSinceLastRun}, runsLast14d=${runsLast14d ?? 0})`);
+
+      let layoffContext = "";
+      let layoffRules = "";
+      if (daysSinceLastRun >= 7) {
+        const layoffLabel = daysSinceLastRun >= 9999 ? "no prior runs on record" : `${daysSinceLastRun} days since last run`;
+        layoffContext = `\nLAYOFF CONTEXT:\n- Days since last run: ${daysSinceLastRun >= 9999 ? "n/a" : daysSinceLastRun}\n- Runs in last 14 days: ${runsLast14d ?? 0}\n`;
+
+        if (daysSinceLastRun >= 28) {
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (MANDATORY — ${layoffLabel}):
+Decision MUST be ADJUSTED. Replace the planned workout with a WALK/RUN INTERVAL session, e.g. "5 × 2min run / 1min walk (Total: ~20-25min)", Z1-Z2 only, conversational pace. No quality work, no continuous tempo, no long run. Warm-up walk row + interval row (Duration formatted "5 × 2min run / 1min walk") + cool-down walk row. Pace targets must be easy (Z2 ± 30s) and include explicit min/km — never race-pace-derived.
+Coach's Note MUST include verbatim: "⚠️ You haven't run in ${daysSinceLastRun} days — easing back in with walk/run intervals to protect tendons and rebuild aerobic base before resuming structured training."
+`;
+        } else if (daysSinceLastRun >= 14) {
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (MANDATORY — ${layoffLabel}):
+Decision MUST be ADJUSTED. Replace the planned workout with an EASY Z2 run capped at ~30-40 min, conversational pace only. No tempo, no intervals, no threshold, no VO2, no hill repeats, no long run.
+Coach's Note MUST include verbatim: "⚠️ You've had ${daysSinceLastRun} days off running — keeping today easy in Z2 to ease back in before resuming structured training."
+`;
+        } else {
+          // 7-13 days
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (${layoffLabel}):
+Mention the gap in the Coach's Note. If TODAY PLANNED INTENSITY = hard, Decision MUST be ADJUSTED to an easy Z2 run of similar-or-shorter duration (no tempo / intervals / threshold / VO2 / hill repeats / long run).
+`;
+        }
+      }
+
+
+
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
       cadenceSince.setDate(cadenceSince.getDate() - 30);
@@ -1056,6 +1105,7 @@ Choose **ADJUSTED** when ANY of these triggers fires:
      - Yesterday was hard or long AND last night was also poor.
   B. TRAINING-LOAD VELOCITY: yesterday was hard AND today is hard AND last night was poor — even if HRV/RHR are only mildly off. Swap the hard session for an easy Z2 run. State reason: "Two consecutive hard sessions on suboptimal recovery risks overtraining."
   C. CHRONIC SLEEP (consecutive poor nights ≥ 7): force ADJUSTED with the Recommended Workout replaced by a Rest Day table, and include the ESCALATION line verbatim in the Coach's Note.
+  D. LAYOFF / RETURN-FROM-BREAK: if a LAYOFF RAMP-BACK RULE block is present in the user prompt, follow it verbatim. ≥28 days off ⇒ ADJUSTED to walk/run intervals; 14–27 days off ⇒ ADJUSTED to easy Z2 (cap ~30–40 min); 7–13 days off ⇒ ADJUSTED if today is hard, otherwise mention the gap in the Coach's Note. This rule overrides KEEP AS-IS.
 
 Choose **SOFT ADJUSTED** when:
   - Exactly 1 poor night ending today AND (HRV is 10–15% below median baseline OR RHR is +2 bpm above median baseline).
@@ -1131,6 +1181,8 @@ ${yesterdayContext}
 ${todayActivityContext}
 ${todayActivityRules}
 ${cadenceContext}
+${layoffContext}
+${layoffRules}
 
 PLANNED WORKOUT FOR ${targetDateStr}:
 ${today_workout || "No workout found for the target date."}
