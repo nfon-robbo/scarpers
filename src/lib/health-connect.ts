@@ -133,9 +133,12 @@ export async function syncHealthConnect(
   report("Starting…", 1);
 
   const end = new Date();
-  const requestedStart = new Date(end.getTime() - daysBack * 86400000);
-  const allHistoryStart = new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO);
-  const start = requestedStart < allHistoryStart ? requestedStart : allHistoryStart;
+  // Honour the requested window. Short windows (e.g. the morning auto-sync)
+  // must NOT silently expand to multi-year ranges — that overloads Health
+  // Connect, hits pagination limits, and was causing recent sleep sessions
+  // to be saved without their per-stage breakdown. Callers that want full
+  // history pass a large daysBack explicitly (e.g. the manual button).
+  const start = new Date(end.getTime() - daysBack * 86400000);
   const startIso = start.toISOString();
   const endIso = end.toISOString();
 
