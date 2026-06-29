@@ -1844,7 +1844,7 @@ const TrainingPlanPage = () => {
       }
     }
 
-    const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${format(next.dateObj, "yyyy-MM-dd")}):\n${workoutText}`;
+    const injected = `COACH RECOMMENDATION TO APPLY:\n${recommendation}\n\nWORKOUT TO MODIFY (date ${nextDateStr}):\n${workoutText}`;
 
     dayAdjustRetryRef.current = () => { void adjustNextWorkout(recommendation); };
 
