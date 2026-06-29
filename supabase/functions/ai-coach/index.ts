@@ -1105,6 +1105,7 @@ Choose **ADJUSTED** when ANY of these triggers fires:
      - Yesterday was hard or long AND last night was also poor.
   B. TRAINING-LOAD VELOCITY: yesterday was hard AND today is hard AND last night was poor — even if HRV/RHR are only mildly off. Swap the hard session for an easy Z2 run. State reason: "Two consecutive hard sessions on suboptimal recovery risks overtraining."
   C. CHRONIC SLEEP (consecutive poor nights ≥ 7): force ADJUSTED with the Recommended Workout replaced by a Rest Day table, and include the ESCALATION line verbatim in the Coach's Note.
+  D. LAYOFF / RETURN-FROM-BREAK: if a LAYOFF RAMP-BACK RULE block is present in the user prompt, follow it verbatim. ≥28 days off ⇒ ADJUSTED to walk/run intervals; 14–27 days off ⇒ ADJUSTED to easy Z2 (cap ~30–40 min); 7–13 days off ⇒ ADJUSTED if today is hard, otherwise mention the gap in the Coach's Note. This rule overrides KEEP AS-IS.
 
 Choose **SOFT ADJUSTED** when:
   - Exactly 1 poor night ending today AND (HRV is 10–15% below median baseline OR RHR is +2 bpm above median baseline).
