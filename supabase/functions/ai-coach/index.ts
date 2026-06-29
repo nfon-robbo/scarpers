@@ -2138,6 +2138,7 @@ CRITICAL FORMAT RULES (required for watch sync — do not deviate):
    - Race pace/VO2max: 🎵 175 BPM
 7. Include HR target ranges from the zones above in the Target column.
 8. Warm-up and cool-down segments MUST be exactly 5 minutes — NEVER shorter than 5 (no 1-min, 2-min, 3-min cool-downs) and never 10+ minutes.
+9. 🚫 Warm-up and cool-down segments MUST NEVER carry a pace target (no "/km", no "min/km", no numeric pace range). Their Target column is HR zone only ("Z1 (<${z1Max} bpm)") — pace targets belong only to main/interval/tempo/race-pace blocks. Walk-only segments also never get a pace target.
 
 Example workout format:
 ### Week 1: Base Building
