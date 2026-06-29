@@ -979,6 +979,55 @@ Coach's Note MUST include verbatim: "⚠️ You've already run ${leadDist}km tod
       else if (/tempo|interval|threshold|race pace|vo2|hill repeat|hill repeats/.test(todayWorkoutText)) plannedIntensity = "hard";
       const intensityContext = `\nTODAY PLANNED INTENSITY: ${plannedIntensity}\n`;
 
+      // ── Layoff context: detect return-from-break so Day Ahead can ramp back ──
+      const _layoffStart = performance.now();
+      const { data: lastRunRow } = await supabase
+        .from("activities")
+        .select("start_time")
+        .eq("user_id", user.id)
+        .or("activity_type.ilike.%run%,activity_type.ilike.%jog%,activity_type.ilike.%treadmill%")
+        .order("start_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const since14 = new Date(targetDateStr);
+      since14.setDate(since14.getDate() - 14);
+      const { count: runsLast14d } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .or("activity_type.ilike.%run%,activity_type.ilike.%jog%,activity_type.ilike.%treadmill%")
+        .gte("start_time", since14.toISOString());
+      const daysSinceLastRun = lastRunRow?.start_time
+        ? Math.floor((new Date(targetDateStr).getTime() - new Date(lastRunRow.start_time).getTime()) / 86400000)
+        : 9999;
+      console.log(`[PERF] layoff query: ${(performance.now() - _layoffStart).toFixed(0)}ms (daysSinceLastRun=${daysSinceLastRun}, runsLast14d=${runsLast14d ?? 0})`);
+
+      let layoffContext = "";
+      let layoffRules = "";
+      if (daysSinceLastRun >= 7) {
+        const layoffLabel = daysSinceLastRun >= 9999 ? "no prior runs on record" : `${daysSinceLastRun} days since last run`;
+        layoffContext = `\nLAYOFF CONTEXT:\n- Days since last run: ${daysSinceLastRun >= 9999 ? "n/a" : daysSinceLastRun}\n- Runs in last 14 days: ${runsLast14d ?? 0}\n`;
+
+        if (daysSinceLastRun >= 28) {
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (MANDATORY — ${layoffLabel}):
+Decision MUST be ADJUSTED. Replace the planned workout with a WALK/RUN INTERVAL session, e.g. "5 × 2min run / 1min walk (Total: ~20-25min)", Z1-Z2 only, conversational pace. No quality work, no continuous tempo, no long run. Warm-up walk row + interval row (Duration formatted "5 × 2min run / 1min walk") + cool-down walk row. Pace targets must be easy (Z2 ± 30s) and include explicit min/km — never race-pace-derived.
+Coach's Note MUST include verbatim: "⚠️ You haven't run in ${daysSinceLastRun} days — easing back in with walk/run intervals to protect tendons and rebuild aerobic base before resuming structured training."
+`;
+        } else if (daysSinceLastRun >= 14) {
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (MANDATORY — ${layoffLabel}):
+Decision MUST be ADJUSTED. Replace the planned workout with an EASY Z2 run capped at ~30-40 min, conversational pace only. No tempo, no intervals, no threshold, no VO2, no hill repeats, no long run.
+Coach's Note MUST include verbatim: "⚠️ You've had ${daysSinceLastRun} days off running — keeping today easy in Z2 to ease back in before resuming structured training."
+`;
+        } else {
+          // 7-13 days
+          layoffRules = `\nLAYOFF RAMP-BACK RULE (${layoffLabel}):
+Mention the gap in the Coach's Note. If TODAY PLANNED INTENSITY = hard, Decision MUST be ADJUSTED to an easy Z2 run of similar-or-shorter duration (no tempo / intervals / threshold / VO2 / hill repeats / long run).
+`;
+        }
+      }
+
+
+
       // Fetch recent cadence data from running activities (last 30 days)
       const cadenceSince = new Date(targetDateStr);
       cadenceSince.setDate(cadenceSince.getDate() - 30);
