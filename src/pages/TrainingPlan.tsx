@@ -1821,13 +1821,18 @@ const TrainingPlanPage = () => {
       toast({ title: "Assessment already in progress", description: "Please wait for the current assessment to finish." });
       return;
     }
-    const workouts = parseWorkoutsFromPlan(content);
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    const next = workouts
-      .filter(w => w.dateObj && format(w.dateObj, "yyyy-MM-dd") > todayStr)
-      .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()))[0];
-    if (!next || !next.dateObj) {
-      toast({ title: "No upcoming workout", description: "Couldn't find a future workout in your plan.", variant: "destructive" });
+    // Pick the next workout that has NOT already been completed. Today counts
+    // only if it's a real (non-rest) session with no linked completed activity.
+    const picked = pickUpcomingWorkout();
+    if (!picked) {
+      toast({ title: "No upcoming workout", description: "Couldn't find an un-completed future workout in your plan.", variant: "destructive" });
+      return;
+    }
+    const next = picked.workout;
+    // Extra safety: never touch a date that already has a completed session.
+    const nextDateStr = format(picked.dateObj, "yyyy-MM-dd");
+    if (hasCompletedSession(nextDateStr)) {
+      toast({ title: "Workout already completed", description: "That session is already done — nothing to adjust.", variant: "destructive" });
       return;
     }
 
