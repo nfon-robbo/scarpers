@@ -1181,6 +1181,8 @@ ${yesterdayContext}
 ${todayActivityContext}
 ${todayActivityRules}
 ${cadenceContext}
+${layoffContext}
+${layoffRules}
 
 PLANNED WORKOUT FOR ${targetDateStr}:
 ${today_workout || "No workout found for the target date."}
