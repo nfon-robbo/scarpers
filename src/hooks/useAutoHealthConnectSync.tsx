@@ -37,8 +37,9 @@ const tryAutoSync = async (uid: string) => {
     const granted = await getGrantedHealthConnectPermissions();
     if (granted.length === 0) return; // user hasn't granted access yet
     markRan(uid);
-    // 7-day lookback is enough to catch any missed nights without overloading.
-    await startHealthConnectSync(uid, 7);
+    // 3-day lookback is enough to catch the latest night plus any missed
+    // sync, without re-reading historical data we already have.
+    await startHealthConnectSync(uid, 3);
   } catch {
     // Silent — manual sync card is still available as a fallback.
   }
