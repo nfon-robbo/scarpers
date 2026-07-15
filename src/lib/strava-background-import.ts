@@ -47,6 +47,17 @@ export async function startStravaBackgroundImport(accessToken: string) {
       }
 
       const result = await res.json();
+      if (result.error === "STRAVA_APP_INACTIVE") {
+        toast.error("Strava temporarily unavailable", {
+          description: result.message ?? "Strava has paused our app (likely a rate limit). Try again in a few hours.",
+          duration: 8000,
+        });
+        return;
+      }
+      if (result.error) {
+        toast.error("Strava import failed", { description: result.message ?? result.error, duration: 6000 });
+        return;
+      }
       totalImported += result.imported || 0;
       totalSkipped += result.skipped || 0;
 
