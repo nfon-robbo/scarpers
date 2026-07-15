@@ -230,7 +230,22 @@ Deno.serve(async (req) => {
 
     if (!stravaRes.ok) {
       const errText = await stravaRes.text();
-      throw new Error(`Strava API error [${stravaRes.status}]: ${errText}`);
+      console.error(`Strava API error [${stravaRes.status}]:`, errText);
+      // Detect the "Application Inactive" case (rate limit / deactivation on Strava's side)
+      // and return a friendly 200 so the client doesn't blank-screen on a 500.
+      let code = `STRAVA_API_ERROR_${stravaRes.status}`;
+      let message = `Strava returned ${stravaRes.status}. Please try again later.`;
+      try {
+        const parsed = JSON.parse(errText);
+        if (stravaRes.status === 403 && parsed?.errors?.[0]?.code === "Inactive") {
+          code = "STRAVA_APP_INACTIVE";
+          message = "Strava has temporarily disabled our app (usually a rate-limit hit). Please try again in a few hours.";
+        }
+      } catch { /* non-JSON body */ }
+      return new Response(
+        JSON.stringify({ error: code, message, fallback: true, imported: 0, skipped: 0, has_more: false }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     let stravaActivities = await stravaRes.json();
