@@ -179,7 +179,7 @@ export async function getProvisionalPace(
 
     let rejection: ProvisionalPace["rejection"] | undefined;
     for (const cand of fives) {
-      const reject = vetTier1(cand, easyAvg, easyRuns.length);
+      const reject = vetTier1(cand, easyAvg, easyRuns.length, opts.resolvedMaxHr ?? null);
       if (!reject) {
         const easySec = cand.sec_per_km + 60; // easy sits ~60 s/km slower than a hard 5k
         return {
