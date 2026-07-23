@@ -1,14 +1,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useHrZones } from "@/hooks/useHrZones";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, TrendingUp, ChevronRight, History, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { computeRunningIQ, countCleanRuns, RUNNING_IQ_MIN_CLEAN_RUNS, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import type { Zones } from "@shared/hr-zones";
 import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
 import { calculateSleepScore } from "@/lib/sleep-score";
+
 
 // ── Large Score Display ──
 function IQGauge({ score, label }: { score: number; label: string }) {
