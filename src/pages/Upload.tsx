@@ -216,11 +216,11 @@ const UploadPage = () => {
       const remainingImport = mergePlan.remainingIndexes.map((i) => toImport[i]);
 
 
-      // Insert activities in batches
+      // Insert activities in batches (fuzzy-matched rows already enriched above)
       const batchSize = 50;
       let saved = 0;
-      for (let i = 0; i < toImport.length; i += batchSize) {
-        const slice = toImport.slice(i, i + batchSize);
+      for (let i = 0; i < remainingImport.length; i += batchSize) {
+        const slice = remainingImport.slice(i, i + batchSize);
         const batch = slice.map((a) => ({
           user_id: user.id,
           upload_id: uploadRecord.id,
@@ -268,15 +268,17 @@ const UploadPage = () => {
 
         saved += batch.length;
         setSavedCount(saved);
-        setProgress(60 + Math.round((saved / Math.max(1, toImport.length)) * 35));
+        setProgress(60 + Math.round((saved / Math.max(1, remainingImport.length)) * 35));
       }
 
       setProgress(100);
       setState("done");
-      const desc = skippedCount > 0
-        ? `${saved} imported, ${skippedCount} skipped (already imported).`
-        : `${saved} activities imported from ${parseResult.fileCount} FIT files.`;
-      toast({ title: "Import complete", description: desc });
+      const parts: string[] = [];
+      parts.push(`${saved} imported`);
+      if (enrichedCount) parts.push(`${enrichedCount} enriched existing`);
+      if (skippedCount) parts.push(`${skippedCount} skipped (already imported)`);
+      toast({ title: "Import complete", description: parts.join(", ") + "." });
+
     } catch (e: any) {
       console.error("Upload error:", e);
       setState("error");
