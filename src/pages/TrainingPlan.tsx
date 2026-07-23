@@ -3014,6 +3014,9 @@ const TrainingPlanPage = () => {
               isPaused={isPlanPaused}
               pauseWindow={pauseWindow}
               pauseReason={pauseReason}
+              planContent={content}
+              planId={savedPlanId ?? null}
+              userId={user?.id ?? null}
             />
             <WorkoutEditDialog
               open={!!editingWorkout}
