@@ -67,7 +67,7 @@ describe("Benchmark E2E — plan rewrite + token survival", () => {
     const { newContent, changes } = recomputePlanPaces(plan, 270);
     expect(changes.length).toBeGreaterThanOrEqual(3);
     expect(newContent).toContain("5:46-6:13/km"); // easy
-    expect(newContent).toContain("4:25-4:36/km"); // threshold (0.98-1.02 * 270)
+    expect(newContent).toContain("4:25-4:35/km"); // threshold (0.98-1.02 * 270)
     expect(newContent).toContain("3:58-4:08/km"); // vo2 (0.88-0.92 * 270)
   });
 
