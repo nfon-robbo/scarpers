@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { resolveZones, bpmToZone as sharedBpmToZone, type Zones } from "../_shared/hr-zones.ts";
+import { resolveZonesForUser, bpmToZone as sharedBpmToZone, type Zones } from "../_shared/hr-zones.ts";
 
 type WorkoutStep = {
   duration: number;
@@ -351,29 +351,17 @@ serve(async (req) => {
       clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
     };
 
-    // Resolve user's HR zones once per request via shared LTHR band model.
-    // Fed into formatWorkoutDescription so bpm→zone falls on personalised bands
-    // instead of the legacy hard-coded universal ladder.
+    // Resolve user's HR zones once per request via the canonical shared
+    // resolver — same 180-day window used by ai-coach and useHrZones.
+    // Fed into formatWorkoutDescription so bpm→zone falls on personalised
+    // bands instead of the legacy hard-coded universal ladder.
     let userZones: Zones | null = null;
     try {
-      const sinceIso = new Date(Date.now() - 180 * 86400 * 1000).toISOString();
-      const [{ data: profile }, { data: acts }] = await Promise.all([
-        supabase.from("profiles").select("date_of_birth").eq("user_id", user.id).maybeSingle(),
-        supabase
-          .from("activities")
-          .select("id, max_heart_rate, start_time, activity_type")
-          .eq("user_id", user.id)
-          .gte("start_time", sinceIso)
-          .not("max_heart_rate", "is", null),
-      ]);
-      const dob = (profile as { date_of_birth?: string } | null)?.date_of_birth;
-      const ageYears = dob
-        ? (Date.now() - new Date(dob).getTime()) / (365.25 * 86400 * 1000)
-        : null;
-      userZones = resolveZones({ ageYears, activities: (acts ?? []) as any });
+      userZones = await resolveZonesForUser(supabase as any, user.id);
     } catch (e) {
       console.warn("[intervals-sync] zone resolution failed, using fallback ladder:", e);
     }
+
 
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);

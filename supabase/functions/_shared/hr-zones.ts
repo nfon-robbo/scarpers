@@ -87,6 +87,13 @@ export type ActivityMaxSample = {
   activity_type?: string | null | undefined;
 };
 
+/**
+ * INTERNAL. Use `resolveZonesForUser` at every real call site so every
+ * consumer sees the same canonical activity window. Direct callers of
+ * `resolveZones` bypass that guarantee and re-introduce the slice-mismatch
+ * bug this module was written to eliminate. Keep exported only for the
+ * pure-function unit tests in `_shared/hr-zones.test.ts`.
+ */
 export type ResolveInput = {
   ageYears?: number | null;
   /**
@@ -99,6 +106,7 @@ export type ResolveInput = {
   /** If a measured benchmark LTHR exists, pass it — beats every estimator. */
   measuredLthr?: number | null;
 };
+
 
 // ---------- Resolution ----------
 
@@ -234,3 +242,62 @@ export function zonesPromptLine(zones: Zones): string {
     `Z5 ${zoneRangeLabel(5, zones)} bpm`
   );
 }
+
+// ---------- Canonical per-user resolver ----------
+//
+// This is the ONLY entry point real call sites should use. It fetches the
+// canonical 180-day activity window + age from the profile, so every surface
+// (ai-coach, intervals-sync, useHrZones on the client, Running IQ) receives
+// identical zones for a given user at a given moment.
+//
+// If a caller ever needs a different window, do NOT change this helper — add
+// a new named exception function alongside it and document why.
+
+type MinimalSupabase = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: unknown) => {
+        maybeSingle?: () => Promise<{ data: unknown }>;
+        gte?: (col: string, val: unknown) => {
+          not: (col: string, op: string, val: unknown) => Promise<{ data: unknown }>;
+        };
+      };
+    };
+  };
+};
+
+export async function resolveZonesForUser(
+  supabase: MinimalSupabase,
+  userId: string,
+  opts: { measuredLthr?: number | null } = {},
+): Promise<Zones> {
+  const sinceIso = new Date(
+    Date.now() - OBSERVED_MAX_LOOKBACK_DAYS * 86400 * 1000,
+  ).toISOString();
+
+  const [profileRes, actsRes] = await Promise.all([
+    (supabase as any)
+      .from("profiles")
+      .select("date_of_birth")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    (supabase as any)
+      .from("activities")
+      .select("id, max_heart_rate, start_time, activity_type")
+      .eq("user_id", userId)
+      .gte("start_time", sinceIso)
+      .not("max_heart_rate", "is", null),
+  ]);
+
+  const dob = (profileRes?.data as { date_of_birth?: string } | null)?.date_of_birth;
+  const ageYears = dob
+    ? (Date.now() - new Date(dob).getTime()) / (365.25 * 86400 * 1000)
+    : null;
+
+  return resolveZones({
+    ageYears,
+    activities: (actsRes?.data ?? []) as ActivityMaxSample[],
+    measuredLthr: opts.measuredLthr ?? null,
+  });
+}
+

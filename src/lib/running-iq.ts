@@ -1,6 +1,7 @@
 // ── Running IQ Calculation Engine ──
 // Computes a 0–200 score across 5 weighted pillars
-import { resolveZones } from "@shared/hr-zones";
+import type { Zones } from "@shared/hr-zones";
+
 
 export interface RunActivity {
   distance_meters: number | null;
@@ -105,10 +106,18 @@ export interface RunningIQInput {
   readinessScore?: number | null;
   ageYears: number;
   gender: "MALE" | "FEMALE" | "UNSPECIFIED";
+  /**
+   * Canonical user HR zones from `resolveZonesForUser` (via useHrZones on
+   * the client). Required — Running IQ MUST use the same aerobic ceiling
+   * as every other surface. Never resolve zones from `runs` here — the
+   * caller supplies zones, this function consumes them.
+   */
+  zones: Zones;
   missedWorkoutsLast4Weeks: number;
   plannedWorkoutsLast4Weeks: number;
   historicalWeeklyDistancesKm?: number[];
 }
+
 
 export interface PillarScore {
   name: string;
@@ -286,13 +295,15 @@ function calcAerobicCapacity(
 
   // Aerobic-pace efficiency: median pace on easy *clean* runs only.
   // Walk/run intervals have blended pace and would drag the median.
-  // Aerobic ceiling = Z2 upper bound from shared LTHR band model (single source of truth).
-  const iqZones = resolveZones({ ageYears: input.ageYears, activities: runs });
-  const maxAerobicHR = iqZones.z2Max;
+  // Aerobic ceiling = Z2 upper bound from the caller-supplied canonical zones
+  // (never resolved locally — that would let this window override the app-wide
+  // single source of truth).
+  const maxAerobicHR = input.zones.z2Max;
   const cleanRuns = runs.filter(isCleanRun);
   let easyRuns = cleanRuns.filter(
     (r) => r.avg_heart_rate && r.avg_heart_rate <= maxAerobicHR && r.distance_meters && r.duration_seconds
   );
+
 
   // Fallback: clean runs >= 40 min
   if (easyRuns.length < 3) {
