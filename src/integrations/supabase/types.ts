@@ -404,6 +404,7 @@ export type Database = {
           capture_method: string
           confidence_band: string | null
           confidence_score: number | null
+          could_continue_response: string | null
           created_at: string
           effort_window_distance_m: number
           effort_window_duration_s: number
@@ -412,11 +413,13 @@ export type Database = {
           effort_window_source: string
           effort_window_start_time: string
           id: string
+          likely_submaximal: boolean
           lthr: number | null
           predicted_5k_seconds: number | null
           riegel_exponent: number
           rpe_effort: number | null
           rpe_notes: string | null
+          rpe_response: string | null
           scheduled_date: string | null
           status: string
           threshold_hr: number | null
@@ -432,6 +435,7 @@ export type Database = {
           capture_method: string
           confidence_band?: string | null
           confidence_score?: number | null
+          could_continue_response?: string | null
           created_at?: string
           effort_window_distance_m: number
           effort_window_duration_s: number
@@ -440,11 +444,13 @@ export type Database = {
           effort_window_source: string
           effort_window_start_time: string
           id?: string
+          likely_submaximal?: boolean
           lthr?: number | null
           predicted_5k_seconds?: number | null
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
+          rpe_response?: string | null
           scheduled_date?: string | null
           status?: string
           threshold_hr?: number | null
@@ -460,6 +466,7 @@ export type Database = {
           capture_method?: string
           confidence_band?: string | null
           confidence_score?: number | null
+          could_continue_response?: string | null
           created_at?: string
           effort_window_distance_m?: number
           effort_window_duration_s?: number
@@ -468,11 +475,13 @@ export type Database = {
           effort_window_source?: string
           effort_window_start_time?: string
           id?: string
+          likely_submaximal?: boolean
           lthr?: number | null
           predicted_5k_seconds?: number | null
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
+          rpe_response?: string | null
           scheduled_date?: string | null
           status?: string
           threshold_hr?: number | null
