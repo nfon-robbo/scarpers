@@ -34,6 +34,8 @@ export interface ProvisionalPace {
   rejection?: { tier: ProvisionalTier; reason: string; pace: string; detail: string };
   /** Set when the chosen seed disagrees sharply with the recent training baseline. */
   discrepancy?: { message: string; recentBaselinePace: string; recentBaselineCount: number };
+  /** Set when the easy-run filter found nothing and fell back to moderate-intensity runs. */
+  relaxation?: { message: string };
 }
 
 /**
@@ -280,6 +282,17 @@ export async function getProvisionalPace(
       const skipNote = !tier1Allowed
         ? ` — recent training is walk/run or sparse, so older race form is ignored`
         : "";
+      const hrsInSample = easyRuns
+        .map(r => r.avg_heart_rate)
+        .filter((h): h is number => h != null);
+      const hrRange = hrsInSample.length
+        ? `avg HR ${Math.min(...hrsInSample).toFixed(0)}–${Math.max(...hrsInSample).toFixed(0)} bpm`
+        : "HR not recorded";
+      const relaxation = easyRelaxed
+        ? {
+            message: `No easy runs at or below your Z2 cap (${z2Max ?? "n/a"} bpm) in the last ${c.TIER1_FALLBACK_WINDOW_DAYS} days — seeded from your recent continuous runs instead (${hrRange}, likely Z3). Treat the seed as moderate-intensity, not easy.`,
+          }
+        : undefined;
       return {
         tier: "tier2_easy_avg",
         paceMin: fmt(cushioned),
@@ -287,6 +300,7 @@ export async function getProvisionalPace(
         label: "Provisional pace",
         detail: `Average of your last ${easyRuns.length} ${easyRelaxed ? "continuous" : "easy"} run${easyRuns.length === 1 ? "" : "s"} (${fmt(easyAvg)}/km) with a 15 s/km cushion${skipNote}`,
         rejection,
+        relaxation,
       };
     }
 
