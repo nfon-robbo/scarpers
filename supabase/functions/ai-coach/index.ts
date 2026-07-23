@@ -6,12 +6,13 @@ import {
   type TodayActivityInput,
 } from "./day-adjust-logic.ts";
 import {
-  resolveZones,
+  resolveZonesForUser,
   zonesFromLthr,
   bpmToZone,
   zonesPromptLine,
   LTHR_PCT_OF_MAX,
 } from "../_shared/hr-zones.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1841,15 +1842,10 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         else if (diff > 5) hrvTrend = "improving";
       }
 
-      // HR zones via shared LTHR band model (single source of truth).
-      // Resolution: measured LTHR (step 3) → corroborated observed max → 220-age → 190.
-      const ageMaxYears = profile?.date_of_birth
-        ? (Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 86400 * 1000)
-        : null;
-      const zones = resolveZones({
-        ageYears: ageMaxYears,
-        activities: (activities || []) as any,
-      });
+      // HR zones via shared canonical resolver — same 180-day activity window
+      // as useHrZones and intervals-sync. Never pass a bespoke slice here.
+      const zones = await resolveZonesForUser(supabase as any, user.id);
+
       const maxHr = zones.maxHr;
       const z1Max = zones.z1Max;
       const z2Range = `${zones.z1Max + 1}-${zones.z2Max}`;

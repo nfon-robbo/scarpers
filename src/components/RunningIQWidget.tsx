@@ -1,14 +1,17 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useHrZones } from "@/hooks/useHrZones";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, TrendingUp, ChevronRight, History, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { computeRunningIQ, countCleanRuns, RUNNING_IQ_MIN_CLEAN_RUNS, type RunActivity, type RunningIQResult } from "@/lib/running-iq";
+import type { Zones } from "@shared/hr-zones";
 import RunningIQHistoryDialog from "./RunningIQHistoryDialog";
 import { computeReadiness, groupSleepByDate, activityIntensityLoad, workoutIntensity, type ReadinessData } from "@/lib/readiness";
 import { calculateSleepScore } from "@/lib/sleep-score";
+
 
 // ── Large Score Display ──
 function IQGauge({ score, label }: { score: number; label: string }) {
@@ -61,12 +64,23 @@ function PillarBar({ name, score, icon, weight }: { name: string; score: number;
 const RunningIQWidget = () => {
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { zones } = useHrZones();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<RunningIQResult | null>(null);
   const [cleanRunCount, setCleanRunCount] = useState<number | null>(null);
   const [totalSessionCount, setTotalSessionCount] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+
+  // Derive real age from profile.date_of_birth. Fallback 40 only when profile
+  // is genuinely missing DOB (age feeds vo2 baseline + rhr age offset, so a
+  // wrong hard-coded age was silently distorting the aerobic pillar).
+  const ageYears = useMemo(() => {
+    const dob = profile?.date_of_birth;
+    if (!dob) return 40;
+    return (Date.now() - new Date(dob).getTime()) / (365.25 * 86400 * 1000);
+  }, [profile?.date_of_birth]);
+
 
   const fetchCleanRunCount = async (userId: string) => {
     const twelveWeeksAgo = new Date(Date.now() - 12 * 7 * 86400000).toISOString();
@@ -126,9 +140,12 @@ const RunningIQWidget = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !zones) return;
     loadScore(user.id);
-  }, [user]);
+    // Re-run once zones/age become available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, zones, ageYears]);
+
 
   const handleRecalculate = async () => {
     if (!user || recalculating) return;
@@ -241,7 +258,9 @@ const RunningIQWidget = () => {
         missed = Math.max(0, planned - recentRunCount);
       }
 
-      const ageYears = 30;
+      const genderRaw = (profile as any)?.sex;
+      const gender: "MALE" | "FEMALE" | "UNSPECIFIED" =
+        genderRaw === "male" ? "MALE" : genderRaw === "female" ? "FEMALE" : "UNSPECIFIED";
 
       const iqResult = computeRunningIQ({
         runs,
@@ -251,10 +270,12 @@ const RunningIQWidget = () => {
         sleepScore: latestSleep?.sleep_score ?? null,
         readinessScore,
         ageYears,
-        gender: "UNSPECIFIED",
+        gender,
+        zones: zones as Zones,
         missedWorkoutsLast4Weeks: missed,
         plannedWorkoutsLast4Weeks: planned,
       });
+
 
       setResult(iqResult);
       setLoading(false);
