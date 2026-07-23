@@ -87,27 +87,6 @@ export type ActivityMaxSample = {
   activity_type?: string | null | undefined;
 };
 
-/**
- * INTERNAL. Use `resolveZonesForUser` at every real call site so every
- * consumer sees the same canonical activity window. Direct callers of
- * `resolveZones` bypass that guarantee and re-introduce the slice-mismatch
- * bug this module was written to eliminate. Keep exported only for the
- * pure-function unit tests in `_shared/hr-zones.test.ts`.
- */
-export type ResolveInput = {
-  ageYears?: number | null;
-  /**
-   * Recent activity samples (last `OBSERVED_MAX_LOOKBACK_DAYS`). Walk/run
-   * activities are excluded internally by `activity_type` regex. Every
-   * remaining sample counts as one candidate; corroboration is computed
-   * across the set using array-index identity (id is optional).
-   */
-  activities?: ActivityMaxSample[];
-  /** If a measured benchmark LTHR exists, pass it — beats every estimator. */
-  measuredLthr?: number | null;
-};
-
-
 // ---------- Resolution ----------
 
 /**
@@ -142,72 +121,16 @@ export function resolveObservedMax(activities: ActivityMaxSample[]): {
   return null;
 }
 
-function estimateLthr(maxHr: number): number {
-  return Math.round(maxHr * LTHR_PCT_OF_MAX);
-}
-
 /**
  * Derive Z1–Z4 upper bounds from an LTHR using the fixed band model.
  * Z5 is anything above z4Max (unbounded — do not invent a ceiling).
  */
 export function zonesFromLthr(lthr: number): Pick<Zones, "z1Max" | "z2Max" | "z3Max" | "z4Max"> {
   return {
-    z1Max: Math.floor(0.85 * lthr - 0.0001), // <85 % → integers ≤ floor(0.85·LTHR)
-    z2Max: Math.floor(0.90 * lthr - 0.0001), // <90 %
-    z3Max: Math.floor(0.95 * lthr - 0.0001), // <95 %
-    z4Max: Math.floor(1.02 * lthr + 0.5),    // ≤102 % (inclusive)
-  };
-}
-
-export function resolveZones(input: ResolveInput): Zones {
-  // 1. Measured LTHR wins outright.
-  if (input.measuredLthr && input.measuredLthr > 0) {
-    const lthr = Math.round(input.measuredLthr);
-    return {
-      ...zonesFromLthr(lthr),
-      lthr,
-      lthrSource: "measured",
-      // For a measured LTHR we don't need max HR to derive zones, but keep the
-      // field populated for display consumers.
-      maxHr: Math.round(lthr / LTHR_PCT_OF_MAX),
-      maxHrSource: "observed_corroborated",
-    };
-  }
-
-  // 2. Resolve max HR: observed (corroborated) → age → fallback.
-  const observed = input.activities ? resolveObservedMax(input.activities) : null;
-
-  let maxHr: number;
-  let maxHrSource: MaxHrSource;
-  let maxHrActivityId: string | null = null;
-  let maxHrActivityDate: string | null = null;
-  let lthrSource: LthrSource;
-
-  if (observed) {
-    maxHr = observed.bpm;
-    maxHrSource = "observed_corroborated";
-    maxHrActivityId = observed.activityId;
-    maxHrActivityDate = observed.activityDate;
-    lthrSource = "observed_estimated";
-  } else if (input.ageYears && input.ageYears > 0) {
-    maxHr = 220 - Math.round(input.ageYears);
-    maxHrSource = "age";
-    lthrSource = "age_estimated";
-  } else {
-    maxHr = HARD_FALLBACK_MAX_HR;
-    maxHrSource = "fallback";
-    lthrSource = "fallback_estimated";
-  }
-
-  const lthr = estimateLthr(maxHr);
-  return {
-    ...zonesFromLthr(lthr),
-    lthr,
-    lthrSource,
-    maxHr,
-    maxHrSource,
-    maxHrActivityId,
-    maxHrActivityDate,
+    z1Max: Math.floor(0.85 * lthr - 0.0001),
+    z2Max: Math.floor(0.90 * lthr - 0.0001),
+    z3Max: Math.floor(0.95 * lthr - 0.0001),
+    z4Max: Math.floor(1.02 * lthr + 0.5),
   };
 }
 
