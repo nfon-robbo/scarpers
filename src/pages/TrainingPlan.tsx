@@ -1388,20 +1388,21 @@ const TrainingPlanPage = () => {
       return;
     }
 
-    // Provisional pace seed — used only when the athlete hasn't typed one in.
-    // Never blocks generation: getProvisionalPace resolves on error to the
-    // experience-level default.
+    // Provisional pace seed — always computed on mount so the athlete can
+    // see what their own history suggests. Typed values win: only inject the
+    // seed into the coach stream when both pace fields are empty. Never
+    // blocks generation.
     let seedPaceMin = currentPaceMin;
     let seedPaceMax = currentPaceMax;
-    let seed: ProvisionalPace | null = null;
     if (!currentPaceMin && !currentPaceMax) {
+      let seed: ProvisionalPace | null = provisionalPace;
       try {
-        seed = await getProvisionalPace(supabase, user.id, {
-          experienceLevel: null,
-        });
+        if (!seed) {
+          seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+          setProvisionalPace(seed);
+        }
         seedPaceMin = seed.paceMin;
         seedPaceMax = seed.paceMax;
-        setProvisionalPace(seed);
         toast({
           title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`,
           description: seed.detail,
@@ -1409,8 +1410,6 @@ const TrainingPlanPage = () => {
       } catch (e) {
         console.warn("provisional pace seed failed; continuing without", e);
       }
-    } else {
-      setProvisionalPace(null);
     }
 
     let accumulated = "";
