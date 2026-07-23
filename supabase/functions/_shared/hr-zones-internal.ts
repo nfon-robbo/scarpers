@@ -14,6 +14,7 @@
  */
 
 import {
+  HARD_FALLBACK_MAX_HR,
   LTHR_PCT_OF_MAX,
   resolveObservedMax,
   zonesFromLthr,
