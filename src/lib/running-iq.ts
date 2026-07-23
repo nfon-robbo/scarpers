@@ -286,7 +286,9 @@ function calcAerobicCapacity(
 
   // Aerobic-pace efficiency: median pace on easy *clean* runs only.
   // Walk/run intervals have blended pace and would drag the median.
-  const maxAerobicHR = 0.75 * (220 - input.ageYears);
+  // Aerobic ceiling = Z2 upper bound from shared LTHR band model (single source of truth).
+  const iqZones = resolveZones({ ageYears: input.ageYears, activities: runs });
+  const maxAerobicHR = iqZones.z2Max;
   const cleanRuns = runs.filter(isCleanRun);
   let easyRuns = cleanRuns.filter(
     (r) => r.avg_heart_rate && r.avg_heart_rate <= maxAerobicHR && r.distance_meters && r.duration_seconds
