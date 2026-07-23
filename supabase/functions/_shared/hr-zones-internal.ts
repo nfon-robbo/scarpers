@@ -91,7 +91,3 @@ export function resolveZones(input: ResolveInput): Zones {
   };
 }
 
-// Silence "unused import" if constants are only re-exported symbolically.
-void IMPLAUSIBLE_MAX_HR;
-void CORROBORATION_TOLERANCE_BPM;
-void HARD_FALLBACK_MAX_HR;
