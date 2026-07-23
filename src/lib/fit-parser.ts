@@ -260,6 +260,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             source_file: fileName,
             gps_track: cleanedTrack,
             raw_data: { records_count: records.length },
+            laps: allLaps,
           });
         }
       }
