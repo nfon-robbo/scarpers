@@ -243,7 +243,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     }
 
     return { paceSecPerKm, maxPaceSecPerKm, zones, zonesTotal, splits, userMax };
-  }, [data, track]);
+  }, [data, track, userZones]);
 
   const fmtPace = (secPerKm: number | null) => {
     if (!secPerKm || !isFinite(secPerKm) || secPerKm <= 0) return null;
