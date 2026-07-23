@@ -434,23 +434,96 @@ export async function importGarminExport(
       }
     }
 
-    // Also delete any pre-existing activity at same start_time (overlap from Strava/FIT).
-    if (startTimes.length) {
+    // Cross-source fuzzy merge: after source_file replace, check if any
+    // remaining incoming rows match an existing activity (e.g. Strava)
+    // within ±5min / same type / ±2min duration. Enrich instead of
+    // duplicate-then-blanket-delete. Fuzzy-matched rows are removed from
+    // the insert list and their start_times excluded from the blanket
+    // start_time delete so the enriched existing row survives.
+    let fuzzyEnrichCount = 0;
+    let insertRows = rows;
+    let remainingStartTimes = startTimes;
+    try {
+      const mergePlan = await planCrossSourceMerge(
+        userId,
+        rows.map((r: any) => ({
+          start_time: r.start_time,
+          activity_type: r.activity_type,
+          duration_seconds: r.duration_seconds,
+          distance_meters: r.distance_meters,
+          avg_heart_rate: r.avg_heart_rate,
+          max_heart_rate: r.max_heart_rate,
+          avg_speed: r.avg_speed,
+          avg_power: r.avg_power,
+          avg_cadence: r.avg_cadence,
+          total_ascent: r.total_ascent,
+          total_descent: r.total_descent,
+          calories: r.calories,
+          avg_temperature: r.avg_temperature,
+          training_effect: r.training_effect,
+          training_load: r.training_load,
+        })),
+      );
+      if (mergePlan.enrichments.length) {
+        await applyEnrichmentPatches(mergePlan.enrichments);
+        // Attach Garmin splits to existing activity ids.
+        const fuzzyBatch: any[] = [];
+        const fuzzyInserted: Array<{ id: string; source_file: string | null }> = [];
+        for (const e of mergePlan.enrichments) {
+          const src = rows[e.incomingIndex];
+          fuzzyBatch.push(src);
+          fuzzyInserted.push({ id: e.existingId, source_file: src.source_file });
+        }
+        try {
+          const lapRows = buildGarminLapRows(userId, fuzzyBatch, fuzzyInserted);
+          if (lapRows.length > 0) {
+            const { error: lapErr } = await supabase
+              .from("activity_laps")
+              .insert(lapRows);
+            if (lapErr)
+              console.warn(
+                "activity_laps insert (garmin_export fuzzy) failed (non-fatal):",
+                lapErr,
+              );
+          }
+        } catch (e: any) {
+          console.warn(
+            "garmin_export fuzzy lap map failed (non-fatal):",
+            e?.message || e,
+          );
+        }
+        const enrichedIdx = new Set(mergePlan.enrichments.map((e) => e.incomingIndex));
+        insertRows = rows.filter((_: any, i: number) => !enrichedIdx.has(i));
+        const excludedStarts = new Set(
+          mergePlan.enrichments.map((e) => rows[e.incomingIndex].start_time),
+        );
+        remainingStartTimes = startTimes.filter((s) => !excludedStarts.has(s));
+        fuzzyEnrichCount = mergePlan.enrichments.length;
+        result.activities.replaced += fuzzyEnrichCount;
+      }
+    } catch (e: any) {
+      errors.push(`Cross-source merge: ${e?.message || e}`);
+    }
+
+    // Blanket delete any pre-existing activity at same start_time (overlap from Strava/FIT)
+    // — but skip start_times we just fuzzy-enriched.
+    if (remainingStartTimes.length) {
       const chunkSize = 500;
-      for (let i = 0; i < startTimes.length; i += chunkSize) {
+      for (let i = 0; i < remainingStartTimes.length; i += chunkSize) {
         await supabase.from("activities")
           .delete()
           .eq("user_id", userId)
-          .in("start_time", startTimes.slice(i, i + chunkSize));
+          .in("start_time", remainingStartTimes.slice(i, i + chunkSize));
+      }
+
+      // FIT always wins: remove Strava overlaps within ±15min of any remaining start_time
+      try {
+        await purgeStravaOverlaps(userId, remainingStartTimes, 15);
+      } catch (e: any) {
+        errors.push(`Strava overlap purge: ${e?.message || e}`);
+      }
     }
 
-    // FIT always wins: remove Strava overlaps within ±15min of any FIT start_time
-    try {
-      await purgeStravaOverlaps(userId, startTimes, 15);
-    } catch (e: any) {
-      errors.push(`Strava overlap purge: ${e?.message || e}`);
-    }
-    }
 
     // Insert in batches, capture ids so we can persist Garmin splits into
     // activity_laps (source='garmin_export'). This is additive — a failure
