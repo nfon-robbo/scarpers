@@ -201,6 +201,8 @@ function hrZoneBpm(zone: string): string | null {
 // Defaults assume a recreational runner; tweak per-athlete in a future iteration.
 function paceForZone(zone: string, segmentText: string): string {
   const txt = `${zone} ${segmentText}`.toLowerCase();
+  // Benchmark / test efforts: pace is athlete-determined, don't prescribe one.
+  if (/benchmark|hardest\s*effort|all[-\s]?out|time\s*trial|max\s*effort/.test(txt)) return "";
   if (/walk/.test(txt)) return "9:25";
   if (/z5|vo2|sprint/.test(txt)) return "4:30";
   if (/z4|threshold|race\s*pace/.test(txt)) return "5:00";
@@ -330,7 +332,7 @@ function expandSegments(
         kind: "run",
         label: runIdx === 1 && !/main/i.test(seg.segment) ? seg.segment : `Run ${runIdx}`,
         duration: formatTime(seg.duration),
-        pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
+        pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.target || "") + " " + (seg.notes || "")),
       });
       mainEmitted = true;
     }
@@ -1169,7 +1171,7 @@ export default function PlanDayList({
                                         : setStepOverride(selectedWorkout, i, "duration", v)}
                                       isOverridden={isCustom ? false : !!overrides[workoutContentKey(selectedWorkout)]?.[i]?.duration}
                                     />
-                                    {isWarmCool ? (
+                                    {isWarmCool || (!isCustom && !paceStr && !overrides[workoutContentKey(selectedWorkout)]?.[i]?.pace) ? (
                                       <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
                                         <p className="text-base font-bold leading-tight text-muted-foreground">—</p>
                                         <p className="text-[10px] text-muted-foreground mt-0.5">No pace</p>
