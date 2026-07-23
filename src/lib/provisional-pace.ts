@@ -203,6 +203,7 @@ export async function getProvisionalPace(
     const z2Max = opts.z2MaxHr ?? null;
     const easyRuns = withPace
       .filter(r => (r.distance_meters ?? 0) >= 2000)
+      .filter(r => r.sec_per_km < c.WALK_RUN_PACE_THRESHOLD_SEC_PER_KM)
       .filter(r => z2Max == null || r.avg_heart_rate == null || r.avg_heart_rate <= z2Max)
       .slice(0, 5);
     const easyPaces = easyRuns.map(r => r.sec_per_km);
