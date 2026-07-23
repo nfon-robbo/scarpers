@@ -5,12 +5,12 @@ import {
   formatPace,
   predict5kSeconds,
   formatDuration,
-  computeHrZonesFromLthr,
   thresholdHrFromStream,
   meanHrBeforeCutoff,
   scoreConfidence,
   type HrStreamSample,
 } from "@/lib/benchmark-calculations";
+import { zonesFromLthr, bpmToZone, type Zones } from "@shared/hr-zones";
 
 describe("BenchmarkConfig", () => {
   it("exposes the tuned constants", () => {
