@@ -31,14 +31,14 @@ export const BenchmarkConfig = {
     /** Applied when second-half average pace is >=10% slower than first-half. */
     SECOND_HALF_SLOWDOWN: 20,
     CADENCE_MISSING: 15,
-    GPS_LOW: 15,
+    GPS_LOW: 20,
     GPS_MEDIUM: 5,
     RPE_SUBMAXIMAL: 15,
     /** Effort window derived from moving averages rather than watch laps. */
     EFFORT_WINDOW_DERIVED: 15,
   },
-  /** Threshold at or above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
-  CONFIDENCE_BANDS: { HIGH_MIN: 80, MEDIUM_MIN: 40 },
+  /** Above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
+  CONFIDENCE_BANDS: { HIGH_MIN: 70, MEDIUM_MIN: 40 },
 
   /** Seconds of warm-up excluded when computing threshold HR from a stream. */
   THRESHOLD_HR_WARMUP_EXCLUDE_S: 10 * 60,
