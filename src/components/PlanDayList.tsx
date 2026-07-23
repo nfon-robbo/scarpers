@@ -42,6 +42,12 @@ interface PlanDayListProps {
   isPaused?: boolean;
   pauseWindow?: { start: Date; end: Date } | null;
   pauseReason?: string | null;
+  /** Full plan markdown — used to detect scheduled benchmarks per day. */
+  planContent?: string | null;
+  /** Owning plan id, persisted onto benchmark_results.training_plan_id. */
+  planId?: string | null;
+  /** Current user id — required for benchmark confirm/reject writes. */
+  userId?: string | null;
 }
 
 function pauseReasonMeta(reason?: string | null): { icon: string; label: string; bg: string } {
@@ -485,6 +491,9 @@ export default function PlanDayList({
   isPaused = false,
   pauseWindow = null,
   pauseReason = null,
+  planContent = null,
+  planId = null,
+  userId = null,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
