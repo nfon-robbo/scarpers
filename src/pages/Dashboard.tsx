@@ -30,6 +30,7 @@ import PlanAdaptationBanner from "@/components/PlanAdaptationBanner";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
 import { isPauseActive, isPauseReadyToResume, pauseResumeDeltaDays, resumePlanAfterPause } from "@/lib/plan-utils";
 import ReadinessWidget from "@/components/ReadinessWidget";
+import BenchmarkDashboardBanner from "@/components/BenchmarkDashboardBanner";
 import {
   evaluateAdaptation,
   shouldRunAdaptCheck,
@@ -796,6 +797,11 @@ const Dashboard = () => {
       <p className="text-sm text-muted-foreground leading-relaxed italic">
         "{dailyQuote.text}" — {dailyQuote.author}
       </p>
+
+      {/* ── Benchmark ready banner (dismissible, session-scoped) ── */}
+      {user && plan?.content && (
+        <BenchmarkDashboardBanner userId={user.id} planContent={plan.content} />
+      )}
 
       {/* ── Build a plan CTA (when user has no plan) ── */}
       {!plan && (
