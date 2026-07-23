@@ -529,8 +529,8 @@ export async function importGarminExport(
     // activity_laps (source='garmin_export'). This is additive — a failure
     // to insert laps must never break the activity import.
     const batchSize = 100;
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize);
+    for (let i = 0; i < insertRows.length; i += batchSize) {
+      const batch = insertRows.slice(i, i + batchSize);
       const { data: inserted, error } = await supabase
         .from("activities")
         .insert(batch as any)
@@ -548,8 +548,12 @@ export async function importGarminExport(
         console.warn("garmin_export lap map failed (non-fatal):", e?.message || e);
       }
 
-      onProgress?.({ phase: "Importing activities", total: rows.length, current: i + batch.length });
+      onProgress?.({ phase: "Importing activities", total: insertRows.length, current: i + batch.length });
     }
+    if (fuzzyEnrichCount) {
+      console.info(`[garmin-export] cross-source enriched ${fuzzyEnrichCount} existing activities`);
+    }
+
   } catch (e: any) {
     errors.push(`Activities: ${e?.message || e}`);
   }
