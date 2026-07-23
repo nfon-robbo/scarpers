@@ -150,7 +150,8 @@ const UploadPage = () => {
       const batchSize = 50;
       let saved = 0;
       for (let i = 0; i < parseResult.activities.length; i += batchSize) {
-        const batch = parseResult.activities.slice(i, i + batchSize).map((a) => ({
+        const slice = parseResult.activities.slice(i, i + batchSize);
+        const batch = slice.map((a) => ({
           user_id: user.id,
           upload_id: uploadRecord.id,
           activity_type: a.activity_type,
@@ -174,8 +175,48 @@ const UploadPage = () => {
           raw_data: { ...a.raw_data as object, gps_track: a.gps_track },
         }));
 
-        const { error } = await supabase.from("activities").insert(batch as any);
+        const { data: inserted, error } = await supabase
+          .from("activities")
+          .insert(batch as any)
+          .select("id");
         if (error) throw error;
+
+        // Additive: persist laps for each inserted activity. Failures here
+        // must never affect the activity import result.
+        if (inserted && inserted.length === slice.length) {
+          const lapRows: any[] = [];
+          for (let j = 0; j < slice.length; j++) {
+            const laps = slice[j].laps || [];
+            for (const lap of laps) {
+              lapRows.push({
+                user_id: user.id,
+                activity_id: (inserted[j] as any).id,
+                lap_index: lap.lap_index,
+                start_time: lap.start_time,
+                elapsed_time_s: lap.elapsed_time_s,
+                moving_time_s: lap.moving_time_s,
+                distance_m: lap.distance_m,
+                avg_heart_rate: lap.avg_heart_rate,
+                max_heart_rate: lap.max_heart_rate,
+                avg_speed_mps: lap.avg_speed_mps,
+                max_speed_mps: lap.max_speed_mps,
+                avg_cadence: lap.avg_cadence,
+                avg_power: lap.avg_power,
+                max_power: lap.max_power,
+                total_ascent_m: lap.total_ascent_m,
+                total_descent_m: lap.total_descent_m,
+                lap_trigger: lap.lap_trigger,
+                source: "fit",
+                raw: lap.raw ?? {},
+              });
+            }
+          }
+          if (lapRows.length > 0) {
+            const { error: lapErr } = await supabase.from("activity_laps").insert(lapRows);
+            if (lapErr) console.warn("activity_laps insert failed (non-fatal):", lapErr);
+          }
+        }
+
         saved += batch.length;
         setSavedCount(saved);
         setProgress(60 + Math.round((saved / parseResult.activities.length) * 35));

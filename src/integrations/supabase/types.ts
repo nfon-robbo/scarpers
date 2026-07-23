@@ -26,6 +26,8 @@ export type Database = {
           created_at: string
           distance_meters: number | null
           duration_seconds: number | null
+          effort_window_note: string | null
+          effort_window_source: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -55,6 +57,8 @@ export type Database = {
           created_at?: string
           distance_meters?: number | null
           duration_seconds?: number | null
+          effort_window_note?: string | null
+          effort_window_source?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -84,6 +88,8 @@ export type Database = {
           created_at?: string
           distance_meters?: number | null
           duration_seconds?: number | null
+          effort_window_note?: string | null
+          effort_window_source?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -115,6 +121,86 @@ export type Database = {
             columns: ["upload_id"]
             isOneToOne: false
             referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_laps: {
+        Row: {
+          activity_id: string
+          avg_cadence: number | null
+          avg_heart_rate: number | null
+          avg_power: number | null
+          avg_speed_mps: number | null
+          created_at: string
+          distance_m: number | null
+          elapsed_time_s: number | null
+          id: string
+          lap_index: number
+          lap_trigger: string | null
+          max_heart_rate: number | null
+          max_power: number | null
+          max_speed_mps: number | null
+          moving_time_s: number | null
+          raw: Json
+          source: string
+          start_time: string | null
+          total_ascent_m: number | null
+          total_descent_m: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          avg_cadence?: number | null
+          avg_heart_rate?: number | null
+          avg_power?: number | null
+          avg_speed_mps?: number | null
+          created_at?: string
+          distance_m?: number | null
+          elapsed_time_s?: number | null
+          id?: string
+          lap_index: number
+          lap_trigger?: string | null
+          max_heart_rate?: number | null
+          max_power?: number | null
+          max_speed_mps?: number | null
+          moving_time_s?: number | null
+          raw?: Json
+          source: string
+          start_time?: string | null
+          total_ascent_m?: number | null
+          total_descent_m?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          avg_cadence?: number | null
+          avg_heart_rate?: number | null
+          avg_power?: number | null
+          avg_speed_mps?: number | null
+          created_at?: string
+          distance_m?: number | null
+          elapsed_time_s?: number | null
+          id?: string
+          lap_index?: number
+          lap_trigger?: string | null
+          max_heart_rate?: number | null
+          max_power?: number | null
+          max_speed_mps?: number | null
+          moving_time_s?: number | null
+          raw?: Json
+          source?: string
+          start_time?: string | null
+          total_ascent_m?: number | null
+          total_descent_m?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_laps_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
             referencedColumns: ["id"]
           },
         ]

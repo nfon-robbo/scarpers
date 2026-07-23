@@ -22,6 +22,25 @@ export interface GpsPoint {
   grade?: number;
 }
 
+export interface ParsedLap {
+  lap_index: number;
+  start_time: string | null;
+  elapsed_time_s: number | null;
+  moving_time_s: number | null;
+  distance_m: number | null;
+  avg_heart_rate: number | null;
+  max_heart_rate: number | null;
+  avg_speed_mps: number | null;
+  max_speed_mps: number | null;
+  avg_cadence: number | null;
+  avg_power: number | null;
+  max_power: number | null;
+  total_ascent_m: number | null;
+  total_descent_m: number | null;
+  lap_trigger: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface ParsedActivity {
   activity_type: string | null;
   start_time: string | null;
@@ -43,6 +62,7 @@ export interface ParsedActivity {
   source_file: string;
   gps_track: GpsPoint[];
   raw_data: Record<string, unknown>;
+  laps: ParsedLap[];
 }
 
 export interface ParseResult {
@@ -81,6 +101,36 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
           if (s.records) records = records.concat(s.records);
         }
       }
+      // Extract laps — in cascade mode nested under sessions
+      const rawSessions: any[] = data?.sessions || data?.activity?.sessions || [];
+      const collectLaps = (): any[] => {
+        const out: any[] = [];
+        if (Array.isArray(data?.laps)) out.push(...data.laps);
+        for (const s of rawSessions) {
+          if (Array.isArray(s?.laps)) out.push(...s.laps);
+        }
+        return out;
+      };
+      const buildLaps = (source: any[]): ParsedLap[] =>
+        source.map((lap: any, idx: number) => ({
+          lap_index: idx,
+          start_time: lap.start_time ? new Date(lap.start_time).toISOString() : null,
+          elapsed_time_s: lap.total_elapsed_time ?? null,
+          moving_time_s: lap.total_timer_time ?? null,
+          distance_m: lap.total_distance != null ? lap.total_distance * 1000 : null,
+          avg_heart_rate: lap.avg_heart_rate ?? null,
+          max_heart_rate: lap.max_heart_rate ?? null,
+          avg_speed_mps: lap.avg_speed ?? lap.enhanced_avg_speed ?? null,
+          max_speed_mps: lap.max_speed ?? lap.enhanced_max_speed ?? null,
+          avg_cadence: lap.avg_cadence ?? lap.avg_running_cadence ?? null,
+          avg_power: lap.avg_power ?? null,
+          max_power: lap.max_power ?? null,
+          total_ascent_m: lap.total_ascent != null ? lap.total_ascent * 1000 : null,
+          total_descent_m: lap.total_descent != null ? lap.total_descent * 1000 : null,
+          lap_trigger: lap.lap_trigger ?? null,
+          raw: lap,
+        }));
+
       const gpsTrack: GpsPoint[] = [];
       const firstRecordTime = records.find((r: any) => r.timestamp)?.timestamp;
       const firstRecordMs = firstRecordTime ? new Date(firstRecordTime).getTime() : null;
@@ -125,7 +175,9 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
 
       // Extract session-level data — try multiple paths
       const sessions = data?.sessions || data?.activity?.sessions || [];
+      const allLaps = buildLaps(collectLaps());
       if (sessions.length > 0) {
+        let sessionIdx = 0;
         for (const session of sessions) {
           const cleanedTrack = cleanGpsTrack(gpsTrack);
           activities.push({
@@ -149,7 +201,9 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             source_file: fileName,
             gps_track: cleanedTrack,
             raw_data: session,
+            laps: sessionIdx === 0 ? allLaps : [],
           });
+          sessionIdx++;
         }
       } else {
         // Fallback: try to extract from records
@@ -206,6 +260,7 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             source_file: fileName,
             gps_track: cleanedTrack,
             raw_data: { records_count: records.length },
+            laps: allLaps,
           });
         }
       }
