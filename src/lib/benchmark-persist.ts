@@ -25,6 +25,11 @@ import {
   thresholdPaceSecPerKm,
   predict5kSeconds,
 } from "@/lib/benchmark-calculations";
+import {
+  deriveLikelySubmaximal,
+  type RpeResponse,
+  type CouldContinueResponse,
+} from "@/lib/benchmark-rpe";
 
 const NEXT_BENCHMARK_WEEKS = 6;
 
@@ -45,15 +50,24 @@ export interface ConfirmParams {
   /** Path 3 inputs; ignored when `activity` is provided. */
   manualDurationS?: number;
   manualDistanceM?: number;
-  /** True when the athlete flags the effort as submaximal. */
-  rpeSubmaximal?: boolean;
+  /** Post-benchmark answers. When both provided, likely_submaximal is derived
+   *  ONCE via deriveLikelySubmaximal and used for BOTH the confidence-score
+   *  deduction and the stored flag — never re-evaluated separately. */
+  rpeResponse?: RpeResponse | null;
+  couldContinueResponse?: CouldContinueResponse | null;
 }
 
-export async function confirmBenchmark(params: ConfirmParams): Promise<{ id: string }> {
+export async function confirmBenchmark(
+  params: ConfirmParams,
+): Promise<{ id: string; lthr: number | null }> {
   const {
     userId, planId, scheduledDateIso, protocol,
-    activity, laps, manualDurationS, manualDistanceM, rpeSubmaximal,
+    activity, laps, manualDurationS, manualDistanceM,
+    rpeResponse, couldContinueResponse,
   } = params;
+
+  // Derived once — same boolean feeds scoreConfidence AND the stored flag.
+  const likelySubmaximal = deriveLikelySubmaximal(rpeResponse, couldContinueResponse);
 
   const isManual = !activity;
   const effort = isManual
