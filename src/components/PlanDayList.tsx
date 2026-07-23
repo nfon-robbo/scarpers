@@ -1171,7 +1171,7 @@ export default function PlanDayList({
                                         : setStepOverride(selectedWorkout, i, "duration", v)}
                                       isOverridden={isCustom ? false : !!overrides[workoutContentKey(selectedWorkout)]?.[i]?.duration}
                                     />
-                                    {isWarmCool ? (
+                                    {isWarmCool || (!isCustom && !paceStr && !overrides[workoutContentKey(selectedWorkout)]?.[i]?.pace) ? (
                                       <div className="px-3 py-2 text-center w-full flex flex-col items-center justify-center">
                                         <p className="text-base font-bold leading-tight text-muted-foreground">—</p>
                                         <p className="text-[10px] text-muted-foreground mt-0.5">No pace</p>
