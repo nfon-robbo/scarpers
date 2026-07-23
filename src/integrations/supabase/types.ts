@@ -119,6 +119,54 @@ export type Database = {
           },
         ]
       }
+      activity_deletions_log: {
+        Row: {
+          activity_id: string
+          activity_type: string | null
+          deleted_at: string
+          distance_meters: number | null
+          duration_seconds: number | null
+          id: string
+          import_source: string | null
+          raw_snapshot: Json | null
+          reason: string
+          source: string | null
+          source_file: string | null
+          start_time: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          activity_type?: string | null
+          deleted_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          id?: string
+          import_source?: string | null
+          raw_snapshot?: Json | null
+          reason: string
+          source?: string | null
+          source_file?: string | null
+          start_time?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          activity_type?: string | null
+          deleted_at?: string
+          distance_meters?: number | null
+          duration_seconds?: number | null
+          id?: string
+          import_source?: string | null
+          raw_snapshot?: Json | null
+          reason?: string
+          source?: string | null
+          source_file?: string | null
+          start_time?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_laps: {
         Row: {
           activity_id: string
@@ -316,10 +364,43 @@ export type Database = {
         }
         Relationships: []
       }
+      benchmark_rejections: {
+        Row: {
+          activity_id: string
+          id: string
+          reason: string | null
+          rejected_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          id?: string
+          reason?: string | null
+          rejected_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          id?: string
+          reason?: string | null
+          rejected_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benchmark_rejections_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       benchmark_results: {
         Row: {
           active: boolean
           activity_id: string | null
+          activity_snapshot: Json | null
           capture_method: string
           confidence_band: string | null
           confidence_score: number | null
@@ -332,7 +413,6 @@ export type Database = {
           effort_window_start_time: string
           id: string
           lthr: number | null
-          plan_workout_id: string | null
           predicted_10k_seconds: number | null
           predicted_5k_seconds: number | null
           predicted_full_seconds: number | null
@@ -340,15 +420,18 @@ export type Database = {
           riegel_exponent: number
           rpe_effort: number | null
           rpe_notes: string | null
+          scheduled_date: string | null
           status: string
           threshold_hr: number | null
           threshold_pace_s_per_km: number
+          training_plan_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           active?: boolean
           activity_id?: string | null
+          activity_snapshot?: Json | null
           capture_method: string
           confidence_band?: string | null
           confidence_score?: number | null
@@ -361,7 +444,6 @@ export type Database = {
           effort_window_start_time: string
           id?: string
           lthr?: number | null
-          plan_workout_id?: string | null
           predicted_10k_seconds?: number | null
           predicted_5k_seconds?: number | null
           predicted_full_seconds?: number | null
@@ -369,15 +451,18 @@ export type Database = {
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
+          scheduled_date?: string | null
           status?: string
           threshold_hr?: number | null
           threshold_pace_s_per_km: number
+          training_plan_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           active?: boolean
           activity_id?: string | null
+          activity_snapshot?: Json | null
           capture_method?: string
           confidence_band?: string | null
           confidence_score?: number | null
@@ -390,7 +475,6 @@ export type Database = {
           effort_window_start_time?: string
           id?: string
           lthr?: number | null
-          plan_workout_id?: string | null
           predicted_10k_seconds?: number | null
           predicted_5k_seconds?: number | null
           predicted_full_seconds?: number | null
@@ -398,9 +482,11 @@ export type Database = {
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
+          scheduled_date?: string | null
           status?: string
           threshold_hr?: number | null
           threshold_pace_s_per_km?: number
+          training_plan_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -413,10 +499,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "benchmark_results_plan_workout_id_fkey"
-            columns: ["plan_workout_id"]
+            foreignKeyName: "benchmark_results_training_plan_id_fkey"
+            columns: ["training_plan_id"]
             isOneToOne: false
-            referencedRelation: "plan_workouts"
+            referencedRelation: "training_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -1129,53 +1215,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      plan_workouts: {
-        Row: {
-          benchmark_protocol: string | null
-          created_at: string
-          id: string
-          is_benchmark: boolean
-          rejected_activity_ids: string[]
-          scheduled_date: string
-          training_plan_id: string | null
-          updated_at: string
-          user_id: string
-          workout_type: string | null
-        }
-        Insert: {
-          benchmark_protocol?: string | null
-          created_at?: string
-          id?: string
-          is_benchmark?: boolean
-          rejected_activity_ids?: string[]
-          scheduled_date: string
-          training_plan_id?: string | null
-          updated_at?: string
-          user_id: string
-          workout_type?: string | null
-        }
-        Update: {
-          benchmark_protocol?: string | null
-          created_at?: string
-          id?: string
-          is_benchmark?: boolean
-          rejected_activity_ids?: string[]
-          scheduled_date?: string
-          training_plan_id?: string | null
-          updated_at?: string
-          user_id?: string
-          workout_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "plan_workouts_training_plan_id_fkey"
-            columns: ["training_plan_id"]
-            isOneToOne: false
-            referencedRelation: "training_plans"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       profiles: {
         Row: {
