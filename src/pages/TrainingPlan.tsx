@@ -2827,6 +2827,16 @@ const TrainingPlanPage = () => {
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
+                {provisionalPace && !currentPaceMin && !currentPaceMax && (
+                  <div className="mt-2 flex items-start gap-2 text-xs">
+                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
+                      Provisional pace
+                    </span>
+                    <span className="text-muted-foreground">
+                      {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
