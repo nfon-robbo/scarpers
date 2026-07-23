@@ -32,27 +32,48 @@ export interface ProvisionalPace {
   detail: string;
   /** Populated when a higher-tier candidate was rejected by the guard. */
   rejection?: { tier: ProvisionalTier; reason: string; pace: string; detail: string };
+  /** Set when the chosen seed disagrees sharply with the recent training baseline. */
+  discrepancy?: { message: string; recentBaselinePace: string; recentBaselineCount: number };
 }
 
 /**
- * Plausibility guard for Tier 1. Tunable in one place.
+ * Plausibility + recency configuration for the tiered seed.
  *
- * - HARD_FLOOR_SEC_PER_KM: an absolute floor below which no candidate is
- *   ever accepted (sub-3:30/km implies elite; almost always a mis-recorded
- *   cycle or GPS drift).
- * - MIN_HR_FRACTION_OF_MAX: if avg HR is present and below this fraction of
- *   an assumed 190 bpm max, the effort was not hard enough to be a 5k TT.
- * - MAX_FASTER_THAN_EASY_BASELINE_SEC: candidate must not be more than this
- *   many seconds/km faster than the athlete's own easy-run baseline. This
- *   catches the "one hot outlier surrounded by walk/run sessions" case.
- * - EASY_BASELINE_MIN_RUNS: minimum easy runs required before the relative
- *   check applies; below this we fall back to the hard floor only.
+ * Tier 1 gating (recent training must corroborate an older PB):
+ *  - TIER1_PRIMARY_WINDOW_DAYS: first look here. A recent 5 km is preferred
+ *    over an older, faster one.
+ *  - TIER1_FALLBACK_WINDOW_DAYS: only used if the primary window is empty.
+ *  - TIER1_MIN_CONTINUOUS_RUNS_28D: the athlete must have at least this many
+ *    continuous runs in the last 28 days for Tier 1 to apply at all. If
+ *    they're mid walk/run block (or laid off), Tier 1 is skipped even if a
+ *    PB sits in the window.
+ *  - WALK_RUN_PACE_THRESHOLD_SEC_PER_KM: pace slower than this counts as a
+ *    walk/run session, not a continuous run.
+ *  - CONTINUOUS_RUN_MIN_METERS: minimum distance for a run to count toward
+ *    the continuous-run tally.
+ *
+ * Plausibility guard for accepted Tier 1 candidates:
+ *  - HARD_FLOOR_SEC_PER_KM: unconditional floor.
+ *  - MIN_HR_FRACTION_OF_MAX × resolvedMaxHr: HR check (skipped without max).
+ *  - MAX_FASTER_THAN_EASY_BASELINE_SEC: relative check vs the athlete's own
+ *    easy-run baseline (needs EASY_BASELINE_MIN_RUNS to apply).
+ *
+ * Discrepancy flag (soft warning, no rejection):
+ *  - DISCREPANCY_GAP_SEC_PER_KM: when the seeded easy pace is this many
+ *    seconds/km FASTER than the recent easy baseline, surface a note so the
+ *    athlete sees the contradiction instead of silently trusting Tier 1.
  */
 export const ProvisionalPaceConfig = {
+  TIER1_PRIMARY_WINDOW_DAYS: 42,
+  TIER1_FALLBACK_WINDOW_DAYS: 90,
+  TIER1_MIN_CONTINUOUS_RUNS_28D: 3,
+  WALK_RUN_PACE_THRESHOLD_SEC_PER_KM: 9 * 60, // 9:00/km
+  CONTINUOUS_RUN_MIN_METERS: 3000,
   HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km — unconditional
   MIN_HR_FRACTION_OF_MAX: 0.88,
   MAX_FASTER_THAN_EASY_BASELINE_SEC: 90,
   EASY_BASELINE_MIN_RUNS: 3,
+  DISCREPANCY_GAP_SEC_PER_KM: 30,
 } as const;
 
 function fmt(secPerKm: number): string {
@@ -145,8 +166,9 @@ export async function getProvisionalPace(
   userId: string,
   opts: { experienceLevel?: string | null; z2MaxHr?: number | null; resolvedMaxHr?: number | null } = {},
 ): Promise<ProvisionalPace> {
+  const c = ProvisionalPaceConfig;
   try {
-    const since = new Date(Date.now() - 90 * 86400_000).toISOString();
+    const since = new Date(Date.now() - c.TIER1_FALLBACK_WINDOW_DAYS * 86400_000).toISOString();
     const { data } = await supabase
       .from("activities")
       .select("id,start_time,distance_meters,duration_seconds,avg_heart_rate,activity_type")
@@ -157,62 +179,113 @@ export async function getProvisionalPace(
       .limit(500);
     const runs = ((data as unknown) as Row[] | null) ?? [];
 
-    // Easy-run baseline — used both by Tier 2 and by the Tier 1 guard.
-    const z2Max = opts.z2MaxHr ?? null;
-    const easyRuns = runs
-      .filter(r => (r.distance_meters ?? 0) >= 2000 && (r.duration_seconds ?? 0) > 0)
-      .filter(r => z2Max == null || r.avg_heart_rate == null || r.avg_heart_rate <= z2Max)
-      .slice(0, 5);
-    const easyPaces = easyRuns.map(r => (r.duration_seconds as number) / ((r.distance_meters as number) / 1000));
-    const easyAvg = easyPaces.length ? easyPaces.reduce((s, p) => s + p, 0) / easyPaces.length : null;
-
-    // Tier 1 — fastest continuous 5 km (accept ±4%), plausibility-vetted.
-    const fives = runs
-      .filter(r => r.distance_meters != null && r.duration_seconds != null
-        && r.distance_meters >= 4800 && r.distance_meters <= 5200
-        && r.duration_seconds > 0)
+    const now = Date.now();
+    const withPace = runs
+      .filter(r => (r.distance_meters ?? 0) > 0 && (r.duration_seconds ?? 0) > 0)
       .map(r => ({
         ...r,
         sec_per_km: (r.duration_seconds as number) / ((r.distance_meters as number) / 1000),
-      }))
-      .sort((a, b) => a.sec_per_km - b.sec_per_km);
+        ageDays: (now - new Date(r.start_time).getTime()) / 86400_000,
+      }));
+
+    // Recent-training gate: continuous runs (≥3 km, faster than walk/run
+    // threshold) in the last 28 days. Below the minimum → Tier 1 is disabled
+    // entirely; recent training wins over stale race form.
+    const continuous28d = withPace.filter(r =>
+      r.ageDays <= 28
+      && (r.distance_meters ?? 0) >= c.CONTINUOUS_RUN_MIN_METERS
+      && r.sec_per_km < c.WALK_RUN_PACE_THRESHOLD_SEC_PER_KM,
+    );
+    const tier1Allowed = continuous28d.length >= c.TIER1_MIN_CONTINUOUS_RUNS_28D;
+
+    // Easy-run baseline for Tier 2, for the Tier 1 relative guard, and for
+    // the discrepancy check. Prefer the most recent 5.
+    const z2Max = opts.z2MaxHr ?? null;
+    const continuousRuns = withPace
+      .filter(r => (r.distance_meters ?? 0) >= 2000)
+      .filter(r => r.sec_per_km < c.WALK_RUN_PACE_THRESHOLD_SEC_PER_KM);
+    const easyByHr = continuousRuns
+      .filter(r => z2Max == null || r.avg_heart_rate == null || r.avg_heart_rate <= z2Max)
+      .slice(0, 5);
+    // If the athlete habitually trains above Z2, the HR filter yields nothing.
+    // Relax to the most recent continuous runs so Tier 2 can still fire.
+    const easyRuns = easyByHr.length > 0 ? easyByHr : continuousRuns.slice(0, 5);
+    const easyRelaxed = easyByHr.length === 0 && continuousRuns.length > 0;
+    const easyPaces = easyRuns.map(r => r.sec_per_km);
+    const easyAvg = easyPaces.length ? easyPaces.reduce((s, p) => s + p, 0) / easyPaces.length : null;
 
     let rejection: ProvisionalPace["rejection"] | undefined;
-    for (const cand of fives) {
-      const reject = vetTier1(cand, easyAvg, easyRuns.length, opts.resolvedMaxHr ?? null);
-      if (!reject) {
-        const easySec = cand.sec_per_km + 60; // easy sits ~60 s/km slower than a hard 5k
-        return {
-          tier: "tier1_5k",
-          paceMin: fmt(easySec),
-          paceMax: fmt(easySec + 20),
-          label: "Provisional pace",
-          detail: `From your ${(cand.distance_meters! / 1000).toFixed(2)} km run on ${new Date(cand.start_time).toLocaleDateString("en-GB")} at ${fmt(cand.sec_per_km)}/km`,
-          rejection,
-        };
+
+    // Tier 1 — fastest continuous 5 km, but recency-weighted: primary 42-day
+    // window first, 90-day fallback only if primary is empty.
+    if (tier1Allowed) {
+      const allFives = withPace
+        .filter(r => (r.distance_meters ?? 0) >= 4800 && (r.distance_meters ?? 0) <= 5200)
+        .sort((a, b) => a.sec_per_km - b.sec_per_km);
+      const primary = allFives.filter(r => r.ageDays <= c.TIER1_PRIMARY_WINDOW_DAYS);
+      const pool = primary.length > 0 ? primary : allFives;
+      const usedFallback = primary.length === 0 && allFives.length > 0;
+
+      for (const cand of pool) {
+        const reject = vetTier1(cand, easyAvg, easyRuns.length, opts.resolvedMaxHr ?? null);
+        if (!reject) {
+          const easySec = cand.sec_per_km + 60;
+          const dateStr = new Date(cand.start_time).toLocaleDateString("en-GB");
+          const windowNote = usedFallback
+            ? ` (nothing in the last ${c.TIER1_PRIMARY_WINDOW_DAYS} days — falling back to ${c.TIER1_FALLBACK_WINDOW_DAYS})`
+            : "";
+          const seed: ProvisionalPace = {
+            tier: "tier1_5k",
+            paceMin: fmt(easySec),
+            paceMax: fmt(easySec + 20),
+            label: "Provisional pace",
+            detail: `From your ${(cand.distance_meters! / 1000).toFixed(2)} km run on ${dateStr} at ${fmt(cand.sec_per_km)}/km${windowNote}`,
+            rejection,
+          };
+          // Soft discrepancy flag: chosen easy pace is much faster than the
+          // recent easy baseline. Do not reject — surface it.
+          if (easyAvg != null && easyRuns.length >= 2) {
+            const gap = easyAvg - easySec;
+            if (gap > c.DISCREPANCY_GAP_SEC_PER_KM) {
+              seed.discrepancy = {
+                message: `Seeded from your ${(cand.distance_meters! / 1000).toFixed(2)} km on ${dateStr} at ${fmt(cand.sec_per_km)}/km. Your recent easy runs suggest something slower (~${fmt(easyAvg)}/km).`,
+                recentBaselinePace: fmt(easyAvg),
+                recentBaselineCount: easyRuns.length,
+              };
+            }
+          }
+          return seed;
+        }
+        console.warn("[provisional-pace] Tier 1 candidate rejected:", {
+          activity_id: cand.id,
+          pace: fmt(cand.sec_per_km),
+          avg_hr: cand.avg_heart_rate,
+          reason: reject.reason,
+          detail: reject.detail,
+        });
+        if (!rejection) {
+          rejection = { tier: "tier1_5k", reason: reject.reason, pace: reject.pace, detail: reject.detail };
+        }
       }
-      console.warn("[provisional-pace] Tier 1 candidate rejected:", {
-        activity_id: cand.id,
-        pace: fmt(cand.sec_per_km),
-        avg_hr: cand.avg_heart_rate,
-        reason: reject.reason,
-        detail: reject.detail,
-      });
-      // Keep the first rejection for user-facing surfacing; try next candidate.
-      if (!rejection) {
-        rejection = { tier: "tier1_5k", reason: reject.reason, pace: reject.pace, detail: reject.detail };
-      }
+    } else {
+      console.info("[provisional-pace] Tier 1 skipped: only", continuous28d.length, "continuous runs in last 28d (need", c.TIER1_MIN_CONTINUOUS_RUNS_28D, ")");
     }
 
-    // Tier 2 — last five easy runs (≥ 2 km), average pace + 15 s cushion.
-    if (easyAvg != null && easyRuns.length >= 3) {
+    // Tier 2 — recent easy runs. When Tier 1 was skipped for recency reasons,
+    // use whatever easy runs we have (however few); otherwise require the
+    // usual 3-run minimum for confidence.
+    const tier2MinRuns = tier1Allowed ? 3 : 1;
+    if (easyAvg != null && easyRuns.length >= tier2MinRuns) {
       const cushioned = easyAvg + 15;
+      const skipNote = !tier1Allowed
+        ? ` — recent training is walk/run or sparse, so older race form is ignored`
+        : "";
       return {
         tier: "tier2_easy_avg",
         paceMin: fmt(cushioned),
         paceMax: fmt(cushioned + 20),
         label: "Provisional pace",
-        detail: `Average of your last ${easyRuns.length} easy runs (${fmt(easyAvg)}/km) with a 15 s/km cushion`,
+        detail: `Average of your last ${easyRuns.length} ${easyRelaxed ? "continuous" : "easy"} run${easyRuns.length === 1 ? "" : "s"} (${fmt(easyAvg)}/km) with a 15 s/km cushion${skipNote}`,
         rejection,
       };
     }

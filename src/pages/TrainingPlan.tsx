@@ -2875,6 +2875,16 @@ const TrainingPlanPage = () => {
                         </span>
                       </div>
                     )}
+                    {provisionalPace.discrepancy && (
+                      <div className="flex items-start gap-2">
+                        <span className="inline-flex items-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 px-2 py-0.5 font-semibold uppercase tracking-wider">
+                          Check
+                        </span>
+                        <span className="text-muted-foreground">
+                          {provisionalPace.discrepancy.message}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
