@@ -149,8 +149,8 @@ describe("identifyEffortWindow — which path fires", () => {
   it("Path 2 fires with a diagnostic note when laps present but no window matches", () => {
     const laps = [
       { lap_index: 0, elapsed_time_s: 600 },   // 10 min
-      { lap_index: 1, elapsed_time_s: 1200 },  // 20 min
-      { lap_index: 2, elapsed_time_s: 1080 },  // 18 min — no contiguous 28–32
+      { lap_index: 1, elapsed_time_s: 300 },   // 5 min
+      { lap_index: 2, elapsed_time_s: 2100 },  // 35 min single lap → over 32
     ];
     const w = identifyEffortWindow({
       protocol: "30min", laps, activityDurationS: durationS, activityDistanceM: distanceM,
