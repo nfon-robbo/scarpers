@@ -73,11 +73,11 @@ export async function confirmBenchmark(params: ConfirmParams): Promise<{ id: str
     throw new Error("Could not identify a valid effort window for this activity.");
   }
 
+  // Threshold pace is computed and stored on the benchmark row so a later
+  // "apply new pace" action can read it, but nothing downstream should treat
+  // this row as the active pace source until the user explicitly confirms.
   const pace = thresholdPaceSecPerKm(effort.distanceMeters, effort.durationSeconds);
   const predicted5k = Math.round(predict5kSeconds(effort.distanceMeters, effort.durationSeconds));
-  const predicted10k = riegel(effort.distanceMeters, effort.durationSeconds, 10_000);
-  const predictedHalf = riegel(effort.distanceMeters, effort.durationSeconds, 21_097);
-  const predictedFull = riegel(effort.distanceMeters, effort.durationSeconds, 42_195);
 
   // Threshold HR: for a 30-min TT the effort's average HR ≈ LTHR. For 3k/5k
   // it's a running-max estimator that we still treat as LTHR-proxy pending a
@@ -136,9 +136,6 @@ export async function confirmBenchmark(params: ConfirmParams): Promise<{ id: str
     lthr,
     riegel_exponent: BenchmarkConfig.PREDICTED_5K_EXPONENT,
     predicted_5k_seconds: predicted5k,
-    predicted_10k_seconds: predicted10k,
-    predicted_half_seconds: predictedHalf,
-    predicted_full_seconds: predictedFull,
     capture_method: isManual ? "manual" : "auto",
     status: "confirmed",
     active: true,
@@ -157,21 +154,12 @@ export async function confirmBenchmark(params: ConfirmParams): Promise<{ id: str
 
   const id = (data as any).id as string;
 
-  // Upsert measured HR zones pinned to this benchmark.
-  if (lthr && lthr > 0) {
-    const z = zonesFromLthr(lthr);
-    await supabase.from("hr_zones" as any).insert({
-      user_id: userId,
-      source: "measured",
-      benchmark_result_id: id,
-      lthr,
-      z1_max: z.z1Max,
-      z2_max: z.z2Max,
-      z3_max: z.z3Max,
-      z4_max: z.z4Max,
-      effective_from: effortEndTime ?? new Date().toISOString(),
-    } as any);
-  }
+  // NOTE: hr_zones is NOT written here. Zone application requires an explicit
+  // user confirm tap after the old-vs-new comparison dialog (spec item 22).
+  // A separate action — applyMeasuredZones(benchmarkId) — is the only writer.
+  // Threshold pace recalculation across remaining workouts is also gated by a
+  // separate confirm; this row stores the measured pace but does not activate
+  // it downstream.
 
   // Advance next_benchmark_due (best-effort; ignore if column absent).
   await supabase
