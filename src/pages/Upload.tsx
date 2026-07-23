@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
 import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+import { buildFitLapRows } from "@/lib/fit-lap-rows";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
