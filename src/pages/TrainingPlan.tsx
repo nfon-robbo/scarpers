@@ -2151,11 +2151,14 @@ const TrainingPlanPage = () => {
           pace: step.pace,
         }));
         const steps = [...aiSteps, ...customSteps];
-        const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
-        const notes = w.segments
-          .map(s => s.notes?.trim())
-          .filter(Boolean)
-          .join("\n");
+        const stripToken = (s: string) => s.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
+        const description = stripToken(w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | "));
+        const notes = stripToken(
+          w.segments
+            .map(s => s.notes?.trim())
+            .filter(Boolean)
+            .join("\n")
+        );
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const descriptiveTitle = deriveWorkoutTitle(w.title, steps, totalMins);
@@ -2163,14 +2166,14 @@ const TrainingPlanPage = () => {
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "") // strip any existing brand prefix
           .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers Dash - — Walk"
-        const correctedName = `Scarpers Dash - ${baseName}`;
+        const correctedName = stripToken(`Scarpers Dash - ${baseName}`);
         return {
           date: dateStr,
           name: correctedName,
           description,
           steps,
           notes,
-          rawDescription: w.intervalsText,
+          rawDescription: w.intervalsText ? stripToken(w.intervalsText) : undefined,
         };
       });
 
