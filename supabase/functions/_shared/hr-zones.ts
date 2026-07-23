@@ -175,6 +175,12 @@ export function zonesPromptLine(zones: Zones): string {
 //
 // If a caller ever needs a different window, do NOT change this helper — add
 // a new named exception function alongside it and document why.
+//
+// The underlying pure resolver lives in `./hr-zones-internal.ts` and is
+// intentionally NOT re-exported from this module — production code must not
+// pass its own activity slice. Tests import from the internal file directly.
+
+import { resolveZones } from "./hr-zones-internal.ts";
 
 type MinimalSupabase = {
   from: (table: string) => {
@@ -223,4 +229,5 @@ export async function resolveZonesForUser(
     measuredLthr: opts.measuredLthr ?? null,
   });
 }
+
 
