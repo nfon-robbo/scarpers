@@ -1381,7 +1381,7 @@ const TrainingPlanPage = () => {
     if (!currentPaceMin && !currentPaceMax) {
       try {
         seed = await getProvisionalPace(supabase, user.id, {
-          experienceLevel: (profile as any)?.experience_level ?? null,
+          experienceLevel: null,
         });
         seedPaceMin = seed.paceMin;
         seedPaceMax = seed.paceMax;
