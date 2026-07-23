@@ -1,5 +1,6 @@
 // ── Running IQ Calculation Engine ──
 // Computes a 0–200 score across 5 weighted pillars
+import { resolveZones } from "@shared/hr-zones";
 
 export interface RunActivity {
   distance_meters: number | null;
