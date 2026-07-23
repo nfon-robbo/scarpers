@@ -90,6 +90,9 @@ export default function BenchmarkConfirmCard({
   const [zoneDialog, setZoneDialog] = useState<{
     benchmarkId: string; measuredLthr: number;
   } | null>(null);
+  const [recalcDialog, setRecalcDialog] = useState<{
+    thresholdSecPerKm: number; planContent: string;
+  } | null>(null);
   const { zones: currentZones } = useHrZones();
 
   const current = candidates[index] ?? null;
