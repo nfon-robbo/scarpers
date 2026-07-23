@@ -1040,6 +1040,7 @@ export default function PlanDayList({
                       </div>
                     )}
                   </div>
+                  </div>
                 );
               })}
             </div>
