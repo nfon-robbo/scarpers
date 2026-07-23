@@ -32,27 +32,48 @@ export interface ProvisionalPace {
   detail: string;
   /** Populated when a higher-tier candidate was rejected by the guard. */
   rejection?: { tier: ProvisionalTier; reason: string; pace: string; detail: string };
+  /** Set when the chosen seed disagrees sharply with the recent training baseline. */
+  discrepancy?: { message: string; recentBaselinePace: string; recentBaselineCount: number };
 }
 
 /**
- * Plausibility guard for Tier 1. Tunable in one place.
+ * Plausibility + recency configuration for the tiered seed.
  *
- * - HARD_FLOOR_SEC_PER_KM: an absolute floor below which no candidate is
- *   ever accepted (sub-3:30/km implies elite; almost always a mis-recorded
- *   cycle or GPS drift).
- * - MIN_HR_FRACTION_OF_MAX: if avg HR is present and below this fraction of
- *   an assumed 190 bpm max, the effort was not hard enough to be a 5k TT.
- * - MAX_FASTER_THAN_EASY_BASELINE_SEC: candidate must not be more than this
- *   many seconds/km faster than the athlete's own easy-run baseline. This
- *   catches the "one hot outlier surrounded by walk/run sessions" case.
- * - EASY_BASELINE_MIN_RUNS: minimum easy runs required before the relative
- *   check applies; below this we fall back to the hard floor only.
+ * Tier 1 gating (recent training must corroborate an older PB):
+ *  - TIER1_PRIMARY_WINDOW_DAYS: first look here. A recent 5 km is preferred
+ *    over an older, faster one.
+ *  - TIER1_FALLBACK_WINDOW_DAYS: only used if the primary window is empty.
+ *  - TIER1_MIN_CONTINUOUS_RUNS_28D: the athlete must have at least this many
+ *    continuous runs in the last 28 days for Tier 1 to apply at all. If
+ *    they're mid walk/run block (or laid off), Tier 1 is skipped even if a
+ *    PB sits in the window.
+ *  - WALK_RUN_PACE_THRESHOLD_SEC_PER_KM: pace slower than this counts as a
+ *    walk/run session, not a continuous run.
+ *  - CONTINUOUS_RUN_MIN_METERS: minimum distance for a run to count toward
+ *    the continuous-run tally.
+ *
+ * Plausibility guard for accepted Tier 1 candidates:
+ *  - HARD_FLOOR_SEC_PER_KM: unconditional floor.
+ *  - MIN_HR_FRACTION_OF_MAX × resolvedMaxHr: HR check (skipped without max).
+ *  - MAX_FASTER_THAN_EASY_BASELINE_SEC: relative check vs the athlete's own
+ *    easy-run baseline (needs EASY_BASELINE_MIN_RUNS to apply).
+ *
+ * Discrepancy flag (soft warning, no rejection):
+ *  - DISCREPANCY_GAP_SEC_PER_KM: when the seeded easy pace is this many
+ *    seconds/km FASTER than the recent easy baseline, surface a note so the
+ *    athlete sees the contradiction instead of silently trusting Tier 1.
  */
 export const ProvisionalPaceConfig = {
+  TIER1_PRIMARY_WINDOW_DAYS: 42,
+  TIER1_FALLBACK_WINDOW_DAYS: 90,
+  TIER1_MIN_CONTINUOUS_RUNS_28D: 3,
+  WALK_RUN_PACE_THRESHOLD_SEC_PER_KM: 9 * 60, // 9:00/km
+  CONTINUOUS_RUN_MIN_METERS: 3000,
   HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km — unconditional
   MIN_HR_FRACTION_OF_MAX: 0.88,
   MAX_FASTER_THAN_EASY_BASELINE_SEC: 90,
   EASY_BASELINE_MIN_RUNS: 3,
+  DISCREPANCY_GAP_SEC_PER_KM: 30,
 } as const;
 
 function fmt(secPerKm: number): string {
