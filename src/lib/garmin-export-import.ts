@@ -11,6 +11,7 @@ import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
 import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 
 export interface GarminImportProgress {
   phase: string;
