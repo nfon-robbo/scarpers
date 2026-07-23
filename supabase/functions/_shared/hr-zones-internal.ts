@@ -14,9 +14,6 @@
  */
 
 import {
-  CORROBORATION_TOLERANCE_BPM,
-  HARD_FALLBACK_MAX_HR,
-  IMPLAUSIBLE_MAX_HR,
   LTHR_PCT_OF_MAX,
   resolveObservedMax,
   zonesFromLthr,
