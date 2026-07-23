@@ -31,6 +31,7 @@ import PlanPausedBanner from "@/components/PlanPausedBanner";
 import { isPauseActive, isPauseReadyToResume, pauseResumeDeltaDays, resumePlanAfterPause } from "@/lib/plan-utils";
 import ReadinessWidget from "@/components/ReadinessWidget";
 import BenchmarkDashboardBanner from "@/components/BenchmarkDashboardBanner";
+import BenchmarkDueBanner from "@/components/BenchmarkDueBanner";
 import {
   evaluateAdaptation,
   shouldRunAdaptCheck,
