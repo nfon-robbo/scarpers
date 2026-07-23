@@ -1,0 +1,1 @@
+ALTER TABLE public.benchmark_results ALTER COLUMN effort_window_start_time DROP NOT NULL; ALTER TABLE public.benchmark_results ALTER COLUMN effort_window_end_time DROP NOT NULL;
