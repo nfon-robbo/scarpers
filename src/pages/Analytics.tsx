@@ -247,12 +247,9 @@ export default function Analytics() {
       const p = planData as PlanRow | null;
       setPlan(p);
 
-      // Estimate max HR from age
+      // Max HR now resolved centrally via useHrZones (LTHR band model).
       const dob = (profileData as any)?.date_of_birth;
-      if (dob) {
-        const age = (Date.now() - new Date(dob).getTime()) / (365.25 * 86400000);
-        setMaxHR(Math.round(220 - age));
-      }
+      void dob;
 
       const startDate = p ? p.start_date : new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
       const sinceIso = new Date(startDate).toISOString();
