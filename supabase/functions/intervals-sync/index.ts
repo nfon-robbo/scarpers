@@ -343,12 +343,19 @@ serve(async (req) => {
     const INTERVALS_ATHLETE_ID = creds.athlete_id;
 
     const body = await req.json();
-    const { workouts, clearRange, deleteRange, pauseEvent, clearPauseEvent } = body as {
+    const { workouts, clearRange, deleteRange, pauseEvent, clearPauseEvent, setThresholdPace } = body as {
       workouts?: WorkoutInput[];
       clearRange?: { oldest: string; newest: string };
       deleteRange?: { oldest: string; newest: string };
       pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
       clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
+      /**
+       * Force-overwrite the Run threshold_pace on intervals.icu. Sent from the
+       * benchmark confirm flow with the measured m/s value. When present it
+       * ALWAYS overwrites — no "only if null/0" guard — otherwise the 3.03
+       * default sticks forever once written.
+       */
+      setThresholdPace?: { mPerSec: number };
     };
 
     // Resolve user's HR zones once per request via the canonical shared
@@ -371,9 +378,14 @@ serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // Ensure a Run threshold_pace is set on intervals.icu. Without it, the
-    // Garmin export silently strips all pace targets and the watch shows
-    // "No Target" — regardless of workout description syntax.
+    // Threshold pace management on intervals.icu.
+    //
+    // Two modes:
+    //   1. `setThresholdPace: { mPerSec }` — caller (benchmark confirm) has a
+    //      measured value; ALWAYS overwrite. This is the only way the 3.03
+    //      m/s default is ever replaced with a real number.
+    //   2. No override provided — seed 3.03 only when the athlete has no
+    //      threshold_pace set at all. Never touch an existing value.
     try {
       const settingsResp = await fetch(`${baseUrl}/sport-settings`, { headers: authHeaders });
       if (settingsResp.ok) {
@@ -381,18 +393,42 @@ serve(async (req) => {
         const runSettings = Array.isArray(allSettings)
           ? allSettings.find((s: { types?: string[] }) => Array.isArray(s.types) && s.types.includes("Run"))
           : null;
-        if (runSettings && (runSettings.threshold_pace == null || runSettings.threshold_pace === 0)) {
-          await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
-            method: "PUT",
-            headers: authHeaders,
-            body: JSON.stringify({ threshold_pace: 3.03 }),
-          });
-          console.log("Set default Run threshold_pace=3.03 m/s on intervals.icu");
+        if (runSettings) {
+          if (setThresholdPace && Number.isFinite(setThresholdPace.mPerSec) && setThresholdPace.mPerSec > 0) {
+            const resp = await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
+              method: "PUT",
+              headers: authHeaders,
+              body: JSON.stringify({ threshold_pace: setThresholdPace.mPerSec }),
+            });
+            if (!resp.ok) {
+              const txt = await resp.text().catch(() => "");
+              console.error("[intervals-sync] threshold_pace overwrite failed", resp.status, txt);
+            } else {
+              console.log(`[intervals-sync] Overwrote Run.threshold_pace = ${setThresholdPace.mPerSec} m/s (measured benchmark)`);
+            }
+          } else if (runSettings.threshold_pace == null || runSettings.threshold_pace === 0) {
+            await fetch(`${baseUrl}/sport-settings/${runSettings.id}`, {
+              method: "PUT",
+              headers: authHeaders,
+              body: JSON.stringify({ threshold_pace: 3.03 }),
+            });
+            console.log("Set default Run threshold_pace=3.03 m/s on intervals.icu (no measured benchmark)");
+          }
         }
       }
     } catch (e) {
       console.error("Failed to verify/set threshold_pace:", e);
     }
+
+    // Allow the caller to invoke ONLY threshold-pace setting without also
+    // pushing workouts, clearing ranges, or dropping pause events.
+    if (setThresholdPace && !workouts && !clearRange && !deleteRange && !pauseEvent && !clearPauseEvent) {
+      return new Response(
+        JSON.stringify({ ok: true, thresholdPaceMPerSec: setThresholdPace.mPerSec }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
 
     // Clear pause marker events created previously for this plan.
     // Used on resume/cancel to wipe the HOLIDAY/SICK/INJURED/NOTE block.
