@@ -1,16 +1,24 @@
 /**
  * BenchmarkConfirmCard — the confirmation surface for a scheduled benchmark.
  *
- * Renders above the workout card on the scheduled day (never replacing it,
- * so rejecting a candidate leaves the workout visible for another attempt).
- * Cycles through nearest-first candidates; each Reject writes to
- * benchmark_rejections and advances to the next. "Enter result manually"
- * opens a dialog that captures duration (and distance for 30-min) and
- * writes a Path 3 result.
+ * Flow (Group 2 spec):
+ *   1. Show the card with the 30-minute effort instruction (verbatim) when
+ *      protocol === "30min".
+ *   2. On Confirm/Save:
+ *      - 3K/5K: open BenchmarkOverrideDialog first (verbatim HR warning);
+ *        athlete must acknowledge before we proceed.
+ *      - 30min: skip straight to step 3.
+ *   3. Open BenchmarkPostQuestionsDialog (RPE + could-continue). Answers
+ *      derive `likely_submaximal` via deriveLikelySubmaximal — the SAME
+ *      boolean feeds both the confidence-score deduction and the stored flag.
+ *   4. Call confirmBenchmark with the answers; row is saved.
+ *   5. If protocol === "30min" AND we have a measured LTHR, open
+ *      ZoneComparisonDialog. That dialog is the only caller of
+ *      applyMeasuredZones, the only writer to public.hr_zones.
  */
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Award, ChevronRight, Loader2, Pencil, ThumbsDown, HeartPulse, Clock, MapPin } from "lucide-react";
+import { Award, Loader2, Pencil, ThumbsDown, HeartPulse, Clock, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,9 +30,14 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
-import type { CandidateActivity } from "@/lib/benchmark-detection";
+import type { CandidateActivity, ActivityForDetection } from "@/lib/benchmark-detection";
 import type { BenchmarkLap } from "@/lib/benchmark-lap-matcher";
 import { confirmBenchmark, rejectCandidate } from "@/lib/benchmark-persist";
+import type { RpeResponse, CouldContinueResponse } from "@/lib/benchmark-rpe";
+import BenchmarkOverrideDialog from "@/components/BenchmarkOverrideDialog";
+import BenchmarkPostQuestionsDialog from "@/components/BenchmarkPostQuestionsDialog";
+import ZoneComparisonDialog from "@/components/ZoneComparisonDialog";
+import { useHrZones } from "@/hooks/useHrZones";
 
 interface Props {
   userId: string;
@@ -47,11 +60,9 @@ const PROTOCOL_DEFAULT_DIST_M: Record<BenchmarkProtocol, number> = {
   "5k": 5000,
 };
 
-function fmtDuration(secs: number): string {
-  const m = Math.floor(secs / 60);
-  const s = Math.round(secs % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+// Verbatim effort instruction shown on the card for 30-min TTs.
+const EFFORT_INSTRUCTION_30MIN =
+  "Run at the hardest pace you believe you can maintain evenly for the full 30 minutes. You should finish feeling you gave almost everything, but not having sprinted the first few minutes.";
 
 function parseMmSs(v: string): number | null {
   const m = v.trim().match(/^(\d{1,3}):(\d{2})$/);
@@ -59,15 +70,38 @@ function parseMmSs(v: string): number | null {
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 }
 
+// A pending save — captured when the athlete taps Confirm/Save, resolved
+// once the post-question dialog closes with answers.
+type Pending =
+  | { kind: "auto"; activity: ActivityForDetection; laps: BenchmarkLap[] | null }
+  | { kind: "manual"; durationS: number; distanceM: number };
+
 export default function BenchmarkConfirmCard({
   userId, planId, scheduledDateIso, protocol, candidates, onDone,
 }: Props) {
   const [index, setIndex] = useState(0);
   const [working, setWorking] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [zoneDialog, setZoneDialog] = useState<{
+    benchmarkId: string; measuredLthr: number;
+  } | null>(null);
+  const { zones: currentZones } = useHrZones();
 
   const current = candidates[index] ?? null;
   const remaining = candidates.length - index - 1;
+
+  // Step 2: intercept the Confirm/Save taps and route via override → questions.
+  const beginSave = (p: Pending) => {
+    setPending(p);
+    if (protocol === "3k" || protocol === "5k") {
+      setOverrideOpen(true);
+    } else {
+      setQuestionsOpen(true);
+    }
+  };
 
   const handleConfirm = async () => {
     if (!current) return;
@@ -78,19 +112,13 @@ export default function BenchmarkConfirmCard({
         .select("lap_index, elapsed_time_s, distance_m")
         .eq("activity_id", current.id)
         .order("lap_index", { ascending: true });
-
-      await confirmBenchmark({
-        userId,
-        planId,
-        scheduledDateIso,
-        protocol,
+      beginSave({
+        kind: "auto",
         activity: current,
         laps: ((laps as unknown) as BenchmarkLap[] | null) ?? null,
       });
-      toast.success("Benchmark saved", { description: "Zones and race predictions updated." });
-      await onDone();
     } catch (e: any) {
-      toast.error("Couldn't save benchmark", { description: e?.message ?? String(e) });
+      toast.error("Couldn't load activity", { description: e?.message ?? String(e) });
     } finally {
       setWorking(false);
     }
@@ -109,6 +137,41 @@ export default function BenchmarkConfirmCard({
       }
     } catch (e: any) {
       toast.error("Couldn't reject candidate", { description: e?.message ?? String(e) });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  // Step 4: persist with the RPE answers.
+  const handleQuestionsSubmit = async (v: {
+    rpe: RpeResponse; couldContinue: CouldContinueResponse;
+  }) => {
+    if (!pending) return;
+    setWorking(true);
+    try {
+      const saved = await confirmBenchmark({
+        userId, planId, scheduledDateIso, protocol,
+        activity: pending.kind === "auto" ? pending.activity : null,
+        laps: pending.kind === "auto" ? pending.laps : null,
+        manualDurationS: pending.kind === "manual" ? pending.durationS : undefined,
+        manualDistanceM: pending.kind === "manual" ? pending.distanceM : undefined,
+        rpeResponse: v.rpe,
+        couldContinueResponse: v.couldContinue,
+      });
+      toast.success("Benchmark saved");
+      setQuestionsOpen(false);
+      setManualOpen(false);
+      setPending(null);
+
+      // Step 5: only 30-min TTs can rebuild HR zones. Skip for 3K/5K per the
+      // verbatim override warning.
+      if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
+        setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
+      } else {
+        await onDone();
+      }
+    } catch (e: any) {
+      toast.error("Couldn't save benchmark", { description: e?.message ?? String(e) });
     } finally {
       setWorking(false);
     }
@@ -135,6 +198,12 @@ export default function BenchmarkConfirmCard({
             </span>
           )}
         </div>
+
+        {protocol === "30min" && (
+          <p className="text-[11px] leading-relaxed text-muted-foreground bg-background/40 border border-border/40 rounded-lg p-2 mb-2">
+            {EFFORT_INSTRUCTION_30MIN}
+          </p>
+        )}
 
         {current ? (
           <>
@@ -205,26 +274,43 @@ export default function BenchmarkConfirmCard({
         onOpenChange={setManualOpen}
         protocol={protocol}
         working={working}
-        onSubmit={async ({ durationS, distanceM, submaximal }) => {
-          setWorking(true);
-          try {
-            await confirmBenchmark({
-              userId, planId, scheduledDateIso, protocol,
-              activity: null, laps: null,
-              manualDurationS: durationS,
-              manualDistanceM: distanceM,
-              rpeSubmaximal: submaximal,
-            });
-            toast.success("Benchmark saved", { description: "Zones and race predictions updated." });
-            setManualOpen(false);
-            await onDone();
-          } catch (e: any) {
-            toast.error("Couldn't save benchmark", { description: e?.message ?? String(e) });
-          } finally {
-            setWorking(false);
-          }
+        onSubmit={({ durationS, distanceM }) => {
+          beginSave({ kind: "manual", durationS, distanceM });
         }}
       />
+
+      <BenchmarkOverrideDialog
+        open={overrideOpen}
+        protocol={protocol}
+        onCancel={() => { setOverrideOpen(false); setPending(null); }}
+        onAcknowledge={() => { setOverrideOpen(false); setQuestionsOpen(true); }}
+      />
+
+      <BenchmarkPostQuestionsDialog
+        open={questionsOpen}
+        working={working}
+        onCancel={() => { setQuestionsOpen(false); setPending(null); }}
+        onSubmit={handleQuestionsSubmit}
+      />
+
+      {zoneDialog && (
+        <ZoneComparisonDialog
+          open={!!zoneDialog}
+          onOpenChange={(o) => {
+            if (!o) {
+              setZoneDialog(null);
+              // Regardless of apply vs skip, we're done with this benchmark cycle.
+              void onDone();
+            }
+          }}
+          userId={userId}
+          benchmarkId={zoneDialog.benchmarkId}
+          protocol={protocol}
+          measuredLthr={zoneDialog.measuredLthr}
+          currentZones={currentZones}
+          planId={planId}
+        />
+      )}
     </>
   );
 }
@@ -236,7 +322,7 @@ interface ManualProps {
   onOpenChange: (b: boolean) => void;
   protocol: BenchmarkProtocol;
   working: boolean;
-  onSubmit: (v: { durationS: number; distanceM: number; submaximal: boolean }) => void | Promise<void>;
+  onSubmit: (v: { durationS: number; distanceM: number }) => void | Promise<void>;
 }
 
 function ManualEntryDialog({ open, onOpenChange, protocol, working, onSubmit }: ManualProps) {
@@ -244,7 +330,6 @@ function ManualEntryDialog({ open, onOpenChange, protocol, working, onSubmit }: 
   const [distanceKm, setDistanceKm] = useState(
     protocol === "30min" ? "" : (PROTOCOL_DEFAULT_DIST_M[protocol] / 1000).toString(),
   );
-  const [submaximal, setSubmaximal] = useState(false);
 
   const durationHelp = useMemo(() => {
     switch (protocol) {
@@ -259,7 +344,7 @@ function ManualEntryDialog({ open, onOpenChange, protocol, working, onSubmit }: 
     const distM = Math.round(parseFloat(distanceKm) * 1000);
     if (!durS || durS <= 0) return toast.error("Enter a valid duration (m:ss).");
     if (!Number.isFinite(distM) || distM <= 0) return toast.error("Enter a valid distance in km.");
-    await onSubmit({ durationS: durS, distanceM: distM, submaximal });
+    await onSubmit({ durationS: durS, distanceM: distM });
   };
 
   return (
@@ -298,18 +383,8 @@ function ManualEntryDialog({ open, onOpenChange, protocol, working, onSubmit }: 
             />
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={submaximal}
-              onChange={(e) => setSubmaximal(e.target.checked)}
-              className="rounded border-border"
-            />
-            The effort was submaximal (I didn't fully commit)
-          </label>
-
           <Button className="w-full" onClick={submit} disabled={working}>
-            {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save benchmark"}
+            {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Continue"}
           </Button>
         </div>
       </DialogContent>
