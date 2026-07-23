@@ -624,11 +624,11 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                     <Card>
                       <CardContent className="p-4 space-y-2.5">
                         {[
-                          { label: "Z1 Recovery", color: "bg-sky-500", range: `<${Math.round(derived!.userMax * 0.6)}` },
-                          { label: "Z2 Endurance", color: "bg-emerald-500", range: `${Math.round(derived!.userMax * 0.6)}–${Math.round(derived!.userMax * 0.7)}` },
-                          { label: "Z3 Tempo", color: "bg-amber-500", range: `${Math.round(derived!.userMax * 0.7)}–${Math.round(derived!.userMax * 0.8)}` },
-                          { label: "Z4 Threshold", color: "bg-orange-500", range: `${Math.round(derived!.userMax * 0.8)}–${Math.round(derived!.userMax * 0.9)}` },
-                          { label: "Z5 VO2 Max", color: "bg-rose-500", range: `>${Math.round(derived!.userMax * 0.9)}` },
+                          { label: "Z1 Recovery", color: "bg-sky-500", range: userZones ? `≤${userZones.z1Max}` : "—" },
+                          { label: "Z2 Endurance", color: "bg-emerald-500", range: userZones ? `${userZones.z1Max + 1}–${userZones.z2Max}` : "—" },
+                          { label: "Z3 Tempo", color: "bg-amber-500", range: userZones ? `${userZones.z2Max + 1}–${userZones.z3Max}` : "—" },
+                          { label: "Z4 Threshold", color: "bg-orange-500", range: userZones ? `${userZones.z3Max + 1}–${userZones.z4Max}` : "—" },
+                          { label: "Z5 VO2 Max", color: "bg-rose-500", range: userZones ? `>${userZones.z4Max}` : "—" },
                         ].map((z, i) => {
                           const sec = derived!.zones[i];
                           const pct = derived!.zonesTotal ? (sec / derived!.zonesTotal) * 100 : 0;
