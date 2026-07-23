@@ -166,7 +166,7 @@ function buildStructuredWorkoutDoc(workout: WorkoutInput): StructuredWorkoutDoc 
   return { name: workout.name, steps };
 }
 
-function formatWorkoutDescription(workout: WorkoutInput): string {
+function formatWorkoutDescription(workout: WorkoutInput, userZones: Zones | null): string {
   function fmtDur(secs: number): string {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
