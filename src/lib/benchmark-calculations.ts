@@ -32,7 +32,6 @@ export const BenchmarkConfig = {
     SECOND_HALF_SLOWDOWN: 20,
     CADENCE_MISSING: 15,
     GPS_LOW: 20,
-    GPS_MEDIUM: 5,
     RPE_SUBMAXIMAL: 15,
     /** Effort window derived from moving averages rather than watch laps. */
     EFFORT_WINDOW_DERIVED: 15,
@@ -169,8 +168,6 @@ export function scoreConfidence(inputs: ConfidenceInputs): ConfidenceResult {
   }
   if (inputs.gpsConfidence === "Low") {
     deductions.push({ reason: "gps_low", points: D.GPS_LOW });
-  } else if (inputs.gpsConfidence === "Medium") {
-    deductions.push({ reason: "gps_medium", points: D.GPS_MEDIUM });
   }
   if (inputs.rpeSubmaximal) {
     deductions.push({ reason: "rpe_submaximal", points: D.RPE_SUBMAXIMAL });
