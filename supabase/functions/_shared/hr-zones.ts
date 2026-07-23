@@ -8,7 +8,8 @@
  *   Z4  95 – ≤102 % LTHR
  *   Z5 >102 % LTHR
  *
- * LTHR is resolved once per athlete via `resolveZones`:
+ * LTHR is resolved once per athlete via `resolveZonesForUser` (the ONLY
+ * public entry point):
  *   1. Measured LTHR (from a completed benchmark) — step 3 will supply this.
  *   2. Estimated LTHR = `LTHR_PCT_OF_MAX` × resolved max HR.
  *
@@ -22,8 +23,9 @@
  *
  * All six HR-zone surfaces (ai-coach plan, ai-coach deload, Analytics chart,
  * ActivityDetailDialog, running-iq aerobic cap, intervals-sync push) call
- * `resolveZones` + `bpmToZone` / `zoneRangeLabel`. No surface computes zones
- * locally.
+ * `resolveZonesForUser` + `bpmToZone` / `zoneRangeLabel`. No surface computes
+ * zones locally, and no surface may pass its own activity slice — the pure
+ * resolver lives in `./hr-zones-internal.ts` and is not re-exported here.
  *
  * This file lives under supabase/functions/_shared so Deno edge functions
  * import it natively. The Vite client re-exports it via the `@shared/hr-zones`
@@ -87,27 +89,6 @@ export type ActivityMaxSample = {
   activity_type?: string | null | undefined;
 };
 
-/**
- * INTERNAL. Use `resolveZonesForUser` at every real call site so every
- * consumer sees the same canonical activity window. Direct callers of
- * `resolveZones` bypass that guarantee and re-introduce the slice-mismatch
- * bug this module was written to eliminate. Keep exported only for the
- * pure-function unit tests in `_shared/hr-zones.test.ts`.
- */
-export type ResolveInput = {
-  ageYears?: number | null;
-  /**
-   * Recent activity samples (last `OBSERVED_MAX_LOOKBACK_DAYS`). Walk/run
-   * activities are excluded internally by `activity_type` regex. Every
-   * remaining sample counts as one candidate; corroboration is computed
-   * across the set using array-index identity (id is optional).
-   */
-  activities?: ActivityMaxSample[];
-  /** If a measured benchmark LTHR exists, pass it — beats every estimator. */
-  measuredLthr?: number | null;
-};
-
-
 // ---------- Resolution ----------
 
 /**
@@ -142,72 +123,16 @@ export function resolveObservedMax(activities: ActivityMaxSample[]): {
   return null;
 }
 
-function estimateLthr(maxHr: number): number {
-  return Math.round(maxHr * LTHR_PCT_OF_MAX);
-}
-
 /**
  * Derive Z1–Z4 upper bounds from an LTHR using the fixed band model.
  * Z5 is anything above z4Max (unbounded — do not invent a ceiling).
  */
 export function zonesFromLthr(lthr: number): Pick<Zones, "z1Max" | "z2Max" | "z3Max" | "z4Max"> {
   return {
-    z1Max: Math.floor(0.85 * lthr - 0.0001), // <85 % → integers ≤ floor(0.85·LTHR)
-    z2Max: Math.floor(0.90 * lthr - 0.0001), // <90 %
-    z3Max: Math.floor(0.95 * lthr - 0.0001), // <95 %
-    z4Max: Math.floor(1.02 * lthr + 0.5),    // ≤102 % (inclusive)
-  };
-}
-
-export function resolveZones(input: ResolveInput): Zones {
-  // 1. Measured LTHR wins outright.
-  if (input.measuredLthr && input.measuredLthr > 0) {
-    const lthr = Math.round(input.measuredLthr);
-    return {
-      ...zonesFromLthr(lthr),
-      lthr,
-      lthrSource: "measured",
-      // For a measured LTHR we don't need max HR to derive zones, but keep the
-      // field populated for display consumers.
-      maxHr: Math.round(lthr / LTHR_PCT_OF_MAX),
-      maxHrSource: "observed_corroborated",
-    };
-  }
-
-  // 2. Resolve max HR: observed (corroborated) → age → fallback.
-  const observed = input.activities ? resolveObservedMax(input.activities) : null;
-
-  let maxHr: number;
-  let maxHrSource: MaxHrSource;
-  let maxHrActivityId: string | null = null;
-  let maxHrActivityDate: string | null = null;
-  let lthrSource: LthrSource;
-
-  if (observed) {
-    maxHr = observed.bpm;
-    maxHrSource = "observed_corroborated";
-    maxHrActivityId = observed.activityId;
-    maxHrActivityDate = observed.activityDate;
-    lthrSource = "observed_estimated";
-  } else if (input.ageYears && input.ageYears > 0) {
-    maxHr = 220 - Math.round(input.ageYears);
-    maxHrSource = "age";
-    lthrSource = "age_estimated";
-  } else {
-    maxHr = HARD_FALLBACK_MAX_HR;
-    maxHrSource = "fallback";
-    lthrSource = "fallback_estimated";
-  }
-
-  const lthr = estimateLthr(maxHr);
-  return {
-    ...zonesFromLthr(lthr),
-    lthr,
-    lthrSource,
-    maxHr,
-    maxHrSource,
-    maxHrActivityId,
-    maxHrActivityDate,
+    z1Max: Math.floor(0.85 * lthr - 0.0001),
+    z2Max: Math.floor(0.90 * lthr - 0.0001),
+    z3Max: Math.floor(0.95 * lthr - 0.0001),
+    z4Max: Math.floor(1.02 * lthr + 0.5),
   };
 }
 
@@ -252,6 +177,12 @@ export function zonesPromptLine(zones: Zones): string {
 //
 // If a caller ever needs a different window, do NOT change this helper — add
 // a new named exception function alongside it and document why.
+//
+// The underlying pure resolver lives in `./hr-zones-internal.ts` and is
+// intentionally NOT re-exported from this module — production code must not
+// pass its own activity slice. Tests import from the internal file directly.
+
+import { resolveZones } from "./hr-zones-internal.ts";
 
 type MinimalSupabase = {
   from: (table: string) => {
@@ -300,4 +231,5 @@ export async function resolveZonesForUser(
     measuredLthr: opts.measuredLthr ?? null,
   });
 }
+
 
