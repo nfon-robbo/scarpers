@@ -19,6 +19,8 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { bpmToZone, type Zones } from "@shared/hr-zones";
+import { useHrZones } from "@/hooks/useHrZones";
 
 const tooltipStyle = {
   background: "hsl(var(--card))",
@@ -172,30 +174,23 @@ function intensityWeight(title: string): number {
   return 1.0;
 }
 
-function hrZonesFromActivity(a: Activity, maxHR: number) {
+function hrZonesFromActivity(a: Activity, zones: Zones) {
   // Use raw_data HR samples if available, else estimate from avg HR.
   const samples: number[] = Array.isArray(a.raw_data?.hr_samples) ? a.raw_data.hr_samples : [];
   const dur = a.duration_seconds || 0;
-  const zones = [0, 0, 0, 0, 0]; // Z1..Z5 minutes
-  const bands = [0.6, 0.7, 0.8, 0.9, 1.01];
+  const perZone = [0, 0, 0, 0, 0]; // Z1..Z5 minutes
   if (samples.length > 1 && dur > 0) {
     const per = dur / samples.length / 60; // minutes per sample
     for (const hr of samples) {
-      const pct = hr / maxHR;
-      let z = 0;
-      for (let i = 0; i < 5; i++) if (pct < bands[i]) { z = i; break; }
-      zones[z] += per;
+      perZone[bpmToZone(hr, zones) - 1] += per;
     }
-    return zones;
+    return perZone;
   }
   // Fallback: dump duration in single zone matching avg HR.
   if (a.avg_heart_rate && dur > 0) {
-    const pct = a.avg_heart_rate / maxHR;
-    let z = 0;
-    for (let i = 0; i < 5; i++) if (pct < bands[i]) { z = i; break; }
-    zones[z] = dur / 60;
+    perZone[bpmToZone(a.avg_heart_rate, zones) - 1] = dur / 60;
   }
-  return zones;
+  return perZone;
 }
 
 function isoWeekKey(d: Date): string {
@@ -226,7 +221,7 @@ export default function Analytics() {
   const [readiness, setReadiness] = useState<ReadinessSnap[]>([]);
   const [iq, setIq] = useState<IqSnap[]>([]);
   const [metrics, setMetrics] = useState<DailyMetric[]>([]);
-  const [maxHR, setMaxHR] = useState<number>(190);
+  const { zones: hrZones } = useHrZones();
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiGeneratedAt, setAiGeneratedAt] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -252,12 +247,9 @@ export default function Analytics() {
       const p = planData as PlanRow | null;
       setPlan(p);
 
-      // Estimate max HR from age
+      // Max HR now resolved centrally via useHrZones (LTHR band model).
       const dob = (profileData as any)?.date_of_birth;
-      if (dob) {
-        const age = (Date.now() - new Date(dob).getTime()) / (365.25 * 86400000);
-        setMaxHR(Math.round(220 - age));
-      }
+      void dob;
 
       const startDate = p ? p.start_date : new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
       const sinceIso = new Date(startDate).toISOString();
@@ -418,7 +410,7 @@ export default function Analytics() {
     const byWeek = new Map<string, number[]>();
     for (const a of fActs) {
       const wk = isoWeekKey(new Date(a.start_time));
-      const z = hrZonesFromActivity(a, maxHR);
+      const z = hrZones ? hrZonesFromActivity(a, hrZones) : [0, 0, 0, 0, 0];
       const cur = byWeek.get(wk) || [0, 0, 0, 0, 0];
       for (let i = 0; i < 5; i++) cur[i] += z[i];
       byWeek.set(wk, cur);
@@ -428,7 +420,7 @@ export default function Analytics() {
       Z1: Math.round(z[0]), Z2: Math.round(z[1]), Z3: Math.round(z[2]),
       Z4: Math.round(z[3]), Z5: Math.round(z[4]),
     }));
-  }, [fActs, maxHR]);
+  }, [fActs, hrZones]);
 
   // ----- 4. Readiness vs performance -----
   const readyVsPerf = useMemo(() => {
@@ -777,7 +769,7 @@ export default function Analytics() {
           <CardTitle className="text-base flex items-center gap-2">
             <Heart className="w-4 h-4 text-primary" /> Heart Rate Zones
           </CardTitle>
-          <CardDescription className="text-xs">Minutes per zone, by week (max HR ≈ {maxHR})</CardDescription>
+          <CardDescription className="text-xs">Minutes per zone, by week (max HR ≈ {hrZones?.maxHr ?? "…"}, LTHR {hrZones?.lthr ?? "…"} bpm{hrZones?.lthrSource === "measured" ? "" : " est."})</CardDescription>
         </CardHeader>
         <CardContent>
           {hrData.length === 0 ? (

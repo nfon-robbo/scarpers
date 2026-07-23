@@ -14,6 +14,8 @@ import {
 import ActivityMap from "@/components/ActivityMap";
 import ActivityCharts from "@/components/ActivityCharts";
 import { decodePolyline } from "@/lib/polyline";
+import { bpmToZone } from "@shared/hr-zones";
+import { useHrZones } from "@/hooks/useHrZones";
 
 interface Props {
   activityId: string | null;
@@ -65,6 +67,7 @@ const teDescription = (te: number) => {
 
 const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
   const { fmt, label, units } = useUnits();
+  const { zones: userZones } = useHrZones();
   const [data, setData] = useState<ActivityRow | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -119,8 +122,10 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     const maxPaceSecPerKm = data.max_speed && data.max_speed > 0
       ? 3600 / data.max_speed : null;
 
-    // HR zones from track (using max HR ~ user's max if present, else 190)
-    const userMax = data.max_heart_rate ?? 190;
+    // HR zones from track — resolved via shared LTHR band model (user zones).
+    // Falls back to activity-level max HR (as pseudo-max, LTHR estimated at 89%)
+    // when the shared hook hasn't returned yet — same shape, transient only.
+    const userMax = userZones?.maxHr ?? (data.max_heart_rate ?? 190);
     const zones = [0, 0, 0, 0, 0];
     const firstTrackTime = track[0]?.time ? new Date(track[0].time).getTime() : null;
     const elapsedForPoint = (p: any) => p.elapsed_time ?? (p.time && firstTrackTime != null ? (new Date(p.time).getTime() - firstTrackTime) / 1000 : null);
@@ -129,8 +134,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
       const p: any = track[i];
       const hr = p.heart_rate;
       if (!hr) { lastT = elapsedForPoint(p) ?? lastT; continue; }
-      const pct = hr / userMax;
-      const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
+      const z = userZones ? bpmToZone(hr, userZones) - 1 : Math.min(4, Math.max(0, Math.floor((hr / userMax) * 10) - 5));
       const t = elapsedForPoint(p) ?? lastT + 1;
       zones[z] += Math.max(0, t - lastT);
       lastT = t;
@@ -239,7 +243,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     }
 
     return { paceSecPerKm, maxPaceSecPerKm, zones, zonesTotal, splits, userMax };
-  }, [data, track]);
+  }, [data, track, userZones]);
 
   const fmtPace = (secPerKm: number | null) => {
     if (!secPerKm || !isFinite(secPerKm) || secPerKm <= 0) return null;
@@ -620,11 +624,11 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                     <Card>
                       <CardContent className="p-4 space-y-2.5">
                         {[
-                          { label: "Z1 Recovery", color: "bg-sky-500", range: `<${Math.round(derived!.userMax * 0.6)}` },
-                          { label: "Z2 Endurance", color: "bg-emerald-500", range: `${Math.round(derived!.userMax * 0.6)}–${Math.round(derived!.userMax * 0.7)}` },
-                          { label: "Z3 Tempo", color: "bg-amber-500", range: `${Math.round(derived!.userMax * 0.7)}–${Math.round(derived!.userMax * 0.8)}` },
-                          { label: "Z4 Threshold", color: "bg-orange-500", range: `${Math.round(derived!.userMax * 0.8)}–${Math.round(derived!.userMax * 0.9)}` },
-                          { label: "Z5 VO2 Max", color: "bg-rose-500", range: `>${Math.round(derived!.userMax * 0.9)}` },
+                          { label: "Z1 Recovery", color: "bg-sky-500", range: userZones ? `≤${userZones.z1Max}` : "—" },
+                          { label: "Z2 Endurance", color: "bg-emerald-500", range: userZones ? `${userZones.z1Max + 1}–${userZones.z2Max}` : "—" },
+                          { label: "Z3 Tempo", color: "bg-amber-500", range: userZones ? `${userZones.z2Max + 1}–${userZones.z3Max}` : "—" },
+                          { label: "Z4 Threshold", color: "bg-orange-500", range: userZones ? `${userZones.z3Max + 1}–${userZones.z4Max}` : "—" },
+                          { label: "Z5 VO2 Max", color: "bg-rose-500", range: userZones ? `>${userZones.z4Max}` : "—" },
                         ].map((z, i) => {
                           const sec = derived!.zones[i];
                           const pct = derived!.zonesTotal ? (sec / derived!.zonesTotal) * 100 : 0;

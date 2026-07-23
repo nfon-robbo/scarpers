@@ -5,6 +5,13 @@ import {
   isExtremeAccumulatedVolume,
   type TodayActivityInput,
 } from "./day-adjust-logic.ts";
+import {
+  resolveZones,
+  zonesFromLthr,
+  bpmToZone,
+  zonesPromptLine,
+  LTHR_PCT_OF_MAX,
+} from "../_shared/hr-zones.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -733,12 +740,13 @@ Rest, or do an easy activity of your choice — walk, gentle spin, mobility. We'
         for (const a of yesterdayActivities) {
           const dur = Number(a.duration_seconds || 0);
           const avgHr = Number(a.avg_heart_rate || 0);
-          const maxHr = Number(a.max_heart_rate || 0) || 190; // fallback estimate
+          const perActMax = Number(a.max_heart_rate || 0) || 190;
+          const perActZones = zonesFromLthr(Math.round(perActMax * LTHR_PCT_OF_MAX));
           const load = Number(a.training_load || 0);
           if (dur > 5400) { yesterdayLoad.long = true; yesterdayLoad.reason += `duration ${(dur/60).toFixed(0)}min; `; }
-          if ((dur > 3600 && avgHr >= 0.85 * maxHr) || load > 150) {
+          if ((dur > 3600 && avgHr > perActZones.z3Max) || load > 150) {
             yesterdayLoad.hard = true;
-            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (≥85% max); `;
+            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (Z4+); `;
           }
         }
       }
@@ -1833,17 +1841,21 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         else if (diff > 5) hrvTrend = "improving";
       }
 
-      // HR zones from estimated max HR (220 - age fallback) or from activity max
-      const ageMax = profile?.date_of_birth
-        ? 220 - (new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear())
+      // HR zones via shared LTHR band model (single source of truth).
+      // Resolution: measured LTHR (step 3) → corroborated observed max → 220-age → 190.
+      const ageMaxYears = profile?.date_of_birth
+        ? (Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 86400 * 1000)
         : null;
-      const observedMax = Math.max(...(activities || []).map((a: any) => a.max_heart_rate || 0));
-      const maxHr = ageMax || (observedMax > 0 ? observedMax : 190);
-      const z1Max = Math.round(maxHr * 0.65);
-      const z2Range = `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.75)}`;
-      const z3Range = `${Math.round(maxHr * 0.75)}-${Math.round(maxHr * 0.85)}`;
-      const z4Range = `${Math.round(maxHr * 0.85)}-${Math.round(maxHr * 0.92)}`;
-      const z5Min = Math.round(maxHr * 0.92);
+      const zones = resolveZones({
+        ageYears: ageMaxYears,
+        activities: (activities || []) as any,
+      });
+      const maxHr = zones.maxHr;
+      const z1Max = zones.z1Max;
+      const z2Range = `${zones.z1Max + 1}-${zones.z2Max}`;
+      const z3Range = `${zones.z2Max + 1}-${zones.z3Max}`;
+      const z4Range = `${zones.z3Max + 1}-${zones.z4Max}`;
+      const z5Min = zones.z4Max + 1;
 
       // Recent run stats
       const runs = (activities || []).filter((a: any) => /run/i.test(a.activity_type || ""));
@@ -1857,7 +1869,7 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
       // NOTE: activities.avg_speed is stored in km/h (not m/s). 60 / kmh = min/km.
       const paceFromMps = (kmh: number) => (60 / kmh) * 60; // returns seconds per km
       // Z2 (HR-filtered) pace if we have it
-      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
+      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate > zones.z1Max && a.avg_heart_rate <= zones.z2Max && a.avg_speed);
       const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
       // Average pace across ALL runs with speed (fallback when HR data is sparse)
       const allPacedRuns = runs.filter((a: any) => a.avg_speed && Number(a.avg_speed) > 0);
@@ -2052,7 +2064,7 @@ For EACH of the 10 sessions:
 - Title MUST start with "Walk/Run Intervals:" e.g. "Walk/Run Intervals: 10 × 1min (Total: 30min)"
 - Markdown table with a warm-up walk row, the structured interval rep block row(s), and a cool-down walk row
 - The interval row's Duration column MUST use the format "N × Xmin run / Ymin walk" (ASCII "x" is also fine) so the watch can expand the reps. Example: "10 × 1min run / 1min walk"
-- Run intensity stays in Z1-Z2 (HR < ${Math.round(maxHr * 0.75)} bpm). NO Z3+ work in these 10 sessions
+- Run intensity stays in Z1-Z2 (HR ≤ ${zones.z2Max} bpm). NO Z3+ work in these 10 sessions
 - Walk recoveries in Z1
 - Target column MUST include BOTH the HR range AND an explicit pace range in min/km, based on the athlete's actual Z2 pace (${z2Pace}/km). Run pace target: roughly Z2 pace ± 30s (e.g. if Z2 is 7:00/km use "7:00-7:30/km"). Walk pace: 9:00-10:00/km. NEVER omit the pace — without it the watch defaults to a generic 6:27/km which is too fast for a beginner.
 - ⚠️ DO NOT use race-pace-derived paces (threshold, VO2max, race pace) for these 10 walk/run sessions. The athlete is ramping up — paces MUST be conversational easy paces only (Z2 ± 30s, i.e. roughly ${z2Pace}/km). Any run pace faster than 5:30/km in these 10 sessions is FORBIDDEN regardless of goal time.
@@ -2100,7 +2112,7 @@ Plan: ${weeks} weeks starting ${planStart}
 Training Days: ${(training_days as string[] | undefined)?.length || 4} (${daysStr})
 
 ══ PHYSIOLOGICAL DATA ══
-HR Zones (estimated from max HR ${maxHr}): Z1<${z1Max}, Z2:${z2Range}, Z3:${z3Range}, Z4:${z4Range}, Z5>${z5Min} bpm
+${zonesPromptLine(zones)}
 VO2max: derive from activity history above
 Resting HR: ${restingHr ?? "N/A"} bpm (7-day avg)
 HRV: ${hrv ?? "N/A"} ms (trend: ${hrvTrend})

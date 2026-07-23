@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { resolveZones, bpmToZone as sharedBpmToZone, type Zones } from "../_shared/hr-zones.ts";
 
 type WorkoutStep = {
   duration: number;
@@ -165,7 +166,7 @@ function buildStructuredWorkoutDoc(workout: WorkoutInput): StructuredWorkoutDoc 
   return { name: workout.name, steps };
 }
 
-function formatWorkoutDescription(workout: WorkoutInput): string {
+function formatWorkoutDescription(workout: WorkoutInput, userZones: Zones | null): string {
   function fmtDur(secs: number): string {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
@@ -181,7 +182,11 @@ function formatWorkoutDescription(workout: WorkoutInput): string {
       if (zones.length > 1) return `Z${zones[0]}-Z${zones[zones.length - 1]}`;
     }
 
+    // Personalised bpm→zone via shared LTHR band model (single source of truth).
+    // Falls back to the previous hard-coded ladder only if user zones are
+    // unavailable (e.g. brand-new account with zero activity history).
     const bpmToZone = (bpm: number) => {
+      if (userZones) return sharedBpmToZone(bpm, userZones);
       if (bpm <= 120) return 1;
       if (bpm <= 140) return 2;
       if (bpm <= 160) return 3;
@@ -345,6 +350,30 @@ serve(async (req) => {
       pauseEvent?: { category: "HOLIDAY" | "SICK" | "INJURED" | "NOTE"; name: string; start: string; end: string; planId: string };
       clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
     };
+
+    // Resolve user's HR zones once per request via shared LTHR band model.
+    // Fed into formatWorkoutDescription so bpm→zone falls on personalised bands
+    // instead of the legacy hard-coded universal ladder.
+    let userZones: Zones | null = null;
+    try {
+      const sinceIso = new Date(Date.now() - 180 * 86400 * 1000).toISOString();
+      const [{ data: profile }, { data: acts }] = await Promise.all([
+        supabase.from("profiles").select("date_of_birth").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("activities")
+          .select("id, max_heart_rate, start_time, activity_type")
+          .eq("user_id", user.id)
+          .gte("start_time", sinceIso)
+          .not("max_heart_rate", "is", null),
+      ]);
+      const dob = (profile as { date_of_birth?: string } | null)?.date_of_birth;
+      const ageYears = dob
+        ? (Date.now() - new Date(dob).getTime()) / (365.25 * 86400 * 1000)
+        : null;
+      userZones = resolveZones({ ageYears, activities: (acts ?? []) as any });
+    } catch (e) {
+      console.warn("[intervals-sync] zone resolution failed, using fallback ladder:", e);
+    }
 
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
@@ -598,7 +627,7 @@ serve(async (req) => {
     }
 
     const eventsToSync = workouts.map((workout, idx) => {
-      const fullDescription = formatWorkoutDescription(workout);
+      const fullDescription = formatWorkoutDescription(workout, userZones);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
 
