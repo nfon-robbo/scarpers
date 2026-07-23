@@ -101,6 +101,35 @@ function mapGarminSplit(split: any, idx: number) {
   };
 }
 
+// Base-lap discriminator for Garmin export splits[].
+//
+// The splits[] array mixes two categories:
+//   - Base laps: watch-recorded segments (auto-lap by distance/time, or
+//     workout-step). Types observed in real data: 17 (walk), 18 (run),
+//     22 (other-sport). Never carry `lapIndexes`.
+//   - Rollups: climb / interval / warmup / cooldown summaries that aggregate
+//     one or more base laps. Types observed: 3, 5, 6, 7. Almost always carry
+//     `lapIndexes` pointing at the base laps they cover.
+//
+// Storing rollups in activity_laps double-counts durations (rollup +
+// underlying base laps overlap in time), which breaks any lap-based analysis
+// downstream. Require BOTH conditions — enum in the allowlist AND no
+// lapIndexes — because neither on its own is sufficient:
+//   - Enum-only would drop base laps if Garmin ever emits a new type not in
+//     the allowlist.
+//   - Structural-only lets rollups through (a small number of type-3 climb
+//     entries in real data lack lapIndexes despite being rollups).
+//
+// Splits excluded by exactly one condition are logged as disagreements so
+// enum drift becomes visible instead of being resolved silently.
+const GARMIN_BASE_LAP_TYPES = new Set(["17", "18", "22"]);
+
+function isBaseLapSplit(split: any): boolean {
+  const typeOk = GARMIN_BASE_LAP_TYPES.has(String(split?.type));
+  const noLapIndexes = !Object.prototype.hasOwnProperty.call(split ?? {}, "lapIndexes");
+  return typeOk && noLapIndexes;
+}
+
 export function buildGarminLapRows(
   userId: string,
   batch: Array<{ source_file: string | null; raw_data?: any }>,
@@ -109,12 +138,24 @@ export function buildGarminLapRows(
   const idBySourceFile = new Map<string, string>();
   for (const r of inserted) if (r.source_file) idBySourceFile.set(r.source_file, r.id);
   const rows: any[] = [];
+  const disagreements: Array<{ activity_id: string; reason: string; type: unknown; has_lapIndexes: boolean }> = [];
   for (const r of batch) {
     const activityId = r.source_file ? idBySourceFile.get(r.source_file) : null;
     if (!activityId) continue;
     const splits: any[] = r.raw_data?.garmin?.splits;
     if (!Array.isArray(splits) || splits.length === 0) continue;
     splits.forEach((s, i) => {
+      const typeOk = GARMIN_BASE_LAP_TYPES.has(String(s?.type));
+      const noLapIndexes = !Object.prototype.hasOwnProperty.call(s ?? {}, "lapIndexes");
+      if (typeOk !== noLapIndexes) {
+        disagreements.push({
+          activity_id: activityId,
+          reason: typeOk ? "base-lap type but carries lapIndexes" : "non-base-lap type but has no lapIndexes",
+          type: s?.type,
+          has_lapIndexes: !noLapIndexes,
+        });
+      }
+      if (!isBaseLapSplit(s)) return;
       rows.push({
         user_id: userId,
         activity_id: activityId,
@@ -122,6 +163,12 @@ export function buildGarminLapRows(
         ...mapGarminSplit(s, i),
       });
     });
+  }
+  if (disagreements.length > 0) {
+    console.warn(
+      `[garmin-lap-filter] ${disagreements.length} split(s) disagreed between type enum and lapIndexes structural test:`,
+      disagreements,
+    );
   }
   return rows;
 }
