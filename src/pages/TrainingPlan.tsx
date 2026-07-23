@@ -540,6 +540,8 @@ const TrainingPlanPage = () => {
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [benchmarkFirstOpen, setBenchmarkFirstOpen] = useState(false);
+  const [schedulingBenchmark, setSchedulingBenchmark] = useState(false);
   const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
@@ -2729,7 +2731,7 @@ const TrainingPlanPage = () => {
       )}
       {(showConfig || loading) && (
         <div className="flex flex-wrap gap-3">
-          <Button onClick={generatePlan} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+          <Button onClick={() => { if (!loading) setBenchmarkFirstOpen(true); }} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2742,6 +2744,28 @@ const TrainingPlanPage = () => {
               </>
             )}
           </Button>
+          <BenchmarkFirstDialog
+            open={benchmarkFirstOpen}
+            onOpenChange={setBenchmarkFirstOpen}
+            scheduling={schedulingBenchmark}
+            onSkip={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
+            onScheduleBenchmark={async (dateIso, protocol) => {
+              if (!user) return;
+              setSchedulingBenchmark(true);
+              try {
+                await scheduleStandaloneBenchmark({ userId: user.id, benchmarkDateIso: dateIso, protocol });
+                toast({
+                  title: "Benchmark scheduled",
+                  description: `We'll build your plan from real data after you run it on ${dateIso}. You can generate now if you'd like a provisional plan in the meantime.`,
+                });
+                setBenchmarkFirstOpen(false);
+              } catch (e: any) {
+                toast({ title: "Couldn't schedule benchmark", description: e?.message ?? "Try again.", variant: "destructive" });
+              } finally {
+                setSchedulingBenchmark(false);
+              }
+            }}
+          />
           <input
             ref={fileInputRef}
             type="file"
