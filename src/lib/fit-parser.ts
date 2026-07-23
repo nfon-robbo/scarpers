@@ -22,6 +22,25 @@ export interface GpsPoint {
   grade?: number;
 }
 
+export interface ParsedLap {
+  lap_index: number;
+  start_time: string | null;
+  elapsed_time_s: number | null;
+  moving_time_s: number | null;
+  distance_m: number | null;
+  avg_heart_rate: number | null;
+  max_heart_rate: number | null;
+  avg_speed_mps: number | null;
+  max_speed_mps: number | null;
+  avg_cadence: number | null;
+  avg_power: number | null;
+  max_power: number | null;
+  total_ascent_m: number | null;
+  total_descent_m: number | null;
+  lap_trigger: string | null;
+  raw: Record<string, unknown>;
+}
+
 export interface ParsedActivity {
   activity_type: string | null;
   start_time: string | null;
@@ -43,6 +62,7 @@ export interface ParsedActivity {
   source_file: string;
   gps_track: GpsPoint[];
   raw_data: Record<string, unknown>;
+  laps: ParsedLap[];
 }
 
 export interface ParseResult {
