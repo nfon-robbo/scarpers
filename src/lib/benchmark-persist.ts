@@ -104,7 +104,7 @@ export async function confirmBenchmark(
     secondHalfSlowdown: 0,       // no stream fetched at confirm time
     cadencePresent: true,        // conservative default; refined by future stream work
     gpsConfidence: "High",
-    rpeSubmaximal: !!rpeSubmaximal,
+    rpeSubmaximal: likelySubmaximal,
     effortWindowSource: effort.source,
     protocol,
   });
@@ -155,7 +155,10 @@ export async function confirmBenchmark(
     active: true,
     confidence_score: conf.score,
     confidence_band: conf.band,
-    rpe_effort: rpeSubmaximal ? 6 : 9,
+    rpe_effort: likelySubmaximal ? 6 : 9,
+    rpe_response: rpeResponse ?? null,
+    could_continue_response: couldContinueResponse ?? null,
+    likely_submaximal: likelySubmaximal,
     activity_snapshot: snapshot,
   };
 
@@ -181,7 +184,7 @@ export async function confirmBenchmark(
     .update({ next_benchmark_due: addWeeksIso(scheduledDateIso, NEXT_BENCHMARK_WEEKS) } as any)
     .eq("user_id", userId);
 
-  return { id };
+  return { id, lthr };
 }
 
 export async function rejectCandidate(params: {
