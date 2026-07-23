@@ -80,7 +80,8 @@ export type Zones = {
 };
 
 export type ActivityMaxSample = {
-  id: string;
+  /** Optional — used only for diagnostic reporting of which activity supplied the max. */
+  id?: string | null;
   max_heart_rate: number | null | undefined;
   start_time: string | null | undefined;
   activity_type?: string | null | undefined;
@@ -90,8 +91,9 @@ export type ResolveInput = {
   ageYears?: number | null;
   /**
    * Recent activity samples (last `OBSERVED_MAX_LOOKBACK_DAYS`). Walk/run
-   * activities are excluded here — callers pass a pre-filtered list. Every
-   * sample counts as one candidate; corroboration is computed across the set.
+   * activities are excluded internally by `activity_type` regex. Every
+   * remaining sample counts as one candidate; corroboration is computed
+   * across the set using array-index identity (id is optional).
    */
   activities?: ActivityMaxSample[];
   /** If a measured benchmark LTHR exists, pass it — beats every estimator. */
@@ -106,27 +108,24 @@ export type ResolveInput = {
  */
 export function resolveObservedMax(activities: ActivityMaxSample[]): {
   bpm: number;
-  activityId: string;
+  activityId: string | null;
   activityDate: string | null;
 } | null {
-  const walkRunRe = /walk[\s_-]*run|run[\s_-]*walk/i;
+  const walkRunRe = /walk[\s_-]*run|run[\s_-]*walk|walk|hike/i;
   const candidates = activities
-    .filter((a) => {
-      const bpm = Number(a.max_heart_rate ?? 0);
-      if (!(bpm > 0) || bpm > IMPLAUSIBLE_MAX_HR) return false;
-      if (a.activity_type && walkRunRe.test(a.activity_type)) return false;
-      return true;
-    })
-    .map((a) => ({
-      bpm: Math.round(Number(a.max_heart_rate)),
-      id: a.id,
+    .map((a, idx) => ({
+      idx,
+      bpm: Math.round(Number(a.max_heart_rate ?? 0)),
+      id: a.id ?? null,
       date: a.start_time ?? null,
+      type: a.activity_type ?? null,
     }))
+    .filter((c) => c.bpm > 0 && c.bpm <= IMPLAUSIBLE_MAX_HR && !(c.type && walkRunRe.test(c.type)))
     .sort((a, b) => b.bpm - a.bpm);
 
   for (const c of candidates) {
     const corroborated = candidates.some(
-      (o) => o.id !== c.id && Math.abs(o.bpm - c.bpm) <= CORROBORATION_TOLERANCE_BPM,
+      (o) => o.idx !== c.idx && Math.abs(o.bpm - c.bpm) <= CORROBORATION_TOLERANCE_BPM,
     );
     if (corroborated) {
       return { bpm: c.bpm, activityId: c.id, activityDate: c.date };
