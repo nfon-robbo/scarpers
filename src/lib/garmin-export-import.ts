@@ -320,13 +320,29 @@ export async function importGarminExport(
     }
     }
 
-    // Insert in batches
+    // Insert in batches, capture ids so we can persist Garmin splits into
+    // activity_laps (source='garmin_export'). This is additive — a failure
+    // to insert laps must never break the activity import.
     const batchSize = 100;
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
-      const { error } = await supabase.from("activities").insert(batch as any);
+      const { data: inserted, error } = await supabase
+        .from("activities")
+        .insert(batch as any)
+        .select("id, source_file");
       if (error) { errors.push(`Activities: ${error.message}`); break; }
       result.activities.inserted += batch.length;
+
+      try {
+        const lapRows = buildGarminLapRows(userId, batch, inserted || []);
+        if (lapRows.length > 0) {
+          const { error: lapErr } = await supabase.from("activity_laps").insert(lapRows);
+          if (lapErr) console.warn("activity_laps insert (garmin_export) failed (non-fatal):", lapErr);
+        }
+      } catch (e: any) {
+        console.warn("garmin_export lap map failed (non-fatal):", e?.message || e);
+      }
+
       onProgress?.({ phase: "Importing activities", total: rows.length, current: i + batch.length });
     }
   } catch (e: any) {
