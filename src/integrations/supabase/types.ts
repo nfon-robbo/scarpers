@@ -401,8 +401,11 @@ export type Database = {
           active: boolean
           activity_id: string | null
           activity_snapshot: Json | null
+          benchmark_date: string
+          benchmark_protocol: string | null
           capture_method: string
           confidence_band: string | null
+          confidence_deductions: Json
           confidence_score: number | null
           could_continue_response: string | null
           created_at: string
@@ -417,7 +420,6 @@ export type Database = {
           lthr: number | null
           predicted_5k_seconds: number | null
           riegel_exponent: number
-          rpe_effort: number | null
           rpe_notes: string | null
           rpe_response: string | null
           scheduled_date: string | null
@@ -432,8 +434,11 @@ export type Database = {
           active?: boolean
           activity_id?: string | null
           activity_snapshot?: Json | null
+          benchmark_date: string
+          benchmark_protocol?: string | null
           capture_method: string
           confidence_band?: string | null
+          confidence_deductions?: Json
           confidence_score?: number | null
           could_continue_response?: string | null
           created_at?: string
@@ -448,7 +453,6 @@ export type Database = {
           lthr?: number | null
           predicted_5k_seconds?: number | null
           riegel_exponent?: number
-          rpe_effort?: number | null
           rpe_notes?: string | null
           rpe_response?: string | null
           scheduled_date?: string | null
@@ -463,8 +467,11 @@ export type Database = {
           active?: boolean
           activity_id?: string | null
           activity_snapshot?: Json | null
+          benchmark_date?: string
+          benchmark_protocol?: string | null
           capture_method?: string
           confidence_band?: string | null
+          confidence_deductions?: Json
           confidence_score?: number | null
           could_continue_response?: string | null
           created_at?: string
@@ -479,7 +486,6 @@ export type Database = {
           lthr?: number | null
           predicted_5k_seconds?: number | null
           riegel_exponent?: number
-          rpe_effort?: number | null
           rpe_notes?: string | null
           rpe_response?: string | null
           scheduled_date?: string | null
