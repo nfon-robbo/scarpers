@@ -27,6 +27,16 @@ export interface ParsedWorkout {
   intervalsText?: string; // Native intervals.icu workout text block (from DOCX import)
 }
 
+/**
+ * Strip in-title benchmark markers (e.g. `[benchmark:30min]`) from a workout
+ * title before it's pushed to intervals.icu / a watch. The marker is our
+ * internal cue for the benchmark detector — the watch must never render it in
+ * the workout name.
+ */
+export function stripBenchmarkTokens(title: string): string {
+  return title.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 function cleanMarkdownCell(value: string): string {
   return value
     .replace(/\\([*_`])/g, "$1")
@@ -263,9 +273,10 @@ export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blo
   for (const workout of workouts) {
     if (workout.segments.length === 0) continue;
 
-    const tcxContent = encodeTcxWorkout(workout.title || "Workout", workout.segments);
+    const exportTitle = stripBenchmarkTokens(workout.title || "Workout") || "Workout";
+    const tcxContent = encodeTcxWorkout(exportTitle, workout.segments);
     const safeName = (workout.date || "workout").replace(/\//g, "-");
-    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
+    const fileName = `${safeName}_${exportTitle.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
     zip.file(fileName, tcxContent);
   }
 
@@ -300,7 +311,7 @@ export function generateIcsCalendar(workouts: ParsedWorkout[]): string {
     lines.push("BEGIN:VEVENT");
     lines.push(`DTSTART;VALUE=DATE:${dateVal}`);
     lines.push(`DTEND;VALUE=DATE:${dateVal}`);
-    lines.push(`SUMMARY:🏃 ${workout.title}`);
+    lines.push(`SUMMARY:🏃 ${stripBenchmarkTokens(workout.title)}`);
     lines.push(`DESCRIPTION:${description}`);
     lines.push(`UID:${dateVal}-${Math.random().toString(36).slice(2)}@trainingplan`);
     lines.push("END:VEVENT");

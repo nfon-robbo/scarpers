@@ -253,10 +253,12 @@ export function buildIntervalsFitFile(workout: SyncWorkoutInput): FitFilePayload
 
   if (fitSteps.length === 0) return undefined;
 
-  const fileBytes = encodeWorkoutFit(workout.name, fitSteps);
+  // Strip internal benchmark markers before the name reaches the watch.
+  const exportName = workout.name.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim() || "Workout";
+  const fileBytes = encodeWorkoutFit(exportName, fitSteps);
 
   return {
-    fileName: `${sanitizeFileName(workout.name)}.fit`,
+    fileName: `${sanitizeFileName(exportName)}.fit`,
     fileContentsBase64: encodeBase64(fileBytes),
   };
 }
