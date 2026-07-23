@@ -221,7 +221,7 @@ export default function Analytics() {
   const [readiness, setReadiness] = useState<ReadinessSnap[]>([]);
   const [iq, setIq] = useState<IqSnap[]>([]);
   const [metrics, setMetrics] = useState<DailyMetric[]>([]);
-  const [maxHR, setMaxHR] = useState<number>(190);
+  const { zones: hrZones } = useHrZones();
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiGeneratedAt, setAiGeneratedAt] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
