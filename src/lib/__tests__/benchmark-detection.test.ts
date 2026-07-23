@@ -159,13 +159,27 @@ describe("identifyEffortWindow — which path fires", () => {
     expect(w!.note).toMatch(/laps present.*n=3/);
   });
 
-  it("Path 2 fires for 3k/5k protocols regardless of laps", () => {
+  it("Path 1 fires for 5k when a lap matches 5000m ±5%", () => {
+    // Single lap of 5050m qualifies (±1%).
     const w = identifyEffortWindow({
-      protocol: "5k", laps: [{ lap_index: 0, elapsed_time_s: 1500 }],
+      protocol: "5k",
+      laps: [{ lap_index: 0, elapsed_time_s: 22 * 60 + 15, distance_m: 5050 }],
       activityDurationS: 30 * 60, activityDistanceM: 5200,
     });
+    expect(w!.source).toBe("laps");
+    expect(Math.round(w!.distanceMeters)).toBe(5050);
+    expect(w!.durationSeconds).toBe(22 * 60 + 15);
+  });
+
+  it("Path 2 fires for 5k with a diagnostic note when no lap matches ±5%", () => {
+    // Single lap of 5400m is > 5% over 5000m → no match.
+    const w = identifyEffortWindow({
+      protocol: "5k",
+      laps: [{ lap_index: 0, elapsed_time_s: 25 * 60, distance_m: 5400 }],
+      activityDurationS: 30 * 60, activityDistanceM: 5400,
+    });
     expect(w!.source).toBe("derived");
-    expect(w!.note).toBeUndefined(); // 3k/5k skip Path 1 entirely
+    expect(w!.note).toMatch(/no lap matched 5000m/);
   });
 
   it("Path 3 — manual entry", () => {

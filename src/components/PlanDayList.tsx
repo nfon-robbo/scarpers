@@ -1,6 +1,10 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
 import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
+import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
+import { supabase } from "@/integrations/supabase/client";
+import { extractAllBenchmarkDates, type BenchmarkProtocol } from "@/lib/benchmark-token";
+import { findBenchmarkCandidates, type ActivityForDetection, type CandidateActivity } from "@/lib/benchmark-detection";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,6 +46,12 @@ interface PlanDayListProps {
   isPaused?: boolean;
   pauseWindow?: { start: Date; end: Date } | null;
   pauseReason?: string | null;
+  /** Full plan markdown — used to detect scheduled benchmarks per day. */
+  planContent?: string | null;
+  /** Owning plan id, persisted onto benchmark_results.training_plan_id. */
+  planId?: string | null;
+  /** Current user id — required for benchmark confirm/reject writes. */
+  userId?: string | null;
 }
 
 function pauseReasonMeta(reason?: string | null): { icon: string; label: string; bg: string } {
@@ -485,6 +495,9 @@ export default function PlanDayList({
   isPaused = false,
   pauseWindow = null,
   pauseReason = null,
+  planContent = null,
+  planId = null,
+  userId = null,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
@@ -564,6 +577,72 @@ export default function PlanDayList({
   const [customSteps, setCustomSteps] = useState<CustomStepsMap>({});
   useEffect(() => { setCustomSteps(loadCustomSteps()); }, []);
   useEffect(() => { saveCustomSteps(customSteps); }, [customSteps]);
+
+  // ─── Benchmarks ────────────────────────────────────────────────────────────
+  // For every day that has a scheduled benchmark, resolve nearest-first
+  // candidate activities within ±48h and expose them to the row renderer.
+  // A single query per plan; results grouped by scheduled iso date.
+  const benchmarkSchedule = useMemo(() => {
+    const map = new Map<string, BenchmarkProtocol>();
+    if (planContent) {
+      for (const b of extractAllBenchmarkDates(planContent)) {
+        map.set(b.isoDate, b.protocol);
+      }
+    }
+    return map;
+  }, [planContent]);
+
+  const [confirmedDates, setConfirmedDates] = useState<Set<string>>(new Set());
+  const [benchmarkCandidates, setBenchmarkCandidates] = useState<Map<string, CandidateActivity[]>>(new Map());
+  const [benchmarkRefreshKey, setBenchmarkRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!userId || benchmarkSchedule.size === 0) {
+      setConfirmedDates(new Set());
+      setBenchmarkCandidates(new Map());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const dates = Array.from(benchmarkSchedule.keys());
+      const minDate = dates.reduce((m, d) => (d < m ? d : m), dates[0]);
+      const maxDate = dates.reduce((m, d) => (d > m ? d : m), dates[0]);
+      const from = new Date(`${minDate}T12:00:00Z`); from.setUTCDate(from.getUTCDate() - 3);
+      const to = new Date(`${maxDate}T12:00:00Z`); to.setUTCDate(to.getUTCDate() + 3);
+
+      const [{ data: acts }, { data: rej }, { data: existing }] = await Promise.all([
+        supabase.from("activities")
+          .select("id, start_time, duration_seconds, distance_meters, avg_heart_rate, activity_type")
+          .eq("user_id", userId)
+          .gte("start_time", from.toISOString())
+          .lte("start_time", to.toISOString()),
+        supabase.from("benchmark_rejections" as any)
+          .select("activity_id").eq("user_id", userId),
+        supabase.from("benchmark_results" as any)
+          .select("scheduled_date").eq("user_id", userId).in("scheduled_date", dates),
+      ]);
+      if (cancelled) return;
+
+      const rejectedIds = new Set<string>((rej ?? []).map((r: any) => r.activity_id));
+      const confirmed = new Set<string>((existing ?? []).map((r: any) => r.scheduled_date));
+      const perDate = new Map<string, CandidateActivity[]>();
+      benchmarkSchedule.forEach((protocol, isoDate) => {
+        if (confirmed.has(isoDate)) return;
+        const list = findBenchmarkCandidates({
+          activities: (acts ?? []) as ActivityForDetection[],
+          scheduledDateIso: isoDate,
+          protocol,
+          rejectedIds,
+        });
+        perDate.set(isoDate, list);
+      });
+      setConfirmedDates(confirmed);
+      setBenchmarkCandidates(perDate);
+    })();
+    return () => { cancelled = true; };
+  }, [userId, benchmarkSchedule, benchmarkRefreshKey]);
+
+  const refreshBenchmarks = useCallback(() => setBenchmarkRefreshKey((n) => n + 1), []);
 
   // Auto-open the review dialog when an activity has just been auto-linked
   // to a planned session (fired by the Strava import auto-linker).
@@ -723,10 +802,26 @@ export default function PlanDayList({
                   day.getTime() >= new Date(pauseWindow.start).setHours(0, 0, 0, 0) &&
                   day.getTime() < new Date(pauseWindow.end).setHours(0, 0, 0, 0));
                 const pauseMeta = pauseReasonMeta(pauseReason);
+                const benchmarkProtocol = benchmarkSchedule.get(key);
+                const showBenchmark =
+                  !!userId && !!benchmarkProtocol && !confirmedDates.has(key);
+                const benchmarkList = benchmarkCandidates.get(key) ?? [];
 
                 return (
+                  <div key={key}>
+                    {showBenchmark && (
+                      <div className="px-3 pt-2.5 pb-1">
+                        <BenchmarkConfirmCard
+                          userId={userId!}
+                          planId={planId}
+                          scheduledDateIso={key}
+                          protocol={benchmarkProtocol!}
+                          candidates={benchmarkList}
+                          onDone={refreshBenchmarks}
+                        />
+                      </div>
+                    )}
                   <div
-                    key={key}
                     data-plan-date={key}
                     onDragOver={(e) => handleDragOver(e, key)}
                     onDragLeave={() => setDragOverDate((d) => (d === key ? null : d))}
@@ -944,6 +1039,7 @@ export default function PlanDayList({
                         </span>
                       </div>
                     )}
+                  </div>
                   </div>
                 );
               })}

@@ -14,9 +14,16 @@
 
 import {
   matchBenchmarkEffortWindow,
+  matchLapByDistance,
   type BenchmarkLap,
 } from "@/lib/benchmark-lap-matcher";
 import { protocolDurationWindow, type BenchmarkProtocol } from "@/lib/benchmark-token";
+
+const PROTOCOL_DISTANCE_M: Record<BenchmarkProtocol, number | null> = {
+  "30min": null,
+  "3k": 3000,
+  "5k": 5000,
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,27 +123,46 @@ export function identifyEffortWindow(params: {
 }): EffortWindow | null {
   const { protocol, laps, activityDurationS, activityDistanceM, stream } = params;
 
-  // ── Path 1 — laps (30-min protocol only; 3k/5k drop straight to derived) ──
-  if (protocol === "30min" && laps && laps.length > 0) {
-    const match = matchBenchmarkEffortWindow(laps);
-    if (match) {
-      // Estimate distance proportionally: laps don't carry distance in this
-      // shape, so use activity-wide pace across the matched duration.
-      const distanceMeters = activityDurationS > 0
-        ? (activityDistanceM * match.durationS) / activityDurationS
-        : 0;
-      return {
-        startSeconds: match.startOffsetS,
-        endSeconds: match.startOffsetS + match.durationS,
-        durationSeconds: match.durationS,
-        distanceMeters,
-        source: "laps",
-      };
+  // ── Path 1 — laps ─────────────────────────────────────────────────────────
+  //   30-min protocol → contiguous laps summing to 28–32 min.
+  //   3k / 5k protocol → single lap whose distance matches ±5 %.
+  if (laps && laps.length > 0) {
+    if (protocol === "30min") {
+      const match = matchBenchmarkEffortWindow(laps);
+      if (match) {
+        const distanceMeters = match.distanceM ??
+          (activityDurationS > 0 ? (activityDistanceM * match.durationS) / activityDurationS : 0);
+        return {
+          startSeconds: match.startOffsetS,
+          endSeconds: match.startOffsetS + match.durationS,
+          durationSeconds: match.durationS,
+          distanceMeters,
+          source: "laps",
+        };
+      }
+      return buildDerivedWindow({
+        protocol, activityDurationS, activityDistanceM, stream,
+        note: `laps present (n=${laps.length}) but no contiguous window matched 1680–1920s`,
+      });
     }
-    return buildDerivedWindow({
-      protocol, activityDurationS, activityDistanceM, stream,
-      note: `laps present (n=${laps.length}) but no contiguous window matched 1680–1920s`,
-    });
+
+    const target = PROTOCOL_DISTANCE_M[protocol];
+    if (target != null) {
+      const match = matchLapByDistance(laps, target);
+      if (match) {
+        return {
+          startSeconds: match.startOffsetS,
+          endSeconds: match.startOffsetS + match.durationS,
+          durationSeconds: match.durationS,
+          distanceMeters: match.distanceM ?? target,
+          source: "laps",
+        };
+      }
+      return buildDerivedWindow({
+        protocol, activityDurationS, activityDistanceM, stream,
+        note: `laps present (n=${laps.length}) but no lap matched ${target}m ±5%`,
+      });
+    }
   }
 
   return buildDerivedWindow({ protocol, activityDurationS, activityDistanceM, stream });

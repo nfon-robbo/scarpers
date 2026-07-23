@@ -47,7 +47,7 @@ export const BenchmarkConfig = {
 } as const;
 
 export type GpsConfidence = "High" | "Medium" | "Low";
-export type EffortWindowSource = "lap" | "derived" | "manual";
+export type EffortWindowSource = "lap" | "laps" | "derived" | "manual";
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
 // ---------------------------------------------------------------------------
@@ -140,6 +140,14 @@ export interface ConfidenceInputs {
   /** True if the athlete reported the effort was submaximal. */
   rpeSubmaximal: boolean;
   effortWindowSource: EffortWindowSource;
+  /**
+   * Protocol the effort was performed under. The `effort_window_derived`
+   * penalty only applies to the 30-min protocol, where laps are the expected
+   * primary path. 3k / 5k time trials often have no matching lap boundary
+   * because the watch was configured for auto-lap-per-km — penalising them
+   * for that is unfair, so the deduction is suppressed.
+   */
+  protocol?: "30min" | "3k" | "5k";
 }
 
 export interface ConfidenceDeduction {
@@ -172,7 +180,10 @@ export function scoreConfidence(inputs: ConfidenceInputs): ConfidenceResult {
   if (inputs.rpeSubmaximal) {
     deductions.push({ reason: "rpe_submaximal", points: D.RPE_SUBMAXIMAL });
   }
-  if (inputs.effortWindowSource === "derived") {
+  const derivedPenaltyApplies =
+    inputs.effortWindowSource === "derived" &&
+    (!inputs.protocol || inputs.protocol === "30min");
+  if (derivedPenaltyApplies) {
     deductions.push({ reason: "effort_window_derived", points: D.EFFORT_WINDOW_DERIVED });
   }
 
