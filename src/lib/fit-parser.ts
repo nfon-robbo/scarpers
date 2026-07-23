@@ -104,6 +104,39 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
       const gpsTrack: GpsPoint[] = [];
       const firstRecordTime = records.find((r: any) => r.timestamp)?.timestamp;
       const firstRecordMs = firstRecordTime ? new Date(firstRecordTime).getTime() : null;
+      // Extract laps — in cascade mode nested under sessions
+      const rawSessions: any[] = data?.sessions || data?.activity?.sessions || [];
+      const collectLaps = (): any[] => {
+        const out: any[] = [];
+        if (Array.isArray(data?.laps)) out.push(...data.laps);
+        for (const s of rawSessions) {
+          if (Array.isArray(s?.laps)) out.push(...s.laps);
+        }
+        return out;
+      };
+      const buildLaps = (source: any[]): ParsedLap[] =>
+        source.map((lap: any, idx: number) => ({
+          lap_index: idx,
+          start_time: lap.start_time ? new Date(lap.start_time).toISOString() : null,
+          elapsed_time_s: lap.total_elapsed_time ?? null,
+          moving_time_s: lap.total_timer_time ?? null,
+          distance_m: lap.total_distance != null ? lap.total_distance * 1000 : null,
+          avg_heart_rate: lap.avg_heart_rate ?? null,
+          max_heart_rate: lap.max_heart_rate ?? null,
+          avg_speed_mps: lap.avg_speed ?? lap.enhanced_avg_speed ?? null,
+          max_speed_mps: lap.max_speed ?? lap.enhanced_max_speed ?? null,
+          avg_cadence: lap.avg_cadence ?? lap.avg_running_cadence ?? null,
+          avg_power: lap.avg_power ?? null,
+          max_power: lap.max_power ?? null,
+          total_ascent_m: lap.total_ascent != null ? lap.total_ascent * 1000 : null,
+          total_descent_m: lap.total_descent != null ? lap.total_descent * 1000 : null,
+          lap_trigger: lap.lap_trigger ?? null,
+          raw: lap,
+        }));
+
+      const gpsTrack: GpsPoint[] = [];
+      const firstRecordTime = records.find((r: any) => r.timestamp)?.timestamp;
+      const firstRecordMs = firstRecordTime ? new Date(firstRecordTime).getTime() : null;
       for (const r of records) {
         const lat = r.position_lat;
         const lng = r.position_long;
