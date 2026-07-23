@@ -1841,20 +1841,21 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         else if (diff > 5) hrvTrend = "improving";
       }
 
-      // HR zones from max HR. Prefer observed activity max (real data) over
-      // age-based estimate; fall back to 220 - age; final fallback 190.
-      // Previously: `ageMax || (observedMax > 0 ? observedMax : 190)` — a truthy
-      // ageMax short-circuited and observedMax was unreachable whenever DOB was set.
-      const ageMax = profile?.date_of_birth
-        ? 220 - (new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear())
+      // HR zones via shared LTHR band model (single source of truth).
+      // Resolution: measured LTHR (step 3) → corroborated observed max → 220-age → 190.
+      const ageMaxYears = profile?.date_of_birth
+        ? (Date.now() - new Date(profile.date_of_birth).getTime()) / (365.25 * 86400 * 1000)
         : null;
-      const observedMax = Math.max(...(activities || []).map((a: any) => a.max_heart_rate || 0));
-      const maxHr = observedMax > 0 ? observedMax : (ageMax || 190);
-      const z1Max = Math.round(maxHr * 0.65);
-      const z2Range = `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.75)}`;
-      const z3Range = `${Math.round(maxHr * 0.75)}-${Math.round(maxHr * 0.85)}`;
-      const z4Range = `${Math.round(maxHr * 0.85)}-${Math.round(maxHr * 0.92)}`;
-      const z5Min = Math.round(maxHr * 0.92);
+      const zones = resolveZones({
+        ageYears: ageMaxYears,
+        activities: (activities || []) as any,
+      });
+      const maxHr = zones.maxHr;
+      const z1Max = zones.z1Max;
+      const z2Range = `${zones.z1Max + 1}-${zones.z2Max}`;
+      const z3Range = `${zones.z2Max + 1}-${zones.z3Max}`;
+      const z4Range = `${zones.z3Max + 1}-${zones.z4Max}`;
+      const z5Min = zones.z4Max + 1;
 
       // Recent run stats
       const runs = (activities || []).filter((a: any) => /run/i.test(a.activity_type || ""));
