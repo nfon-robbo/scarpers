@@ -311,7 +311,7 @@ export function generateIcsCalendar(workouts: ParsedWorkout[]): string {
     lines.push("BEGIN:VEVENT");
     lines.push(`DTSTART;VALUE=DATE:${dateVal}`);
     lines.push(`DTEND;VALUE=DATE:${dateVal}`);
-    lines.push(`SUMMARY:🏃 ${workout.title}`);
+    lines.push(`SUMMARY:🏃 ${stripBenchmarkTokens(workout.title)}`);
     lines.push(`DESCRIPTION:${description}`);
     lines.push(`UID:${dateVal}-${Math.random().toString(36).slice(2)}@trainingplan`);
     lines.push("END:VEVENT");
