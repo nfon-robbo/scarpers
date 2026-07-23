@@ -71,12 +71,10 @@ async function refreshTokenIfNeeded(supabase: any, userId: string, tokens: any):
   return data.access_token;
 }
 
-async function stampFallback(supabase: any, activityId: string, note: string) {
-  await supabase
-    .from("activities")
-    .update({ effort_window_source: "derived", effort_window_note: note })
-    .eq("id", activityId);
-}
+// NOTE: intentionally no stampFallback helper. This function must not write
+// to public.activities. Callers own the effort_window_source decision.
+
+
 
 function mapStravaLap(lap: any, idx: number) {
   return {
