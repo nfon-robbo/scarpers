@@ -37,6 +37,7 @@ function stubActivity(fileName: string, extras?: { workout?: FitWorkout | null; 
       workout_name: extras?.workout?.name || null,
       intervals_text: extras?.intervalsText || null,
     },
+    laps: [],
   };
 }
 
