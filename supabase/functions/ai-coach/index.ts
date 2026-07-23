@@ -2064,7 +2064,7 @@ For EACH of the 10 sessions:
 - Title MUST start with "Walk/Run Intervals:" e.g. "Walk/Run Intervals: 10 × 1min (Total: 30min)"
 - Markdown table with a warm-up walk row, the structured interval rep block row(s), and a cool-down walk row
 - The interval row's Duration column MUST use the format "N × Xmin run / Ymin walk" (ASCII "x" is also fine) so the watch can expand the reps. Example: "10 × 1min run / 1min walk"
-- Run intensity stays in Z1-Z2 (HR < ${Math.round(maxHr * 0.75)} bpm). NO Z3+ work in these 10 sessions
+- Run intensity stays in Z1-Z2 (HR ≤ ${zones.z2Max} bpm). NO Z3+ work in these 10 sessions
 - Walk recoveries in Z1
 - Target column MUST include BOTH the HR range AND an explicit pace range in min/km, based on the athlete's actual Z2 pace (${z2Pace}/km). Run pace target: roughly Z2 pace ± 30s (e.g. if Z2 is 7:00/km use "7:00-7:30/km"). Walk pace: 9:00-10:00/km. NEVER omit the pace — without it the watch defaults to a generic 6:27/km which is too fast for a beginner.
 - ⚠️ DO NOT use race-pace-derived paces (threshold, VO2max, race pace) for these 10 walk/run sessions. The athlete is ramping up — paces MUST be conversational easy paces only (Z2 ± 30s, i.e. roughly ${z2Pace}/km). Any run pace faster than 5:30/km in these 10 sessions is FORBIDDEN regardless of goal time.
