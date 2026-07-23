@@ -55,6 +55,8 @@ import WorkoutEditDialog, { type EditWorkoutChange } from "@/components/WorkoutE
 import { logPlanEdit } from "@/lib/plan-edit-log";
 import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
+import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
+import { placeWeek1Benchmark } from "@/lib/place-benchmark";
 
 // ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
 // Skip re-running the LLM when the user re-clicks within 30 min and no new
