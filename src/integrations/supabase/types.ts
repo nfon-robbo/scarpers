@@ -316,6 +316,111 @@ export type Database = {
         }
         Relationships: []
       }
+      benchmark_results: {
+        Row: {
+          active: boolean
+          activity_id: string | null
+          capture_method: string
+          confidence_band: string | null
+          confidence_score: number | null
+          created_at: string
+          effort_window_distance_m: number
+          effort_window_duration_s: number
+          effort_window_end_time: string
+          effort_window_note: string | null
+          effort_window_source: string
+          effort_window_start_time: string
+          id: string
+          lthr: number | null
+          plan_workout_id: string | null
+          predicted_10k_seconds: number | null
+          predicted_5k_seconds: number | null
+          predicted_full_seconds: number | null
+          predicted_half_seconds: number | null
+          riegel_exponent: number
+          rpe_effort: number | null
+          rpe_notes: string | null
+          status: string
+          threshold_hr: number | null
+          threshold_pace_s_per_km: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          activity_id?: string | null
+          capture_method: string
+          confidence_band?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          effort_window_distance_m: number
+          effort_window_duration_s: number
+          effort_window_end_time: string
+          effort_window_note?: string | null
+          effort_window_source: string
+          effort_window_start_time: string
+          id?: string
+          lthr?: number | null
+          plan_workout_id?: string | null
+          predicted_10k_seconds?: number | null
+          predicted_5k_seconds?: number | null
+          predicted_full_seconds?: number | null
+          predicted_half_seconds?: number | null
+          riegel_exponent?: number
+          rpe_effort?: number | null
+          rpe_notes?: string | null
+          status?: string
+          threshold_hr?: number | null
+          threshold_pace_s_per_km: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          activity_id?: string | null
+          capture_method?: string
+          confidence_band?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          effort_window_distance_m?: number
+          effort_window_duration_s?: number
+          effort_window_end_time?: string
+          effort_window_note?: string | null
+          effort_window_source?: string
+          effort_window_start_time?: string
+          id?: string
+          lthr?: number | null
+          plan_workout_id?: string | null
+          predicted_10k_seconds?: number | null
+          predicted_5k_seconds?: number | null
+          predicted_full_seconds?: number | null
+          predicted_half_seconds?: number | null
+          riegel_exponent?: number
+          rpe_effort?: number | null
+          rpe_notes?: string | null
+          status?: string
+          threshold_hr?: number | null
+          threshold_pace_s_per_km?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benchmark_results_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "benchmark_results_plan_workout_id_fkey"
+            columns: ["plan_workout_id"]
+            isOneToOne: false
+            referencedRelation: "plan_workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blog_comments: {
         Row: {
           author_name: string
@@ -780,6 +885,59 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_zones: {
+        Row: {
+          benchmark_result_id: string | null
+          created_at: string
+          effective_from: string
+          id: string
+          lthr: number
+          source: string
+          updated_at: string
+          user_id: string
+          z1_max: number
+          z2_max: number
+          z3_max: number
+          z4_max: number
+        }
+        Insert: {
+          benchmark_result_id?: string | null
+          created_at?: string
+          effective_from?: string
+          id?: string
+          lthr: number
+          source: string
+          updated_at?: string
+          user_id: string
+          z1_max: number
+          z2_max: number
+          z3_max: number
+          z4_max: number
+        }
+        Update: {
+          benchmark_result_id?: string | null
+          created_at?: string
+          effective_from?: string
+          id?: string
+          lthr?: number
+          source?: string
+          updated_at?: string
+          user_id?: string
+          z1_max?: number
+          z2_max?: number
+          z3_max?: number
+          z4_max?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_zones_benchmark_result_id_fkey"
+            columns: ["benchmark_result_id"]
+            isOneToOne: false
+            referencedRelation: "benchmark_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intervals_credentials: {
         Row: {
           api_key: string
@@ -972,6 +1130,53 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_workouts: {
+        Row: {
+          benchmark_protocol: string | null
+          created_at: string
+          id: string
+          is_benchmark: boolean
+          rejected_activity_ids: string[]
+          scheduled_date: string
+          training_plan_id: string | null
+          updated_at: string
+          user_id: string
+          workout_type: string | null
+        }
+        Insert: {
+          benchmark_protocol?: string | null
+          created_at?: string
+          id?: string
+          is_benchmark?: boolean
+          rejected_activity_ids?: string[]
+          scheduled_date: string
+          training_plan_id?: string | null
+          updated_at?: string
+          user_id: string
+          workout_type?: string | null
+        }
+        Update: {
+          benchmark_protocol?: string | null
+          created_at?: string
+          id?: string
+          is_benchmark?: boolean
+          rejected_activity_ids?: string[]
+          scheduled_date?: string
+          training_plan_id?: string | null
+          updated_at?: string
+          user_id?: string
+          workout_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_workouts_training_plan_id_fkey"
+            columns: ["training_plan_id"]
+            isOneToOne: false
+            referencedRelation: "training_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           athlete_context: string | null
@@ -981,6 +1186,7 @@ export type Database = {
           height_cm: number | null
           id: string
           name: string | null
+          next_benchmark_due: string | null
           onboarding_completed: boolean
           primary_sport: string | null
           race_date: string | null
@@ -1006,6 +1212,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           name?: string | null
+          next_benchmark_due?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
           race_date?: string | null
@@ -1031,6 +1238,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           name?: string | null
+          next_benchmark_due?: string | null
           onboarding_completed?: boolean
           primary_sport?: string | null
           race_date?: string | null
