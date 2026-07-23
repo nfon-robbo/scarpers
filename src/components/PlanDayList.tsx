@@ -626,12 +626,12 @@ export default function PlanDayList({
         supabase.from("benchmark_rejections" as any)
           .select("activity_id").eq("user_id", userId),
         supabase.from("benchmark_results" as any)
-          .select("scheduled_date").eq("user_id", userId).in("scheduled_date", dates),
+          .select("benchmark_date").eq("user_id", userId).eq("status", "confirmed").in("benchmark_date", dates),
       ]);
       if (cancelled) return;
 
       const rejectedIds = new Set<string>((rej ?? []).map((r: any) => r.activity_id));
-      const confirmed = new Set<string>((existing ?? []).map((r: any) => r.scheduled_date));
+      const confirmed = new Set<string>((existing ?? []).map((r: any) => r.benchmark_date));
       const perDate = new Map<string, CandidateActivity[]>();
       benchmarkSchedule.forEach((protocol, isoDate) => {
         if (confirmed.has(isoDate)) return;
