@@ -411,10 +411,10 @@ export type Database = {
           created_at: string
           effort_window_distance_m: number
           effort_window_duration_s: number
-          effort_window_end_time: string
+          effort_window_end_time: string | null
           effort_window_note: string | null
           effort_window_source: string
-          effort_window_start_time: string
+          effort_window_start_time: string | null
           id: string
           likely_submaximal: boolean
           lthr: number | null
@@ -444,10 +444,10 @@ export type Database = {
           created_at?: string
           effort_window_distance_m: number
           effort_window_duration_s: number
-          effort_window_end_time: string
+          effort_window_end_time?: string | null
           effort_window_note?: string | null
           effort_window_source: string
-          effort_window_start_time: string
+          effort_window_start_time?: string | null
           id?: string
           likely_submaximal?: boolean
           lthr?: number | null
@@ -477,10 +477,10 @@ export type Database = {
           created_at?: string
           effort_window_distance_m?: number
           effort_window_duration_s?: number
-          effort_window_end_time?: string
+          effort_window_end_time?: string | null
           effort_window_note?: string | null
           effort_window_source?: string
-          effort_window_start_time?: string
+          effort_window_start_time?: string | null
           id?: string
           likely_submaximal?: boolean
           lthr?: number | null
