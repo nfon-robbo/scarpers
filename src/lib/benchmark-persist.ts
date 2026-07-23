@@ -24,7 +24,6 @@ import {
   scoreConfidence,
   thresholdPaceSecPerKm,
   predict5kSeconds,
-  zonesFromLthr,
 } from "@/lib/benchmark-calculations";
 
 const NEXT_BENCHMARK_WEEKS = 6;
@@ -33,12 +32,6 @@ function addWeeksIso(baseIso: string, weeks: number): string {
   const d = new Date(`${baseIso}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + weeks * 7);
   return d.toISOString().slice(0, 10);
-}
-
-/** Riegel prediction — same exponent used across all four race distances. */
-function riegel(distanceM: number, durationS: number, targetM: number): number {
-  const ratio = targetM / distanceM;
-  return Math.round(durationS * Math.pow(ratio, BenchmarkConfig.PREDICTED_5K_EXPONENT));
 }
 
 export interface ConfirmParams {
