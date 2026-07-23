@@ -39,7 +39,11 @@ export type FuzzyMatch = {
   durationDeltaS: number;
 };
 
-export const FUZZY_START_WINDOW_S = 5 * 60; // 300
+// Start window widened to ±15 min to absorb the clock-drift case that the
+// removed blanket ±15-min purge existed for. Same-activity-type and ±2-min
+// duration constraints are what keep this safe — a wider start window with
+// those two intact does not merge different sessions.
+export const FUZZY_START_WINDOW_S = 15 * 60; // 900
 export const FUZZY_DURATION_WINDOW_S = 2 * 60; // 120
 
 export function findFuzzyMatch(
