@@ -99,6 +99,7 @@ function vetTier1(
   candidate: Row & { sec_per_km: number },
   easyBaselineSec: number | null,
   easyBaselineCount: number,
+  resolvedMaxHr: number | null,
 ): Tier1Reject | null {
   const c = ProvisionalPaceConfig;
   const dateStr = new Date(candidate.start_time).toLocaleDateString("en-GB");
@@ -111,13 +112,16 @@ function vetTier1(
     };
   }
 
-  if (candidate.avg_heart_rate != null) {
-    const minHr = c.ASSUMED_MAX_HR * c.MIN_HR_FRACTION_OF_MAX;
+  // HR check only runs when we have both a candidate HR AND a canonical max HR.
+  // No hardcoded fallback — if max HR is unknown, skip the check rather than
+  // invent a number that competes with the single source of truth.
+  if (candidate.avg_heart_rate != null && resolvedMaxHr != null) {
+    const minHr = resolvedMaxHr * c.MIN_HR_FRACTION_OF_MAX;
     if (candidate.avg_heart_rate < minHr) {
       return {
         reason: "hr_too_low_for_5k_effort",
         pace: fmt(candidate.sec_per_km),
-        detail: `Avg HR ${Math.round(candidate.avg_heart_rate)} bpm on ${dateStr} is below ${Math.round(minHr)} bpm — not a hard 5k.`,
+        detail: `Avg HR ${Math.round(candidate.avg_heart_rate)} bpm on ${dateStr} is below ${Math.round(minHr)} bpm (88% of max ${resolvedMaxHr}) — not a hard 5k.`,
       };
     }
   }
