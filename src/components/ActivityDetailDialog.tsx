@@ -122,8 +122,10 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
     const maxPaceSecPerKm = data.max_speed && data.max_speed > 0
       ? 3600 / data.max_speed : null;
 
-    // HR zones from track (using max HR ~ user's max if present, else 190)
-    const userMax = data.max_heart_rate ?? 190;
+    // HR zones from track — resolved via shared LTHR band model (user zones).
+    // Falls back to activity-level max HR (as pseudo-max, LTHR estimated at 89%)
+    // when the shared hook hasn't returned yet — same shape, transient only.
+    const userMax = userZones?.maxHr ?? (data.max_heart_rate ?? 190);
     const zones = [0, 0, 0, 0, 0];
     const firstTrackTime = track[0]?.time ? new Date(track[0].time).getTime() : null;
     const elapsedForPoint = (p: any) => p.elapsed_time ?? (p.time && firstTrackTime != null ? (new Date(p.time).getTime() - firstTrackTime) / 1000 : null);
@@ -132,8 +134,7 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
       const p: any = track[i];
       const hr = p.heart_rate;
       if (!hr) { lastT = elapsedForPoint(p) ?? lastT; continue; }
-      const pct = hr / userMax;
-      const z = pct < 0.6 ? 0 : pct < 0.7 ? 1 : pct < 0.8 ? 2 : pct < 0.9 ? 3 : 4;
+      const z = userZones ? bpmToZone(hr, userZones) - 1 : Math.min(4, Math.max(0, Math.floor((hr / userMax) * 10) - 5));
       const t = elapsedForPoint(p) ?? lastT + 1;
       zones[z] += Math.max(0, t - lastT);
       lastT = t;
