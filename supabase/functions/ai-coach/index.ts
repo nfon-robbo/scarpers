@@ -5,6 +5,13 @@ import {
   isExtremeAccumulatedVolume,
   type TodayActivityInput,
 } from "./day-adjust-logic.ts";
+import {
+  resolveZones,
+  zonesFromLthr,
+  bpmToZone,
+  zonesPromptLine,
+  LTHR_PCT_OF_MAX,
+} from "../_shared/hr-zones.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
