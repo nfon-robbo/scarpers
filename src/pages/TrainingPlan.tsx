@@ -2754,11 +2754,72 @@ const TrainingPlanPage = () => {
               setSchedulingBenchmark(true);
               try {
                 await scheduleStandaloneBenchmark({ userId: user.id, benchmarkDateIso: dateIso, protocol });
-                toast({
-                  title: "Benchmark scheduled",
-                  description: `We'll build your plan from real data after you run it on ${dateIso}. You can generate now if you'd like a provisional plan in the meantime.`,
-                });
+
+                // Build a minimal training plan containing just the benchmark
+                // on the chosen date so it appears in the diary AND gets
+                // pushed to Intervals.icu like any other planned workout.
+                const bDate = parseLocalISODate(dateIso);
+                const dd = String(bDate.getDate()).padStart(2, "0");
+                const mm = String(bDate.getMonth() + 1).padStart(2, "0");
+                const yyyy = bDate.getFullYear();
+                const dmy = `${dd}/${mm}/${yyyy}`;
+                const weekday = format(bDate, "EEE");
+                const protoLabel = protocol === "30min"
+                  ? "30-minute Threshold Test"
+                  : protocol === "3k" ? "3K Time Trial" : "5K Time Trial";
+                const mainRow = protocol === "30min"
+                  ? "| Main | 30 min | Hardest pace you can hold evenly for 30 min | Z4 | Threshold benchmark — even effort throughout |"
+                  : protocol === "3k"
+                    ? "| Main | 3 km | All-out time trial | Z5 | 3K benchmark — race the full distance |"
+                    : "| Main | 5 km | All-out time trial | Z5 | 5K benchmark — race the full distance |";
+                const benchmarkPlan = `## Week 1
+
+**${weekday} ${dmy}** - Benchmark: ${protoLabel}
+
+| Segment | Duration | Target | HR Zone | Notes |
+|---------|----------|--------|---------|-------|
+| Warm-up | 10 min | Easy jog | Z1 | Loosen up, a few strides at the end |
+${mainRow}
+| Cool-down | 10 min | Easy jog | Z1 | Easy jog to finish |
+`;
+
+                // Archive any existing active plan so this one becomes active.
+                if (savedPlanId) {
+                  await supabase.from("training_plans").update({ archived: true }).eq("id", savedPlanId);
+                }
+                const { data: inserted, error: insertErr } = await supabase
+                  .from("training_plans")
+                  .insert({
+                    user_id: user.id,
+                    race_distance: raceDistance || "5k",
+                    goal_time: goalTime || null,
+                    training_days: (trainingDays && trainingDays.length ? trainingDays : [weekday.toLowerCase()]),
+                    start_date: dateIso,
+                    race_date: dateIso,
+                    content: benchmarkPlan,
+                  } as any)
+                  .select("id")
+                  .single();
+                if (insertErr) throw insertErr;
+
+                setSavedPlanId((inserted as any).id);
+                setContent(benchmarkPlan);
+                setStartDate(bDate);
                 setBenchmarkFirstOpen(false);
+
+                toast({
+                  title: "Benchmark added to your diary",
+                  description: `Scheduled for ${dmy}. Pushing to Intervals.icu…`,
+                });
+
+                // Fire-and-forget push to Intervals.icu (silent if not connected).
+                try {
+                  if (await hasIntervalsConnected()) {
+                    await handleSyncToIntervals(false, dateIso, benchmarkPlan);
+                  }
+                } catch {
+                  // errors surfaced inside handleSyncToIntervals
+                }
               } catch (e: any) {
                 toast({ title: "Couldn't schedule benchmark", description: e?.message ?? "Try again.", variant: "destructive" });
               } finally {
