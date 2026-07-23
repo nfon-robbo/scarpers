@@ -201,6 +201,8 @@ function hrZoneBpm(zone: string): string | null {
 // Defaults assume a recreational runner; tweak per-athlete in a future iteration.
 function paceForZone(zone: string, segmentText: string): string {
   const txt = `${zone} ${segmentText}`.toLowerCase();
+  // Benchmark / test efforts: pace is athlete-determined, don't prescribe one.
+  if (/benchmark|hardest\s*effort|all[-\s]?out|time\s*trial|max\s*effort/.test(txt)) return "";
   if (/walk/.test(txt)) return "9:25";
   if (/z5|vo2|sprint/.test(txt)) return "4:30";
   if (/z4|threshold|race\s*pace/.test(txt)) return "5:00";
