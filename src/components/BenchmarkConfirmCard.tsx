@@ -168,10 +168,33 @@ export default function BenchmarkConfirmCard({
       setManualOpen(false);
       setPending(null);
 
+      // Push measured threshold pace to intervals.icu (always overwrites).
+      // Fire-and-forget: failure is not fatal to the benchmark save.
+      void pushBenchmarkThresholdPace(saved.thresholdPaceSecPerKm).then((r) => {
+        if (r.ok) toast.success(`Threshold pace synced to intervals.icu (${r.mPerSec} m/s)`);
+      });
+
+      // Load current plan content for the pace-recalc diff dialog.
+      let planContent: string | null = null;
+      if (planId) {
+        const { data: plan } = await supabase
+          .from("training_plans")
+          .select("content")
+          .eq("id", planId)
+          .maybeSingle();
+        planContent = (plan as any)?.content ?? null;
+      }
+
       // Step 5: only 30-min TTs can rebuild HR zones. Skip for 3K/5K per the
-      // verbatim override warning.
+      // verbatim override warning. Recalc dialog fires after zones (or
+      // immediately for 3K/5K, which still update pace targets).
       if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
         setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
+        if (planContent) {
+          setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
+        }
+      } else if (planContent) {
+        setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
       } else {
         await onDone();
       }
