@@ -10,7 +10,7 @@
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
-import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+// purgeStravaOverlaps removed with Delete C — fuzzy merge covers the same case.
 import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 
 export interface GarminImportProgress {

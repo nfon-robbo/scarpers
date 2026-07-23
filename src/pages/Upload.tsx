@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
-import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+// purgeStravaOverlaps removed with Delete C — fuzzy merge covers the same case.
 import { buildFitLapRows } from "@/lib/fit-lap-rows";
 import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 import { Button } from "@/components/ui/button";
