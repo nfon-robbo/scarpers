@@ -420,7 +420,7 @@ export default function Analytics() {
       Z1: Math.round(z[0]), Z2: Math.round(z[1]), Z3: Math.round(z[2]),
       Z4: Math.round(z[3]), Z5: Math.round(z[4]),
     }));
-  }, [fActs, maxHR]);
+  }, [fActs, hrZones]);
 
   // ----- 4. Readiness vs performance -----
   const readyVsPerf = useMemo(() => {
