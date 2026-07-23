@@ -1,12 +1,9 @@
 /**
  * Benchmark Group 3 — synthetic end-to-end assertions.
  *
- * These tests exercise the pure modules the confirm flow depends on:
- *   1. Threshold pace is computed correctly from a synthetic 30-min effort.
- *   2. The intervals.icu m/s value is derived correctly (4:30/km → 3.7037 m/s).
- *   3. `recomputePlanPaces` rewrites session pace tokens using the ratios.
- *   4. Benchmark tokens `[benchmark:30min|3k|5k]` SURVIVE the rewrite.
- *   5. Confidence scoring surfaces deductions.
+ * Tests the pure modules the confirm flow depends on. Benchmark tokens are
+ * NOT part of plan content anymore — benchmarks live in benchmark_results —
+ * so token-survival assertions have been removed with the token machinery.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -17,10 +14,6 @@ import {
   scoreConfidence,
 } from "@/lib/benchmark-calculations";
 import { recomputePlanPaces } from "@/lib/recompute-plan-paces";
-import {
-  extractAllBenchmarkDates,
-  extractBenchmarkProtocolForDate,
-} from "@/lib/benchmark-token";
 
 describe("Benchmark E2E — pace + ratios", () => {
   it("computes 4:30/km threshold from a synthetic 30-min effort at 6.667 km", () => {
@@ -35,7 +28,6 @@ describe("Benchmark E2E — pace + ratios", () => {
 
   it("computes easy/threshold ranges from a 4:30/km LT", () => {
     const easy = paceRangeFromThreshold(270, "easy");
-    // ratios 1.28-1.38 => 345.6-372.6 => 5:46-6:13
     expect(Math.round(easy.minSecPerKm)).toBe(346);
     expect(Math.round(easy.maxSecPerKm)).toBe(373);
     const thr = paceRangeFromThreshold(270, "threshold");
@@ -44,11 +36,11 @@ describe("Benchmark E2E — pace + ratios", () => {
   });
 });
 
-describe("Benchmark E2E — plan rewrite + token survival", () => {
+describe("Benchmark E2E — plan rewrite", () => {
   const plan = [
     "# Week 3",
     "",
-    "## Monday 6/10/2025 [benchmark:30min]",
+    "## Monday 6/10/2025",
     "Warm-up: 15 min Z1 HR 110-130",
     "Main: 30 min threshold at 4:20-4:35/km",
     "Cool-down: 10 min Z1",
@@ -56,7 +48,7 @@ describe("Benchmark E2E — plan rewrite + token survival", () => {
     "## Tuesday 7/10/2025",
     "Easy run 60 min at 5:50-6:15/km",
     "",
-    "## Wednesday 8/10/2025 [benchmark:5k]",
+    "## Wednesday 8/10/2025",
     "5K TT: full effort at 4:10-4:25/km",
     "",
     "## Thursday 9/10/2025",
@@ -66,21 +58,9 @@ describe("Benchmark E2E — plan rewrite + token survival", () => {
   it("rewrites session paces from a new 4:30/km LT", () => {
     const { newContent, changes } = recomputePlanPaces(plan, 270);
     expect(changes.length).toBeGreaterThanOrEqual(3);
-    expect(newContent).toContain("5:46-6:13/km"); // easy
-    expect(newContent).toContain("4:25-4:35/km"); // threshold (0.98-1.02 * 270)
-    expect(newContent).toContain("3:58-4:08/km"); // vo2 (0.88-0.92 * 270)
-  });
-
-  it("preserves benchmark tokens verbatim through the rewrite", () => {
-    const { newContent } = recomputePlanPaces(plan, 270);
-    expect(newContent).toContain("[benchmark:30min]");
-    expect(newContent).toContain("[benchmark:5k]");
-    expect(extractBenchmarkProtocolForDate(newContent, "2025-10-06")).toBe("30min");
-    expect(extractBenchmarkProtocolForDate(newContent, "2025-10-08")).toBe("5k");
-    expect(extractAllBenchmarkDates(newContent)).toEqual([
-      { isoDate: "2025-10-06", protocol: "30min" },
-      { isoDate: "2025-10-08", protocol: "5k" },
-    ]);
+    expect(newContent).toContain("5:46-6:13/km");
+    expect(newContent).toContain("4:25-4:35/km");
+    expect(newContent).toContain("3:58-4:08/km");
   });
 
   it("leaves HR-only warm-up/cool-down lines untouched", () => {

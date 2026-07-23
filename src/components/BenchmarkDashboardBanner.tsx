@@ -2,18 +2,17 @@
  * Slim dashboard banner shown when a scheduled benchmark has at least one
  * candidate activity ready to confirm within ±48h.
  *
- * Behaviour:
- *   • Renders directly under the dashboard header (never above Next Workout).
- *   • Dismisses when the user clicks Confirm/Reject on the plan page (via a
- *     window event) or the passing-day rules fire.
- *   • Session-dismissible via the ✕ button.
+ * Detection now reads scheduled benchmark rows directly from
+ * benchmark_results (status='scheduled') — no more plan-markdown token
+ * scanning. Nearest match wins in the window [past 7d, future 14d].
  */
 import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { Award, ChevronRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { extractAllBenchmarkDates, type BenchmarkProtocol } from "@/lib/benchmark-token";
+import type { BenchmarkProtocol } from "@/lib/benchmark-token";
+import { getScheduledBenchmarksInRange, type ScheduledBenchmark } from "@/lib/benchmark-scheduled";
 import {
   findBenchmarkCandidates,
   type ActivityForDetection,
@@ -28,32 +27,47 @@ const PROTOCOL_LABEL: Record<BenchmarkProtocol, string> = {
 
 interface Props {
   userId: string;
-  planContent: string | null | undefined;
+  /** Kept for signature compatibility; ignored — detection is now DB-driven. */
+  planContent?: string | null | undefined;
 }
 
-export default function BenchmarkDashboardBanner({ userId, planContent }: Props) {
+function isoLocal(d: Date) {
+  const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0"); const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+export default function BenchmarkDashboardBanner({ userId }: Props) {
   const [candidateCount, setCandidateCount] = useState(0);
   const [target, setTarget] = useState<{ isoDate: string; protocol: BenchmarkProtocol } | null>(null);
+  const [scheduled, setScheduled] = useState<ScheduledBenchmark[]>([]);
   const [dismissed, setDismissed] = useState(() => {
     try { return sessionStorage.getItem(DISMISS_KEY) === "1"; } catch { return false; }
   });
   const navigate = useNavigate();
 
-  // Nearest scheduled benchmark (past 7d → future 14d).
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const from = new Date(); from.setDate(from.getDate() - 7);
+      const to = new Date(); to.setDate(to.getDate() + 14);
+      const rows = await getScheduledBenchmarksInRange(userId, isoLocal(from), isoLocal(to)).catch(() => []);
+      if (!cancelled) setScheduled(rows);
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
   const nearest = useMemo(() => {
-    if (!planContent) return null;
-    const all = extractAllBenchmarkDates(planContent);
-    if (all.length === 0) return null;
+    if (scheduled.length === 0) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const scored = all
-      .map((b) => ({ ...b, delta: differenceInCalendarDays(new Date(`${b.isoDate}T12:00:00Z`), today) }))
-      .filter((b) => b.delta >= -7 && b.delta <= 14)
+    const scored = scheduled
+      .map((b) => ({ ...b, delta: differenceInCalendarDays(new Date(`${b.benchmark_date}T12:00:00Z`), today) }))
       .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
     return scored[0] ?? null;
-  }, [planContent]);
+  }, [scheduled]);
 
   useEffect(() => {
-    setTarget(nearest ? { isoDate: nearest.isoDate, protocol: nearest.protocol } : null);
+    setTarget(nearest ? { isoDate: nearest.benchmark_date, protocol: nearest.benchmark_protocol } : null);
   }, [nearest]);
 
   useEffect(() => {
@@ -74,7 +88,7 @@ export default function BenchmarkDashboardBanner({ userId, planContent }: Props)
         supabase.from("benchmark_rejections" as any)
           .select("activity_id").eq("user_id", userId),
         supabase.from("benchmark_results" as any)
-          .select("id").eq("user_id", userId).eq("scheduled_date", target.isoDate).limit(1),
+          .select("id").eq("user_id", userId).eq("status", "confirmed").eq("benchmark_date", target.isoDate).limit(1),
       ]);
 
       if (cancelled) return;

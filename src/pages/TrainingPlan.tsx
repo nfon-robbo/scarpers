@@ -56,7 +56,9 @@ import { logPlanEdit } from "@/lib/plan-edit-log";
 import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
 import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
-import { placeWeek1Benchmark } from "@/lib/place-benchmark";
+import { getLatestConfirmedBenchmark, scheduleStandaloneBenchmark } from "@/lib/benchmark-scheduled";
+import type { BenchmarkProtocol } from "@/lib/benchmark-token";
+import BenchmarkFirstDialog from "@/components/BenchmarkFirstDialog";
 import { useHrZones } from "@/hooks/useHrZones";
 
 // ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
@@ -538,6 +540,8 @@ const TrainingPlanPage = () => {
   const [letAIDecide, setLetAIDecide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNewPlanDialog, setShowNewPlanDialog] = useState(false);
+  const [benchmarkFirstOpen, setBenchmarkFirstOpen] = useState(false);
+  const [schedulingBenchmark, setSchedulingBenchmark] = useState(false);
   const [showTextDialog, setShowTextDialog] = useState(false);
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
   const [linkedActivities, setLinkedActivities] = useState<Record<string, any>>({});
@@ -1422,6 +1426,11 @@ const TrainingPlanPage = () => {
       }
     }
 
+    // Measured benchmark override — if the athlete has a confirmed benchmark,
+    // its threshold pace/HR is passed as a HARD anchor to the coach and the
+    // provisional pace becomes advisory only.
+    const measured = await getLatestConfirmedBenchmark(user.id).catch(() => null);
+
     let accumulated = "";
     streamAICoach({
       type: "training-plan",
@@ -1433,16 +1442,16 @@ const TrainingPlanPage = () => {
       trainingDays,
       startDate: effectiveStartISO,
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
+      measuredThresholdPaceSecPerKm: measured?.thresholdPaceSecPerKm,
+      measuredThresholdHr: measured?.thresholdHr ?? undefined,
+      measuredBenchmarkDateIso: measured?.benchmarkDate,
       onDelta: (text) => {
         accumulated += text;
         setContent(prefix + accumulated);
       },
       onDone: async () => {
         setLoading(false);
-        let finalContent = prefix + accumulated;
-        // Place the week-1 benchmark BEFORE save so the validator, intervals
-        // sync, and coach-context stripper all see it in one place.
-        finalContent = placeWeek1Benchmark(finalContent, effectiveStartISO);
+        const finalContent = prefix + accumulated;
         setContent(finalContent);
         const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
         toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
@@ -2208,14 +2217,11 @@ const TrainingPlanPage = () => {
           pace: step.pace,
         }));
         const steps = [...aiSteps, ...customSteps];
-        const stripToken = (s: string) => s.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
-        const description = stripToken(w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | "));
-        const notes = stripToken(
-          w.segments
-            .map(s => s.notes?.trim())
-            .filter(Boolean)
-            .join("\n")
-        );
+        const description = w.segments.map(s => `${s.segment}: ${s.duration} ${s.hrZone}`).join(" | ");
+        const notes = w.segments
+          .map(s => s.notes?.trim())
+          .filter(Boolean)
+          .join("\n");
         const totalSecs = steps.reduce((sum, s) => sum + s.duration, 0);
         const totalMins = Math.round(totalSecs / 60);
         const descriptiveTitle = deriveWorkoutTitle(w.title, steps, totalMins);
@@ -2223,14 +2229,14 @@ const TrainingPlanPage = () => {
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "") // strip any existing brand prefix
           .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers Dash - — Walk"
-        const correctedName = stripToken(`Scarpers Dash - ${baseName}`);
+        const correctedName = `Scarpers Dash - ${baseName}`;
         return {
           date: dateStr,
           name: correctedName,
           description,
           steps,
           notes,
-          rawDescription: w.intervalsText ? stripToken(w.intervalsText) : undefined,
+          rawDescription: w.intervalsText,
         };
       });
 
@@ -2725,7 +2731,7 @@ const TrainingPlanPage = () => {
       )}
       {(showConfig || loading) && (
         <div className="flex flex-wrap gap-3">
-          <Button onClick={generatePlan} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+          <Button onClick={() => { if (!loading) setBenchmarkFirstOpen(true); }} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2738,6 +2744,28 @@ const TrainingPlanPage = () => {
               </>
             )}
           </Button>
+          <BenchmarkFirstDialog
+            open={benchmarkFirstOpen}
+            onOpenChange={setBenchmarkFirstOpen}
+            scheduling={schedulingBenchmark}
+            onSkip={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
+            onScheduleBenchmark={async (dateIso, protocol) => {
+              if (!user) return;
+              setSchedulingBenchmark(true);
+              try {
+                await scheduleStandaloneBenchmark({ userId: user.id, benchmarkDateIso: dateIso, protocol });
+                toast({
+                  title: "Benchmark scheduled",
+                  description: `We'll build your plan from real data after you run it on ${dateIso}. You can generate now if you'd like a provisional plan in the meantime.`,
+                });
+                setBenchmarkFirstOpen(false);
+              } catch (e: any) {
+                toast({ title: "Couldn't schedule benchmark", description: e?.message ?? "Try again.", variant: "destructive" });
+              } finally {
+                setSchedulingBenchmark(false);
+              }
+            }}
+          />
           <input
             ref={fileInputRef}
             type="file"

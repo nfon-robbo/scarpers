@@ -3,7 +3,8 @@ import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } fr
 import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
 import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
 import { supabase } from "@/integrations/supabase/client";
-import { extractAllBenchmarkDates, type BenchmarkProtocol } from "@/lib/benchmark-token";
+import type { BenchmarkProtocol } from "@/lib/benchmark-token";
+import { getScheduledBenchmarksInRange } from "@/lib/benchmark-scheduled";
 import { findBenchmarkCandidates, type ActivityForDetection, type CandidateActivity } from "@/lib/benchmark-detection";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -579,32 +580,38 @@ export default function PlanDayList({
   useEffect(() => { saveCustomSteps(customSteps); }, [customSteps]);
 
   // ─── Benchmarks ────────────────────────────────────────────────────────────
-  // For every day that has a scheduled benchmark, resolve nearest-first
-  // candidate activities within ±48h and expose them to the row renderer.
-  // A single query per plan; results grouped by scheduled iso date.
-  const benchmarkSchedule = useMemo(() => {
-    const map = new Map<string, BenchmarkProtocol>();
-    if (planContent) {
-      for (const b of extractAllBenchmarkDates(planContent)) {
-        map.set(b.isoDate, b.protocol);
-      }
-    }
-    return map;
-  }, [planContent]);
-
+  // Scheduled benchmarks live in benchmark_results (status='scheduled',
+  // training_plan_id=null). We fetch any that fall within the plan's date
+  // range and, for each, resolve nearest-first candidate activities within
+  // ±48h so the row renderer can offer confirm/reject.
+  const [benchmarkSchedule, setBenchmarkSchedule] = useState<Map<string, BenchmarkProtocol>>(new Map());
   const [confirmedDates, setConfirmedDates] = useState<Set<string>>(new Set());
   const [benchmarkCandidates, setBenchmarkCandidates] = useState<Map<string, CandidateActivity[]>>(new Map());
   const [benchmarkRefreshKey, setBenchmarkRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (!userId || benchmarkSchedule.size === 0) {
+    if (!userId || !planStartDate || !planEndDate) {
+      setBenchmarkSchedule(new Map());
       setConfirmedDates(new Set());
       setBenchmarkCandidates(new Map());
       return;
     }
     let cancelled = false;
     (async () => {
-      const dates = Array.from(benchmarkSchedule.keys());
+      const toIsoLocal = (d: Date) => {
+        const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0"); const dd = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${dd}`;
+      };
+      const fromIso = toIsoLocal(planStartDate);
+      const toIso = toIsoLocal(planEndDate);
+      const scheduled = await getScheduledBenchmarksInRange(userId, fromIso, toIso).catch(() => []);
+      if (cancelled) return;
+      const map = new Map<string, BenchmarkProtocol>();
+      for (const s of scheduled) map.set(s.benchmark_date, s.benchmark_protocol);
+      setBenchmarkSchedule(map);
+      if (map.size === 0) { setConfirmedDates(new Set()); setBenchmarkCandidates(new Map()); return; }
+
+      const dates = Array.from(map.keys());
       const minDate = dates.reduce((m, d) => (d < m ? d : m), dates[0]);
       const maxDate = dates.reduce((m, d) => (d > m ? d : m), dates[0]);
       const from = new Date(`${minDate}T12:00:00Z`); from.setUTCDate(from.getUTCDate() - 3);
@@ -619,12 +626,12 @@ export default function PlanDayList({
         supabase.from("benchmark_rejections" as any)
           .select("activity_id").eq("user_id", userId),
         supabase.from("benchmark_results" as any)
-          .select("scheduled_date").eq("user_id", userId).in("scheduled_date", dates),
+          .select("benchmark_date").eq("user_id", userId).eq("status", "confirmed").in("benchmark_date", dates),
       ]);
       if (cancelled) return;
 
       const rejectedIds = new Set<string>((rej ?? []).map((r: any) => r.activity_id));
-      const confirmed = new Set<string>((existing ?? []).map((r: any) => r.scheduled_date));
+      const confirmed = new Set<string>((existing ?? []).map((r: any) => r.benchmark_date));
       const perDate = new Map<string, CandidateActivity[]>();
       benchmarkSchedule.forEach((protocol, isoDate) => {
         if (confirmed.has(isoDate)) return;
