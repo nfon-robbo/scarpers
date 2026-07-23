@@ -172,30 +172,23 @@ function intensityWeight(title: string): number {
   return 1.0;
 }
 
-function hrZonesFromActivity(a: Activity, maxHR: number) {
+function hrZonesFromActivity(a: Activity, zones: Zones) {
   // Use raw_data HR samples if available, else estimate from avg HR.
   const samples: number[] = Array.isArray(a.raw_data?.hr_samples) ? a.raw_data.hr_samples : [];
   const dur = a.duration_seconds || 0;
-  const zones = [0, 0, 0, 0, 0]; // Z1..Z5 minutes
-  const bands = [0.6, 0.7, 0.8, 0.9, 1.01];
+  const perZone = [0, 0, 0, 0, 0]; // Z1..Z5 minutes
   if (samples.length > 1 && dur > 0) {
     const per = dur / samples.length / 60; // minutes per sample
     for (const hr of samples) {
-      const pct = hr / maxHR;
-      let z = 0;
-      for (let i = 0; i < 5; i++) if (pct < bands[i]) { z = i; break; }
-      zones[z] += per;
+      perZone[bpmToZone(hr, zones) - 1] += per;
     }
-    return zones;
+    return perZone;
   }
   // Fallback: dump duration in single zone matching avg HR.
   if (a.avg_heart_rate && dur > 0) {
-    const pct = a.avg_heart_rate / maxHR;
-    let z = 0;
-    for (let i = 0; i < 5; i++) if (pct < bands[i]) { z = i; break; }
-    zones[z] = dur / 60;
+    perZone[bpmToZone(a.avg_heart_rate, zones) - 1] = dur / 60;
   }
-  return zones;
+  return perZone;
 }
 
 function isoWeekKey(d: Date): string {
