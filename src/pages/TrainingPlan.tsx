@@ -57,6 +57,7 @@ import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePla
 import { splitPlanByDate } from "@/lib/plan-split";
 import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
 import { placeWeek1Benchmark } from "@/lib/place-benchmark";
+import { useHrZones } from "@/hooks/useHrZones";
 
 // ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
 // Skip re-running the LLM when the user re-clicks within 30 min and no new
