@@ -36,6 +36,9 @@ export async function streamAICoach({
   planStartFromDate,
   todayDateUk,
   targetIsNotToday,
+  measuredThresholdPaceSecPerKm,
+  measuredThresholdHr,
+  measuredBenchmarkDateIso,
   featureName,
   onDelta,
   onDone,
@@ -61,6 +64,12 @@ export async function streamAICoach({
   planStartFromDate?: string;
   todayDateUk?: string;
   targetIsNotToday?: boolean;
+  /** Measured LT pace from most recent confirmed benchmark (seconds per km). */
+  measuredThresholdPaceSecPerKm?: number;
+  /** Measured threshold HR (bpm) — from same benchmark row. */
+  measuredThresholdHr?: number;
+  /** ISO date of the measured benchmark, for prompt context. */
+  measuredBenchmarkDateIso?: string;
   /** Optional label for telemetry (e.g. "day-adjust", "chat"). */
   featureName?: string;
   onDelta: (text: string) => void;
@@ -130,6 +139,9 @@ export async function streamAICoach({
     if (planStartFromDate) body.plan_start_from_date = planStartFromDate;
     if (todayDateUk) body.today_date_uk = todayDateUk;
     if (targetIsNotToday) body.target_is_not_today = true;
+    if (typeof measuredThresholdPaceSecPerKm === "number") body.measured_threshold_pace_s_per_km = measuredThresholdPaceSecPerKm;
+    if (typeof measuredThresholdHr === "number") body.measured_threshold_hr = measuredThresholdHr;
+    if (measuredBenchmarkDateIso) body.measured_benchmark_date = measuredBenchmarkDateIso;
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
