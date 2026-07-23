@@ -27,6 +27,16 @@ export interface ParsedWorkout {
   intervalsText?: string; // Native intervals.icu workout text block (from DOCX import)
 }
 
+/**
+ * Strip in-title benchmark markers (e.g. `[benchmark:30min]`) from a workout
+ * title before it's pushed to intervals.icu / a watch. The marker is our
+ * internal cue for the benchmark detector — the watch must never render it in
+ * the workout name.
+ */
+export function stripBenchmarkTokens(title: string): string {
+  return title.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
+}
+
 function cleanMarkdownCell(value: string): string {
   return value
     .replace(/\\([*_`])/g, "$1")
