@@ -143,7 +143,7 @@ function vetTier1(
 export async function getProvisionalPace(
   supabase: SupabaseClient,
   userId: string,
-  opts: { experienceLevel?: string | null; z2MaxHr?: number | null } = {},
+  opts: { experienceLevel?: string | null; z2MaxHr?: number | null; resolvedMaxHr?: number | null } = {},
 ): Promise<ProvisionalPace> {
   try {
     const since = new Date(Date.now() - 90 * 86400_000).toISOString();
