@@ -19,6 +19,8 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { bpmToZone, type Zones } from "@shared/hr-zones";
+import { useHrZones } from "@/hooks/useHrZones";
 
 const tooltipStyle = {
   background: "hsl(var(--card))",
