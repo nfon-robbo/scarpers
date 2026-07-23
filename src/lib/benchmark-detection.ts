@@ -13,8 +13,8 @@
  */
 
 import {
-  findConsecutiveLapWindow,
-  type LapForMatching,
+  matchBenchmarkEffortWindow,
+  type BenchmarkLap,
 } from "@/lib/benchmark-lap-matcher";
 import { protocolDurationWindow, type BenchmarkProtocol } from "@/lib/benchmark-token";
 
@@ -104,7 +104,7 @@ const PROTOCOL_PREFERRED_START_S = 5 * 60;
  */
 export function identifyEffortWindow(params: {
   protocol: BenchmarkProtocol;
-  laps: LapForMatching[] | null;
+  laps: BenchmarkLap[] | null;
   activityDurationS: number;
   activityDistanceM: number;
   /**
@@ -115,32 +115,30 @@ export function identifyEffortWindow(params: {
   stream?: Array<{ tS: number; distM: number }>;
 }): EffortWindow | null {
   const { protocol, laps, activityDurationS, activityDistanceM, stream } = params;
-  const spec = PROTOCOL_TARGET_SECONDS[protocol];
 
-  // ── Path 1 — laps ──────────────────────────────────────────────────────────
-  if (laps && laps.length > 0) {
-    const match = findConsecutiveLapWindow(laps, {
-      targetSeconds: spec.target,
-      toleranceSeconds: spec.tolerance,
-      preferredStartSeconds: PROTOCOL_PREFERRED_START_S,
-    });
+  // ── Path 1 — laps (30-min protocol only; 3k/5k drop straight to derived) ──
+  if (protocol === "30min" && laps && laps.length > 0) {
+    const match = matchBenchmarkEffortWindow(laps);
     if (match) {
+      // Estimate distance proportionally: laps don't carry distance in this
+      // shape, so use activity-wide pace across the matched duration.
+      const distanceMeters = activityDurationS > 0
+        ? (activityDistanceM * match.durationS) / activityDurationS
+        : 0;
       return {
-        startSeconds: match.startSeconds,
-        endSeconds: match.startSeconds + match.durationSeconds,
-        durationSeconds: match.durationSeconds,
-        distanceMeters: match.distanceMeters,
+        startSeconds: match.startOffsetS,
+        endSeconds: match.startOffsetS + match.durationS,
+        durationSeconds: match.durationS,
+        distanceMeters,
         source: "laps",
       };
     }
-    // Path 1 attempted but failed → record why and fall through.
     return buildDerivedWindow({
       protocol, activityDurationS, activityDistanceM, stream,
-      note: `laps present (n=${laps.length}) but no contiguous window matched ${spec.target}s ±${spec.tolerance}s`,
+      note: `laps present (n=${laps.length}) but no contiguous window matched 1680–1920s`,
     });
   }
 
-  // No laps → Path 2 directly, no note.
   return buildDerivedWindow({ protocol, activityDurationS, activityDistanceM, stream });
 }
 
