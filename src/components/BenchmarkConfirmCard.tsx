@@ -327,8 +327,9 @@ export default function BenchmarkConfirmCard({
           onOpenChange={(o) => {
             if (!o) {
               setZoneDialog(null);
-              // Regardless of apply vs skip, we're done with this benchmark cycle.
-              void onDone();
+              // If a recalc dialog is queued we let it drive onDone; otherwise
+              // finish the cycle here.
+              if (!recalcDialog) void onDone();
             }
           }}
           userId={userId}
@@ -337,6 +338,21 @@ export default function BenchmarkConfirmCard({
           measuredLthr={zoneDialog.measuredLthr}
           currentZones={currentZones}
           planId={planId}
+        />
+      )}
+
+      {recalcDialog && planId && (
+        <PlanPaceRecalcDialog
+          open={!!recalcDialog}
+          onOpenChange={(o) => {
+            if (!o) {
+              setRecalcDialog(null);
+              void onDone();
+            }
+          }}
+          planId={planId}
+          planContent={recalcDialog.planContent}
+          newThresholdSecPerKm={recalcDialog.thresholdSecPerKm}
         />
       )}
     </>
