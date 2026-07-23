@@ -798,7 +798,8 @@ const Dashboard = () => {
         "{dailyQuote.text}" — {dailyQuote.author}
       </p>
 
-      {/* ── Benchmark ready banner (dismissible, session-scoped) ── */}
+      {/* ── Benchmark banners: 6-week due prompt (schedule) + candidate-ready (confirm) ── */}
+      {user && <BenchmarkDueBanner userId={user.id} />}
       {user && plan?.content && (
         <BenchmarkDashboardBanner userId={user.id} planContent={plan.content} />
       )}
