@@ -100,7 +100,9 @@ serve(async (req) => {
           plan: plan
             ? {
                 id: plan.id,
-                content: plan.content,
+                content: typeof plan.content === "string"
+                  ? plan.content.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ")
+                  : plan.content,
                 race_distance: plan.race_distance,
                 race_date: plan.race_date,
                 start_date: plan.start_date,

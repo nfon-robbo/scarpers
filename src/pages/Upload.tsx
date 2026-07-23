@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } from "@/lib/fit-parser";
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
-import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+// purgeStravaOverlaps removed with Delete C — fuzzy merge covers the same case.
 import { buildFitLapRows } from "@/lib/fit-lap-rows";
 import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 import { Button } from "@/components/ui/button";
@@ -140,13 +140,9 @@ const UploadPage = () => {
 
       if (uploadError) throw uploadError;
 
-      // FIT always wins: remove any overlapping Strava activities (±15min) before insert
-      try {
-        const allFitTimes = parseResult.activities.map((a) => a.start_time);
-        await purgeStravaOverlaps(user.id, allFitTimes, 15);
-      } catch (e) {
-        console.error("Strava overlap purge failed:", e);
-      }
+      // Delete C (Strava overlap purge) removed. Fuzzy merge in the FIT insert
+      // path below covers the two-sources-same-session case by enriching the
+      // existing Strava row instead of destroying it.
 
       // Skip files that have already been imported (unique on user_id + source_file)
       const allSourceFiles = Array.from(

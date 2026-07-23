@@ -102,29 +102,29 @@ const EXISTING = {
 };
 
 describe("findFuzzyMatch", () => {
-  it("matches when start within 5 min, same type, duration within 2 min", () => {
+  it("matches when start within 15 min, same type, duration within 2 min", () => {
     const incoming = {
-      start_time: "2025-06-01T07:03:00.000Z", // +3 min
+      start_time: "2025-06-01T07:12:00.000Z", // +12 min (inside widened window)
       activity_type: "run",
       duration_s: 2760, // +60 s
     };
     const m = findFuzzyMatch(incoming, [EXISTING]);
     expect(m).not.toBeNull();
     expect(m!.candidate.id).toBe("existing-uuid");
-    expect(m!.startDeltaS).toBe(180);
+    expect(m!.startDeltaS).toBe(720);
     expect(m!.durationDeltaS).toBe(60);
   });
 
-  it("rejects when start delta > 5 min", () => {
+  it("rejects when start delta > 15 min", () => {
     const incoming = {
-      start_time: "2025-06-01T07:06:00.000Z",
+      start_time: "2025-06-01T07:16:00.000Z",
       activity_type: "run",
       duration_s: 2700,
     };
     expect(findFuzzyMatch(incoming, [EXISTING])).toBeNull();
   });
 
-  it("rejects when activity_type differs", () => {
+  it("rejects when activity_type differs (even inside start window)", () => {
     const incoming = {
       start_time: "2025-06-01T07:00:00.000Z",
       activity_type: "ride",
@@ -133,7 +133,7 @@ describe("findFuzzyMatch", () => {
     expect(findFuzzyMatch(incoming, [EXISTING])).toBeNull();
   });
 
-  it("rejects when duration delta > 2 min", () => {
+  it("rejects when duration delta > 2 min (guards different sessions in same window)", () => {
     const incoming = {
       start_time: "2025-06-01T07:00:00.000Z",
       activity_type: "run",

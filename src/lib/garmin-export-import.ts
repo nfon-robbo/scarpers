@@ -10,7 +10,7 @@
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
-import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
+// purgeStravaOverlaps removed with Delete C — fuzzy merge covers the same case.
 import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 
 export interface GarminImportProgress {
@@ -505,24 +505,11 @@ export async function importGarminExport(
       errors.push(`Cross-source merge: ${e?.message || e}`);
     }
 
-    // Blanket delete any pre-existing activity at same start_time (overlap from Strava/FIT)
-    // — but skip start_times we just fuzzy-enriched.
-    if (remainingStartTimes.length) {
-      const chunkSize = 500;
-      for (let i = 0; i < remainingStartTimes.length; i += chunkSize) {
-        await supabase.from("activities")
-          .delete()
-          .eq("user_id", userId)
-          .in("start_time", remainingStartTimes.slice(i, i + chunkSize));
-      }
-
-      // FIT always wins: remove Strava overlaps within ±15min of any remaining start_time
-      try {
-        await purgeStravaOverlaps(userId, remainingStartTimes, 15);
-      } catch (e: any) {
-        errors.push(`Strava overlap purge: ${e?.message || e}`);
-      }
-    }
+    // Delete B (exact same-start_time blanket) and Delete C (±15-min Strava
+    // overlap purge) removed. Fuzzy merge above covers the two-sources-same-
+    // session case by enriching the existing row instead of destroying it.
+    // Same-source_file replacement (Delete A) still runs above.
+    void remainingStartTimes;
 
 
     // Insert in batches, capture ids so we can persist Garmin splits into
