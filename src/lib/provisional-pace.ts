@@ -285,7 +285,7 @@ export async function getProvisionalPace(
         paceMin: fmt(cushioned),
         paceMax: fmt(cushioned + 20),
         label: "Provisional pace",
-        detail: `Average of your last ${easyRuns.length} easy run${easyRuns.length === 1 ? "" : "s"} (${fmt(easyAvg)}/km) with a 15 s/km cushion${skipNote}`,
+        detail: `Average of your last ${easyRuns.length} ${easyRelaxed ? "continuous" : "easy"} run${easyRuns.length === 1 ? "" : "s"} (${fmt(easyAvg)}/km) with a 15 s/km cushion${skipNote}`,
         rejection,
       };
     }
