@@ -101,9 +101,6 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
           if (s.records) records = records.concat(s.records);
         }
       }
-      const gpsTrack: GpsPoint[] = [];
-      const firstRecordTime = records.find((r: any) => r.timestamp)?.timestamp;
-      const firstRecordMs = firstRecordTime ? new Date(firstRecordTime).getTime() : null;
       // Extract laps — in cascade mode nested under sessions
       const rawSessions: any[] = data?.sessions || data?.activity?.sessions || [];
       const collectLaps = (): any[] => {
