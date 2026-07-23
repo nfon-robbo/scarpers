@@ -8,7 +8,8 @@
  *   Z4  95 – ≤102 % LTHR
  *   Z5 >102 % LTHR
  *
- * LTHR is resolved once per athlete via `resolveZones`:
+ * LTHR is resolved once per athlete via `resolveZonesForUser` (the ONLY
+ * public entry point):
  *   1. Measured LTHR (from a completed benchmark) — step 3 will supply this.
  *   2. Estimated LTHR = `LTHR_PCT_OF_MAX` × resolved max HR.
  *
@@ -22,8 +23,9 @@
  *
  * All six HR-zone surfaces (ai-coach plan, ai-coach deload, Analytics chart,
  * ActivityDetailDialog, running-iq aerobic cap, intervals-sync push) call
- * `resolveZones` + `bpmToZone` / `zoneRangeLabel`. No surface computes zones
- * locally.
+ * `resolveZonesForUser` + `bpmToZone` / `zoneRangeLabel`. No surface computes
+ * zones locally, and no surface may pass its own activity slice — the pure
+ * resolver lives in `./hr-zones-internal.ts` and is not re-exported here.
  *
  * This file lives under supabase/functions/_shared so Deno edge functions
  * import it natively. The Vite client re-exports it via the `@shared/hr-zones`
