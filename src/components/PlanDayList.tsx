@@ -802,10 +802,26 @@ export default function PlanDayList({
                   day.getTime() >= new Date(pauseWindow.start).setHours(0, 0, 0, 0) &&
                   day.getTime() < new Date(pauseWindow.end).setHours(0, 0, 0, 0));
                 const pauseMeta = pauseReasonMeta(pauseReason);
+                const benchmarkProtocol = benchmarkSchedule.get(key);
+                const showBenchmark =
+                  !!userId && !!benchmarkProtocol && !confirmedDates.has(key);
+                const benchmarkList = benchmarkCandidates.get(key) ?? [];
 
                 return (
+                  <div key={key}>
+                    {showBenchmark && (
+                      <div className="px-3 pt-2.5 pb-1">
+                        <BenchmarkConfirmCard
+                          userId={userId!}
+                          planId={planId}
+                          scheduledDateIso={key}
+                          protocol={benchmarkProtocol!}
+                          candidates={benchmarkList}
+                          onDone={refreshBenchmarks}
+                        />
+                      </div>
+                    )}
                   <div
-                    key={key}
                     data-plan-date={key}
                     onDragOver={(e) => handleDragOver(e, key)}
                     onDragLeave={() => setDragOverDate((d) => (d === key ? null : d))}
