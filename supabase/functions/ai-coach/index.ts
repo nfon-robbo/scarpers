@@ -387,6 +387,19 @@ function buildPrediction(opts: {
         if (d.getTime() >= today.getTime()) {
           validationDate = `${m[1].padStart(2, "0")}/${m[2].padStart(2, "0")}/${m[3]}`;
           break;
+  if (plan?.content) {
+    const stripped = String(plan.content).replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ");
+    const re = /^#{2,4}\s+.*?\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/gm;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const matches = Array.from(stripped.matchAll(re));
+    for (const m of matches) {
+      const idx = m.index ?? 0;
+      const block = stripped.slice(idx, idx + 600);
+      if (/tempo|race pace|threshold|interval|time trial/i.test(block)) {
+        const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+        if (d.getTime() >= today.getTime()) {
+          validationDate = `${m[1].padStart(2, "0")}/${m[2].padStart(2, "0")}/${m[3]}`;
+          break;
         }
       }
     }
