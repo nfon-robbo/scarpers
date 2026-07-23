@@ -351,6 +351,30 @@ serve(async (req) => {
       clearPauseEvent?: { planId: string; oldest?: string; newest?: string; pauseStart?: string; pauseEnd?: string };
     };
 
+    // Resolve user's HR zones once per request via shared LTHR band model.
+    // Fed into formatWorkoutDescription so bpm→zone falls on personalised bands
+    // instead of the legacy hard-coded universal ladder.
+    let userZones: Zones | null = null;
+    try {
+      const sinceIso = new Date(Date.now() - 180 * 86400 * 1000).toISOString();
+      const [{ data: profile }, { data: acts }] = await Promise.all([
+        supabase.from("profiles").select("date_of_birth").eq("user_id", user.id).maybeSingle(),
+        supabase
+          .from("activities")
+          .select("id, max_heart_rate, start_time, activity_type")
+          .eq("user_id", user.id)
+          .gte("start_time", sinceIso)
+          .not("max_heart_rate", "is", null),
+      ]);
+      const dob = (profile as { date_of_birth?: string } | null)?.date_of_birth;
+      const ageYears = dob
+        ? (Date.now() - new Date(dob).getTime()) / (365.25 * 86400 * 1000)
+        : null;
+      userZones = resolveZones({ ageYears, activities: (acts ?? []) as any });
+    } catch (e) {
+      console.warn("[intervals-sync] zone resolution failed, using fallback ladder:", e);
+    }
+
 
     const basicAuth = btoa(`API_KEY:${INTERVALS_API_KEY}`);
     const baseUrl = `https://intervals.icu/api/v1/athlete/${INTERVALS_ATHLETE_ID}`;
