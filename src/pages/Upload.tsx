@@ -140,13 +140,9 @@ const UploadPage = () => {
 
       if (uploadError) throw uploadError;
 
-      // FIT always wins: remove any overlapping Strava activities (±15min) before insert
-      try {
-        const allFitTimes = parseResult.activities.map((a) => a.start_time);
-        await purgeStravaOverlaps(user.id, allFitTimes, 15);
-      } catch (e) {
-        console.error("Strava overlap purge failed:", e);
-      }
+      // Delete C (Strava overlap purge) removed. Fuzzy merge in the FIT insert
+      // path below covers the two-sources-same-session case by enriching the
+      // existing Strava row instead of destroying it.
 
       // Skip files that have already been imported (unique on user_id + source_file)
       const allSourceFiles = Array.from(
