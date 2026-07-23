@@ -332,7 +332,7 @@ function expandSegments(
         kind: "run",
         label: runIdx === 1 && !/main/i.test(seg.segment) ? seg.segment : `Run ${runIdx}`,
         duration: formatTime(seg.duration),
-        pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.notes || "")),
+        pace: paceForZone(seg.hrZone, seg.segment + " " + (seg.target || "") + " " + (seg.notes || "")),
       });
       mainEmitted = true;
     }
