@@ -740,12 +740,13 @@ Rest, or do an easy activity of your choice — walk, gentle spin, mobility. We'
         for (const a of yesterdayActivities) {
           const dur = Number(a.duration_seconds || 0);
           const avgHr = Number(a.avg_heart_rate || 0);
-          const maxHr = Number(a.max_heart_rate || 0) || 190; // fallback estimate
+          const perActMax = Number(a.max_heart_rate || 0) || 190;
+          const perActZones = zonesFromLthr(Math.round(perActMax * LTHR_PCT_OF_MAX));
           const load = Number(a.training_load || 0);
           if (dur > 5400) { yesterdayLoad.long = true; yesterdayLoad.reason += `duration ${(dur/60).toFixed(0)}min; `; }
-          if ((dur > 3600 && avgHr >= 0.85 * maxHr) || load > 150) {
+          if ((dur > 3600 && avgHr > perActZones.z3Max) || load > 150) {
             yesterdayLoad.hard = true;
-            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (≥85% max); `;
+            yesterdayLoad.reason += load > 150 ? `training load ${load.toFixed(0)}; ` : `${(dur/60).toFixed(0)}min @ ${avgHr.toFixed(0)}bpm (Z4+); `;
           }
         }
       }
