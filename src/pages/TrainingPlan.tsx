@@ -2842,14 +2842,29 @@ const TrainingPlanPage = () => {
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
-                {provisionalPace && !currentPaceMin && !currentPaceMax && (
-                  <div className="mt-2 flex items-start gap-2 text-xs">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
-                      Provisional pace
-                    </span>
-                    <span className="text-muted-foreground">
-                      {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
-                    </span>
+                {provisionalPace && (
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
+                        Provisional pace
+                      </span>
+                      <span className="text-muted-foreground">
+                        {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
+                        {(currentPaceMin || currentPaceMax) && (
+                          <span className="ml-1 italic">(your typed pace wins)</span>
+                        )}
+                      </span>
+                    </div>
+                    {provisionalPace.rejection && (
+                      <div className="flex items-start gap-2">
+                        <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-semibold uppercase tracking-wider">
+                          Skipped
+                        </span>
+                        <span className="text-muted-foreground">
+                          Faster {provisionalPace.rejection.pace}/km candidate rejected — {provisionalPace.rejection.detail}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
