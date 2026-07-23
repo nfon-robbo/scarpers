@@ -496,6 +496,7 @@ const TrainingPlanPage = () => {
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
   const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [provisionalPace, setProvisionalPace] = useState<ProvisionalPace | null>(null);
+  const { zones: hrZones } = useHrZones();
 
   // Always compute the provisional seed so the athlete can see what their own
   // history suggests, even when they've typed a pace. Typed values still win.
@@ -504,14 +505,18 @@ const TrainingPlanPage = () => {
     let cancelled = false;
     (async () => {
       try {
-        const seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+        const seed = await getProvisionalPace(supabase, user.id, {
+          experienceLevel: null,
+          resolvedMaxHr: hrZones?.maxHr ?? null,
+          z2MaxHr: hrZones?.z2Max ?? null,
+        });
         if (!cancelled) setProvisionalPace(seed);
       } catch (e) {
         console.warn("provisional pace load failed", e);
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, hrZones?.maxHr, hrZones?.z2Max]);
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
