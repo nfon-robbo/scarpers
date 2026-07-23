@@ -451,6 +451,20 @@ serve(async (req) => {
     if (!user) throw new Error("Unauthorized");
 
     const reqBody = await req.json();
+    // Strip internal benchmark markers ([benchmark:30min]) from anything
+    // that goes into the model prompt — the athlete-facing model must never
+    // see the token.
+    const stripBenchmarkTokens = (s: unknown): any => {
+      if (typeof s !== "string") return s;
+      return s.replace(/\s*\[benchmark:[^\]]+\]\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
+    };
+    if (typeof reqBody.current_plan === "string") reqBody.current_plan = stripBenchmarkTokens(reqBody.current_plan);
+    if (reqBody.today_workout && typeof reqBody.today_workout === "object" && typeof reqBody.today_workout.title === "string") {
+      reqBody.today_workout.title = stripBenchmarkTokens(reqBody.today_workout.title);
+    }
+    if (reqBody.planned_workout && typeof reqBody.planned_workout === "object" && typeof reqBody.planned_workout.title === "string") {
+      reqBody.planned_workout.title = stripBenchmarkTokens(reqBody.planned_workout.title);
+    }
     const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
