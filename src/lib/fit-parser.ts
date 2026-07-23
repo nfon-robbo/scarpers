@@ -175,7 +175,9 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
 
       // Extract session-level data — try multiple paths
       const sessions = data?.sessions || data?.activity?.sessions || [];
+      const allLaps = buildLaps(collectLaps());
       if (sessions.length > 0) {
+        let sessionIdx = 0;
         for (const session of sessions) {
           const cleanedTrack = cleanGpsTrack(gpsTrack);
           activities.push({
@@ -199,7 +201,9 @@ export function parseFitBuffer(buffer: ArrayBuffer, fileName: string): Promise<P
             source_file: fileName,
             gps_track: cleanedTrack,
             raw_data: session,
+            laps: sessionIdx === 0 ? allLaps : [],
           });
+          sessionIdx++;
         }
       } else {
         // Fallback: try to extract from records
