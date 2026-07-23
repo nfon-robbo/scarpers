@@ -78,16 +78,18 @@ function paceForSegment(seg: ParsedSegment, intensity: string): string {
   const explicit = paceSource.match(/(\d{1,2}:\d{2})\s*(?:\/\s*(?:km|mi)|\b)/i);
   if (explicit) return `${explicit[1]}/km`;
 
-  const txt = `${seg.segment} ${seg.target} ${seg.notes || ""}`.toLowerCase();
-  // Warm-up, cool-down, recovery, rest, and walks are no-target unless the
-  // plan explicitly supplies a jog/run pace (e.g. Warm Up Jog — 7:15/km).
-  if (/warmup|cooldown|recovery|rest/i.test(intensity)) return "";
-  if (/warm|cool|recovery|rest/.test(txt)) return "";
-  if (/walk/.test(txt) && !/run|interval|tempo|stride|fast|jog/.test(txt)) return "";
-  if (/z5|vo2|sprint|fast/.test(txt)) return "4:30/km";
-  if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
-  if (/z3|tempo|steady/.test(txt)) return "5:30/km";
-  return "6:27/km";
+    const txt = `${seg.segment} ${seg.target} ${seg.notes || ""}`.toLowerCase();
+    // Benchmark / test efforts: pace is athlete-determined, don't prescribe one.
+    if (/benchmark|hardest\s*effort|all[-\s]?out|time\s*trial|max\s*effort/.test(txt)) return "";
+    // Warm-up, cool-down, recovery, rest, and walks are no-target unless the
+    // plan explicitly supplies a jog/run pace (e.g. Warm Up Jog — 7:15/km).
+    if (/warmup|cooldown|recovery|rest/i.test(intensity)) return "";
+    if (/warm|cool|recovery|rest/.test(txt)) return "";
+    if (/walk/.test(txt) && !/run|interval|tempo|stride|fast|jog/.test(txt)) return "";
+    if (/z5|vo2|sprint|fast/.test(txt)) return "4:30/km";
+    if (/z4|threshold|race\s*pace|5k/.test(txt)) return "5:00/km";
+    if (/z3|tempo|steady/.test(txt)) return "5:30/km";
+    return "6:27/km";
 }
 
 /** Parse "M:SS/km" → seconds-per-km. Returns null if unparseable. */
