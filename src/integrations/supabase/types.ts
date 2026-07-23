@@ -413,10 +413,7 @@ export type Database = {
           effort_window_start_time: string
           id: string
           lthr: number | null
-          predicted_10k_seconds: number | null
           predicted_5k_seconds: number | null
-          predicted_full_seconds: number | null
-          predicted_half_seconds: number | null
           riegel_exponent: number
           rpe_effort: number | null
           rpe_notes: string | null
@@ -444,10 +441,7 @@ export type Database = {
           effort_window_start_time: string
           id?: string
           lthr?: number | null
-          predicted_10k_seconds?: number | null
           predicted_5k_seconds?: number | null
-          predicted_full_seconds?: number | null
-          predicted_half_seconds?: number | null
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
@@ -475,10 +469,7 @@ export type Database = {
           effort_window_start_time?: string
           id?: string
           lthr?: number | null
-          predicted_10k_seconds?: number | null
           predicted_5k_seconds?: number | null
-          predicted_full_seconds?: number | null
-          predicted_half_seconds?: number | null
           riegel_exponent?: number
           rpe_effort?: number | null
           rpe_notes?: string | null
