@@ -495,6 +495,22 @@ const TrainingPlanPage = () => {
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
   const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [provisionalPace, setProvisionalPace] = useState<ProvisionalPace | null>(null);
+
+  // Always compute the provisional seed so the athlete can see what their own
+  // history suggests, even when they've typed a pace. Typed values still win.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+        if (!cancelled) setProvisionalPace(seed);
+      } catch (e) {
+        console.warn("provisional pace load failed", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
