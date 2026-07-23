@@ -1404,7 +1404,11 @@ const TrainingPlanPage = () => {
       let seed: ProvisionalPace | null = provisionalPace;
       try {
         if (!seed) {
-          seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+          seed = await getProvisionalPace(supabase, user.id, {
+            experienceLevel: null,
+            resolvedMaxHr: hrZones?.maxHr ?? null,
+            z2MaxHr: hrZones?.z2Max ?? null,
+          });
           setProvisionalPace(seed);
         }
         seedPaceMin = seed.paceMin;
