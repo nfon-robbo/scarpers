@@ -48,16 +48,19 @@ export default function ZoneComparisonDialog({
   planId, onApplied,
 }: Props) {
   const [working, setWorking] = useState(false);
-  const [affectedCount, setAffectedCount] = useState<number | null>(null);
+  const [affected, setAffected] = useState<Array<{ iso: string; label: string }> | null>(null);
 
   const newBands = useMemo(() => zonesFromLthr(measuredLthr), [measuredLthr]);
   const oldLthr = currentZones?.lthr ?? null;
   const delta = oldLthr != null ? measuredLthr - oldLthr : null;
   const largeChange = delta != null && Math.abs(delta) >= LARGE_CHANGE_BPM;
 
-  // Best-effort scan of the current plan's markdown for HR-referencing lines.
+  // Parse the plan markdown into dated day blocks and list the ones whose
+  // body references HR zones (Z1-Z5) or explicit bpm — those sessions will
+  // be re-scaled by the new bands. Same heading grammar as splitPlanByDate:
+  //   ### **Weekday DD/MM/YYYY** — Session name (Total: ...)
   useEffect(() => {
-    if (!open || !planId) { setAffectedCount(null); return; }
+    if (!open || !planId) { setAffected(null); return; }
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -67,15 +70,37 @@ export default function ZoneComparisonDialog({
         .maybeSingle();
       if (cancelled) return;
       const md = (data as { content?: string | null } | null)?.content ?? "";
-      if (!md) { setAffectedCount(0); return; }
-      // Count lines mentioning any of Z1-Z5 or explicit bpm — proxy for
-      // workouts driven by HR zones.
+      if (!md) { setAffected([]); return; }
+
+      const HEADING_RE =
+        /^###\s+\*\*[^*]*?(\d{2})\/(\d{2})\/(\d{4})[^*]*\*\*\s*(?:[—–-]\s*)?(.*)$/;
+      const HR_REF_RE = /\b(Z[1-5]|bpm)\b/i;
+      const todayIso = new Date().toISOString().slice(0, 10);
+
       const lines = md.split(/\r?\n/);
-      const hits = lines.filter((l) => /\b(Z[1-5]|bpm)\b/i.test(l)).length;
-      setAffectedCount(hits);
+      const blocks: Array<{ iso: string; label: string; body: string }> = [];
+      let cur: { iso: string; label: string; body: string } | null = null;
+      for (const l of lines) {
+        const m = l.match(HEADING_RE);
+        if (m) {
+          if (cur) blocks.push(cur);
+          const iso = `${m[3]}-${m[2]}-${m[1]}`;
+          const rawLabel = (m[4] || "").replace(/\(Total:[^)]*\)/i, "").trim();
+          cur = { iso, label: rawLabel || "Session", body: "" };
+        } else if (cur) {
+          cur.body += l + "\n";
+        }
+      }
+      if (cur) blocks.push(cur);
+
+      const future = blocks
+        .filter((b) => b.iso >= todayIso && HR_REF_RE.test(b.body))
+        .map(({ iso, label }) => ({ iso, label }));
+      setAffected(future);
     })();
     return () => { cancelled = true; };
   }, [open, planId]);
+
 
   const handleApply = async () => {
     setWorking(true);
@@ -155,14 +180,35 @@ export default function ZoneComparisonDialog({
         </div>
 
         {planId != null && (
-          <p className="text-xs text-muted-foreground">
-            {affectedCount == null
-              ? "Checking your plan…"
-              : affectedCount === 0
-                ? "No HR-referencing sessions detected in the current plan."
-                : `${affectedCount} session${affectedCount === 1 ? "" : "s"} in your current plan reference HR zones and will use the new bands.`}
-          </p>
+          affected == null ? (
+            <p className="text-xs text-muted-foreground">Checking your plan…</p>
+          ) : affected.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No upcoming HR-referencing sessions in the current plan.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {affected.length} upcoming session{affected.length === 1 ? "" : "s"} will
+                re-scale to the new bands:
+              </p>
+              <ul className="max-h-40 overflow-y-auto rounded-lg border border-border/60 divide-y divide-border/40 text-xs">
+                {affected.map((s) => {
+                  const [y, m, d] = s.iso.split("-");
+                  return (
+                    <li key={s.iso + s.label} className="px-2.5 py-1.5 flex items-baseline gap-2">
+                      <span className="tabular-nums text-muted-foreground shrink-0">
+                        {d}/{m}/{y}
+                      </span>
+                      <span className="truncate">{s.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )
         )}
+
 
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={working}>

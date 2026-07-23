@@ -13,6 +13,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { zonesFromLthr } from "@shared/hr-zones";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
 
+/**
+ * Plausibility bounds for a measured lactate-threshold HR. Values outside
+ * this window are almost certainly a sensor artefact (strap dropouts, ECG
+ * cross-talk, or a treadmill armband picking up mains hum) rather than a
+ * real threshold, so we refuse to overwrite zones with them.
+ *
+ * These are deliberately wide — 100 bpm covers well-trained masters
+ * athletes with low resting HR, and 210 bpm covers young athletes with a
+ * genuinely high max. If you hit either limit with a legitimate benchmark,
+ * change the constant here (not silently in a caller).
+ */
+export const MIN_PLAUSIBLE_LTHR_BPM = 100;
+export const MAX_PLAUSIBLE_LTHR_BPM = 210;
+
 export interface ApplyMeasuredZonesResult {
   hrZonesId: string;
   lthr: number;
@@ -36,8 +50,15 @@ export async function applyMeasuredZones(params: {
       "Zones can only be rebuilt from a 30-minute threshold benchmark. A 3K/5K result estimates pace only.",
     );
   }
-  if (!Number.isFinite(measuredLthr) || measuredLthr < 100 || measuredLthr > 210) {
-    throw new Error(`Refusing to write hr_zones: implausible LTHR ${measuredLthr}.`);
+  if (
+    !Number.isFinite(measuredLthr) ||
+    measuredLthr < MIN_PLAUSIBLE_LTHR_BPM ||
+    measuredLthr > MAX_PLAUSIBLE_LTHR_BPM
+  ) {
+    throw new Error(
+      `Refusing to write hr_zones: LTHR ${measuredLthr} bpm is outside the plausible range ` +
+      `${MIN_PLAUSIBLE_LTHR_BPM}-${MAX_PLAUSIBLE_LTHR_BPM} bpm.`,
+    );
   }
 
   const bands = zonesFromLthr(measuredLthr);
