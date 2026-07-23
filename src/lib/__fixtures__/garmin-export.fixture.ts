@@ -1,12 +1,21 @@
 // Minimal Garmin Connect data-export activity JSON shape (only fields the
-// splits mapper reads). Two splits: one "full", one with mostly missing
-// measurements so nulls are exercised.
+// splits mapper reads). Exercises the base-lap filter deliberately:
+//
+//   [0] type=18 (run), no lapIndexes            → KEPT (base lap, full)
+//   [1] type=18 (run), no lapIndexes            → KEPT (base lap, mostly-null)
+//   [2] type=3  (climb), lapIndexes=[0,1]       → DROPPED (rollup, both conditions agree)
+//   [3] type=3  (climb), no lapIndexes          → DROPPED + LOGGED (disagreement: non-base type, no lapIndexes)
+//
+// A hypothetical "base-lap type carrying lapIndexes" disagreement does not
+// appear in real data (0 rows across 41 activities) and is left uncovered
+// here to keep the fixture faithful to observed shape.
 export const GARMIN_EXPORT_ACTIVITY_FIXTURE = {
   source_file: "garmin_export:activity:987654321",
   raw_data: {
     garmin: {
       splits: [
         {
+          type: 18,
           messageIndex: 0,
           startTimeGMT: 1717228800000, // 2024-06-01T08:00:00.000Z
           measurements: [
@@ -25,11 +34,36 @@ export const GARMIN_EXPORT_ACTIVITY_FIXTURE = {
           ],
         },
         {
+          type: 18,
           messageIndex: 1,
           startTimeGMT: 1717229100000, // 2024-06-01T08:05:00.000Z
           measurements: [
             { fieldEnum: "SUM_DURATION", unitEnum: "MILLISECOND", value: 180000 },
             { fieldEnum: "WEIGHTED_MEAN_HEARTRATE", unitEnum: "BPM", value: 168, valid: false }, // invalid → null
+          ],
+        },
+        {
+          // Climb rollup covering both base laps above. Must be dropped so
+          // stored lap durations don't double-count against the activity.
+          type: 3,
+          messageIndex: 2,
+          lapIndexes: [0, 1],
+          startTimeGMT: 1717228800000,
+          measurements: [
+            { fieldEnum: "SUM_DURATION", unitEnum: "MILLISECOND", value: 480000 },
+            { fieldEnum: "SUM_DISTANCE", unitEnum: "CENTIMETER", value: 180000 },
+            { fieldEnum: "GAIN_ELEVATION", unitEnum: "CENTIMETER", value: 800 },
+          ],
+        },
+        {
+          // Rare: rollup-flavoured type without lapIndexes. Structural test
+          // alone would let this through; enum guard drops it and the logger
+          // records the disagreement.
+          type: 3,
+          messageIndex: 3,
+          startTimeGMT: 1717229280000,
+          measurements: [
+            { fieldEnum: "SUM_DURATION", unitEnum: "MILLISECOND", value: 60000 },
           ],
         },
       ],
