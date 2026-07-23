@@ -59,7 +59,13 @@ export interface ConfirmParams {
 
 export async function confirmBenchmark(
   params: ConfirmParams,
-): Promise<{ id: string; lthr: number | null }> {
+): Promise<{
+  id: string;
+  lthr: number | null;
+  thresholdPaceSecPerKm: number;
+  protocol: BenchmarkProtocol;
+  confidenceDeductions: Array<{ reason: string; points: number }>;
+}> {
   const {
     userId, planId, scheduledDateIso, protocol,
     activity, laps, manualDurationS, manualDistanceM,
@@ -87,22 +93,16 @@ export async function confirmBenchmark(
     throw new Error("Could not identify a valid effort window for this activity.");
   }
 
-  // Threshold pace is computed and stored on the benchmark row so a later
-  // "apply new pace" action can read it, but nothing downstream should treat
-  // this row as the active pace source until the user explicitly confirms.
   const pace = thresholdPaceSecPerKm(effort.distanceMeters, effort.durationSeconds);
   const predicted5k = Math.round(predict5kSeconds(effort.distanceMeters, effort.durationSeconds));
 
-  // Threshold HR: for a 30-min TT the effort's average HR ≈ LTHR. For 3k/5k
-  // it's a running-max estimator that we still treat as LTHR-proxy pending a
-  // full stream (we don't fetch streams here).
   const thresholdHr = activity?.avg_heart_rate ?? null;
   const lthr = thresholdHr;
 
   const conf = scoreConfidence({
     hrStreamAvailable: !!activity?.avg_heart_rate,
-    secondHalfSlowdown: 0,       // no stream fetched at confirm time
-    cadencePresent: true,        // conservative default; refined by future stream work
+    secondHalfSlowdown: 0,
+    cadencePresent: true,
     gpsConfidence: "High",
     rpeSubmaximal: likelySubmaximal,
     effortWindowSource: effort.source,
@@ -134,10 +134,17 @@ export async function confirmBenchmark(
         captured_at: new Date().toISOString(),
       };
 
+  // benchmark_date is required (NOT NULL). For plan-scheduled benchmarks this
+  // matches scheduled_date; for standalone benchmarks it falls back to today.
+  const benchmarkDateIso =
+    scheduledDateIso ?? (activity?.start_time?.slice(0, 10)) ?? new Date().toISOString().slice(0, 10);
+
   const payload = {
     user_id: userId,
     training_plan_id: planId,
     scheduled_date: scheduledDateIso,
+    benchmark_date: benchmarkDateIso,
+    benchmark_protocol: protocol,
     activity_id: activity?.id ?? null,
     effort_window_start_time: effortStartTime,
     effort_window_end_time: effortEndTime,
@@ -155,7 +162,7 @@ export async function confirmBenchmark(
     active: true,
     confidence_score: conf.score,
     confidence_band: conf.band,
-    rpe_effort: likelySubmaximal ? 6 : 9,
+    confidence_deductions: conf.deductions,
     rpe_response: rpeResponse ?? null,
     could_continue_response: couldContinueResponse ?? null,
     likely_submaximal: likelySubmaximal,
@@ -171,20 +178,16 @@ export async function confirmBenchmark(
 
   const id = (data as any).id as string;
 
-  // NOTE: hr_zones is NOT written here. Zone application requires an explicit
-  // user confirm tap after the old-vs-new comparison dialog (spec item 22).
-  // A separate action — applyMeasuredZones(benchmarkId) — is the only writer.
-  // Threshold pace recalculation across remaining workouts is also gated by a
-  // separate confirm; this row stores the measured pace but does not activate
-  // it downstream.
+  // NOTE: hr_zones is written only via applyMeasuredZones (behind the zone
+  // comparison dialog). Threshold-pace push and plan pace recalc are both
+  // gated by separate user confirmations further downstream.
 
-  // Advance next_benchmark_due (best-effort; ignore if column absent).
   await supabase
     .from("profiles")
-    .update({ next_benchmark_due: addWeeksIso(scheduledDateIso, NEXT_BENCHMARK_WEEKS) } as any)
+    .update({ next_benchmark_due: addWeeksIso(benchmarkDateIso, NEXT_BENCHMARK_WEEKS) } as any)
     .eq("user_id", userId);
 
-  return { id, lthr };
+  return { id, lthr, thresholdPaceSecPerKm: pace, protocol, confidenceDeductions: conf.deductions };
 }
 
 export async function rejectCandidate(params: {
