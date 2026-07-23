@@ -1833,12 +1833,15 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         else if (diff > 5) hrvTrend = "improving";
       }
 
-      // HR zones from estimated max HR (220 - age fallback) or from activity max
+      // HR zones from max HR. Prefer observed activity max (real data) over
+      // age-based estimate; fall back to 220 - age; final fallback 190.
+      // Previously: `ageMax || (observedMax > 0 ? observedMax : 190)` — a truthy
+      // ageMax short-circuited and observedMax was unreachable whenever DOB was set.
       const ageMax = profile?.date_of_birth
         ? 220 - (new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear())
         : null;
       const observedMax = Math.max(...(activities || []).map((a: any) => a.max_heart_rate || 0));
-      const maxHr = ageMax || (observedMax > 0 ? observedMax : 190);
+      const maxHr = observedMax > 0 ? observedMax : (ageMax || 190);
       const z1Max = Math.round(maxHr * 0.65);
       const z2Range = `${Math.round(maxHr * 0.65)}-${Math.round(maxHr * 0.75)}`;
       const z3Range = `${Math.round(maxHr * 0.75)}-${Math.round(maxHr * 0.85)}`;
