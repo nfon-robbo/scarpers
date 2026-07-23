@@ -627,7 +627,7 @@ serve(async (req) => {
     }
 
     const eventsToSync = workouts.map((workout, idx) => {
-      const fullDescription = formatWorkoutDescription(workout);
+      const fullDescription = formatWorkoutDescription(workout, userZones);
       const totalDuration = workout.steps.reduce((sum, s) => sum + s.duration, 0);
       const totalDistance = workout.steps.reduce((sum, s) => sum + paceToDistanceMeters(s.duration, s.pace), 0);
 
