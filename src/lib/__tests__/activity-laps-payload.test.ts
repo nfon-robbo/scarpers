@@ -15,10 +15,10 @@ import {
  *      column mapping or unit conversion moved, OR
  *   b) the change is a regression in activity import and must be reverted.
  *
- * These fixtures deliberately encode current behavior including the
- * fit-parser's ascent/descent × 1000 quirk (see fit-parser.ts:128-129);
- * if that is fixed the FIT fixture values must be recalibrated in the
- * same commit.
+ * These fixtures encode current behavior. FIT ascent/descent values come
+ * out of fit-parser in kilometres (lengthUnit: "km") and are multiplied by
+ * 1000 to store metres — this is the correct unit conversion, not a quirk.
+ * All downstream consumers read total_ascent/descent as metres.
  */
 describe("activity_laps insert payload — FIT path", () => {
   it("maps ParsedLap[] to insert rows byte-identically", () => {
