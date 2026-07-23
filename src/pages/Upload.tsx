@@ -6,6 +6,7 @@ import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } f
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
 import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
 import { buildFitLapRows } from "@/lib/fit-lap-rows";
+import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -165,11 +166,61 @@ const UploadPage = () => {
       );
       const skippedCount = parseResult.activities.length - toImport.length;
 
-      // Insert activities in batches
+      // Cross-source fuzzy merge: enrich existing rows (e.g. from Strava)
+      // instead of inserting duplicates. Attach laps to the existing id.
+      const mergePlan = await planCrossSourceMerge(
+        user.id,
+        toImport.map((a) => ({
+          start_time: a.start_time,
+          activity_type: a.activity_type,
+          duration_seconds: a.duration_seconds,
+          distance_meters: a.distance_meters,
+          avg_heart_rate: a.avg_heart_rate,
+          max_heart_rate: a.max_heart_rate,
+          avg_speed: a.avg_speed,
+          max_speed: a.max_speed,
+          avg_power: a.avg_power,
+          max_power: a.max_power,
+          avg_cadence: a.avg_cadence,
+          total_ascent: a.total_ascent,
+          total_descent: a.total_descent,
+          calories: a.calories,
+          avg_temperature: a.avg_temperature,
+          training_effect: a.training_effect,
+          training_load: a.training_load,
+        })),
+      );
+      await applyEnrichmentPatches(mergePlan.enrichments);
+
+      // Attach laps for fuzzy-matched activities to their existing id.
+      const fuzzyLapRows: any[] = [];
+      for (const e of mergePlan.enrichments) {
+        const src = toImport[e.incomingIndex];
+        fuzzyLapRows.push(
+          ...buildFitLapRows(user.id, e.existingId, src.laps || []),
+        );
+      }
+      if (fuzzyLapRows.length > 0) {
+        const { error: lapErr } = await supabase
+          .from("activity_laps")
+          .insert(fuzzyLapRows);
+        if (lapErr)
+          console.warn(
+            "activity_laps insert (fuzzy-merge) failed (non-fatal):",
+            lapErr,
+          );
+      }
+      const enrichedCount = mergePlan.enrichments.length;
+
+      // Only insert rows that had no fuzzy match either.
+      const remainingImport = mergePlan.remainingIndexes.map((i) => toImport[i]);
+
+
+      // Insert activities in batches (fuzzy-matched rows already enriched above)
       const batchSize = 50;
       let saved = 0;
-      for (let i = 0; i < toImport.length; i += batchSize) {
-        const slice = toImport.slice(i, i + batchSize);
+      for (let i = 0; i < remainingImport.length; i += batchSize) {
+        const slice = remainingImport.slice(i, i + batchSize);
         const batch = slice.map((a) => ({
           user_id: user.id,
           upload_id: uploadRecord.id,
@@ -217,15 +268,17 @@ const UploadPage = () => {
 
         saved += batch.length;
         setSavedCount(saved);
-        setProgress(60 + Math.round((saved / Math.max(1, toImport.length)) * 35));
+        setProgress(60 + Math.round((saved / Math.max(1, remainingImport.length)) * 35));
       }
 
       setProgress(100);
       setState("done");
-      const desc = skippedCount > 0
-        ? `${saved} imported, ${skippedCount} skipped (already imported).`
-        : `${saved} activities imported from ${parseResult.fileCount} FIT files.`;
-      toast({ title: "Import complete", description: desc });
+      const parts: string[] = [];
+      parts.push(`${saved} imported`);
+      if (enrichedCount) parts.push(`${enrichedCount} enriched existing`);
+      if (skippedCount) parts.push(`${skippedCount} skipped (already imported)`);
+      toast({ title: "Import complete", description: parts.join(", ") + "." });
+
     } catch (e: any) {
       console.error("Upload error:", e);
       setState("error");
