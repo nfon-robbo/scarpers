@@ -27,9 +27,9 @@ interface Props {
   }) => void | Promise<void>;
 }
 
-function Chips<T extends string>({
+function Chips({
   options, value, onChange,
-}: { options: readonly T[]; value: T | null; onChange: (v: T) => void }) {
+}: { options: readonly string[]; value: string | null; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((o) => (
@@ -71,14 +71,14 @@ export default function BenchmarkPostQuestionsDialog({
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">How hard did it feel?</Label>
-            <Chips options={RPE_OPTIONS} value={rpe} onChange={setRpe} />
+            <Chips options={RPE_OPTIONS} value={rpe} onChange={(v) => setRpe(v as RpeResponse)} />
           </div>
 
           <div>
             <Label className="text-xs mb-1.5 block">
               Could you have kept going at that effort?
             </Label>
-            <Chips options={COULD_CONTINUE_OPTIONS} value={cc} onChange={setCc} />
+            <Chips options={COULD_CONTINUE_OPTIONS} value={cc} onChange={(v) => setCc(v as CouldContinueResponse)} />
           </div>
 
           <Button
