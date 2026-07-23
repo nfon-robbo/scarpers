@@ -4,17 +4,20 @@
 // lap-level detail for a single activity. Never invoked from the normal
 // activity import path.
 //
+// Responsibility is narrow: fetch laps, cache them in activity_laps
+// (source='strava'), and report status. This function does NOT decide the
+// effort window and does NOT write anything to public.activities. The
+// benchmark evaluator inspects the returned laps and writes
+// effort_window_source on the benchmark_results row.
+//
 // Behaviour:
-//   1. If activity_laps already has rows for this activity (source='strava'),
-//      return them from cache. Each activity is therefore fetched from Strava
-//      at most once.
-//   2. Otherwise refresh the user's Strava token if needed, GET
-//      /activities/:id/laps, read X-ReadRateLimit-Usage / -Limit, and
-//      short-circuit when the remaining budget dips below 10 on either window
-//      (short-term or long-term).
-//   3. On any non-2xx (rate-limit, 4xx, 5xx) fall back gracefully: stamp
-//      activities.effort_window_source='derived' with a note, and return
-//      { fallback: true, reason }. Callers then use their pace-based detector.
+//   1. Cache hit — return existing rows from activity_laps.
+//   2. Otherwise refresh token, GET /activities/:id/laps, read
+//      X-ReadRateLimit-Usage / -Limit, flag budgetLow when remaining < 10 on
+//      either window.
+//   3. On any non-2xx (rate-limit, 4xx, 5xx) return { ok:false, reason }
+//      with an empty laps array. Caller falls back to its pace-based
+//      detector and records the reason on its own row.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -68,12 +71,10 @@ async function refreshTokenIfNeeded(supabase: any, userId: string, tokens: any):
   return data.access_token;
 }
 
-async function stampFallback(supabase: any, activityId: string, note: string) {
-  await supabase
-    .from("activities")
-    .update({ effort_window_source: "derived", effort_window_note: note })
-    .eq("id", activityId);
-}
+// NOTE: intentionally no stampFallback helper. This function must not write
+// to public.activities. Callers own the effort_window_source decision.
+
+
 
 function mapStravaLap(lap: any, idx: number) {
   return {
@@ -134,7 +135,7 @@ Deno.serve(async (req) => {
       .eq("source", "strava")
       .order("lap_index", { ascending: true });
     if (cached && cached.length > 0) {
-      return json(200, { cached: true, laps: cached, fallback: false });
+      return json(200, { ok: true, cached: true, laps: cached });
     }
 
     // Resolve Strava activity id.
@@ -144,8 +145,7 @@ Deno.serve(async (req) => {
         ? activity.source_file.slice(7)
         : null);
     if (!rawStravaId) {
-      await stampFallback(supabase, activityId, "no strava id on activity");
-      return json(200, { fallback: true, reason: "no_strava_id", laps: [] });
+      return json(200, { ok: false, reason: "no_strava_id", laps: [] });
     }
 
     // 2. Get tokens.
@@ -155,16 +155,14 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id)
       .single();
     if (tokErr || !tokens) {
-      await stampFallback(supabase, activityId, "strava not connected");
-      return json(200, { fallback: true, reason: "strava_not_connected", laps: [] });
+      return json(200, { ok: false, reason: "strava_not_connected", laps: [] });
     }
 
     let accessToken: string;
     try {
       accessToken = await refreshTokenIfNeeded(supabase, user.id, tokens);
     } catch (e: any) {
-      await stampFallback(supabase, activityId, `token refresh failed: ${e.message}`);
-      return json(200, { fallback: true, reason: "token_refresh_failed", laps: [] });
+      return json(200, { ok: false, reason: "token_refresh_failed", detail: e.message, laps: [] });
     }
 
     // 3. Call Strava.
@@ -180,14 +178,11 @@ Deno.serve(async (req) => {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      const reason = res.status === 429
-        ? "strava rate limit (429)"
-        : `strava ${res.status}`;
-      await stampFallback(supabase, activityId, `${reason}: ${errText.slice(0, 200)}`);
       return json(200, {
-        fallback: true,
+        ok: false,
         reason: res.status === 429 ? "rate_limited" : "strava_error",
         status: res.status,
+        detail: errText.slice(0, 200),
         rate_limit: { shortRemaining, longRemaining, budgetLow: true },
         laps: [],
       });
@@ -208,18 +203,13 @@ Deno.serve(async (req) => {
       if (insErr) console.warn("activity_laps insert warning:", insErr);
     }
 
-    // Stamp source so downstream detector knows lap data is authoritative.
-    await supabase
-      .from("activities")
-      .update({ effort_window_source: "strava_lap", effort_window_note: null })
-      .eq("id", activityId);
-
     return json(200, {
+      ok: true,
       cached: false,
-      fallback: false,
       laps: mapped,
       rate_limit: { shortRemaining, longRemaining, budgetLow },
     });
+
   } catch (e: any) {
     console.error("strava-fetch-laps error:", e);
     return json(500, { error: e.message || String(e) });

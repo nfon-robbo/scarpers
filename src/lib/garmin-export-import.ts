@@ -42,6 +42,90 @@ async function findFiles(zip: JSZip, predicate: (p: string) => boolean): Promise
   return out;
 }
 
+// -------- Garmin export split → activity_laps mapping --------
+//
+// A Garmin Connect data export split has no lap-name / trigger field. Each
+// split carries startTimeGMT (ms epoch) and a measurements[] array of
+// { fieldEnum, unitEnum, value } records. We map the well-known fields into
+// activity_laps columns and stash the full split under raw for later.
+const GARMIN_MEASURE_UNITS: Record<string, string> = {
+  SUM_DURATION: "MILLISECOND",
+  SUM_MOVINGDURATION: "MILLISECOND",
+  SUM_DISTANCE: "CENTIMETER",
+  WEIGHTED_MEAN_HEARTRATE: "BPM",
+  MAX_HEARTRATE: "BPM",
+  WEIGHTED_MEAN_SPEED: "CENTIMETERS_PER_MILLISECOND",
+  MAX_SPEED: "CENTIMETERS_PER_MILLISECOND",
+  WEIGHTED_MEAN_POWER: "WATT",
+  MAX_POWER: "WATT",
+  WEIGHTED_MEAN_DOUBLE_CADENCE: "BPM",
+  GAIN_ELEVATION: "CENTIMETER",
+  LOSS_ELEVATION: "CENTIMETER",
+};
+
+function measure(split: any, field: string): number | null {
+  const arr = Array.isArray(split?.measurements) ? split.measurements : [];
+  const m = arr.find((x: any) => x?.fieldEnum === field && x?.valid !== false);
+  if (!m || m.value == null) return null;
+  const n = Number(m.value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapGarminSplit(split: any, idx: number) {
+  const durMs = measure(split, "SUM_DURATION");
+  const movMs = measure(split, "SUM_MOVINGDURATION");
+  const distCm = measure(split, "SUM_DISTANCE");
+  const avgSpdCmPerMs = measure(split, "WEIGHTED_MEAN_SPEED");
+  const maxSpdCmPerMs = measure(split, "MAX_SPEED");
+  const gainCm = measure(split, "GAIN_ELEVATION");
+  const lossCm = measure(split, "LOSS_ELEVATION");
+  const startMs = Number(split?.startTimeGMT);
+  return {
+    lap_index: typeof split?.messageIndex === "number" ? split.messageIndex : idx,
+    start_time: Number.isFinite(startMs) ? new Date(startMs).toISOString() : null,
+    elapsed_time_s: durMs != null ? durMs / 1000 : null,
+    moving_time_s: movMs != null ? movMs / 1000 : null,
+    distance_m: distCm != null ? distCm / 100 : null,
+    avg_heart_rate: measure(split, "WEIGHTED_MEAN_HEARTRATE"),
+    max_heart_rate: measure(split, "MAX_HEARTRATE"),
+    avg_speed_mps: avgSpdCmPerMs != null ? avgSpdCmPerMs * 10 : null,
+    max_speed_mps: maxSpdCmPerMs != null ? maxSpdCmPerMs * 10 : null,
+    avg_cadence: measure(split, "WEIGHTED_MEAN_DOUBLE_CADENCE"),
+    avg_power: measure(split, "WEIGHTED_MEAN_POWER"),
+    max_power: measure(split, "MAX_POWER"),
+    total_ascent_m: gainCm != null ? gainCm / 100 : null,
+    total_descent_m: lossCm != null ? lossCm / 100 : null,
+    // Garmin export splits carry no lap-name / trigger field.
+    lap_trigger: null,
+    raw: split,
+  };
+}
+
+export function buildGarminLapRows(
+  userId: string,
+  batch: Array<{ source_file: string | null; raw_data?: any }>,
+  inserted: Array<{ id: string; source_file: string | null }>,
+): any[] {
+  const idBySourceFile = new Map<string, string>();
+  for (const r of inserted) if (r.source_file) idBySourceFile.set(r.source_file, r.id);
+  const rows: any[] = [];
+  for (const r of batch) {
+    const activityId = r.source_file ? idBySourceFile.get(r.source_file) : null;
+    if (!activityId) continue;
+    const splits: any[] = r.raw_data?.garmin?.splits;
+    if (!Array.isArray(splits) || splits.length === 0) continue;
+    splits.forEach((s, i) => {
+      rows.push({
+        user_id: userId,
+        activity_id: activityId,
+        source: "garmin_export",
+        ...mapGarminSplit(s, i),
+      });
+    });
+  }
+  return rows;
+}
+
 function routeFromGarminSummary(a: any): Array<{ lat: number; lng: number; time?: string }> {
   const points: Array<{ lat: number; lng: number; time?: string }> = [];
   const push = (lat: any, lng: any, time?: any) => {
@@ -320,13 +404,29 @@ export async function importGarminExport(
     }
     }
 
-    // Insert in batches
+    // Insert in batches, capture ids so we can persist Garmin splits into
+    // activity_laps (source='garmin_export'). This is additive — a failure
+    // to insert laps must never break the activity import.
     const batchSize = 100;
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
-      const { error } = await supabase.from("activities").insert(batch as any);
+      const { data: inserted, error } = await supabase
+        .from("activities")
+        .insert(batch as any)
+        .select("id, source_file");
       if (error) { errors.push(`Activities: ${error.message}`); break; }
       result.activities.inserted += batch.length;
+
+      try {
+        const lapRows = buildGarminLapRows(userId, batch, inserted || []);
+        if (lapRows.length > 0) {
+          const { error: lapErr } = await supabase.from("activity_laps").insert(lapRows);
+          if (lapErr) console.warn("activity_laps insert (garmin_export) failed (non-fatal):", lapErr);
+        }
+      } catch (e: any) {
+        console.warn("garmin_export lap map failed (non-fatal):", e?.message || e);
+      }
+
       onProgress?.({ phase: "Importing activities", total: rows.length, current: i + batch.length });
     }
   } catch (e: any) {
