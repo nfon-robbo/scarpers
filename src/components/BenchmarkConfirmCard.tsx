@@ -85,7 +85,7 @@ export default function BenchmarkConfirmCard({
         scheduledDateIso,
         protocol,
         activity: current,
-        laps: (laps as BenchmarkLap[] | null) ?? null,
+        laps: ((laps as unknown) as BenchmarkLap[] | null) ?? null,
       });
       toast.success("Benchmark saved", { description: "Zones and race predictions updated." });
       await onDone();
