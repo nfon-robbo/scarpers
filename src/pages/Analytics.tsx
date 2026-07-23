@@ -410,7 +410,7 @@ export default function Analytics() {
     const byWeek = new Map<string, number[]>();
     for (const a of fActs) {
       const wk = isoWeekKey(new Date(a.start_time));
-      const z = hrZonesFromActivity(a, maxHR);
+      const z = hrZones ? hrZonesFromActivity(a, hrZones) : [0, 0, 0, 0, 0];
       const cur = byWeek.get(wk) || [0, 0, 0, 0, 0];
       for (let i = 0; i < 5; i++) cur[i] += z[i];
       byWeek.set(wk, cur);
