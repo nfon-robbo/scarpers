@@ -201,11 +201,16 @@ export async function getProvisionalPace(
     // Easy-run baseline for Tier 2, for the Tier 1 relative guard, and for
     // the discrepancy check. Prefer the most recent 5.
     const z2Max = opts.z2MaxHr ?? null;
-    const easyRuns = withPace
+    const continuousRuns = withPace
       .filter(r => (r.distance_meters ?? 0) >= 2000)
-      .filter(r => r.sec_per_km < c.WALK_RUN_PACE_THRESHOLD_SEC_PER_KM)
+      .filter(r => r.sec_per_km < c.WALK_RUN_PACE_THRESHOLD_SEC_PER_KM);
+    const easyByHr = continuousRuns
       .filter(r => z2Max == null || r.avg_heart_rate == null || r.avg_heart_rate <= z2Max)
       .slice(0, 5);
+    // If the athlete habitually trains above Z2, the HR filter yields nothing.
+    // Relax to the most recent continuous runs so Tier 2 can still fire.
+    const easyRuns = easyByHr.length > 0 ? easyByHr : continuousRuns.slice(0, 5);
+    const easyRelaxed = easyByHr.length === 0 && continuousRuns.length > 0;
     const easyPaces = easyRuns.map(r => r.sec_per_km);
     const easyAvg = easyPaces.length ? easyPaces.reduce((s, p) => s + p, 0) / easyPaces.length : null;
 
