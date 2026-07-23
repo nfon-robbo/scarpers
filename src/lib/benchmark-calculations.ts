@@ -44,7 +44,49 @@ export const BenchmarkConfig = {
 
   /** Fractional slowdown that triggers the SECOND_HALF_SLOWDOWN deduction. */
   SECOND_HALF_SLOWDOWN_THRESHOLD: 0.10,
+
+  /**
+   * Session-type pace ratios expressed as a multiplier on THRESHOLD pace
+   * (LT = 1.000). Slower paces are > 1, faster paces are < 1. Ranges give the
+   * min/max target so downstream code can emit "5:46-6:13/km"-style windows.
+   *
+   * Anchor: LT (0.98-1.02) — deliberately narrow around threshold.
+   * Easy/Steady/Marathon derived from Daniels' vDOT at LT-equivalent effort,
+   * reality-checked against Pfitzinger easy-pace conventions (28-38% slower).
+   * CV/VO2/Rep from Coggan-style CV≈95%LT, 5K≈90%LT, 3K≈85%LT.
+   *
+   * Tune here, nowhere else — every consumer imports this constant.
+   */
+  THRESHOLD_PACE_RATIOS: {
+    easy:      { min: 1.28, max: 1.38 },
+    steady:    { min: 1.18, max: 1.24 },
+    marathon:  { min: 1.10, max: 1.14 },
+    threshold: { min: 0.98, max: 1.02 },
+    cv:        { min: 0.94, max: 0.97 },
+    vo2:       { min: 0.88, max: 0.92 },
+    rep:       { min: 0.82, max: 0.86 },
+  },
 } as const;
+
+export type SessionPaceCategory = keyof typeof BenchmarkConfig.THRESHOLD_PACE_RATIOS;
+
+/** Compute a pace RANGE (sec/km) for a session category from a threshold pace. */
+export function paceRangeFromThreshold(
+  thresholdSecPerKm: number,
+  category: SessionPaceCategory,
+): { minSecPerKm: number; maxSecPerKm: number } {
+  const r = BenchmarkConfig.THRESHOLD_PACE_RATIOS[category];
+  return {
+    minSecPerKm: thresholdSecPerKm * r.min,
+    maxSecPerKm: thresholdSecPerKm * r.max,
+  };
+}
+
+/** Convert seconds-per-km to metres-per-second (intervals.icu native unit). */
+export function secPerKmToMPerSec(secPerKm: number): number {
+  if (secPerKm <= 0) throw new Error("pace must be > 0");
+  return 1000 / secPerKm;
+}
 
 export type GpsConfidence = "High" | "Medium" | "Low";
 export type EffortWindowSource = "lap" | "laps" | "derived" | "manual";
