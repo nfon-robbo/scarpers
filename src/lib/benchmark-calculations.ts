@@ -47,7 +47,7 @@ export const BenchmarkConfig = {
 } as const;
 
 export type GpsConfidence = "High" | "Medium" | "Low";
-export type EffortWindowSource = "lap" | "derived" | "manual";
+export type EffortWindowSource = "lap" | "laps" | "derived" | "manual";
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
 // ---------------------------------------------------------------------------
