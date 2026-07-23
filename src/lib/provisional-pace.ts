@@ -49,9 +49,8 @@ export interface ProvisionalPace {
  *   check applies; below this we fall back to the hard floor only.
  */
 export const ProvisionalPaceConfig = {
-  HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km
+  HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km — unconditional
   MIN_HR_FRACTION_OF_MAX: 0.88,
-  ASSUMED_MAX_HR: 190,
   MAX_FASTER_THAN_EASY_BASELINE_SEC: 90,
   EASY_BASELINE_MIN_RUNS: 3,
 } as const;
