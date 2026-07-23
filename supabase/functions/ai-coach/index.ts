@@ -2112,7 +2112,7 @@ Plan: ${weeks} weeks starting ${planStart}
 Training Days: ${(training_days as string[] | undefined)?.length || 4} (${daysStr})
 
 ══ PHYSIOLOGICAL DATA ══
-HR Zones (estimated from max HR ${maxHr}): Z1<${z1Max}, Z2:${z2Range}, Z3:${z3Range}, Z4:${z4Range}, Z5>${z5Min} bpm
+${zonesPromptLine(zones)}
 VO2max: derive from activity history above
 Resting HR: ${restingHr ?? "N/A"} bpm (7-day avg)
 HRV: ${hrv ?? "N/A"} ms (trend: ${hrvTrend})
