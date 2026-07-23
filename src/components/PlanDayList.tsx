@@ -1,6 +1,10 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
 import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
+import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
+import { supabase } from "@/integrations/supabase/client";
+import { extractAllBenchmarkDates, type BenchmarkProtocol } from "@/lib/benchmark-token";
+import { findBenchmarkCandidates, type ActivityForDetection, type CandidateActivity } from "@/lib/benchmark-detection";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
