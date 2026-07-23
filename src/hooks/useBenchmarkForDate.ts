@@ -1,19 +1,16 @@
 /**
- * useBenchmarkForDate — resolves the benchmark protocol scheduled on a
- * given ISO date, loads candidate activities within ±48h, applies the
- * user's rejection set, and returns the sorted candidate list plus a
- * `refresh` to re-query after a confirm/reject write.
+ * useBenchmarkForDate — resolves the benchmark protocol scheduled on a given
+ * ISO date (via the standalone benchmark_results row), loads candidate
+ * activities within ±48h, applies the user's rejection set, and returns the
+ * sorted candidate list plus a `refresh` to re-query after a confirm/reject
+ * write.
  *
  * Returns `{ protocol: null }` when no benchmark is scheduled on that date.
- * Returns `candidates: []` when a benchmark is scheduled but nothing has
- * been run yet inside the window.
  */
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  extractBenchmarkProtocolForDate,
-  type BenchmarkProtocol,
-} from "@/lib/benchmark-token";
+import type { BenchmarkProtocol } from "@/lib/benchmark-token";
+import { getScheduledBenchmarkForDate } from "@/lib/benchmark-scheduled";
 import {
   findBenchmarkCandidates,
   type ActivityForDetection,
@@ -22,7 +19,8 @@ import {
 
 export interface UseBenchmarkForDateArgs {
   userId: string | null | undefined;
-  planContent: string | null | undefined;
+  /** Kept for signature compatibility; no longer read. */
+  planContent?: string | null | undefined;
   isoDate: string; // YYYY-MM-DD
   /** When true, we've already confirmed one — hide the card. */
   alreadyConfirmed?: boolean;
@@ -38,23 +36,28 @@ export interface UseBenchmarkForDateResult {
 export function useBenchmarkForDate(
   args: UseBenchmarkForDateArgs,
 ): UseBenchmarkForDateResult {
-  const { userId, planContent, isoDate, alreadyConfirmed } = args;
+  const { userId, isoDate, alreadyConfirmed } = args;
 
-  const protocol = useMemo(
-    () => extractBenchmarkProtocolForDate(planContent ?? "", isoDate),
-    [planContent, isoDate],
-  );
-
+  const [protocol, setProtocol] = useState<BenchmarkProtocol | null>(null);
   const [candidates, setCandidates] = useState<CandidateActivity[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!userId || !protocol || alreadyConfirmed) {
+    if (!userId || alreadyConfirmed) {
+      setProtocol(null);
       setCandidates([]);
       return;
     }
     setLoading(true);
     try {
+      const scheduled = await getScheduledBenchmarkForDate(userId, isoDate);
+      if (!scheduled) {
+        setProtocol(null);
+        setCandidates([]);
+        return;
+      }
+      setProtocol(scheduled.benchmark_protocol);
+
       const from = new Date(`${isoDate}T12:00:00Z`);
       from.setUTCDate(from.getUTCDate() - 3);
       const to = new Date(`${isoDate}T12:00:00Z`);
@@ -74,17 +77,16 @@ export function useBenchmarkForDate(
       ]);
 
       const rejectedIds = new Set<string>((rej ?? []).map((r: any) => r.activity_id));
-      const list = findBenchmarkCandidates({
+      setCandidates(findBenchmarkCandidates({
         activities: (acts ?? []) as ActivityForDetection[],
         scheduledDateIso: isoDate,
-        protocol,
+        protocol: scheduled.benchmark_protocol,
         rejectedIds,
-      });
-      setCandidates(list);
+      }));
     } finally {
       setLoading(false);
     }
-  }, [userId, protocol, isoDate, alreadyConfirmed]);
+  }, [userId, isoDate, alreadyConfirmed]);
 
   useEffect(() => { void load(); }, [load]);
 
