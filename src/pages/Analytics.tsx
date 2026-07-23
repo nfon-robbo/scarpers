@@ -769,7 +769,7 @@ export default function Analytics() {
           <CardTitle className="text-base flex items-center gap-2">
             <Heart className="w-4 h-4 text-primary" /> Heart Rate Zones
           </CardTitle>
-          <CardDescription className="text-xs">Minutes per zone, by week (max HR ≈ {maxHR})</CardDescription>
+          <CardDescription className="text-xs">Minutes per zone, by week (max HR ≈ {hrZones?.maxHr ?? "…"}, LTHR {hrZones?.lthr ?? "…"} bpm{hrZones?.lthrSource === "measured" ? "" : " est."})</CardDescription>
         </CardHeader>
         <CardContent>
           {hrData.length === 0 ? (
