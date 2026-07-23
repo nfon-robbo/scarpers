@@ -37,6 +37,8 @@ import type { RpeResponse, CouldContinueResponse } from "@/lib/benchmark-rpe";
 import BenchmarkOverrideDialog from "@/components/BenchmarkOverrideDialog";
 import BenchmarkPostQuestionsDialog from "@/components/BenchmarkPostQuestionsDialog";
 import ZoneComparisonDialog from "@/components/ZoneComparisonDialog";
+import PlanPaceRecalcDialog from "@/components/PlanPaceRecalcDialog";
+import { pushBenchmarkThresholdPace } from "@/lib/push-benchmark-threshold-pace";
 import { useHrZones } from "@/hooks/useHrZones";
 
 interface Props {
