@@ -31,14 +31,14 @@ export const BenchmarkConfig = {
     /** Applied when second-half average pace is >=10% slower than first-half. */
     SECOND_HALF_SLOWDOWN: 20,
     CADENCE_MISSING: 15,
-    GPS_LOW: 15,
+    GPS_LOW: 20,
     GPS_MEDIUM: 5,
     RPE_SUBMAXIMAL: 15,
     /** Effort window derived from moving averages rather than watch laps. */
     EFFORT_WINDOW_DERIVED: 15,
   },
-  /** Threshold at or above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
-  CONFIDENCE_BANDS: { HIGH_MIN: 80, MEDIUM_MIN: 40 },
+  /** Above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
+  CONFIDENCE_BANDS: { HIGH_MIN: 70, MEDIUM_MIN: 40 },
 
   /** Seconds of warm-up excluded when computing threshold HR from a stream. */
   THRESHOLD_HR_WARMUP_EXCLUDE_S: 10 * 60,
@@ -91,32 +91,11 @@ export function formatDuration(seconds: number): string {
 // HR zones
 // ---------------------------------------------------------------------------
 
-export interface HrZoneBoundaries {
-  lthr: number;
-  z1: { min: 0; max: number };
-  z2: { min: number; max: number };
-  z3: { min: number; max: number };
-  z4: { min: number; max: number };
-  z5: { min: number; max: null };
-}
-
-/** Compute Z1–Z5 boundaries from LTHR. All values rounded to whole bpm. */
-export function computeHrZonesFromLthr(lthr: number): HrZoneBoundaries {
-  if (lthr <= 0) throw new Error("LTHR must be > 0");
-  const pct = BenchmarkConfig.LTHR_ZONE_UPPER_PCT;
-  const z1Max = Math.round(lthr * pct.z1);
-  const z2Max = Math.round(lthr * pct.z2);
-  const z3Max = Math.round(lthr * pct.z3);
-  const z4Max = Math.round(lthr * pct.z4);
-  return {
-    lthr,
-    z1: { min: 0, max: z1Max },
-    z2: { min: z1Max + 1, max: z2Max },
-    z3: { min: z2Max + 1, max: z3Max },
-    z4: { min: z3Max + 1, max: z4Max },
-    z5: { min: z4Max + 1, max: null },
-  };
-}
+// Zone computation lives in the canonical shared resolver. The benchmark
+// module never derives zones locally — pass the measured LTHR to
+// `resolveZonesForUser` (or `zonesFromLthr` for pure unit inputs) and use
+// what it returns.
+export { zonesFromLthr } from "@shared/hr-zones";
 
 // ---------------------------------------------------------------------------
 // Threshold HR from stream
