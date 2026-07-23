@@ -4,17 +4,20 @@
 // lap-level detail for a single activity. Never invoked from the normal
 // activity import path.
 //
+// Responsibility is narrow: fetch laps, cache them in activity_laps
+// (source='strava'), and report status. This function does NOT decide the
+// effort window and does NOT write anything to public.activities. The
+// benchmark evaluator inspects the returned laps and writes
+// effort_window_source on the benchmark_results row.
+//
 // Behaviour:
-//   1. If activity_laps already has rows for this activity (source='strava'),
-//      return them from cache. Each activity is therefore fetched from Strava
-//      at most once.
-//   2. Otherwise refresh the user's Strava token if needed, GET
-//      /activities/:id/laps, read X-ReadRateLimit-Usage / -Limit, and
-//      short-circuit when the remaining budget dips below 10 on either window
-//      (short-term or long-term).
-//   3. On any non-2xx (rate-limit, 4xx, 5xx) fall back gracefully: stamp
-//      activities.effort_window_source='derived' with a note, and return
-//      { fallback: true, reason }. Callers then use their pace-based detector.
+//   1. Cache hit — return existing rows from activity_laps.
+//   2. Otherwise refresh token, GET /activities/:id/laps, read
+//      X-ReadRateLimit-Usage / -Limit, flag budgetLow when remaining < 10 on
+//      either window.
+//   3. On any non-2xx (rate-limit, 4xx, 5xx) return { ok:false, reason }
+//      with an empty laps array. Caller falls back to its pace-based
+//      detector and records the reason on its own row.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
