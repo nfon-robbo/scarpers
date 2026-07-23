@@ -495,6 +495,22 @@ const TrainingPlanPage = () => {
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
   const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [provisionalPace, setProvisionalPace] = useState<ProvisionalPace | null>(null);
+
+  // Always compute the provisional seed so the athlete can see what their own
+  // history suggests, even when they've typed a pace. Typed values still win.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+        if (!cancelled) setProvisionalPace(seed);
+      } catch (e) {
+        console.warn("provisional pace load failed", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
@@ -1372,20 +1388,21 @@ const TrainingPlanPage = () => {
       return;
     }
 
-    // Provisional pace seed — used only when the athlete hasn't typed one in.
-    // Never blocks generation: getProvisionalPace resolves on error to the
-    // experience-level default.
+    // Provisional pace seed — always computed on mount so the athlete can
+    // see what their own history suggests. Typed values win: only inject the
+    // seed into the coach stream when both pace fields are empty. Never
+    // blocks generation.
     let seedPaceMin = currentPaceMin;
     let seedPaceMax = currentPaceMax;
-    let seed: ProvisionalPace | null = null;
     if (!currentPaceMin && !currentPaceMax) {
+      let seed: ProvisionalPace | null = provisionalPace;
       try {
-        seed = await getProvisionalPace(supabase, user.id, {
-          experienceLevel: null,
-        });
+        if (!seed) {
+          seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+          setProvisionalPace(seed);
+        }
         seedPaceMin = seed.paceMin;
         seedPaceMax = seed.paceMax;
-        setProvisionalPace(seed);
         toast({
           title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`,
           description: seed.detail,
@@ -1393,8 +1410,6 @@ const TrainingPlanPage = () => {
       } catch (e) {
         console.warn("provisional pace seed failed; continuing without", e);
       }
-    } else {
-      setProvisionalPace(null);
     }
 
     let accumulated = "";
@@ -2827,14 +2842,29 @@ const TrainingPlanPage = () => {
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
-                {provisionalPace && !currentPaceMin && !currentPaceMax && (
-                  <div className="mt-2 flex items-start gap-2 text-xs">
-                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
-                      Provisional pace
-                    </span>
-                    <span className="text-muted-foreground">
-                      {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
-                    </span>
+                {provisionalPace && (
+                  <div className="mt-2 space-y-1 text-xs">
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
+                        Provisional pace
+                      </span>
+                      <span className="text-muted-foreground">
+                        {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
+                        {(currentPaceMin || currentPaceMax) && (
+                          <span className="ml-1 italic">(your typed pace wins)</span>
+                        )}
+                      </span>
+                    </div>
+                    {provisionalPace.rejection && (
+                      <div className="flex items-start gap-2">
+                        <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-semibold uppercase tracking-wider">
+                          Skipped
+                        </span>
+                        <span className="text-muted-foreground">
+                          Faster {provisionalPace.rejection.pace}/km candidate rejected — {provisionalPace.rejection.detail}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
