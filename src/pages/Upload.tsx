@@ -147,11 +147,29 @@ const UploadPage = () => {
         console.error("Strava overlap purge failed:", e);
       }
 
+      // Skip files that have already been imported (unique on user_id + source_file)
+      const allSourceFiles = Array.from(
+        new Set(parseResult.activities.map((a) => a.source_file).filter(Boolean) as string[])
+      );
+      let existingSet = new Set<string>();
+      if (allSourceFiles.length) {
+        const { data: existingRows } = await supabase
+          .from("activities")
+          .select("source_file")
+          .eq("user_id", user.id)
+          .in("source_file", allSourceFiles);
+        existingSet = new Set((existingRows || []).map((r: any) => r.source_file));
+      }
+      const toImport = parseResult.activities.filter(
+        (a) => !a.source_file || !existingSet.has(a.source_file)
+      );
+      const skippedCount = parseResult.activities.length - toImport.length;
+
       // Insert activities in batches
       const batchSize = 50;
       let saved = 0;
-      for (let i = 0; i < parseResult.activities.length; i += batchSize) {
-        const slice = parseResult.activities.slice(i, i + batchSize);
+      for (let i = 0; i < toImport.length; i += batchSize) {
+        const slice = toImport.slice(i, i + batchSize);
         const batch = slice.map((a) => ({
           user_id: user.id,
           upload_id: uploadRecord.id,
@@ -199,12 +217,15 @@ const UploadPage = () => {
 
         saved += batch.length;
         setSavedCount(saved);
-        setProgress(60 + Math.round((saved / parseResult.activities.length) * 35));
+        setProgress(60 + Math.round((saved / Math.max(1, toImport.length)) * 35));
       }
 
       setProgress(100);
       setState("done");
-      toast({ title: "Import complete", description: `${saved} activities imported from ${parseResult.fileCount} FIT files.` });
+      const desc = skippedCount > 0
+        ? `${saved} imported, ${skippedCount} skipped (already imported).`
+        : `${saved} activities imported from ${parseResult.fileCount} FIT files.`;
+      toast({ title: "Import complete", description: desc });
     } catch (e: any) {
       console.error("Upload error:", e);
       setState("error");
