@@ -166,6 +166,56 @@ const UploadPage = () => {
       );
       const skippedCount = parseResult.activities.length - toImport.length;
 
+      // Cross-source fuzzy merge: enrich existing rows (e.g. from Strava)
+      // instead of inserting duplicates. Attach laps to the existing id.
+      const mergePlan = await planCrossSourceMerge(
+        user.id,
+        toImport.map((a) => ({
+          start_time: a.start_time,
+          activity_type: a.activity_type,
+          duration_seconds: a.duration_seconds,
+          distance_meters: a.distance_meters,
+          avg_heart_rate: a.avg_heart_rate,
+          max_heart_rate: a.max_heart_rate,
+          avg_speed: a.avg_speed,
+          max_speed: a.max_speed,
+          avg_power: a.avg_power,
+          max_power: a.max_power,
+          avg_cadence: a.avg_cadence,
+          total_ascent: a.total_ascent,
+          total_descent: a.total_descent,
+          calories: a.calories,
+          avg_temperature: a.avg_temperature,
+          training_effect: a.training_effect,
+          training_load: a.training_load,
+        })),
+      );
+      await applyEnrichmentPatches(mergePlan.enrichments);
+
+      // Attach laps for fuzzy-matched activities to their existing id.
+      const fuzzyLapRows: any[] = [];
+      for (const e of mergePlan.enrichments) {
+        const src = toImport[e.incomingIndex];
+        fuzzyLapRows.push(
+          ...buildFitLapRows(user.id, e.existingId, src.laps || []),
+        );
+      }
+      if (fuzzyLapRows.length > 0) {
+        const { error: lapErr } = await supabase
+          .from("activity_laps")
+          .insert(fuzzyLapRows);
+        if (lapErr)
+          console.warn(
+            "activity_laps insert (fuzzy-merge) failed (non-fatal):",
+            lapErr,
+          );
+      }
+      const enrichedCount = mergePlan.enrichments.length;
+
+      // Only insert rows that had no fuzzy match either.
+      const remainingImport = mergePlan.remainingIndexes.map((i) => toImport[i]);
+
+
       // Insert activities in batches
       const batchSize = 50;
       let saved = 0;
