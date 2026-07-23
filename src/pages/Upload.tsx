@@ -6,6 +6,7 @@ import { parseZipFile, parseFitBuffer, type ParseResult, type ParsedActivity } f
 import { isGarminExportZip, importGarminExport } from "@/lib/garmin-export-import";
 import { purgeStravaOverlaps } from "@/lib/activity-dedupe";
 import { buildFitLapRows } from "@/lib/fit-lap-rows";
+import { planCrossSourceMerge, applyEnrichmentPatches } from "@/lib/activity-cross-source-merge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload as UploadIcon, FileArchive, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
