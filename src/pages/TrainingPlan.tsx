@@ -1372,14 +1372,39 @@ const TrainingPlanPage = () => {
       return;
     }
 
+    // Provisional pace seed — used only when the athlete hasn't typed one in.
+    // Never blocks generation: getProvisionalPace resolves on error to the
+    // experience-level default.
+    let seedPaceMin = currentPaceMin;
+    let seedPaceMax = currentPaceMax;
+    let seed: ProvisionalPace | null = null;
+    if (!currentPaceMin && !currentPaceMax) {
+      try {
+        seed = await getProvisionalPace(supabase, user.id, {
+          experienceLevel: (profile as any)?.experience_level ?? null,
+        });
+        seedPaceMin = seed.paceMin;
+        seedPaceMax = seed.paceMax;
+        setProvisionalPace(seed);
+        toast({
+          title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`,
+          description: seed.detail,
+        });
+      } catch (e) {
+        console.warn("provisional pace seed failed; continuing without", e);
+      }
+    } else {
+      setProvisionalPace(null);
+    }
+
     let accumulated = "";
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
       raceDistance,
       goalTime,
-      currentPaceMin,
-      currentPaceMax,
+      currentPaceMin: seedPaceMin,
+      currentPaceMax: seedPaceMax,
       trainingDays,
       startDate: effectiveStartISO,
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
@@ -1389,7 +1414,11 @@ const TrainingPlanPage = () => {
       },
       onDone: async () => {
         setLoading(false);
-        const finalContent = prefix + accumulated;
+        let finalContent = prefix + accumulated;
+        // Place the week-1 benchmark BEFORE save so the validator, intervals
+        // sync, and coach-context stripper all see it in one place.
+        finalContent = placeWeek1Benchmark(finalContent, effectiveStartISO);
+        setContent(finalContent);
         const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
         toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
       },
