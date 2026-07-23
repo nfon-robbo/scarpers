@@ -2768,7 +2768,7 @@ const TrainingPlanPage = () => {
                   ? "30-minute Threshold Test"
                   : protocol === "3k" ? "3K Time Trial" : "5K Time Trial";
                 const mainRow = protocol === "30min"
-                  ? "| Main | 30 min | Hardest pace you can hold evenly for 30 min | Z4 | Threshold benchmark — even effort throughout |"
+                  ? "| Main | 30 min | Hardest effort you can hold evenly for 30 min | Z4 | Threshold benchmark — even effort throughout |"
                   : protocol === "3k"
                     ? "| Main | 3 km | All-out time trial | Z5 | 3K benchmark — race the full distance |"
                     : "| Main | 5 km | All-out time trial | Z5 | 5K benchmark — race the full distance |";
@@ -2778,9 +2778,9 @@ const TrainingPlanPage = () => {
 
 | Segment | Duration | Target | HR Zone | Notes |
 |---------|----------|--------|---------|-------|
-| Warm-up | 10 min | Easy jog | Z1 | Loosen up, a few strides at the end |
+| Warm-up | 5 min | Easy jog | Z1 | Loosen up, a few strides at the end |
 ${mainRow}
-| Cool-down | 10 min | Easy jog | Z1 | Easy jog to finish |
+| Cool-down | 5 min | Easy jog | Z1 | Easy jog to finish |
 `;
 
                 // Archive any existing active plan so this one becomes active.
