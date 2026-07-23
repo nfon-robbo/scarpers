@@ -55,6 +55,8 @@ import WorkoutEditDialog, { type EditWorkoutChange } from "@/components/WorkoutE
 import { logPlanEdit } from "@/lib/plan-edit-log";
 import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePlanForSave } from "@/lib/plan-validation";
 import { splitPlanByDate } from "@/lib/plan-split";
+import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
+import { placeWeek1Benchmark } from "@/lib/place-benchmark";
 
 // ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
 // Skip re-running the LLM when the user re-clicks within 30 min and no new
@@ -492,6 +494,7 @@ const TrainingPlanPage = () => {
   const [goalTime, setGoalTime] = useState<string>("");
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
   const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
+  const [provisionalPace, setProvisionalPace] = useState<ProvisionalPace | null>(null);
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
@@ -1369,14 +1372,39 @@ const TrainingPlanPage = () => {
       return;
     }
 
+    // Provisional pace seed — used only when the athlete hasn't typed one in.
+    // Never blocks generation: getProvisionalPace resolves on error to the
+    // experience-level default.
+    let seedPaceMin = currentPaceMin;
+    let seedPaceMax = currentPaceMax;
+    let seed: ProvisionalPace | null = null;
+    if (!currentPaceMin && !currentPaceMax) {
+      try {
+        seed = await getProvisionalPace(supabase, user.id, {
+          experienceLevel: null,
+        });
+        seedPaceMin = seed.paceMin;
+        seedPaceMax = seed.paceMax;
+        setProvisionalPace(seed);
+        toast({
+          title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`,
+          description: seed.detail,
+        });
+      } catch (e) {
+        console.warn("provisional pace seed failed; continuing without", e);
+      }
+    } else {
+      setProvisionalPace(null);
+    }
+
     let accumulated = "";
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
       raceDistance,
       goalTime,
-      currentPaceMin,
-      currentPaceMax,
+      currentPaceMin: seedPaceMin,
+      currentPaceMax: seedPaceMax,
       trainingDays,
       startDate: effectiveStartISO,
       raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
@@ -1386,7 +1414,11 @@ const TrainingPlanPage = () => {
       },
       onDone: async () => {
         setLoading(false);
-        const finalContent = prefix + accumulated;
+        let finalContent = prefix + accumulated;
+        // Place the week-1 benchmark BEFORE save so the validator, intervals
+        // sync, and coach-context stripper all see it in one place.
+        finalContent = placeWeek1Benchmark(finalContent, effectiveStartISO);
+        setContent(finalContent);
         const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
         toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
       },
@@ -2795,6 +2827,16 @@ const TrainingPlanPage = () => {
                   />
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/km</span>
                 </div>
+                {provisionalPace && !currentPaceMin && !currentPaceMax && (
+                  <div className="mt-2 flex items-start gap-2 text-xs">
+                    <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 font-semibold uppercase tracking-wider">
+                      Provisional pace
+                    </span>
+                    <span className="text-muted-foreground">
+                      {provisionalPace.paceMin}–{provisionalPace.paceMax}/km · {provisionalPace.detail}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Training Days</Label>
