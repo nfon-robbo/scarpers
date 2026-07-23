@@ -26,8 +26,6 @@ export type Database = {
           created_at: string
           distance_meters: number | null
           duration_seconds: number | null
-          effort_window_note: string | null
-          effort_window_source: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -57,8 +55,6 @@ export type Database = {
           created_at?: string
           distance_meters?: number | null
           duration_seconds?: number | null
-          effort_window_note?: string | null
-          effort_window_source?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -88,8 +84,6 @@ export type Database = {
           created_at?: string
           distance_meters?: number | null
           duration_seconds?: number | null
-          effort_window_note?: string | null
-          effort_window_source?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
