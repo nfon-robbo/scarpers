@@ -182,7 +182,11 @@ function formatWorkoutDescription(workout: WorkoutInput, userZones: Zones | null
       if (zones.length > 1) return `Z${zones[0]}-Z${zones[zones.length - 1]}`;
     }
 
+    // Personalised bpm→zone via shared LTHR band model (single source of truth).
+    // Falls back to the previous hard-coded ladder only if user zones are
+    // unavailable (e.g. brand-new account with zero activity history).
     const bpmToZone = (bpm: number) => {
+      if (userZones) return sharedBpmToZone(bpm, userZones);
       if (bpm <= 120) return 1;
       if (bpm <= 140) return 2;
       if (bpm <= 160) return 3;
