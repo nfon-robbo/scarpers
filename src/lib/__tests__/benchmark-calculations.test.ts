@@ -39,18 +39,26 @@ describe("predicted 5K", () => {
   });
 });
 
-describe("LTHR zone boundaries", () => {
-  it("LTHR 165 returns all five zone boundaries in bpm", () => {
-    const z = computeHrZonesFromLthr(165);
-    // 165 * 0.85 = 140.25 -> 140
-    // 165 * 0.90 = 148.5  -> 149 (banker's) — Math.round(148.5) = 149
-    // 165 * 0.95 = 156.75 -> 157
-    // 165 * 1.02 = 168.3  -> 168
-    expect(z.z1).toEqual({ min: 0, max: 140 });
-    expect(z.z2).toEqual({ min: 141, max: 149 });
-    expect(z.z3).toEqual({ min: 150, max: 157 });
-    expect(z.z4).toEqual({ min: 158, max: 168 });
-    expect(z.z5).toEqual({ min: 169, max: null });
+describe("LTHR zone boundaries via canonical shared resolver", () => {
+  it("LTHR 165 returns Z1–Z4 upper bounds and Z5 unbounded (matches @shared/hr-zones)", () => {
+    const bands = zonesFromLthr(165);
+    // Canonical resolver uses floor with tiny epsilon (Z1–Z3) and floor(+0.5) for Z4.
+    //   0.85*165 = 140.25  -> 140
+    //   0.90*165 = 148.5   -> 148
+    //   0.95*165 = 156.75  -> 156
+    //   1.02*165 = 168.3   -> 168
+    expect(bands).toEqual({ z1Max: 140, z2Max: 148, z3Max: 156, z4Max: 168 });
+
+    // And routing via bpmToZone matches the intended bands.
+    const z: Zones = { ...bands, lthr: 165, lthrSource: "measured", maxHr: 185, maxHrSource: "age" };
+    expect(bpmToZone(140, z)).toBe(1);
+    expect(bpmToZone(141, z)).toBe(2);
+    expect(bpmToZone(148, z)).toBe(2);
+    expect(bpmToZone(149, z)).toBe(3);
+    expect(bpmToZone(156, z)).toBe(3);
+    expect(bpmToZone(157, z)).toBe(4);
+    expect(bpmToZone(168, z)).toBe(4);
+    expect(bpmToZone(169, z)).toBe(5);
   });
 });
 
