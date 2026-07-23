@@ -49,9 +49,8 @@ export interface ProvisionalPace {
  *   check applies; below this we fall back to the hard floor only.
  */
 export const ProvisionalPaceConfig = {
-  HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km
+  HARD_FLOOR_SEC_PER_KM: 3 * 60 + 30, // 3:30/km — unconditional
   MIN_HR_FRACTION_OF_MAX: 0.88,
-  ASSUMED_MAX_HR: 190,
   MAX_FASTER_THAN_EASY_BASELINE_SEC: 90,
   EASY_BASELINE_MIN_RUNS: 3,
 } as const;
@@ -100,6 +99,7 @@ function vetTier1(
   candidate: Row & { sec_per_km: number },
   easyBaselineSec: number | null,
   easyBaselineCount: number,
+  resolvedMaxHr: number | null,
 ): Tier1Reject | null {
   const c = ProvisionalPaceConfig;
   const dateStr = new Date(candidate.start_time).toLocaleDateString("en-GB");
@@ -112,13 +112,16 @@ function vetTier1(
     };
   }
 
-  if (candidate.avg_heart_rate != null) {
-    const minHr = c.ASSUMED_MAX_HR * c.MIN_HR_FRACTION_OF_MAX;
+  // HR check only runs when we have both a candidate HR AND a canonical max HR.
+  // No hardcoded fallback — if max HR is unknown, skip the check rather than
+  // invent a number that competes with the single source of truth.
+  if (candidate.avg_heart_rate != null && resolvedMaxHr != null) {
+    const minHr = resolvedMaxHr * c.MIN_HR_FRACTION_OF_MAX;
     if (candidate.avg_heart_rate < minHr) {
       return {
         reason: "hr_too_low_for_5k_effort",
         pace: fmt(candidate.sec_per_km),
-        detail: `Avg HR ${Math.round(candidate.avg_heart_rate)} bpm on ${dateStr} is below ${Math.round(minHr)} bpm — not a hard 5k.`,
+        detail: `Avg HR ${Math.round(candidate.avg_heart_rate)} bpm on ${dateStr} is below ${Math.round(minHr)} bpm (88% of max ${resolvedMaxHr}) — not a hard 5k.`,
       };
     }
   }
@@ -140,7 +143,7 @@ function vetTier1(
 export async function getProvisionalPace(
   supabase: SupabaseClient,
   userId: string,
-  opts: { experienceLevel?: string | null; z2MaxHr?: number | null } = {},
+  opts: { experienceLevel?: string | null; z2MaxHr?: number | null; resolvedMaxHr?: number | null } = {},
 ): Promise<ProvisionalPace> {
   try {
     const since = new Date(Date.now() - 90 * 86400_000).toISOString();
@@ -176,7 +179,7 @@ export async function getProvisionalPace(
 
     let rejection: ProvisionalPace["rejection"] | undefined;
     for (const cand of fives) {
-      const reject = vetTier1(cand, easyAvg, easyRuns.length);
+      const reject = vetTier1(cand, easyAvg, easyRuns.length, opts.resolvedMaxHr ?? null);
       if (!reject) {
         const easySec = cand.sec_per_km + 60; // easy sits ~60 s/km slower than a hard 5k
         return {

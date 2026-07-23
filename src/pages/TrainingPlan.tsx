@@ -57,6 +57,7 @@ import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePla
 import { splitPlanByDate } from "@/lib/plan-split";
 import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
 import { placeWeek1Benchmark } from "@/lib/place-benchmark";
+import { useHrZones } from "@/hooks/useHrZones";
 
 // ── Day-ahead assessment cache (improvement #1) ─────────────────────────────
 // Skip re-running the LLM when the user re-clicks within 30 min and no new
@@ -495,6 +496,7 @@ const TrainingPlanPage = () => {
   const [currentPaceMin, setCurrentPaceMin] = useState<string>("");
   const [currentPaceMax, setCurrentPaceMax] = useState<string>("");
   const [provisionalPace, setProvisionalPace] = useState<ProvisionalPace | null>(null);
+  const { zones: hrZones } = useHrZones();
 
   // Always compute the provisional seed so the athlete can see what their own
   // history suggests, even when they've typed a pace. Typed values still win.
@@ -503,14 +505,18 @@ const TrainingPlanPage = () => {
     let cancelled = false;
     (async () => {
       try {
-        const seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+        const seed = await getProvisionalPace(supabase, user.id, {
+          experienceLevel: null,
+          resolvedMaxHr: hrZones?.maxHr ?? null,
+          z2MaxHr: hrZones?.z2Max ?? null,
+        });
         if (!cancelled) setProvisionalPace(seed);
       } catch (e) {
         console.warn("provisional pace load failed", e);
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, hrZones?.maxHr, hrZones?.z2Max]);
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
@@ -1398,7 +1404,11 @@ const TrainingPlanPage = () => {
       let seed: ProvisionalPace | null = provisionalPace;
       try {
         if (!seed) {
-          seed = await getProvisionalPace(supabase, user.id, { experienceLevel: null });
+          seed = await getProvisionalPace(supabase, user.id, {
+            experienceLevel: null,
+            resolvedMaxHr: hrZones?.maxHr ?? null,
+            z2MaxHr: hrZones?.z2Max ?? null,
+          });
           setProvisionalPace(seed);
         }
         seedPaceMin = seed.paceMin;
