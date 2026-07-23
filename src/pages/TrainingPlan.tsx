@@ -2227,14 +2227,14 @@ const TrainingPlanPage = () => {
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "") // strip any existing brand prefix
           .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers Dash - — Walk"
-        const correctedName = stripToken(`Scarpers Dash - ${baseName}`);
+        const correctedName = `Scarpers Dash - ${baseName}`;
         return {
           date: dateStr,
           name: correctedName,
           description,
           steps,
           notes,
-          rawDescription: w.intervalsText ? stripToken(w.intervalsText) : undefined,
+          rawDescription: w.intervalsText,
         };
       });
 
