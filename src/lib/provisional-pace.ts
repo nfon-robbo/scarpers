@@ -34,6 +34,8 @@ export interface ProvisionalPace {
   rejection?: { tier: ProvisionalTier; reason: string; pace: string; detail: string };
   /** Set when the chosen seed disagrees sharply with the recent training baseline. */
   discrepancy?: { message: string; recentBaselinePace: string; recentBaselineCount: number };
+  /** Set when the easy-run filter found nothing and fell back to moderate-intensity runs. */
+  relaxation?: { message: string };
 }
 
 /**
