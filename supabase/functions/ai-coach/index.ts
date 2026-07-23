@@ -1869,7 +1869,7 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
       // NOTE: activities.avg_speed is stored in km/h (not m/s). 60 / kmh = min/km.
       const paceFromMps = (kmh: number) => (60 / kmh) * 60; // returns seconds per km
       // Z2 (HR-filtered) pace if we have it
-      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate >= maxHr * 0.65 && a.avg_heart_rate <= maxHr * 0.75 && a.avg_speed);
+      const z2Runs = runs.filter((a: any) => a.avg_heart_rate && a.avg_heart_rate > zones.z1Max && a.avg_heart_rate <= zones.z2Max && a.avg_speed);
       const z2PaceMps = z2Runs.length ? avg(z2Runs.map((a: any) => Number(a.avg_speed))) : null;
       // Average pace across ALL runs with speed (fallback when HR data is sparse)
       const allPacedRuns = runs.filter((a: any) => a.avg_speed && Number(a.avg_speed) > 0);
