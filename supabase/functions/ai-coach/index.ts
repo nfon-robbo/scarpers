@@ -466,7 +466,7 @@ serve(async (req) => {
     if (reqBody.planned_workout && typeof reqBody.planned_workout === "object" && typeof reqBody.planned_workout.title === "string") {
       reqBody.planned_workout.title = stripBenchmarkTokens(reqBody.planned_workout.title);
     }
-    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo } = reqBody;
+    const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo, measured_threshold_pace_s_per_km, measured_threshold_hr, measured_benchmark_date } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
       try {
@@ -1927,9 +1927,25 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
       const avgRunPace = userPaceRange
         ? `IGNORED — user supplied current easy pace (${userPaceRange}/km); use that instead`
         : (avgRunMps ? fmtPace(paceFromMps(avgRunMps)) : "N/A");
-      const userAnchorBlock = userPaceRange
-        ? `\n🚨 USER-SUPPLIED PACE OVERRIDE 🚨\nThe athlete has explicitly told us their current easy run pace is ${userPaceRange}/km.\nWeek 1 EVERY easy/Z2/recovery/long run MUST be prescribed at ${userPaceRange}/km — no faster, no slower.\nDo NOT fall back to historical averages, textbook paces, or goal-derived paces for week 1.\nProgress this anchor by no more than ~5-10 seconds/km per week toward the goal pace as fitness builds.\n`
-        : "";
+      // Measured benchmark anchor — supersedes provisional/user pace when present.
+      // Ratios mirror THRESHOLD_PACE_RATIOS in src/lib/benchmark-calculations.ts.
+      const ltSec = typeof measured_threshold_pace_s_per_km === "number" && measured_threshold_pace_s_per_km > 0
+        ? Number(measured_threshold_pace_s_per_km) : null;
+      const fmtSecPace = (s: number) => {
+        const m = Math.floor(s / 60); const r = Math.round(s - m * 60);
+        return `${m}:${String(r).padStart(2, "0")}`;
+      };
+      const measuredBlock = ltSec ? (() => {
+        const range = (lo: number, hi: number) => `${fmtSecPace(ltSec * lo)}-${fmtSecPace(ltSec * hi)}/km`;
+        const hrBits = typeof measured_threshold_hr === "number" && measured_threshold_hr > 0
+          ? ` Threshold HR: ${Math.round(measured_threshold_hr)} bpm.` : "";
+        return `\n🎯 MEASURED BENCHMARK — HARD ANCHOR 🎯\nThreshold pace: ${fmtSecPace(ltSec)}/km (measured ${measured_benchmark_date ?? "recently"}).${hrBits}\nEVERY pace target in this plan MUST derive from this LT:\n- Easy: ${range(1.28, 1.38)}\n- Steady: ${range(1.18, 1.24)}\n- Marathon: ${range(1.10, 1.14)}\n- Threshold: ${range(0.98, 1.02)}\n- CV: ${range(0.94, 0.97)}\n- VO2: ${range(0.88, 0.92)}\n- Reps: ${range(0.82, 0.86)}\nDo NOT use provisional pace, historical averages, or textbook defaults. This anchor overrides everything.\n`;
+      })() : "";
+      const userAnchorBlock = ltSec
+        ? measuredBlock
+        : (userPaceRange
+          ? `\n🚨 USER-SUPPLIED PACE OVERRIDE 🚨\nThe athlete has explicitly told us their current easy run pace is ${userPaceRange}/km.\nWeek 1 EVERY easy/Z2/recovery/long run MUST be prescribed at ${userPaceRange}/km — no faster, no slower.\nDo NOT fall back to historical averages, textbook paces, or goal-derived paces for week 1.\nProgress this anchor by no more than ~5-10 seconds/km per week toward the goal pace as fitness builds.\n`
+          : "");
 
       // ACWR (acute:chronic workload ratio) from training load
       const today = new Date();
