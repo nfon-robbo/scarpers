@@ -14,6 +14,8 @@ import {
 import ActivityMap from "@/components/ActivityMap";
 import ActivityCharts from "@/components/ActivityCharts";
 import { decodePolyline } from "@/lib/polyline";
+import { bpmToZone } from "@shared/hr-zones";
+import { useHrZones } from "@/hooks/useHrZones";
 
 interface Props {
   activityId: string | null;
