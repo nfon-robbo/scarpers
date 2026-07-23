@@ -180,14 +180,35 @@ export default function ZoneComparisonDialog({
         </div>
 
         {planId != null && (
-          <p className="text-xs text-muted-foreground">
-            {affectedCount == null
-              ? "Checking your plan…"
-              : affectedCount === 0
-                ? "No HR-referencing sessions detected in the current plan."
-                : `${affectedCount} session${affectedCount === 1 ? "" : "s"} in your current plan reference HR zones and will use the new bands.`}
-          </p>
+          affected == null ? (
+            <p className="text-xs text-muted-foreground">Checking your plan…</p>
+          ) : affected.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No upcoming HR-referencing sessions in the current plan.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {affected.length} upcoming session{affected.length === 1 ? "" : "s"} will
+                re-scale to the new bands:
+              </p>
+              <ul className="max-h-40 overflow-y-auto rounded-lg border border-border/60 divide-y divide-border/40 text-xs">
+                {affected.map((s) => {
+                  const [y, m, d] = s.iso.split("-");
+                  return (
+                    <li key={s.iso + s.label} className="px-2.5 py-1.5 flex items-baseline gap-2">
+                      <span className="tabular-nums text-muted-foreground shrink-0">
+                        {d}/{m}/{y}
+                      </span>
+                      <span className="truncate">{s.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )
         )}
+
 
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={working}>
