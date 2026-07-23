@@ -273,9 +273,10 @@ export async function generateWorkoutZip(workouts: ParsedWorkout[]): Promise<Blo
   for (const workout of workouts) {
     if (workout.segments.length === 0) continue;
 
-    const tcxContent = encodeTcxWorkout(workout.title || "Workout", workout.segments);
+    const exportTitle = stripBenchmarkTokens(workout.title || "Workout") || "Workout";
+    const tcxContent = encodeTcxWorkout(exportTitle, workout.segments);
     const safeName = (workout.date || "workout").replace(/\//g, "-");
-    const fileName = `${safeName}_${workout.title.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
+    const fileName = `${safeName}_${exportTitle.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30)}.tcx`;
     zip.file(fileName, tcxContent);
   }
 
