@@ -22,6 +22,7 @@ interface Row {
   benchmark_protocol: BenchmarkProtocol | null;
   effort_window_distance_m: number | null;
   effort_window_duration_s: number | null;
+  effort_window_stopped_s: number | null;
   threshold_pace_s_per_km: number | null;
   threshold_hr: number | null;
   predicted_5k_seconds: number | null;
@@ -62,7 +63,7 @@ export default function BenchmarkHistory({ userId }: { userId: string }) {
       const { data } = await supabase
         .from("benchmark_results" as any)
         .select(
-          "id, benchmark_date, benchmark_protocol, effort_window_distance_m, effort_window_duration_s, threshold_pace_s_per_km, threshold_hr, predicted_5k_seconds, confidence_score, confidence_band, confidence_deductions, likely_submaximal, injury_flagged, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, post_benchmark_interview",
+          "id, benchmark_date, benchmark_protocol, effort_window_distance_m, effort_window_duration_s, effort_window_stopped_s, threshold_pace_s_per_km, threshold_hr, predicted_5k_seconds, confidence_score, confidence_band, confidence_deductions, likely_submaximal, injury_flagged, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, post_benchmark_interview",
         )
         .eq("user_id", userId)
         .eq("status", "confirmed")
@@ -159,6 +160,9 @@ export default function BenchmarkHistory({ userId }: { userId: string }) {
                     {r.threshold_hr != null && <span>{r.threshold_hr} bpm</span>}
                     {r.predicted_5k_seconds != null && (
                       <span>5K → {formatDuration(r.predicted_5k_seconds)}</span>
+                    )}
+                    {r.effort_window_stopped_s != null && r.effort_window_stopped_s > 0 && (
+                      <span className="text-amber-400">Timer stopped: {formatDuration(r.effort_window_stopped_s)}</span>
                     )}
                   </div>
                 </div>

@@ -861,6 +861,32 @@ const TrainingPlanPage = () => {
 
   const savePlan = async (planContent: string, options: { inPlace?: boolean; undoLabel?: string; prevContent?: string; skipRaceDayGuard?: boolean } = {}) => {
     if (!user) return null;
+    // Scrub any model-invented bpm ranges next to zone labels FIRST — the
+    // resolver's numbers are canonical, and this keeps the plan aligned with
+    // the same zones the Target column will render on the client.
+    try {
+      const { data: bench } = await supabase
+        .from("benchmark_results" as any)
+        .select("lthr")
+        .eq("user_id", user.id)
+        .eq("status", "confirmed")
+        .eq("active", true)
+        .not("lthr", "is", null)
+        .order("benchmark_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const measuredLthr = (bench as any)?.lthr ?? null;
+      const { resolveZonesForUser } = await import("@shared/hr-zones");
+      const zones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
+      const { scrubZoneBpm } = await import("@/lib/plan-validation");
+      const scrubbed = scrubZoneBpm(planContent, zones);
+      if (scrubbed.scrubs.length > 0) {
+        console.warn(`[plan-save] rewrote ${scrubbed.scrubs.length} zone-bpm blocks to match resolver`, scrubbed.scrubs);
+        planContent = scrubbed.content;
+      }
+    } catch (e) {
+      console.warn("[plan-save] zone-bpm scrub skipped:", e);
+    }
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
     const effectiveSaveTrainingDays = options.inPlace
