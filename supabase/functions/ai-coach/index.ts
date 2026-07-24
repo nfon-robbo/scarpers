@@ -2624,8 +2624,14 @@ ${upcoming.join("\n")}
       })();
 
       const emitDelta = async (delta: string) => {
-        await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+        // Swallow writer failures — client may have disconnected. We still keep
+        // generating and mirroring to the job row.
+        try {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+        } catch { writerClosed = true; }
+        void flushJob();
       };
+
 
       const consumeStream = async (body: ReadableStream<Uint8Array>) => {
         const reader = body.getReader();
