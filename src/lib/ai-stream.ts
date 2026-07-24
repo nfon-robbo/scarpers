@@ -152,6 +152,8 @@ export async function streamAICoach({
     if (typeof measuredThresholdPaceSecPerKm === "number") body.measured_threshold_pace_s_per_km = measuredThresholdPaceSecPerKm;
     if (typeof measuredThresholdHr === "number") body.measured_threshold_hr = measuredThresholdHr;
     if (measuredBenchmarkDateIso) body.measured_benchmark_date = measuredBenchmarkDateIso;
+    if (jobId) body.job_id = jobId;
+
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
