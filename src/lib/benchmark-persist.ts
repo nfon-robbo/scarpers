@@ -253,28 +253,12 @@ export async function confirmBenchmark(
       .eq("user_id", userId);
   }
 
-  // Auto-write hr_zones for the 30-min protocol so every downstream zone
-  // consumer sees the measured LTHR immediately. The ZoneComparisonDialog
-  // remains as an upgrade UX for legacy paths. 3K/5K are refused inside
-  // applyMeasuredZones (their peak-HR-based LTHR is not trustworthy).
-  if (
-    protocol === "30min" &&
-    typeof lthr === "number" &&
-    lthr >= MIN_PLAUSIBLE_LTHR_BPM &&
-    lthr <= MAX_PLAUSIBLE_LTHR_BPM
-  ) {
-    try {
-      await applyMeasuredZones({
-        userId,
-        benchmarkId: id,
-        protocol,
-        measuredLthr: lthr,
-      });
-    } catch (e) {
-      // Never let a zone-write failure roll back the benchmark itself.
-      console.warn("[confirmBenchmark] applyMeasuredZones failed:", e);
-    }
-  }
+  // NOTE: hr_zones writes go through ZoneComparisonDialog → applyMeasuredZones
+  // ONLY. Do not auto-apply here. The dialog is the sole gate for a zone write
+  // so the athlete sees old-vs-new bands and affected sessions before commit.
+  // See src/lib/apply-measured-zones.ts (sole writer) and
+  // src/components/ZoneComparisonDialog.tsx (sole caller).
+
 
 
   await supabase
