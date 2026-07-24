@@ -1,0 +1,1 @@
+UPDATE public.training_plans SET race_date = NULL WHERE id = '209b2b19-ed0d-48c0-b558-2578e3e2ebec' AND race_date = '2026-07-24';
