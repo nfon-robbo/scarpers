@@ -7,7 +7,7 @@
  *   Path 3 — manual: user-entered result, no stream analysis.
  *
  * The record of which path fired is written to
- *   benchmark_results.effort_window_source ∈ {"laps","derived","manual"}
+ *   benchmark_results.effort_window_source ∈ {"lap","derived","manual"}
  * with a human-readable reason in effort_window_note when Path 1 was attempted
  * and failed.
  */
@@ -27,7 +27,7 @@ const PROTOCOL_DISTANCE_M: Record<BenchmarkProtocol, number | null> = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type EffortWindowSource = "laps" | "derived" | "manual";
+export type EffortWindowSource = "lap" | "derived" | "manual";
 
 export interface EffortWindow {
   startSeconds: number;   // seconds from activity start
@@ -137,7 +137,7 @@ export function identifyEffortWindow(params: {
           endSeconds: match.startOffsetS + match.durationS,
           durationSeconds: match.durationS,
           distanceMeters,
-          source: "laps",
+          source: "lap",
         };
       }
       return buildDerivedWindow({
@@ -155,7 +155,7 @@ export function identifyEffortWindow(params: {
           endSeconds: match.startOffsetS + match.durationS,
           durationSeconds: match.durationS,
           distanceMeters: match.distanceM ?? target,
-          source: "laps",
+          source: "lap",
         };
       }
       return buildDerivedWindow({
