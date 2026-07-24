@@ -2280,6 +2280,8 @@ CRITICAL FORMAT RULES (required for watch sync — do not deviate):
 7. Include HR target ranges from the zones above in the Target column.
 8. Warm-up and cool-down segments MUST be exactly 5 minutes — NEVER shorter than 5 (no 1-min, 2-min, 3-min cool-downs) and never 10+ minutes.
 9. 🚫 Warm-up and cool-down segments MUST NEVER carry a pace target (no "/km", no "min/km", no numeric pace range). Their Target column is HR zone only ("Z1 (<${z1Max} bpm)") — pace targets belong only to main/interval/tempo/race-pace blocks. Walk-only segments also never get a pace target.
+10. 🚫 RACE DAY: if a session's date equals the athlete's race_date, the day heading MUST be "Race Day" (never "REST DAY", never any rest-day boilerplate) and it MUST contain the goal race workout. Rest-day content on race_date is a bug.
+11. 🚫 ZONE BPM NUMBERS: when writing zone labels like "Z1", "Z2", "Z1-Z2" in the Target column, use the EXACT bpm ranges printed in the zone list above ("Z1 (<${z1Max} bpm)", "Z2 (${z2Range} bpm)", "Z3 (${z3Range} bpm)", "Z4 (${z4Range} bpm)", "Z5 (${z5Min}+ bpm)"). Do NOT invent bpm ranges. Do NOT write your own bpm ranges next to a zone label (e.g. never write "Z2 (130-145 bpm)" if the resolver says Z2 is different). If unsure, write the zone label alone.
 
 Example workout format:
 ### Week 1: Base Building
