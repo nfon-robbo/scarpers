@@ -2911,30 +2911,6 @@ const TrainingPlanPage = () => {
       )}
       {(showConfig || loading) && (
         <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={() => {
-              if (loading) return;
-              // Benchmark already done — skip the "benchmark first" dialog and
-              // build the full plan straight from the measured anchors.
-              if (hasConfirmedBenchmark) { void generatePlan(); return; }
-              setBenchmarkFirstOpen(true);
-            }}
-            disabled={loading || importing}
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Calendar className="w-4 h-4 mr-2" />
-                {hasConfirmedBenchmark && isBenchmarkStubPlan ? "Build Full Plan From Benchmark" : "Generate Plan"}
-              </>
-            )}
-          </Button>
           <BenchmarkFirstDialog
             open={benchmarkFirstOpen}
             onOpenChange={setBenchmarkFirstOpen}
@@ -3261,14 +3237,39 @@ ${mainRow}
                         if (v) setRaceDate(undefined);
                       }}
                     />
-                    <Label htmlFor="ai-decide" className="text-sm cursor-pointer text-muted-foreground">
-                      Let the AI recommend a race date based on my fitness
-                    </Label>
-                  </div>
+                  <Label htmlFor="ai-decide" className="text-sm cursor-pointer text-muted-foreground">
+                    Let the AI recommend a race date based on my fitness
+                  </Label>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            <Button
+              onClick={() => {
+                if (loading) return;
+                // Benchmark already done — skip the "benchmark first" dialog and
+                // build the full plan straight from the measured anchors.
+                if (hasConfirmedBenchmark) { void generatePlan(); return; }
+                setBenchmarkFirstOpen(true);
+              }}
+              disabled={loading || importing}
+              size="lg"
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-4 h-4 mr-2" />
+                  {hasConfirmedBenchmark && isBenchmarkStubPlan ? "Build Full Plan From Benchmark" : "Generate Plan"}
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <FeatureCard icon={Target} title="Tailored to You" desc="Built around your goals, experience, and weekly availability" />
