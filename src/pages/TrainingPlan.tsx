@@ -555,8 +555,32 @@ const TrainingPlanPage = () => {
   const [postAnalyzing, setPostAnalyzing] = useState(false);
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [hasConfirmedBenchmark, setHasConfirmedBenchmark] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect the "benchmark stub" plan — a 1-day plan whose only entry is the
+  // scheduled threshold/TT session. Once the athlete has completed and
+  // confirmed that benchmark, the config form must reappear so they can
+  // configure race + distance and generate their full plan.
+  const isBenchmarkStubPlan = useMemo(() => {
+    if (!content) return false;
+    const weeks = (content.match(/^##\s+Week\s/gmi) || []).length;
+    const workouts = (content.match(/^\*\*/gm) || []).length;
+    return /Benchmark:/i.test(content) && weeks <= 1 && workouts <= 1;
+  }, [content]);
+
+  // Poll for a confirmed benchmark on mount / whenever the plan reloads so the
+  // "Build full plan" CTA appears as soon as the questionnaire is saved.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const b = await getLatestConfirmedBenchmark(user.id).catch(() => null);
+      if (!cancelled) setHasConfirmedBenchmark(!!b);
+    })();
+    return () => { cancelled = true; };
+  }, [user, content]);
 
   // Auto-recalc race prediction when a new activity gets linked to a plan day.
   // Debounced 2s; uses linked-activity count as the change signal so any new
