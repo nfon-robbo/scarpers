@@ -827,14 +827,22 @@ export default function PlanDayList({
                   <div key={key}>
                     {showBenchmark && (
                       <div className="px-3 pt-2.5 pb-1">
-                        <BenchmarkConfirmCard
-                          userId={userId!}
-                          planId={planId}
-                          scheduledDateIso={key}
-                          protocol={benchmarkProtocol!}
-                          candidates={benchmarkList}
-                          onDone={refreshBenchmarks}
-                        />
+                        <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                          <div>
+                            <p className="text-sm font-semibold text-primary">Threshold run detected</p>
+                            <p className="text-xs text-muted-foreground">
+                              Confirm this activity to open the benchmark questions.
+                            </p>
+                          </div>
+                          <BenchmarkConfirmCard
+                            userId={userId!}
+                            planId={planId}
+                            scheduledDateIso={key}
+                            protocol={benchmarkProtocol!}
+                            candidates={benchmarkList}
+                            onDone={refreshBenchmarks}
+                          />
+                        </div>
                       </div>
                     )}
                   <div
