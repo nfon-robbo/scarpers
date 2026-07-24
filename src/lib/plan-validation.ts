@@ -759,6 +759,11 @@ export interface RaceCoverageResult {
   raceDurationSec: number | null;
   longestContinuousKm: number;
   longestContinuousMin: number;
+  /** Which basis was applied to decide ok. */
+  basisApplied: "distance" | "duration" | "either" | "none";
+  /** Independent results for each basis (null when not applicable). */
+  distanceOk: boolean | null;
+  durationOk: boolean | null;
   reason?: string;
 }
 
@@ -781,6 +786,16 @@ function goalTimeSec(goalTime: string | null | undefined): number | null {
   return null;
 }
 
+/**
+ * For fixed-distance races the DISTANCE basis is the meaningful one — a
+ * 35-min easy run at 9:30-10:30/km covers less ground than a 5 km race, so
+ * passing on duration alone hides the gap. Rules:
+ *   - Fixed-distance race (raceKm known): require distance coverage.
+ *     Duration is reported but not used to pass.
+ *   - No distance (duration-only goal, e.g. "run for 60 min"): fall back
+ *     to duration coverage.
+ *   - Neither known: skip.
+ */
 export function validateRaceCoverage(
   markdown: string,
   raceLabel: string,
@@ -791,8 +806,6 @@ export function validateRaceCoverage(
   let longestKm = 0;
   let longestMin = 0;
 
-  // Walk day-by-day; skip the RACE DAY heading itself so the race entry
-  // can't satisfy its own coverage requirement.
   const dayRx = /^###\s+.+$/gm;
   const headings: { idx: number; text: string }[] = [];
   let m: RegExpExecArray | null;
@@ -808,9 +821,7 @@ export function validateRaceCoverage(
       const row = raw.trim();
       if (!row.startsWith("|")) continue;
       if (/^\|\s*-+/.test(row)) continue;
-      if (/\d+\s*[×x]\s*\d/.test(row)) continue; // interval row
-      // Only count "Easy run" / "Long run" / plain running segment rows —
-      // skip warm-up/cool-down/strength/etc.
+      if (/\d+\s*[×x]\s*\d/.test(row)) continue;
       const segCell = row.split("|")[1] || "";
       if (!/run\b|tempo|long/i.test(segCell)) continue;
       if (/warm.?up|cool.?down|walk|stride|strength|mobility/i.test(segCell)) continue;
@@ -823,25 +834,44 @@ export function validateRaceCoverage(
     }
   }
 
+  const frac = RACE_COVERAGE_MIN_FRACTION;
+  const distanceOk = raceKm != null ? longestKm >= raceKm * frac : null;
+  const durationOk = raceSec != null ? longestMin * 60 >= raceSec * frac : null;
 
   if (raceKm == null && raceSec == null) {
-    return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
+    return {
+      ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec,
+      longestContinuousKm: longestKm, longestContinuousMin: longestMin,
+      basisApplied: "none", distanceOk, durationOk,
+    };
   }
-  const frac = RACE_COVERAGE_MIN_FRACTION;
-  const distanceOk = raceKm != null && longestKm >= raceKm * frac;
-  const durationOk = raceSec != null && longestMin * 60 >= raceSec * frac;
-  if (distanceOk || durationOk) {
-    return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
+
+  // Fixed-distance race → DISTANCE is the meaningful basis; duration alone
+  // must not paper over a short longest run.
+  if (raceKm != null) {
+    const ok = distanceOk === true;
+    return {
+      ok, raceDistanceKm: raceKm, raceDurationSec: raceSec,
+      longestContinuousKm: longestKm, longestContinuousMin: longestMin,
+      basisApplied: "distance", distanceOk, durationOk,
+      reason: ok
+        ? undefined
+        : `Longest continuous run is ${longestKm.toFixed(1)} km / ${longestMin.toFixed(0)} min but race is ${raceKm} km (need ≥ ${(raceKm * frac).toFixed(2)} km = ${(frac * 100).toFixed(0)}% coverage on distance).`,
+    };
   }
+
+  // Duration-only goal.
+  const ok = durationOk === true;
   return {
-    ok: false,
-    raceDistanceKm: raceKm,
-    raceDurationSec: raceSec,
-    longestContinuousKm: longestKm,
-    longestContinuousMin: longestMin,
-    reason: `Longest continuous run is ${longestKm.toFixed(1)} km / ${longestMin.toFixed(0)} min but race is ${raceKm ?? "?"} km${raceSec ? ` / goal ${Math.round(raceSec/60)} min` : ""} (need >= ${(frac*100).toFixed(0)}% coverage).`,
+    ok, raceDistanceKm: raceKm, raceDurationSec: raceSec,
+    longestContinuousKm: longestKm, longestContinuousMin: longestMin,
+    basisApplied: "duration", distanceOk, durationOk,
+    reason: ok
+      ? undefined
+      : `Longest continuous run is ${longestMin.toFixed(0)} min but goal is ${Math.round((raceSec ?? 0) / 60)} min (need ≥ ${(frac * 100).toFixed(0)}% coverage on duration).`,
   };
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tunable plan-validation constants — one place, sourced by every consumer.
