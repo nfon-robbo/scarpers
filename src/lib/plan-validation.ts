@@ -1143,4 +1143,72 @@ export function validateRacePaceExposure(markdown: string): RacePaceExposureResu
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RACE DAY standalone validator.
+// The plan must contain EXACTLY ONE day-block whose heading references
+// "race day", it must land on race_date, and the block must not carry
+// training rows borrowed from an adjacent session (e.g. a threshold set
+// merged into race day). Warm-up / Cool-down / the race itself / race-pace
+// strides are fine. Anything else — Interval/Tempo/Threshold/Long/Easy/
+// Fartlek/VO2/Hill — trips the guard.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface RaceDayStandaloneResult {
+  ok: boolean;
+  raceDateIso: string | null;
+  raceDayCount: number;
+  raceDayDates: string[];       // DD/MM/YYYY for each race-day block found
+  borrowedRows: string[];       // offending table rows on race day
+  reason?: string;
+}
+
+const RACE_DAY_BORROWED_RE =
+  /\|\s*(Interval(?:\s*Set)?|Threshold|Tempo|Steady|VO2|Fartlek|Hill|Long\s*Run|Easy\s*Run|Cruise|Sharpening|Repeats?|Reps?|Pre-?Race|Main\s*Set)\b/i;
+
+export function validateRaceDayStandalone(
+  markdown: string,
+  raceDateIso: string | null | undefined,
+): RaceDayStandaloneResult {
+  if (!markdown || !raceDateIso || raceDateIso === "ai-recommend") {
+    return { ok: true, raceDateIso: raceDateIso ?? null, raceDayCount: 0, raceDayDates: [], borrowedRows: [] };
+  }
+  const lines = markdown.split("\n");
+  const blocks = findDayBlocks(lines);
+  const raceDayBlocks = blocks.filter((b) => RACE_DAY_RE.test(b.heading));
+  const raceDayDates = raceDayBlocks.map((b) => b.date);
+  const [y, m, d] = raceDateIso.split("-");
+  const raceUk = `${d}/${m}/${y}`;
+
+  if (raceDayBlocks.length !== 1) {
+    return {
+      ok: false, raceDateIso, raceDayCount: raceDayBlocks.length, raceDayDates, borrowedRows: [],
+      reason: raceDayBlocks.length === 0
+        ? `No RACE DAY entry found (expected exactly one on ${raceUk}).`
+        : `Found ${raceDayBlocks.length} RACE DAY entries — expected exactly one.`,
+    };
+  }
+  const b = raceDayBlocks[0];
+  if (b.date !== raceUk) {
+    return {
+      ok: false, raceDateIso, raceDayCount: 1, raceDayDates, borrowedRows: [],
+      reason: `RACE DAY is on ${b.date} but race_date is ${raceUk}.`,
+    };
+  }
+  const borrowed: string[] = [];
+  for (let i = b.startLine + 1; i < b.endLine; i++) {
+    const row = lines[i];
+    if (!/^\|/.test(row)) continue;
+    if (/^\|\s*Segment\s*\|/i.test(row)) continue;
+    if (/^\|\s*[-:\s|]+\|\s*$/.test(row)) continue;
+    if (RACE_DAY_BORROWED_RE.test(row)) borrowed.push(row.trim());
+  }
+  if (borrowed.length > 0) {
+    return {
+      ok: false, raceDateIso, raceDayCount: 1, raceDayDates, borrowedRows: borrowed,
+      reason: `RACE DAY block on ${raceUk} carries ${borrowed.length} training row(s) borrowed from another session.`,
+    };
+  }
+  return { ok: true, raceDateIso, raceDayCount: 1, raceDayDates, borrowedRows: [] };
+}
+
+
 
