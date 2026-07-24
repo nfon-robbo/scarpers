@@ -1658,7 +1658,7 @@ const TrainingPlanPage = () => {
       currentPaceMax: seedPaceMax,
       trainingDays,
       startDate: effectiveStartISO,
-      raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
+      raceDate: effectiveRaceISO ?? undefined,
       measuredThresholdPaceSecPerKm: measured?.thresholdPaceSecPerKm,
       measuredThresholdHr: measured?.thresholdHr ?? undefined,
       measuredBenchmarkDateIso: measured?.benchmarkDate,
