@@ -1774,7 +1774,7 @@ const TrainingPlanPage = () => {
       });
     };
 
-    let jobPoll: ReturnType<typeof window.setInterval> | null = null;
+    let jobPoll: number | null = null;
     const stopJobPoll = () => {
       if (!jobPoll) return;
       window.clearInterval(jobPoll);
