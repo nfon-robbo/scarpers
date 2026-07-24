@@ -1,9 +1,4 @@
-// Import.meta shim for the app client
-process.env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-(globalThis as any).importMetaEnv = {
-  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
-  VITE_SUPABASE_PUBLISHABLE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY,
-};
+(globalThis as any).localStorage = { getItem:()=>null, setItem:()=>{}, removeItem:()=>{} };
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,16 +6,10 @@ const url = process.env.VITE_SUPABASE_URL!;
 const anon = process.env.VITE_SUPABASE_ANON_KEY!;
 const session = JSON.parse(process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON!);
 
-const client = createClient(url, anon, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-await client.auth.setSession({
-  access_token: session.access_token,
-  refresh_token: session.refresh_token,
-});
+const client = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+await client.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
 
-// Stub the app's supabase client module so the reprocess lib uses ours
-const clientMod = await import("../src/integrations/supabase/client.ts");
+const clientMod: any = await import("../src/integrations/supabase/client.ts");
 Object.defineProperty(clientMod, "supabase", { value: client, writable: true, configurable: true });
 
 const { reprocessBenchmark } = await import("../src/lib/benchmark-reprocess.ts");
