@@ -2698,6 +2698,8 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
                 maxTokens: 64000,
                 label: `ai-coach:${type}:final-validation`,
                 lovableModel: planLovableModel,
+                providerOverride: useClaudeForPlan ? "claude" : undefined,
+                claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
                 messages: [
                   { role: "system", content: nowPrelude + systemPrompt },
                   { role: "user", content: userPrompt },
@@ -2705,6 +2707,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
                   { role: "user", content: finalUser },
                 ],
               });
+
               if (finalResp.ok && finalResp.body) {
                 const beforeLen = fullText.length;
                 await consumeStream(finalResp.body);
