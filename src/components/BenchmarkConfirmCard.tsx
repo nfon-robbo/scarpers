@@ -1,30 +1,30 @@
 /**
- * BenchmarkConfirmCard — the confirmation surface for a scheduled benchmark.
+ * BenchmarkConfirmCard — confirmation surface for a scheduled benchmark.
  *
- * Flow (Group 2 spec):
- *   1. Show the card with the 30-minute effort instruction (verbatim) when
- *      protocol === "30min".
+ * Flow:
+ *   1. Show the card; 30-min TTs show the verbatim effort instruction.
  *   2. On Confirm/Save:
- *      - 3K/5K: open BenchmarkOverrideDialog first (verbatim HR warning);
- *        athlete must acknowledge before we proceed.
+ *      - 3K/5K: open BenchmarkOverrideDialog first (verbatim HR warning).
  *      - 30min: skip straight to step 3.
- *   3. Open BenchmarkPostQuestionsDialog (RPE + could-continue). Answers
- *      derive `likely_submaximal` via deriveLikelySubmaximal — the SAME
- *      boolean feeds both the confidence-score deduction and the stored flag.
- *   4. Call confirmBenchmark with the answers; row is saved.
- *   5. If protocol === "30min" AND we have a measured LTHR, open
- *      ZoneComparisonDialog. That dialog is the only caller of
- *      applyMeasuredZones, the only writer to public.hr_zones.
+ *   3. Run detection (slowdown / breaks) from laps, load hr_sensor_type
+ *      from profile, then open BenchmarkInterviewDialog.
+ *   4. Persist via confirmBenchmark with the full interview payload.
+ *   5. If athlete chose "Yes, reschedule": discard + reschedule, SKIP the
+ *      pace-recalc and zone-comparison dialogs.
+ *   6. Otherwise: threshold-pace push + optional zones + optional pace recalc.
+ *   7. Fire-and-forget: benchmark-coach-verdict edge function.
  */
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Award, Loader2, Pencil, ThumbsDown, HeartPulse, Clock, MapPin } from "lucide-react";
+import {
+  Award, Loader2, Pencil, ThumbsDown, HeartPulse, Clock, MapPin, HeartHandshake,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,13 +33,15 @@ import type { BenchmarkProtocol } from "@/lib/benchmark-token";
 import type { CandidateActivity, ActivityForDetection } from "@/lib/benchmark-detection";
 import type { BenchmarkLap } from "@/lib/benchmark-lap-matcher";
 import { confirmBenchmark, rejectCandidate } from "@/lib/benchmark-persist";
-import type { RpeResponse, CouldContinueResponse } from "@/lib/benchmark-rpe";
+import { requestBenchmarkRedo } from "@/lib/benchmark-redo";
 import BenchmarkOverrideDialog from "@/components/BenchmarkOverrideDialog";
-import BenchmarkPostQuestionsDialog from "@/components/BenchmarkPostQuestionsDialog";
+import BenchmarkInterviewDialog from "@/components/BenchmarkInterviewDialog";
 import ZoneComparisonDialog from "@/components/ZoneComparisonDialog";
 import PlanPaceRecalcDialog from "@/components/PlanPaceRecalcDialog";
 import { pushBenchmarkThresholdPace } from "@/lib/push-benchmark-threshold-pace";
 import { useHrZones } from "@/hooks/useHrZones";
+import { detectBenchmarkSignals } from "@/lib/benchmark-detection-signals";
+import type { InterviewAnswers, InterviewContext } from "@/lib/benchmark-interview";
 
 interface Props {
   userId: string;
@@ -57,12 +59,9 @@ const PROTOCOL_LABEL: Record<BenchmarkProtocol, string> = {
 };
 
 const PROTOCOL_DEFAULT_DIST_M: Record<BenchmarkProtocol, number> = {
-  "30min": 0,
-  "3k": 3000,
-  "5k": 5000,
+  "30min": 0, "3k": 3000, "5k": 5000,
 };
 
-// Verbatim effort instruction shown on the card for 30-min TTs.
 const EFFORT_INSTRUCTION_30MIN =
   "Run at the hardest pace you believe you can maintain evenly for the full 30 minutes. You should finish feeling you gave almost everything, but not having sprinted the first few minutes.";
 
@@ -72,11 +71,17 @@ function parseMmSs(v: string): number | null {
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 }
 
-// A pending save — captured when the athlete taps Confirm/Save, resolved
-// once the post-question dialog closes with answers.
 type Pending =
-  | { kind: "auto"; activity: ActivityForDetection; laps: BenchmarkLap[] | null }
-  | { kind: "manual"; durationS: number; distanceM: number };
+  | {
+      kind: "auto"; activity: ActivityForDetection; laps: BenchmarkLap[] | null;
+      ctx: InterviewContext;
+      storedHrSensor: string | null;
+    }
+  | {
+      kind: "manual"; durationS: number; distanceM: number;
+      ctx: InterviewContext;
+      storedHrSensor: string | null;
+    };
 
 export default function BenchmarkConfirmCard({
   userId, planId, scheduledDateIso, protocol, candidates, onDone,
@@ -85,27 +90,32 @@ export default function BenchmarkConfirmCard({
   const [working, setWorking] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
-  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [interviewOpen, setInterviewOpen] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [zoneDialog, setZoneDialog] = useState<{
-    benchmarkId: string; measuredLthr: number;
-  } | null>(null);
-  const [recalcDialog, setRecalcDialog] = useState<{
-    thresholdSecPerKm: number; planContent: string;
-  } | null>(null);
+  const [redoDate, setRedoDate] = useState<{ benchmarkId: string } | null>(null);
+  const [redoDateValue, setRedoDateValue] = useState<string>("");
+  const [injuryPrompt, setInjuryPrompt] = useState(false);
+  const [zoneDialog, setZoneDialog] = useState<{ benchmarkId: string; measuredLthr: number } | null>(null);
+  const [recalcDialog, setRecalcDialog] = useState<{ thresholdSecPerKm: number; planContent: string } | null>(null);
   const { zones: currentZones } = useHrZones();
 
   const current = candidates[index] ?? null;
   const remaining = candidates.length - index - 1;
 
-  // Step 2: intercept the Confirm/Save taps and route via override → questions.
-  const beginSave = (p: Pending) => {
+  const openInterview = (p: Pending) => {
     setPending(p);
     if (protocol === "3k" || protocol === "5k") {
       setOverrideOpen(true);
     } else {
-      setQuestionsOpen(true);
+      setInterviewOpen(true);
     }
+  };
+
+  const loadProfileHrSensor = async (): Promise<string | null> => {
+    const { data } = await supabase
+      .from("profiles").select("hr_sensor_type" as any)
+      .eq("user_id", userId).maybeSingle();
+    return ((data as any)?.hr_sensor_type as string | null) ?? null;
   };
 
   const handleConfirm = async () => {
@@ -114,13 +124,21 @@ export default function BenchmarkConfirmCard({
     try {
       const { data: laps } = await supabase
         .from("activity_laps" as any)
-        .select("lap_index, elapsed_time_s, distance_m")
+        .select("lap_index, elapsed_time_s, moving_time_s, distance_m")
         .eq("activity_id", current.id)
         .order("lap_index", { ascending: true });
-      beginSave({
-        kind: "auto",
-        activity: current,
-        laps: ((laps as unknown) as BenchmarkLap[] | null) ?? null,
+      const lapsArr = (laps as unknown as any[]) ?? [];
+      const detection = detectBenchmarkSignals(lapsArr);
+      const storedHrSensor = await loadProfileHrSensor();
+      const ctx: InterviewContext = {
+        hasHrStream: current.avg_heart_rate != null,
+        hasActivity: true,
+        detection,
+        hrSensorAlreadyKnown: !!storedHrSensor,
+      };
+      openInterview({
+        kind: "auto", activity: current, laps: lapsArr as BenchmarkLap[],
+        ctx, storedHrSensor,
       });
     } catch (e: any) {
       toast.error("Couldn't load activity", { description: e?.message ?? String(e) });
@@ -134,75 +152,95 @@ export default function BenchmarkConfirmCard({
     setWorking(true);
     try {
       await rejectCandidate({ userId, activityId: current.id, reason: "user_rejected" });
-      if (remaining > 0) {
-        setIndex((i) => i + 1);
-      } else {
+      if (remaining > 0) setIndex((i) => i + 1);
+      else {
         toast.info("No more candidates in the ±48h window.");
         await onDone();
       }
     } catch (e: any) {
       toast.error("Couldn't reject candidate", { description: e?.message ?? String(e) });
-    } finally {
-      setWorking(false);
-    }
+    } finally { setWorking(false); }
   };
 
-  // Step 4: persist with the RPE answers.
-  const handleQuestionsSubmit = async (v: {
-    rpe: RpeResponse; couldContinue: CouldContinueResponse;
-  }) => {
+  const kickCoachVerdict = (benchmarkId: string) => {
+    // Fire-and-forget — verdict failure must never block the athlete.
+    void supabase.functions
+      .invoke("benchmark-coach-verdict", { body: { benchmarkId } })
+      .catch(() => {});
+  };
+
+  const handleInterviewSubmit = async (answers: InterviewAnswers) => {
     if (!pending) return;
     setWorking(true);
     try {
+      const effectiveHrSensor = answers.hrSensorType ?? pending.storedHrSensor;
       const saved = await confirmBenchmark({
         userId, planId, scheduledDateIso, protocol,
         activity: pending.kind === "auto" ? pending.activity : null,
         laps: pending.kind === "auto" ? pending.laps : null,
         manualDurationS: pending.kind === "manual" ? pending.durationS : undefined,
         manualDistanceM: pending.kind === "manual" ? pending.distanceM : undefined,
-        rpeResponse: v.rpe,
-        couldContinueResponse: v.couldContinue,
+        interview: answers,
+        detection: pending.ctx.detection,
+        hrSensorType: effectiveHrSensor,
       });
       toast.success("Benchmark saved");
-      setQuestionsOpen(false);
+      setInterviewOpen(false);
       setManualOpen(false);
       setPending(null);
 
-      // Push measured threshold pace to intervals.icu (always overwrites).
-      // Fire-and-forget: failure is not fatal to the benchmark save.
+      kickCoachVerdict(saved.id);
+
+      if (saved.injuryFlagged) setInjuryPrompt(true);
+
+      // ── REDO PATH ──────────────────────────────────────────────────────
+      if (answers.redoChoice === "Yes, reschedule") {
+        setRedoDate({ benchmarkId: saved.id });
+        // Skip pace-recalc + zone-comparison dialogs entirely.
+        return;
+      }
+
+      // ── NORMAL PATH ───────────────────────────────────────────────────
       void pushBenchmarkThresholdPace(saved.thresholdPaceSecPerKm).then((r) => {
         if (r.ok) toast.success(`Threshold pace synced to intervals.icu (${r.mPerSec} m/s)`);
       });
 
-      // Load current plan content for the pace-recalc diff dialog.
       let planContent: string | null = null;
       if (planId) {
         const { data: plan } = await supabase
-          .from("training_plans")
-          .select("content")
-          .eq("id", planId)
-          .maybeSingle();
+          .from("training_plans").select("content").eq("id", planId).maybeSingle();
         planContent = (plan as any)?.content ?? null;
       }
 
-      // Step 5: only 30-min TTs can rebuild HR zones. Skip for 3K/5K per the
-      // verbatim override warning. Recalc dialog fires after zones (or
-      // immediately for 3K/5K, which still update pace targets).
       if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
         setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
-        if (planContent) {
-          setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
-        }
+        if (planContent) setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
       } else if (planContent) {
         setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
-      } else {
+      } else if (!injuryPrompt) {
         await onDone();
       }
     } catch (e: any) {
       toast.error("Couldn't save benchmark", { description: e?.message ?? String(e) });
-    } finally {
-      setWorking(false);
-    }
+    } finally { setWorking(false); }
+  };
+
+  const submitRedo = async () => {
+    if (!redoDate) return;
+    const iso = redoDateValue;
+    if (!iso) return toast.error("Pick a date for the redo.");
+    setWorking(true);
+    try {
+      await requestBenchmarkRedo({
+        discardedBenchmarkId: redoDate.benchmarkId,
+        userId, planId, protocol, newDateIso: iso,
+      });
+      toast.success(`Benchmark rescheduled for ${format(new Date(`${iso}T12:00:00Z`), "d MMM yyyy")}. Keep it easy until then.`);
+      setRedoDate(null); setRedoDateValue("");
+      await onDone();
+    } catch (e: any) {
+      toast.error("Couldn't reschedule", { description: e?.message ?? String(e) });
+    } finally { setWorking(false); }
   };
 
   const hasHr = current?.avg_heart_rate != null;
@@ -263,22 +301,11 @@ export default function BenchmarkConfirmCard({
             </div>
 
             <div className="flex items-center gap-2 mt-2.5">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={handleConfirm}
-                disabled={working}
-              >
+              <Button size="sm" className="flex-1" onClick={handleConfirm} disabled={working}>
                 {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirm"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleReject}
-                disabled={working}
-              >
-                <ThumbsDown className="w-3.5 h-3.5 mr-1" />
-                Reject
+              <Button size="sm" variant="outline" onClick={handleReject} disabled={working}>
+                <ThumbsDown className="w-3.5 h-3.5 mr-1" /> Reject
               </Button>
             </div>
           </>
@@ -302,8 +329,15 @@ export default function BenchmarkConfirmCard({
         onOpenChange={setManualOpen}
         protocol={protocol}
         working={working}
-        onSubmit={({ durationS, distanceM }) => {
-          beginSave({ kind: "manual", durationS, distanceM });
+        onSubmit={async ({ durationS, distanceM }) => {
+          const storedHrSensor = await loadProfileHrSensor();
+          const ctx: InterviewContext = {
+            hasHrStream: false, // manual — no stream
+            hasActivity: false,
+            detection: { slowdownDetected: false, breaksDetected: false, slowdownFraction: null, totalStoppageS: null },
+            hrSensorAlreadyKnown: !!storedHrSensor,
+          };
+          openInterview({ kind: "manual", durationS, distanceM, ctx, storedHrSensor });
         }}
       />
 
@@ -311,15 +345,72 @@ export default function BenchmarkConfirmCard({
         open={overrideOpen}
         protocol={protocol}
         onCancel={() => { setOverrideOpen(false); setPending(null); }}
-        onAcknowledge={() => { setOverrideOpen(false); setQuestionsOpen(true); }}
+        onAcknowledge={() => { setOverrideOpen(false); setInterviewOpen(true); }}
       />
 
-      <BenchmarkPostQuestionsDialog
-        open={questionsOpen}
-        working={working}
-        onCancel={() => { setQuestionsOpen(false); setPending(null); }}
-        onSubmit={handleQuestionsSubmit}
-      />
+      {pending && (
+        <BenchmarkInterviewDialog
+          open={interviewOpen}
+          working={working}
+          ctx={pending.ctx}
+          onCancel={() => { setInterviewOpen(false); setPending(null); }}
+          onSubmit={handleInterviewSubmit}
+        />
+      )}
+
+      {/* Redo date picker — only after a benchmark row was saved with redoChoice=Yes */}
+      <Dialog open={!!redoDate} onOpenChange={(o) => { if (!o) { setRedoDate(null); void onDone(); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reschedule your benchmark</DialogTitle>
+            <DialogDescription>
+              Pick a date to redo this benchmark. Keep intensity easy until then.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="redo-date" className="text-xs">New date</Label>
+            <Input
+              id="redo-date" type="date"
+              value={redoDateValue}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setRedoDateValue(e.target.value)}
+            />
+            <Button className="w-full" onClick={submitRedo} disabled={working || !redoDateValue}>
+              {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Reschedule"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Injury follow-up: single toast-style prompt after save. */}
+      <Dialog open={injuryPrompt} onOpenChange={setInjuryPrompt}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HeartHandshake className="w-4 h-4 text-primary" /> Flagged: old injury
+            </DialogTitle>
+            <DialogDescription>
+              You mentioned an old injury during your benchmark. Want to record any detail so future
+              plans keep it in mind?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setInjuryPrompt(false)}>
+              Not now
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setInjuryPrompt(false);
+                // Deep-link to profile injuries — path already exists in the app.
+                window.location.href = "/settings?section=injuries";
+              }}
+            >
+              Add details
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {zoneDialog && (
         <ZoneComparisonDialog
@@ -327,8 +418,6 @@ export default function BenchmarkConfirmCard({
           onOpenChange={(o) => {
             if (!o) {
               setZoneDialog(null);
-              // If a recalc dialog is queued we let it drive onDone; otherwise
-              // finish the cycle here.
               if (!recalcDialog) void onDone();
             }
           }}
@@ -345,10 +434,7 @@ export default function BenchmarkConfirmCard({
         <PlanPaceRecalcDialog
           open={!!recalcDialog}
           onOpenChange={(o) => {
-            if (!o) {
-              setRecalcDialog(null);
-              void onDone();
-            }
+            if (!o) { setRecalcDialog(null); void onDone(); }
           }}
           planId={planId}
           planContent={recalcDialog.planContent}
@@ -400,33 +486,23 @@ function ManualEntryDialog({ open, onOpenChange, protocol, working, onSubmit }: 
             {PROTOCOL_LABEL[protocol]} — enter what you actually ran.
           </DialogDescription>
         </DialogHeader>
-
         <div className="space-y-3">
           <div>
             <Label htmlFor="bm-dur" className="text-xs">Duration</Label>
             <Input
-              id="bm-dur"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="e.g. 24:30"
-              inputMode="numeric"
-              className="mt-1"
+              id="bm-dur" value={duration} onChange={(e) => setDuration(e.target.value)}
+              placeholder="e.g. 24:30" inputMode="numeric" className="mt-1"
             />
             <p className="text-[11px] text-muted-foreground mt-1">{durationHelp}</p>
           </div>
-
           <div>
             <Label htmlFor="bm-dist" className="text-xs">Distance (km)</Label>
             <Input
-              id="bm-dist"
-              value={distanceKm}
-              onChange={(e) => setDistanceKm(e.target.value)}
+              id="bm-dist" value={distanceKm} onChange={(e) => setDistanceKm(e.target.value)}
               placeholder={protocol === "30min" ? "e.g. 6.20" : "3.00"}
-              inputMode="decimal"
-              className="mt-1"
+              inputMode="decimal" className="mt-1"
             />
           </div>
-
           <Button className="w-full" onClick={submit} disabled={working}>
             {working ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Continue"}
           </Button>

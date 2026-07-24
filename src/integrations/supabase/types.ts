@@ -403,7 +403,9 @@ export type Database = {
           activity_snapshot: Json | null
           benchmark_date: string
           benchmark_protocol: string | null
+          breaks_reasons: string[] | null
           capture_method: string
+          conditions: string[] | null
           confidence_band: string | null
           confidence_deductions: Json
           confidence_score: number | null
@@ -415,15 +417,21 @@ export type Database = {
           effort_window_note: string | null
           effort_window_source: string
           effort_window_start_time: string | null
+          held_back_reasons: string[] | null
           id: string
+          injury_flagged: boolean
           likely_submaximal: boolean
           lthr: number | null
+          post_benchmark_interview: Json
           predicted_5k_seconds: number | null
+          redo_requested: boolean
           riegel_exponent: number
           rpe_notes: string | null
           rpe_response: string | null
           scheduled_date: string | null
+          slowdown_reason: string | null
           status: string
+          stoppage_duration_band: string | null
           threshold_hr: number | null
           threshold_pace_s_per_km: number
           training_plan_id: string | null
@@ -436,7 +444,9 @@ export type Database = {
           activity_snapshot?: Json | null
           benchmark_date: string
           benchmark_protocol?: string | null
+          breaks_reasons?: string[] | null
           capture_method: string
+          conditions?: string[] | null
           confidence_band?: string | null
           confidence_deductions?: Json
           confidence_score?: number | null
@@ -448,15 +458,21 @@ export type Database = {
           effort_window_note?: string | null
           effort_window_source: string
           effort_window_start_time?: string | null
+          held_back_reasons?: string[] | null
           id?: string
+          injury_flagged?: boolean
           likely_submaximal?: boolean
           lthr?: number | null
+          post_benchmark_interview?: Json
           predicted_5k_seconds?: number | null
+          redo_requested?: boolean
           riegel_exponent?: number
           rpe_notes?: string | null
           rpe_response?: string | null
           scheduled_date?: string | null
+          slowdown_reason?: string | null
           status?: string
+          stoppage_duration_band?: string | null
           threshold_hr?: number | null
           threshold_pace_s_per_km: number
           training_plan_id?: string | null
@@ -469,7 +485,9 @@ export type Database = {
           activity_snapshot?: Json | null
           benchmark_date?: string
           benchmark_protocol?: string | null
+          breaks_reasons?: string[] | null
           capture_method?: string
+          conditions?: string[] | null
           confidence_band?: string | null
           confidence_deductions?: Json
           confidence_score?: number | null
@@ -481,15 +499,21 @@ export type Database = {
           effort_window_note?: string | null
           effort_window_source?: string
           effort_window_start_time?: string | null
+          held_back_reasons?: string[] | null
           id?: string
+          injury_flagged?: boolean
           likely_submaximal?: boolean
           lthr?: number | null
+          post_benchmark_interview?: Json
           predicted_5k_seconds?: number | null
+          redo_requested?: boolean
           riegel_exponent?: number
           rpe_notes?: string | null
           rpe_response?: string | null
           scheduled_date?: string | null
+          slowdown_reason?: string | null
           status?: string
+          stoppage_duration_band?: string | null
           threshold_hr?: number | null
           threshold_pace_s_per_km?: number
           training_plan_id?: string | null
@@ -1229,6 +1253,7 @@ export type Database = {
           date_of_birth: string | null
           experience_level: string | null
           height_cm: number | null
+          hr_sensor_type: string | null
           id: string
           name: string | null
           next_benchmark_due: string | null
@@ -1255,6 +1280,7 @@ export type Database = {
           date_of_birth?: string | null
           experience_level?: string | null
           height_cm?: number | null
+          hr_sensor_type?: string | null
           id?: string
           name?: string | null
           next_benchmark_due?: string | null
@@ -1281,6 +1307,7 @@ export type Database = {
           date_of_birth?: string | null
           experience_level?: string | null
           height_cm?: number | null
+          hr_sensor_type?: string | null
           id?: string
           name?: string | null
           next_benchmark_due?: string | null

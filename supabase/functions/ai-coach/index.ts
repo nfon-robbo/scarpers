@@ -1941,11 +1941,48 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
           ? ` Threshold HR: ${Math.round(measured_threshold_hr)} bpm.` : "";
         return `\n🎯 MEASURED BENCHMARK — HARD ANCHOR 🎯\nThreshold pace: ${fmtSecPace(ltSec)}/km (measured ${measured_benchmark_date ?? "recently"}).${hrBits}\nEVERY pace target in this plan MUST derive from this LT:\n- Easy: ${range(1.28, 1.38)}\n- Steady: ${range(1.18, 1.24)}\n- Marathon: ${range(1.10, 1.14)}\n- Threshold: ${range(0.98, 1.02)}\n- CV: ${range(0.94, 0.97)}\n- VO2: ${range(0.88, 0.92)}\n- Reps: ${range(0.82, 0.86)}\nDo NOT use provisional pace, historical averages, or textbook defaults. This anchor overrides everything.\n`;
       })() : "";
-      const userAnchorBlock = ltSec
+
+      // Post-benchmark interview context — the planner reasons from the
+      // structured answers, NOT from the AI-generated verdict. Passing one
+      // model's prose into another model's context loses specifics and can't
+      // be validated.
+      let interviewBlock = "";
+      if (ltSec && measured_benchmark_date) {
+        try {
+          const { data: bmRow } = await supabase
+            .from("benchmark_results")
+            .select("rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, injury_flagged, confidence_band, likely_submaximal")
+            .eq("user_id", user.id)
+            .eq("status", "confirmed")
+            .eq("benchmark_date", measured_benchmark_date)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (bmRow) {
+            const bits: string[] = [];
+            if (bmRow.rpe_response) bits.push(`RPE: ${bmRow.rpe_response}`);
+            if (bmRow.could_continue_response) bits.push(`Could continue: ${bmRow.could_continue_response}`);
+            if (Array.isArray(bmRow.held_back_reasons) && bmRow.held_back_reasons.length) bits.push(`Held back: ${bmRow.held_back_reasons.join(", ")}`);
+            if (bmRow.slowdown_reason) bits.push(`Second-half fade reason: ${bmRow.slowdown_reason}`);
+            if (Array.isArray(bmRow.breaks_reasons) && bmRow.breaks_reasons.length) bits.push(`Breaks: ${bmRow.breaks_reasons.join(", ")}${bmRow.stoppage_duration_band ? ` (${bmRow.stoppage_duration_band})` : ""}`);
+            if (Array.isArray(bmRow.conditions) && bmRow.conditions.length) bits.push(`Conditions: ${bmRow.conditions.join(", ")}`);
+            if (bmRow.injury_flagged) bits.push("⚠️ OLD INJURY FLAGGED — regress volume/intensity and avoid aggravating patterns");
+            if (bmRow.likely_submaximal) bits.push("Likely submaximal effort — treat threshold as a floor, not a ceiling");
+            if (bmRow.confidence_band) bits.push(`Benchmark confidence: ${bmRow.confidence_band}`);
+            if (bits.length) {
+              interviewBlock = `\n📋 POST-BENCHMARK CONTEXT (use to shape the plan)\n- ${bits.join("\n- ")}\n`;
+            }
+          }
+        } catch (e) {
+          console.warn("[ai-coach] failed to load benchmark interview", (e as Error).message);
+        }
+      }
+
+      const userAnchorBlock = (ltSec
         ? measuredBlock
         : (userPaceRange
           ? `\n🚨 USER-SUPPLIED PACE OVERRIDE 🚨\nThe athlete has explicitly told us their current easy run pace is ${userPaceRange}/km.\nWeek 1 EVERY easy/Z2/recovery/long run MUST be prescribed at ${userPaceRange}/km — no faster, no slower.\nDo NOT fall back to historical averages, textbook paces, or goal-derived paces for week 1.\nProgress this anchor by no more than ~5-10 seconds/km per week toward the goal pace as fitness builds.\n`
-          : "");
+          : "")) + interviewBlock;
 
       // ACWR (acute:chronic workload ratio) from training load
       const today = new Date();
