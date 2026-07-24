@@ -2790,20 +2790,48 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
 
         // Always emit a final [DONE] so the client unblocks even if upstream
         // didn't send one or we appended continuations.
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
+        try { await writer.write(encoder.encode("data: [DONE]\n\n")); } catch { /* client gone */ }
+        // Mark job complete for any resuming client.
+        if (jobId) {
+          try {
+            await serviceClient
+              .from("plan_generation_jobs")
+              .update({ content: fullText, status: "done", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq("id", jobId);
+          } catch (e) { console.error("[plan-job] mark done failed:", e); }
+        }
       } catch (e) {
         console.error("[training-plan] buffered stream error:", e);
+        if (jobId) {
+          try {
+            await serviceClient
+              .from("plan_generation_jobs")
+              .update({ content: fullText, status: "error", error: (e instanceof Error ? e.message : String(e)).slice(0, 500), finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq("id", jobId);
+          } catch (dbErr) { console.error("[plan-job] mark error failed:", dbErr); }
+        }
       } finally {
         clearInterval(heartbeat);
         writerClosed = true;
         try { await writer.close(); } catch { /* ignore */ }
       }
-
     })();
+
+    // Detach: keep the generation running (and mirroring to the DB) even after
+    // the client disconnects. Supabase Edge Functions expose EdgeRuntime.waitUntil
+    // for exactly this pattern.
+    try {
+      // @ts-ignore — EdgeRuntime is provided by the Supabase runtime
+      if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(generationTask);
+      }
+    } catch { /* not on Supabase runtime — no-op */ }
 
     return new Response(readable, { headers: sseHeaders });
   } catch (e) {
     console.error("ai-coach error:", e);
+
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
