@@ -212,6 +212,16 @@ export default function BenchmarkConfirmCard({
         if (r.ok) toast.success(`Threshold pace synced to intervals.icu (${r.mPerSec} m/s)`);
       });
 
+      // When the parent will regenerate the plan from measured anchors, skip
+      // BOTH the zone-comparison and pace-recalc dialogs and kick the rebuild
+      // off immediately — the athlete just answered the questionnaire and
+      // expects the plan to start building right away. Measured LTHR is still
+      // persisted on the benchmark row and used by the AI coach prompt.
+      if (onBenchmarkConfirmed) {
+        await onBenchmarkConfirmed();
+        return;
+      }
+
       let planContent: string | null = null;
       if (planId) {
         const { data: plan } = await supabase
@@ -221,17 +231,11 @@ export default function BenchmarkConfirmCard({
 
       if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
         setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
-        // Skip the pace-recalc dialog when the parent will regenerate the plan
-        // from measured anchors (avoids the confusing "no pace tokens matched"
-        // dialog on stub benchmark-only plans).
-        if (planContent && !onBenchmarkConfirmed) {
+        if (planContent) {
           setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
         }
-      } else if (planContent && !onBenchmarkConfirmed) {
+      } else if (planContent) {
         setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
-      } else if (onBenchmarkConfirmed) {
-        // No zone dialog will open — trigger the parent regeneration now.
-        await onBenchmarkConfirmed();
       } else if (!injuryPrompt) {
         await onDone();
       }
