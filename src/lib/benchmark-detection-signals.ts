@@ -27,37 +27,50 @@ export interface DetectionResult {
 }
 
 /**
- * Detect a second-half slowdown from laps: split laps by cumulative elapsed
- * time into first/second half, compute avg pace (s/km) for each, return
- * (second - first) / first. Positive means the second half was slower.
+ * Detect a second-half slowdown from laps: split laps by cumulative MOVING
+ * time into first/second half, compute avg pace (s/km) using MOVING time,
+ * return (second - first) / first. Positive means the second half was slower.
+ *
+ * MOVING time — not elapsed. Timer stops (auto-pause, watch pauses) inflate
+ * elapsed on affected laps and can make a genuine second-half fade look like
+ * a first-half fade. The stoppage penalty is already scored separately via
+ * TIMER_STOPPED_IN_EFFORT; this signal is about pacing, so it must ignore
+ * paused time. Falls back to elapsed only when NO lap carries moving_time_s.
+ *
  * Uses the same threshold as the SECOND_HALF_SLOWDOWN deduction.
  */
 export function detectSecondHalfSlowdownFromLaps(
   laps: DetectionLap[] | null | undefined,
 ): { detected: boolean; fraction: number | null } {
+  const anyMoving = (laps ?? []).some((l) => (l.moving_time_s ?? 0) > 0);
+  const timeOf = (l: DetectionLap): number =>
+    anyMoving
+      ? Number(l.moving_time_s ?? 0)
+      : Number(l.elapsed_time_s ?? 0);
+
   const valid = (laps ?? []).filter(
-    (l) => (l.elapsed_time_s ?? 0) > 0 && (l.distance_m ?? 0) > 0,
+    (l) => timeOf(l) > 0 && (l.distance_m ?? 0) > 0,
   );
   if (valid.length < 2) return { detected: false, fraction: null };
 
-  const totalElapsed = valid.reduce((s, l) => s + (l.elapsed_time_s ?? 0), 0);
-  if (totalElapsed <= 0) return { detected: false, fraction: null };
+  const totalTime = valid.reduce((s, l) => s + timeOf(l), 0);
+  if (totalTime <= 0) return { detected: false, fraction: null };
 
-  const half = totalElapsed / 2;
+  const half = totalTime / 2;
   let cum = 0;
   const firstHalf: DetectionLap[] = [];
   const secondHalf: DetectionLap[] = [];
   for (const l of valid) {
-    if (cum + (l.elapsed_time_s ?? 0) / 2 < half) firstHalf.push(l);
+    if (cum + timeOf(l) / 2 < half) firstHalf.push(l);
     else secondHalf.push(l);
-    cum += l.elapsed_time_s ?? 0;
+    cum += timeOf(l);
   }
   if (firstHalf.length === 0 || secondHalf.length === 0) {
     return { detected: false, fraction: null };
   }
 
   const pace = (arr: DetectionLap[]): number => {
-    const t = arr.reduce((s, l) => s + (l.elapsed_time_s ?? 0), 0);
+    const t = arr.reduce((s, l) => s + timeOf(l), 0);
     const d = arr.reduce((s, l) => s + (l.distance_m ?? 0), 0);
     if (d <= 0) return 0;
     return t / (d / 1000);
