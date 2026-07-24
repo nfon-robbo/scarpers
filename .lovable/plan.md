@@ -1,77 +1,72 @@
+## Goal
 
-## What I found in your data (verified)
+Plan generation must survive: navigating away, refreshing the page, and closing the browser. When the user returns, the in-progress plan continues streaming into the UI (or is already finished and ready to apply). No re-generation, no wasted tokens.
 
-- **Confirmed benchmark row** `fe76a28e…` exists, `status=confirmed`, `active=true`, `benchmark_protocol=30min`, `effort_window_source=lap`.
-  - `effort_window_duration_s = 1855.126` (elapsed), `effort_window_distance_m = 3375.1`
-  - `threshold_pace_s_per_km = 549.65` → **9:09/km** — this is elapsed pace **including the 4:36 timer stop**
-  - `threshold_hr = 145`, `lthr = 145` — this is the **whole-activity average HR**, not the effort window's HR
-  - `confidence_score = 90`, deductions: `hr_sensor_wrist -10` only
-- **`hr_zones` table is empty for you** — `applyMeasuredZones` is never called on the auto-confirm path, so no measured band was ever written. Every zone consumer falls back to observed-max (186 bpm → LTHR 166 → the estimated bands you saw).
-- **Lap 2 evidence for the stop**: `elapsed 719.798s` vs `moving 444.03s` (275.8s of timer-stopped time). Recomputed on the 4 effort laps:
-  - moving-time pace ≈ **7:47/km**, threshold HR (moving-time-weighted over laps 1–4) ≈ **156 bpm** — matches what you're telling me.
-- **Plan gen** reads `resolveZonesForUser` without the measured LTHR; the "estimated" zones you see (<141, 142–149, 150–157, 158–168) are the observed-max path output.
+## Approach
 
-## Fixes (in this order)
+Move the streaming source of truth from the browser to the database. The edge function keeps generating even if the client disconnects, and writes progress to a new `plan_generation_jobs` table. The client subscribes to that row.
 
-### 1. Effort-window pace and HR from moving time, not elapsed
-`src/lib/benchmark-persist.ts` + `src/lib/benchmark-detection.ts`:
-- `identifyEffortWindow` (lap path) already sums `duration_s`; switch the 30-min path to sum `moving_time_s` for the contiguous window, and record `elapsed_time_s - moving_time_s` per lap as `stoppedSeconds`. Return `{ durationSeconds (moving), distanceMeters, stoppedSeconds }`.
-- `confirmBenchmark`:
-  - `threshold_pace_s_per_km = duration_moving / (distance / 1000)`
-  - Replace `threshold_hr = activity.avg_heart_rate` with a **lap-weighted average of `avg_heart_rate` across the effort laps, weighted by moving time**. Falls back to activity avg only when no laps exist (derived path).
-  - Store `stoppedSeconds` on the row (new column `effort_window_stopped_s`).
+### 1. Database
 
-### 2. Timer-stop confidence deduction
-`src/lib/benchmark-calculations.ts` (`BenchmarkConfig.CONFIDENCE_DEDUCTIONS`):
-- Add `TIMER_STOPPED_IN_EFFORT: 15` and threshold constant `TIMER_STOPPED_MIN_S: 60`.
-- `scoreConfidence` gains `timerStoppedSInEffort`; when it exceeds `TIMER_STOPPED_MIN_S`, push `{reason: "timer_stopped_in_effort", points: 15}`.
-- `BenchmarkHistory` renders "Timer stopped: 4:36" when `effort_window_stopped_s > 0`.
+New table `plan_generation_jobs`:
 
-### 3. Migration
-```text
-ALTER TABLE benchmark_results ADD COLUMN effort_window_stopped_s numeric;
-```
-(No grant/policy changes — same access as siblings.)
+- `id` uuid PK
+- `user_id` uuid (RLS: owner-only)
+- `type` text (training-plan, plan-adjust, etc.)
+- `status` text: `running` | `done` | `error` | `cancelled`
+- `request` jsonb — the full body sent to `ai-coach`, so a resume/retry has everything
+- `content` text — accumulated markdown as it streams
+- `error` text, `created_at`, `updated_at`, `finished_at`
+- Unique partial index: only one `running` job per (user_id, type) at a time
+- GRANTs + RLS policies (SELECT/INSERT/UPDATE own rows; service_role full)
+- Realtime enabled on the table
 
-### 4. Measured LTHR must flow into every zone resolver
-Only one thing changes here — the client already passes `measured_threshold_hr` into `ai-coach`, but `resolveZonesForUser` inside `ai-coach` is called with **no `measuredLthr` option**, so the shared resolver still estimates from observed max.
-- `supabase/functions/ai-coach/index.ts` line 1862: pass `{ measuredLthr: measured_threshold_hr ?? null }`.
-- `supabase/functions/intervals-sync/index.ts` line 369: pull the latest confirmed `benchmark_results.lthr` for the user and pass it.
-- `useHrZones` hook: read the latest active-confirmed benchmark's `lthr` and pass it into `resolveZonesForUser`.
-- `resolveZonesForUser` already accepts `opts.measuredLthr` and hands off to `resolveZones`, which returns `lthrSource: "measured"` — no change needed there.
-- Also **write** `hr_zones` on confirmation: call `applyMeasuredZones` from `confirmBenchmark` for the 30-min protocol (it already refuses 3k/5k and enforces the 100–210 plausibility gate). This keeps the ZoneComparisonDialog for the "compare & apply" UX but ensures the canonical row exists.
+### 2. Edge function (`ai-coach`)
 
-### 5. Model must not write bpm ranges
-`supabase/functions/ai-coach/index.ts` (plan-gen prompt around lines 2270–2300):
-- Add a hard rule: "Zones may be referenced by **label only** (`Z1`, `Z2`, `Z1–Z2`). Do not write bpm numbers next to zone labels — the app renders them from the resolver."
-- Add a post-processor after the stream completes: scan every generated segment for `\bZ[1-5](?:\s*[–-]\s*Z[1-5])?\s*\(\s*\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*\)` and rewrite the `(…bpm)` block using `zoneRangeLabel(zone, zones)`. Log any replacement (`{date, segment, model_bpm, resolver_bpm}`) and surface the diff to me on the next benchmark reprocess.
-- Same replacement pass runs in `plan-continuation` output.
+Add a job-backed mode for plan-type requests:
 
-### 6. Race day "REST DAY" bug + race pace derivation
-- The 17/10/2026 rest-day header comes from the coach's rest-day boilerplate being emitted for the race date. Add a guardrail in the prompt: "If a date equals `race_date`, its header MUST be `Race Day` and it MUST contain the goal race workout — never `REST DAY`." Add a validator in `src/lib/plan-validation.ts` to catch a "REST DAY" header on race_date and re-request that day via `plan-continuation`.
-- Race pace target derivation: currently `goal_time` is user-supplied and, if missing, the model invents splits. Change:
-  - Predict race time from measured threshold via `predict5kSeconds` (already implemented) and the existing Riegel exponent for 10k/HM/M distances.
-  - Inject predicted target pace + acceptable window into the prompt and require the race day session to use it verbatim.
-  - Add "**race pace must be trained before race day**": require the plan to include at least 3 race-pace sessions (progressive dose) in the final 6 weeks. Validator flags plans that do not.
+- Client POSTs with `job_mode: true` and gets back `{ job_id }` immediately (fire-and-forget), OR keeps the existing SSE for non-plan calls.
+- Inside the function, wrap the existing model loop with `EdgeRuntime.waitUntil(...)` so the work continues after the HTTP response closes.
+- On every delta: append to `plan_generation_jobs.content` (batched every ~500ms to avoid write storms).
+- On finish: set `status=done`, `finished_at=now()`.
+- On model error: set `status=error`, `error=<message>`.
+- Heartbeat `updated_at` every 20s so we can detect dead jobs.
 
-### 7. Intervals.icu / watch description fixes
-`src/pages/TrainingPlan.tsx` benchmark stub (lines 2956–2965):
-- Change warm-up Notes to `Easy jog to loosen up` (remove "a few strides at the end").
-- Trim workout name — strip trailing whitespace when building `Scarpers Dash - …`.
+### 3. Client (`src/lib/ai-stream.ts` + `TrainingPlan.tsx`)
 
-`supabase/functions/intervals-sync/index.ts` (`formatWorkoutDescription`):
-- Find the truncation (currently silent — likely a `.slice(0, N)` or Intervals' own 255-char cap). Change the description to a compact, complete instruction (≤240 chars) instead of the long freehand one. For a benchmark, emit the fixed verbatim protocol: "Threshold benchmark — hold the hardest even effort you can for 30 min. No pacing target. Warm up 5 min, cool down 5 min." Assert length in code and log a warning if it would exceed the cap.
+- Replace the SSE consumer for plan calls with a job-based flow:
+  1. Insert/POST to create the job, receive `job_id`, store `job_id` in `localStorage` keyed by user.
+  2. Subscribe via Supabase Realtime to `plan_generation_jobs` for that id.
+  3. On each row update, diff `content` vs last seen and call `onDelta` with the new suffix — the existing progress UI keeps working.
+  4. On `status=done` → `onDone`. On `status=error` → `onError`.
+- On `TrainingPlan.tsx` mount: check for a `running` job for this user; if present, resume subscription and show the `PlanBuildProgress` UI with accumulated content. No new model call.
+- Cancel button explicitly sets `status=cancelled` (server checks flag between chunks and stops early).
 
-### 8. Reprocess your existing benchmark
-One-off script (not a migration):
-- Recompute `threshold_pace_s_per_km`, `threshold_hr`, `lthr`, `effort_window_duration_s`, `effort_window_stopped_s`, `confidence_score`, `confidence_deductions` for row `fe76a28e-…` using laps 1–4 of activity `c3ac0ea5-…`.
-- Insert the corresponding `hr_zones` row via `applyMeasuredZones`.
-- Report back to you:
-  - measured pace, HR, LTHR, zones (Z1–Z4 bounds)
-  - confidence score + every deduction (expect `hr_sensor_wrist -10`, `timer_stopped_in_effort -15`)
-  - effort-window path (`lap`)
-- Then regenerate the plan and show you the zone lines + race-day session.
+### 4. UX
 
-## Out of scope (say so if you want them)
-- Rewriting the derived-path (Path 2) to also subtract timer-stopped time from stream data — will file separately unless you want it now.
-- Auto-linking `hr_zones` rows to historic benchmarks that predate this change (only your latest is affected).
+- Small banner on any page: "Plan still generating…" with a link back to `/training-plan`, driven by the running job.
+- When user reopens the app and a job is `done` but not yet applied, show "Your plan is ready — review".
+
+## Technical details
+
+- Non-plan streaming (chat, day-adjust, workout-review) keeps the current SSE path — those are short and re-runnable, and moving them adds latency.
+- `EdgeRuntime.waitUntil` is the Supabase-supported way to keep work alive after the response is returned; combined with DB persistence we get true background execution.
+- Realtime channel: `postgres_changes` filtered by `id=eq.<job_id>`.
+- Race-safety: unique partial index on `(user_id, type) WHERE status='running'` prevents duplicate concurrent runs even across tabs.
+- Continuation passes (plan continuation) run inside the same job — no client involvement.
+- Old client timeout logic (`IDLE_TIMEOUT_MS_PLAN`, hard cap) is removed for plan calls; instead we consider a job dead if `updated_at` hasn't moved in 3 minutes and surface a retry button.
+
+## Files touched
+
+- New: `supabase/migrations/<ts>_plan_generation_jobs.sql`
+- Edit: `supabase/functions/ai-coach/index.ts` (job mode + waitUntil + DB writes)
+- Edit: `src/lib/ai-stream.ts` (add `streamAICoachViaJob`)
+- Edit: `src/pages/TrainingPlan.tsx` (resume-on-mount, use job flow for plan types)
+- New: `src/hooks/usePlanGenerationJob.ts` (subscribe + resume helper)
+- New: `src/components/PlanGeneratingBanner.tsx` (global banner in `AppLayout`)
+- Edit: `src/components/AppLayout.tsx` (mount banner)
+
+## Out of scope
+
+- Migrating chat / day-adjust / workout-review off SSE.
+- Retrying failed jobs automatically (manual retry only, to avoid burning tokens on a real error).

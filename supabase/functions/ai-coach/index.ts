@@ -446,6 +446,16 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    // Service-role client for writing plan_generation_jobs progress. We keep
+    // writing to this even after the client disconnects (see EdgeRuntime.waitUntil
+    // wrapping the plan streaming IIFE below), so plan generation never gets
+    // wasted on a page refresh / navigation / browser close.
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -466,6 +476,10 @@ serve(async (req) => {
     if (reqBody.planned_workout && typeof reqBody.planned_workout === "object" && typeof reqBody.planned_workout.title === "string") {
       reqBody.planned_workout.title = stripBenchmarkTokens(reqBody.planned_workout.title);
     }
+    // Optional client-supplied job id — when set, we mirror all streamed tokens
+    // to plan_generation_jobs.content so the client can resume after nav/refresh.
+    const jobId: string | undefined = typeof reqBody.job_id === "string" ? reqBody.job_id : undefined;
+
     const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo, measured_threshold_pace_s_per_km, measured_threshold_hr, measured_benchmark_date } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
@@ -2540,18 +2554,46 @@ ${upcoming.join("\n")}
     const encoder = new TextEncoder();
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 
-    (async () => {
+    // Wrap the generation IIFE in a Promise we can hand to EdgeRuntime.waitUntil
+    // so the work keeps running (and keeps mirroring to the DB) even after the
+    // client disconnects (navigation, refresh, closed tab).
+    const generationTask = (async () => {
       const writer = writable.getWriter();
       let fullText = "";
+
+      // Throttled mirror of accumulated content to plan_generation_jobs.content.
+      // Client subscribes to that row via Realtime and resumes seamlessly.
+      let lastJobWrite = 0;
+      let jobWriteInFlight: Promise<unknown> | null = null;
+      const flushJob = async (force = false) => {
+        if (!jobId) return;
+        const now = Date.now();
+        if (!force && now - lastJobWrite < 600) return;
+        lastJobWrite = now;
+        try {
+          jobWriteInFlight = serviceClient
+            .from("plan_generation_jobs")
+            .update({ content: fullText, updated_at: new Date().toISOString() })
+            .eq("id", jobId)
+            .then(() => {});
+          await jobWriteInFlight;
+        } catch (e) {
+          console.error("[plan-job] mirror write failed:", e);
+        }
+      };
 
       // Heartbeat: emit an SSE comment every 20s so the client's idle watchdog
       // never fires during long Claude continuation passes (which can go 60-120s
       // between the first token of one pass and the first token of the next).
+      // Also serves as a job-row heartbeat so the client can tell "still alive".
       let writerClosed = false;
       const heartbeat = setInterval(() => {
-        if (writerClosed) return;
-        writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => { /* ignore */ });
+        if (!writerClosed) {
+          writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => { /* ignore */ });
+        }
+        void flushJob(true);
       }, 20_000);
+
 
 
       // Recompute plan-context locals (they live inside the plan branches above
@@ -2582,8 +2624,14 @@ ${upcoming.join("\n")}
       })();
 
       const emitDelta = async (delta: string) => {
-        await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+        // Swallow writer failures — client may have disconnected. We still keep
+        // generating and mirroring to the job row.
+        try {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
+        } catch { writerClosed = true; }
+        void flushJob();
       };
+
 
       const consumeStream = async (body: ReadableStream<Uint8Array>) => {
         const reader = body.getReader();
@@ -2742,20 +2790,48 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
 
         // Always emit a final [DONE] so the client unblocks even if upstream
         // didn't send one or we appended continuations.
-        await writer.write(encoder.encode("data: [DONE]\n\n"));
+        try { await writer.write(encoder.encode("data: [DONE]\n\n")); } catch { /* client gone */ }
+        // Mark job complete for any resuming client.
+        if (jobId) {
+          try {
+            await serviceClient
+              .from("plan_generation_jobs")
+              .update({ content: fullText, status: "done", finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq("id", jobId);
+          } catch (e) { console.error("[plan-job] mark done failed:", e); }
+        }
       } catch (e) {
         console.error("[training-plan] buffered stream error:", e);
+        if (jobId) {
+          try {
+            await serviceClient
+              .from("plan_generation_jobs")
+              .update({ content: fullText, status: "error", error: (e instanceof Error ? e.message : String(e)).slice(0, 500), finished_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq("id", jobId);
+          } catch (dbErr) { console.error("[plan-job] mark error failed:", dbErr); }
+        }
       } finally {
         clearInterval(heartbeat);
         writerClosed = true;
         try { await writer.close(); } catch { /* ignore */ }
       }
-
     })();
+
+    // Detach: keep the generation running (and mirroring to the DB) even after
+    // the client disconnects. Supabase Edge Functions expose EdgeRuntime.waitUntil
+    // for exactly this pattern.
+    try {
+      // @ts-ignore — EdgeRuntime is provided by the Supabase runtime
+      if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(generationTask);
+      }
+    } catch { /* not on Supabase runtime — no-op */ }
 
     return new Response(readable, { headers: sseHeaders });
   } catch (e) {
     console.error("ai-coach error:", e);
+
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

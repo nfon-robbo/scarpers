@@ -1249,6 +1249,45 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_generation_jobs: {
+        Row: {
+          content: string
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          request: Json
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          request?: Json
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          request?: Json
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           athlete_context: string | null

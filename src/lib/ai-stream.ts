@@ -42,6 +42,8 @@ export async function streamAICoach({
   measuredThresholdHr,
   measuredBenchmarkDateIso,
   featureName,
+  jobId,
+
   onDelta,
   onDone,
   onError,
@@ -74,10 +76,14 @@ export async function streamAICoach({
   measuredBenchmarkDateIso?: string;
   /** Optional label for telemetry (e.g. "day-adjust", "chat"). */
   featureName?: string;
+  /** When set, edge fn mirrors accumulated tokens to plan_generation_jobs.id
+   *  so the client can resume after navigation / refresh / browser close. */
+  jobId?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }) {
+
   const startedAt = Date.now();
   const controller = new AbortController();
   let settled = false;
@@ -146,6 +152,8 @@ export async function streamAICoach({
     if (typeof measuredThresholdPaceSecPerKm === "number") body.measured_threshold_pace_s_per_km = measuredThresholdPaceSecPerKm;
     if (typeof measuredThresholdHr === "number") body.measured_threshold_hr = measuredThresholdHr;
     if (measuredBenchmarkDateIso) body.measured_benchmark_date = measuredBenchmarkDateIso;
+    if (jobId) body.job_id = jobId;
+
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",

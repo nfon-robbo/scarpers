@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { streamAICoach } from "@/lib/ai-stream";
+import { createPlanJob, findResumableJob, subscribeToJob, forgetJobId, type PlanGenerationJob } from "@/lib/plan-generation-job";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1735,6 +1737,83 @@ const TrainingPlanPage = () => {
     updateStep("ai", { status: "active", findings: ["Waiting for first tokens…"] });
     let accumulated = "";
     let lastAiUpdate = 0;
+
+    // Create a durable job row FIRST so the edge function can mirror tokens to
+    // it. If the user navigates away / refreshes / closes the browser, the
+    // server keeps running and we resume from this row on next mount.
+    const jobId = await createPlanJob({
+      userId: user.id,
+      type: "training-plan",
+      request: {
+        prefix,
+        previousContent,
+        raceDistance,
+        goalTime,
+        effectiveStartISO,
+        effectiveRaceISO,
+      },
+    });
+
+    const handleDelta = (text: string) => {
+      accumulated += text;
+      setContent(prefix + accumulated);
+      const now = Date.now();
+      if (now - lastAiUpdate > 400) {
+        lastAiUpdate = now;
+        const weeks = (accumulated.match(/^##\s*week/gim) || []).length;
+        const days = (accumulated.match(/^###\s+/gim) || []).length;
+        const words = accumulated.trim().split(/\s+/).length;
+        updateStep("ai", {
+          status: "active",
+          findings: [
+            `${weeks} week${weeks === 1 ? "" : "s"} outlined · ${days} sessions drafted`,
+            `${words.toLocaleString()} words streamed`,
+          ],
+          usage: ["Weaves your history, seed pace, HR zones and benchmark into each session."],
+        });
+      }
+    };
+
+    const handleDone = async () => {
+      const finalContent = prefix + accumulated;
+      const weeks = (finalContent.match(/^##\s*week/gim) || []).length;
+      const days = (finalContent.match(/^###\s+/gim) || []).length;
+      updateStep("ai", {
+        status: "done",
+        findings: [`${weeks} week${weeks === 1 ? "" : "s"} · ${days} sessions written`],
+        usage: ["Full plan drafted — moving to validation."],
+      });
+      updateStep("save", { status: "active" });
+      setContent(finalContent);
+      const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
+      updateStep("save", {
+        status: "done",
+        findings: ["Plan validated and saved to your diary."],
+        usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
+      });
+      setLoading(false);
+      if (user) forgetJobId(user.id);
+      toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
+    };
+
+    const handleError = (err: string) => {
+      updateStep("ai", { status: "warn", findings: [err] });
+      toast({ title: "Plan generation failed", description: err, variant: "destructive" });
+      setLoading(false);
+      if (user) forgetJobId(user.id);
+    };
+
+    // Belt-and-braces resume subscription: even if the SSE connection drops
+    // (nav / close / network blip), realtime keeps our UI updating from the DB.
+    let jobSub: { unsubscribe: () => void } | null = null;
+    if (jobId) {
+      jobSub = subscribeToJob(jobId, "", {
+        onDelta: (chunk) => handleDelta(chunk),
+        onDone: () => { jobSub?.unsubscribe(); void handleDone(); },
+        onError: (msg) => { jobSub?.unsubscribe(); handleError(msg); },
+      });
+    }
+
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
@@ -1748,52 +1827,15 @@ const TrainingPlanPage = () => {
       measuredThresholdPaceSecPerKm: measured?.thresholdPaceSecPerKm,
       measuredThresholdHr: measured?.thresholdHr ?? undefined,
       measuredBenchmarkDateIso: measured?.benchmarkDate,
-      onDelta: (text) => {
-        accumulated += text;
-        setContent(prefix + accumulated);
-        const now = Date.now();
-        if (now - lastAiUpdate > 400) {
-          lastAiUpdate = now;
-          const weeks = (accumulated.match(/^##\s*week/gim) || []).length;
-          const days = (accumulated.match(/^###\s+/gim) || []).length;
-          const words = accumulated.trim().split(/\s+/).length;
-          updateStep("ai", {
-            status: "active",
-            findings: [
-              `${weeks} week${weeks === 1 ? "" : "s"} outlined · ${days} sessions drafted`,
-              `${words.toLocaleString()} words streamed`,
-            ],
-            usage: ["Weaves your history, seed pace, HR zones and benchmark into each session."],
-          });
-        }
-      },
-      onDone: async () => {
-        const finalContent = prefix + accumulated;
-        const weeks = (finalContent.match(/^##\s*week/gim) || []).length;
-        const days = (finalContent.match(/^###\s+/gim) || []).length;
-        updateStep("ai", {
-          status: "done",
-          findings: [`${weeks} week${weeks === 1 ? "" : "s"} · ${days} sessions written`],
-          usage: ["Full plan drafted — moving to validation."],
-        });
-        updateStep("save", { status: "active" });
-        setContent(finalContent);
-        const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
-        updateStep("save", {
-          status: "done",
-          findings: ["Plan validated and saved to your diary."],
-          usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
-        });
-        setLoading(false);
-        toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
-      },
-      onError: (err) => {
-        updateStep("ai", { status: "warn", findings: [err] });
-        toast({ title: "Plan generation failed", description: err, variant: "destructive" });
-        setLoading(false);
-      },
+      jobId: jobId ?? undefined,
+      // When a job is active the realtime subscription drives UI updates —
+      // ignore the SSE stream to avoid double-counting deltas.
+      onDelta: (text) => { if (!jobId) handleDelta(text); },
+      onDone: () => { if (!jobId) void handleDone(); },
+      onError: (err) => { if (!jobId) handleError(err); },
     });
   };
+
 
 
   // Auto-generate after onboarding redirect. Runs once when the initial plan
@@ -1830,6 +1872,97 @@ const TrainingPlanPage = () => {
     generatePlan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceDistance, trainingDays, raceDate, letAIDecide]);
+
+
+  // ── Durable plan-generation resume ────────────────────────────────────
+  // If a plan is still generating on the server (because the user navigated
+  // away, refreshed, or closed the browser), pick it back up on mount.
+  // Also auto-save any completed-but-unacknowledged plan.
+  const resumeTriedRef = useRef(false);
+  useEffect(() => {
+    if (resumeTriedRef.current) return;
+    if (!user) return;
+    if (initialLoading) return;
+    if (loading) return;
+    resumeTriedRef.current = true;
+
+    (async () => {
+      const job = await findResumableJob(user.id);
+      if (!job) return;
+
+      const request = (job.request ?? {}) as {
+        prefix?: string;
+        previousContent?: string;
+      };
+      const prefix = request.prefix ?? "";
+      const previousContent = request.previousContent ?? "";
+
+      const applyFinal = async (finalContent: string) => {
+        if (!finalContent.trim()) return;
+        const full = finalContent.startsWith(prefix) ? finalContent : (prefix + finalContent);
+        setContent(full);
+        try {
+          const planId = await savePlan(full, { undoLabel: "plan generation (resumed)", prevContent: previousContent });
+          toastPlanChange("Plan saved", "We finished your plan in the background while you were away.", previousContent ? planId : null);
+        } catch (e) {
+          console.error("[plan-resume] savePlan failed:", e);
+        } finally {
+          setLoading(false);
+          forgetJobId(user.id);
+        }
+      };
+
+      if (job.status === "done") {
+        toast({ title: "Plan ready", description: "We finished your plan in the background. Saving now…" });
+        void applyFinal(job.content || "");
+        return;
+      }
+
+      if (job.status !== "running") return;
+
+      // Resume live progress from wherever the server got to.
+      setLoading(true);
+      setContent(prefix + (job.content || ""));
+      toast({
+        title: "Resuming your plan",
+        description: "It kept building while you were away — picking up where the coach left off.",
+      });
+      const resumeSteps: BuildStep[] = [
+        { id: "profile",   label: "Reading your goals & schedule",       status: "done", icon: "target" },
+        { id: "history",   label: "Scanning your recent activity history", status: "done", icon: "activity" },
+        { id: "pace",      label: "Estimating your current running pace",   status: "done", icon: "search" },
+        { id: "hr",        label: "Loading heart-rate zones",              status: "done", icon: "heart" },
+        { id: "benchmark", label: "Checking for a confirmed benchmark",    status: "done", icon: "target" },
+        { id: "ai",        label: "Coach is writing your plan",            status: "active", icon: "sparkles", findings: ["Resuming background generation…"] },
+        { id: "save",      label: "Validating and saving the plan",        status: "pending", icon: "save" },
+      ];
+      setBuildSteps(resumeSteps);
+
+
+      const sub = subscribeToJob(job.id, job.content || "", {
+        onDelta: (chunk) => {
+          setContent((prev) => (prev ?? "") + chunk);
+        },
+        onDone: (finalContent) => {
+          sub.unsubscribe();
+          void applyFinal(finalContent);
+        },
+        onError: (msg) => {
+          sub.unsubscribe();
+          setLoading(false);
+          forgetJobId(user.id);
+          toast({ title: "Plan generation failed", description: msg, variant: "destructive" });
+        },
+        onCancelled: () => {
+          sub.unsubscribe();
+          setLoading(false);
+          forgetJobId(user.id);
+        },
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, initialLoading]);
+
 
 
 
