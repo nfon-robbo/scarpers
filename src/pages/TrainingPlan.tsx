@@ -58,6 +58,7 @@ import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePla
 import { splitPlanByDate } from "@/lib/plan-split";
 import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
 import { getLatestConfirmedBenchmark, scheduleStandaloneBenchmark } from "@/lib/benchmark-scheduled";
+import { maxWeeksForDistance, defaultWeeksForDistance, addWeeks, weeksBetween } from "@/lib/plan-length";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
 import BenchmarkFirstDialog from "@/components/BenchmarkFirstDialog";
 import { useHrZones } from "@/hooks/useHrZones";
