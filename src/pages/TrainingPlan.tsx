@@ -1737,6 +1737,83 @@ const TrainingPlanPage = () => {
     updateStep("ai", { status: "active", findings: ["Waiting for first tokens…"] });
     let accumulated = "";
     let lastAiUpdate = 0;
+
+    // Create a durable job row FIRST so the edge function can mirror tokens to
+    // it. If the user navigates away / refreshes / closes the browser, the
+    // server keeps running and we resume from this row on next mount.
+    const jobId = await createPlanJob({
+      userId: user.id,
+      type: "training-plan",
+      request: {
+        prefix,
+        previousContent,
+        raceDistance,
+        goalTime,
+        effectiveStartISO,
+        effectiveRaceISO,
+      },
+    });
+
+    const handleDelta = (text: string) => {
+      accumulated += text;
+      setContent(prefix + accumulated);
+      const now = Date.now();
+      if (now - lastAiUpdate > 400) {
+        lastAiUpdate = now;
+        const weeks = (accumulated.match(/^##\s*week/gim) || []).length;
+        const days = (accumulated.match(/^###\s+/gim) || []).length;
+        const words = accumulated.trim().split(/\s+/).length;
+        updateStep("ai", {
+          status: "active",
+          findings: [
+            `${weeks} week${weeks === 1 ? "" : "s"} outlined · ${days} sessions drafted`,
+            `${words.toLocaleString()} words streamed`,
+          ],
+          usage: ["Weaves your history, seed pace, HR zones and benchmark into each session."],
+        });
+      }
+    };
+
+    const handleDone = async () => {
+      const finalContent = prefix + accumulated;
+      const weeks = (finalContent.match(/^##\s*week/gim) || []).length;
+      const days = (finalContent.match(/^###\s+/gim) || []).length;
+      updateStep("ai", {
+        status: "done",
+        findings: [`${weeks} week${weeks === 1 ? "" : "s"} · ${days} sessions written`],
+        usage: ["Full plan drafted — moving to validation."],
+      });
+      updateStep("save", { status: "active" });
+      setContent(finalContent);
+      const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
+      updateStep("save", {
+        status: "done",
+        findings: ["Plan validated and saved to your diary."],
+        usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
+      });
+      setLoading(false);
+      if (user) forgetJobId(user.id);
+      toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
+    };
+
+    const handleError = (err: string) => {
+      updateStep("ai", { status: "warn", findings: [err] });
+      toast({ title: "Plan generation failed", description: err, variant: "destructive" });
+      setLoading(false);
+      if (user) forgetJobId(user.id);
+    };
+
+    // Belt-and-braces resume subscription: even if the SSE connection drops
+    // (nav / close / network blip), realtime keeps our UI updating from the DB.
+    let jobSub: { unsubscribe: () => void } | null = null;
+    if (jobId) {
+      jobSub = subscribeToJob(jobId, "", {
+        onDelta: (chunk) => handleDelta(chunk),
+        onDone: () => { jobSub?.unsubscribe(); void handleDone(); },
+        onError: (msg) => { jobSub?.unsubscribe(); handleError(msg); },
+      });
+    }
+
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
@@ -1750,52 +1827,15 @@ const TrainingPlanPage = () => {
       measuredThresholdPaceSecPerKm: measured?.thresholdPaceSecPerKm,
       measuredThresholdHr: measured?.thresholdHr ?? undefined,
       measuredBenchmarkDateIso: measured?.benchmarkDate,
-      onDelta: (text) => {
-        accumulated += text;
-        setContent(prefix + accumulated);
-        const now = Date.now();
-        if (now - lastAiUpdate > 400) {
-          lastAiUpdate = now;
-          const weeks = (accumulated.match(/^##\s*week/gim) || []).length;
-          const days = (accumulated.match(/^###\s+/gim) || []).length;
-          const words = accumulated.trim().split(/\s+/).length;
-          updateStep("ai", {
-            status: "active",
-            findings: [
-              `${weeks} week${weeks === 1 ? "" : "s"} outlined · ${days} sessions drafted`,
-              `${words.toLocaleString()} words streamed`,
-            ],
-            usage: ["Weaves your history, seed pace, HR zones and benchmark into each session."],
-          });
-        }
-      },
-      onDone: async () => {
-        const finalContent = prefix + accumulated;
-        const weeks = (finalContent.match(/^##\s*week/gim) || []).length;
-        const days = (finalContent.match(/^###\s+/gim) || []).length;
-        updateStep("ai", {
-          status: "done",
-          findings: [`${weeks} week${weeks === 1 ? "" : "s"} · ${days} sessions written`],
-          usage: ["Full plan drafted — moving to validation."],
-        });
-        updateStep("save", { status: "active" });
-        setContent(finalContent);
-        const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
-        updateStep("save", {
-          status: "done",
-          findings: ["Plan validated and saved to your diary."],
-          usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
-        });
-        setLoading(false);
-        toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
-      },
-      onError: (err) => {
-        updateStep("ai", { status: "warn", findings: [err] });
-        toast({ title: "Plan generation failed", description: err, variant: "destructive" });
-        setLoading(false);
-      },
+      jobId: jobId ?? undefined,
+      // When a job is active the realtime subscription drives UI updates —
+      // ignore the SSE stream to avoid double-counting deltas.
+      onDelta: (text) => { if (!jobId) handleDelta(text); },
+      onDone: () => { if (!jobId) void handleDone(); },
+      onError: (err) => { if (!jobId) handleError(err); },
     });
   };
+
 
 
   // Auto-generate after onboarding redirect. Runs once when the initial plan
