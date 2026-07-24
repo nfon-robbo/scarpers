@@ -635,7 +635,7 @@ export default function PlanDayList({
       const rejectedIds = new Set<string>((rej ?? []).map((r: any) => r.activity_id));
       const confirmed = new Set<string>((existing ?? []).map((r: any) => r.benchmark_date));
       const perDate = new Map<string, CandidateActivity[]>();
-      benchmarkSchedule.forEach((protocol, isoDate) => {
+      map.forEach((protocol, isoDate) => {
         if (confirmed.has(isoDate)) return;
         const list = findBenchmarkCandidates({
           activities: (acts ?? []) as ActivityForDetection[],
@@ -649,7 +649,7 @@ export default function PlanDayList({
       setBenchmarkCandidates(perDate);
     })();
     return () => { cancelled = true; };
-  }, [userId, benchmarkSchedule, benchmarkRefreshKey]);
+  }, [userId, planStartDate?.getTime(), planEndDate?.getTime(), benchmarkRefreshKey]);
 
   const refreshBenchmarks = useCallback(() => setBenchmarkRefreshKey((n) => n + 1), []);
 
