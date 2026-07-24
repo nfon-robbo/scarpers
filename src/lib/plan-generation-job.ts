@@ -58,15 +58,16 @@ export async function createPlanJob(params: {
 
   const { data, error } = await supabase
     .from("plan_generation_jobs")
-    .insert({
+    .insert([{
       user_id: params.userId,
       type: params.type,
       status: "running",
-      request: params.request,
+      request: params.request as any,
       content: "",
-    })
+    }])
     .select("id")
     .single();
+
 
   if (error || !data) {
     console.error("[plan-job] create failed:", error);
