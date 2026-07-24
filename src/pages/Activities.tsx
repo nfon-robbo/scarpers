@@ -88,7 +88,7 @@ const Activities = () => {
   }, [user]);
 
   useEffect(() => {
-    if (!user || activities.length === 0) {
+    if (!user) {
       setBenchmarkPrompt(null);
       return;
     }
@@ -106,8 +106,20 @@ const Activities = () => {
         return;
       }
 
-      const dates = scheduled.map((b) => b.benchmark_date);
-      const [{ data: rejections }, { data: confirmed }] = await Promise.all([
+      const dates = Array.from(new Set(scheduled.map((b) => b.benchmark_date)));
+      const sortedDates = dates.slice().sort();
+      const activityFrom = new Date(`${sortedDates[0]}T12:00:00Z`);
+      activityFrom.setUTCDate(activityFrom.getUTCDate() - 3);
+      const activityTo = new Date(`${sortedDates[sortedDates.length - 1]}T12:00:00Z`);
+      activityTo.setUTCDate(activityTo.getUTCDate() + 3);
+
+      const [{ data: candidateActivities }, { data: rejections }, { data: confirmed }] = await Promise.all([
+        supabase
+          .from("activities")
+          .select("id, start_time, duration_seconds, distance_meters, avg_heart_rate, activity_type")
+          .eq("user_id", user.id)
+          .gte("start_time", activityFrom.toISOString())
+          .lte("start_time", activityTo.toISOString()),
         supabase
           .from("benchmark_rejections" as any)
           .select("activity_id")
@@ -124,14 +136,7 @@ const Activities = () => {
 
       const rejectedIds = new Set<string>((rejections ?? []).map((r: any) => r.activity_id));
       const confirmedDates = new Set<string>((confirmed ?? []).map((r: any) => r.benchmark_date));
-      const activityPool = activities.map((a) => ({
-        id: a.id,
-        start_time: a.start_time,
-        duration_seconds: a.duration_seconds,
-        distance_meters: a.distance_meters,
-        avg_heart_rate: a.avg_heart_rate,
-        activity_type: a.activity_type,
-      })) as ActivityForDetection[];
+      const activityPool = (candidateActivities ?? []) as ActivityForDetection[];
 
       const prompts = scheduled
         .filter((b) => !confirmedDates.has(b.benchmark_date))
@@ -152,7 +157,7 @@ const Activities = () => {
     })();
 
     return () => { cancelled = true; };
-  }, [user, activities, benchmarkRefreshKey]);
+  }, [user, benchmarkRefreshKey]);
 
   const togglePlanAllocation = async (activityId: string, currentlyAllocated: boolean) => {
     setTogglingPlan(activityId);
