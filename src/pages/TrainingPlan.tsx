@@ -2498,7 +2498,7 @@ const TrainingPlanPage = () => {
     }
   };
 
-  const showConfig = !content && !loading;
+  const showConfig = (!content && !loading) || (isBenchmarkStubPlan && hasConfirmedBenchmark && !loading);
 
   if (initialLoading) {
     return (
