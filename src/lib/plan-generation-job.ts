@@ -126,6 +126,7 @@ export function subscribeToJob(
   jobId: string,
   initialContent: string,
   handlers: {
+    onProgress?: (row: PlanGenerationJob) => void;
     onDelta: (chunk: string) => void;
     onDone: (finalContent: string) => void;
     onError: (message: string) => void;
@@ -135,6 +136,7 @@ export function subscribeToJob(
   let seen = initialContent.length;
 
   const apply = (row: PlanGenerationJob) => {
+    handlers.onProgress?.(row);
     if (typeof row.content === "string" && row.content.length > seen) {
       const chunk = row.content.slice(seen);
       seen = row.content.length;
