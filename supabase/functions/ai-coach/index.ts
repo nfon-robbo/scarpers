@@ -2535,6 +2535,16 @@ ${upcoming.join("\n")}
       const writer = writable.getWriter();
       let fullText = "";
 
+      // Heartbeat: emit an SSE comment every 20s so the client's idle watchdog
+      // never fires during long Claude continuation passes (which can go 60-120s
+      // between the first token of one pass and the first token of the next).
+      let writerClosed = false;
+      const heartbeat = setInterval(() => {
+        if (writerClosed) return;
+        writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => { /* ignore */ });
+      }, 20_000);
+
+
       // Recompute plan-context locals (they live inside the plan branches above
       // and aren't in scope here).
       const _planStart = preserve_past && plan_start_from_date
@@ -2727,8 +2737,11 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
       } catch (e) {
         console.error("[training-plan] buffered stream error:", e);
       } finally {
+        clearInterval(heartbeat);
+        writerClosed = true;
         try { await writer.close(); } catch { /* ignore */ }
       }
+
     })();
 
     return new Response(readable, { headers: sseHeaders });
