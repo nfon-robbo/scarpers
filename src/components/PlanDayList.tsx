@@ -661,6 +661,13 @@ export default function PlanDayList({
       if (!detail?.date) return;
       // Wait one tick so that fresh linkedActivities/completedDates props arrive
       setTimeout(() => {
+        // If this date is a scheduled benchmark that hasn't been confirmed yet,
+        // the BenchmarkConfirmCard owns the post-activity flow — do NOT open
+        // the generic Workout Review dialog on top of it.
+        if (benchmarkSchedule.has(detail.date!) && !confirmedDates.has(detail.date!)) {
+          setBenchmarkRefreshKey((n) => n + 1);
+          return;
+        }
         const w = workoutMap.get(detail.date!);
         if (w) setReviewWorkout(w);
       }, 50);
@@ -669,7 +676,7 @@ export default function PlanDayList({
     return () => window.removeEventListener("workout-auto-linked", onAutoLinked as EventListener);
     // workoutMap recreated each render; the listener captures the latest one via closure on next render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workouts]);
+  }, [workouts, benchmarkSchedule, confirmedDates]);
 
   const addCustomStep = (w: ParsedWorkout, step: CustomStep) => {
     const key = workoutKey(w);
