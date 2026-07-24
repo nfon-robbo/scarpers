@@ -582,6 +582,23 @@ const TrainingPlanPage = () => {
     return () => { cancelled = true; };
   }, [user, content]);
 
+  // Stub-plan cleanup: once the benchmark is confirmed and we're sitting on
+  // the 1-day stub, clear any race date that was carried over from the stub
+  // insert (previously we saved race_date = benchmark date, which caused the
+  // full-plan generator to think the race was today and produce nothing).
+  // Runs once per transition into the stub+confirmed state.
+  const stubResetDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isBenchmarkStubPlan || !hasConfirmedBenchmark) {
+      stubResetDoneRef.current = false;
+      return;
+    }
+    if (stubResetDoneRef.current) return;
+    stubResetDoneRef.current = true;
+    setRaceDate(undefined);
+    setLetAIDecide(true);
+  }, [isBenchmarkStubPlan, hasConfirmedBenchmark]);
+
   // Auto-recalc race prediction when a new activity gets linked to a plan day.
   // Debounced 2s; uses linked-activity count as the change signal so any new
   // workout completion triggers a fresh prediction + history row.
