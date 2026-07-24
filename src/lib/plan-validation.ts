@@ -827,8 +827,9 @@ export function validateRaceCoverage(
   if (raceKm == null && raceSec == null) {
     return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
   }
-  const distanceOk = raceKm != null && longestKm >= raceKm * 0.95;
-  const durationOk = raceSec != null && longestMin * 60 >= raceSec * 0.95;
+  const frac = RACE_COVERAGE_MIN_FRACTION;
+  const distanceOk = raceKm != null && longestKm >= raceKm * frac;
+  const durationOk = raceSec != null && longestMin * 60 >= raceSec * frac;
   if (distanceOk || durationOk) {
     return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
   }
@@ -838,7 +839,278 @@ export function validateRaceCoverage(
     raceDurationSec: raceSec,
     longestContinuousKm: longestKm,
     longestContinuousMin: longestMin,
-    reason: `Longest continuous run is ${longestKm.toFixed(1)} km / ${longestMin.toFixed(0)} min but race is ${raceKm ?? "?"} km${raceSec ? ` / goal ${Math.round(raceSec/60)} min` : ""}. Add at least one session covering race distance or race duration before race day.`,
+    reason: `Longest continuous run is ${longestKm.toFixed(1)} km / ${longestMin.toFixed(0)} min but race is ${raceKm ?? "?"} km${raceSec ? ` / goal ${Math.round(raceSec/60)} min` : ""} (need >= ${(frac*100).toFixed(0)}% coverage).`,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tunable plan-validation constants — one place, sourced by every consumer.
+// ─────────────────────────────────────────────────────────────────────────────
+export const PlanValidationConfig = {
+  /** Fraction of race distance/duration the longest continuous run must reach. */
+  RACE_COVERAGE_MIN_FRACTION: 0.85,
+  /**
+   * Long-run growth cap. A week's longest continuous run may grow by
+   * whichever is GREATER of `MAX_WEEKLY_LONG_RUN_GROWTH_PCT` or
+   * `MAX_WEEKLY_LONG_RUN_GROWTH_ABS_MIN` seconds. The absolute floor
+   * prevents the percentage cap from stranding beginners at trivial
+   * durations (10% of 20 min is only 2 min).
+   */
+  MAX_WEEKLY_LONG_RUN_GROWTH_PCT: 0.10,
+  MAX_WEEKLY_LONG_RUN_GROWTH_ABS_MIN: 300, // seconds (5 min)
+  /**
+   * Minimum rep length that counts as a genuine race-pace exposure.
+   * Strides / neuromuscular reps under this are excluded from the
+   * "3 race-pace sessions" requirement.
+   */
+  MIN_RACE_PACE_REP_SECONDS: 90,
+  /** Number of qualifying race-pace sessions required across the plan. */
+  MIN_RACE_PACE_SESSIONS: 3,
+  /**
+   * Tempo/easy pace tolerance vs the canonical THRESHOLD_PACE_RATIOS band
+   * (see benchmark-calculations). Values outside band ± this fraction
+   * flag as mislabelled.
+   */
+  TEMPO_COHERENCE_TOLERANCE_PCT: 0.05,
+} as const;
+
+const RACE_COVERAGE_MIN_FRACTION = PlanValidationConfig.RACE_COVERAGE_MIN_FRACTION;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Long-run progression validator.
+// Walks day-blocks in date order, tracks the longest continuous run per ISO
+// week, and flags any week whose longest run grew by more than the GREATER
+// of the percentage cap and the absolute-seconds floor.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface LongRunProgressionConflict {
+  weekIso: string;              // e.g. "2026-W36"
+  fromMin: number;              // previous week's longest run (min)
+  toMin: number;                // this week's longest run (min)
+  allowedMaxMin: number;        // cap given the pct + abs floor
+  reason: string;
+}
+
+function isoWeekKey(dmy: string): string | null {
+  const [d, m, y] = dmy.split("/").map((s) => parseInt(s, 10));
+  if (!d || !m || !y) return null;
+  // ISO week: Thursday-based
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dayNum = (dt.getUTCDay() + 6) % 7; // Mon=0..Sun=6
+  dt.setUTCDate(dt.getUTCDate() - dayNum + 3);
+  const firstThu = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((dt.getTime() - firstThu.getTime()) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return `${dt.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function longestContinuousRunMinInBlock(lines: string[], start: number, end: number): number {
+  let longest = 0;
+  for (let i = start + 1; i < end; i++) {
+    const row = lines[i].trim();
+    if (!row.startsWith("|")) continue;
+    if (/^\|\s*-+/.test(row)) continue;
+    if (/\d+\s*[×x]\s*\d/.test(row)) continue;
+    const segCell = row.split("|")[1] || "";
+    if (!/run\b|tempo|long/i.test(segCell)) continue;
+    if (/warm.?up|cool.?down|walk|stride|strength|mobility/i.test(segCell)) continue;
+    const minMatch = /(\d+(?:\.\d+)?)\s*min\b/i.exec(row);
+    if (minMatch) longest = Math.max(longest, Number(minMatch[1]));
+  }
+  return longest;
+}
+
+export function validateLongRunProgression(markdown: string): LongRunProgressionConflict[] {
+  if (!markdown) return [];
+  const lines = markdown.split("\n");
+  const blocks = findDayBlocks(lines);
+  // week -> longest continuous run (min)
+  const perWeek = new Map<string, { longest: number; date: string }>();
+  for (const b of blocks) {
+    const wk = isoWeekKey(b.date);
+    if (!wk) continue;
+    const longest = longestContinuousRunMinInBlock(lines, b.startLine, b.endLine);
+    if (longest <= 0) continue;
+    const cur = perWeek.get(wk);
+    if (!cur || longest > cur.longest) perWeek.set(wk, { longest, date: b.date });
+  }
+  const weeksSorted = [...perWeek.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const conflicts: LongRunProgressionConflict[] = [];
+  const pct = PlanValidationConfig.MAX_WEEKLY_LONG_RUN_GROWTH_PCT;
+  const absMin = PlanValidationConfig.MAX_WEEKLY_LONG_RUN_GROWTH_ABS_MIN / 60;
+  for (let i = 1; i < weeksSorted.length; i++) {
+    const prev = weeksSorted[i - 1][1].longest;
+    const cur = weeksSorted[i][1].longest;
+    const allowed = prev + Math.max(prev * pct, absMin);
+    if (cur > allowed + 0.5) {
+      conflicts.push({
+        weekIso: weeksSorted[i][0],
+        fromMin: prev,
+        toMin: cur,
+        allowedMaxMin: Math.round(allowed * 10) / 10,
+        reason: `Longest run jumped ${prev.toFixed(0)}→${cur.toFixed(0)} min. Cap: max(${(pct*100).toFixed(0)}%, +${absMin.toFixed(0)} min) = ${allowed.toFixed(0)} min.`,
+      });
+    }
+  }
+  return conflicts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tempo / easy coherence validator.
+// Threshold pace ratios (from benchmark-calculations.THRESHOLD_PACE_RATIOS)
+// define the canonical multiplier band for every session category.
+// - A row labelled "tempo" / "threshold" whose prescribed pace is SLOWER
+//   than the threshold band by more than TOLERANCE flags (marathon pace
+//   under tempo label = the case that shipped in the last plan).
+// - A row labelled "easy" / "recovery" whose prescribed pace is FASTER
+//   than the easy band by more than TOLERANCE also flags (mislabel the
+//   other way — a tempo written under "easy").
+// ─────────────────────────────────────────────────────────────────────────────
+export interface TempoCoherenceConflict {
+  day: string;
+  segmentText: string;
+  label: "tempo" | "easy";
+  prescribedFastestPace: string;
+  prescribedSlowestPace: string;
+  expectedRangePace: string;
+  reason: string;
+}
+
+interface RatioBand { min: number; max: number }
+
+function formatPaceLocal(sec: number): string {
+  const t = Math.round(sec);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}/km`;
+}
+
+export function validateTempoCoherence(
+  markdown: string,
+  opts: { thresholdPaceSecPerKm: number; tempoBand: RatioBand; easyBand: RatioBand },
+): TempoCoherenceConflict[] {
+  if (!markdown) return [];
+  const tol = PlanValidationConfig.TEMPO_COHERENCE_TOLERANCE_PCT;
+  const thr = opts.thresholdPaceSecPerKm;
+  const tempoMin = thr * opts.tempoBand.min * (1 - tol);
+  const tempoMax = thr * opts.tempoBand.max * (1 + tol);
+  const easyMin = thr * opts.easyBand.min * (1 - tol);
+  const easyMax = thr * opts.easyBand.max * (1 + tol);
+
+  const conflicts: TempoCoherenceConflict[] = [];
+  const dayRx = /^###\s+.+$/gm;
+  const headings: { idx: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = dayRx.exec(markdown)) !== null) headings.push({ idx: m.index, text: m[0] });
+  for (let i = 0; i < headings.length; i++) {
+    const start = headings[i].idx;
+    const end = i + 1 < headings.length ? headings[i + 1].idx : markdown.length;
+    const section = markdown.slice(start, end);
+    const dayHeading = headings[i].text;
+
+    for (const raw of section.split(/\r?\n/)) {
+      const row = raw.trim();
+      if (!row.startsWith("|")) continue;
+      if (/^\|\s*-+/.test(row)) continue;
+
+      const paces = Array.from(row.matchAll(/(\d{1,2}):(\d{2})\s*\/km/g)).map((mm) => Number(mm[1]) * 60 + Number(mm[2]));
+      if (paces.length === 0) continue;
+      const fastest = Math.min(...paces);
+      const slowest = Math.max(...paces);
+
+      const isTempo = /\btempo\b|\bthreshold\b/i.test(row);
+      const isEasy = /\beasy\b|\brecovery\b/i.test(row) && !/warm.?up|cool.?down/i.test(row.split("|")[1] || "");
+
+      if (isTempo && fastest > tempoMax) {
+        conflicts.push({
+          day: dayHeading,
+          segmentText: row,
+          label: "tempo",
+          prescribedFastestPace: formatPaceLocal(fastest),
+          prescribedSlowestPace: formatPaceLocal(slowest),
+          expectedRangePace: `${formatPaceLocal(tempoMin)} – ${formatPaceLocal(tempoMax)}`,
+          reason: `Row labelled tempo/threshold prescribes ${formatPaceLocal(fastest)} but tempo band from threshold ${formatPaceLocal(thr)} is ${formatPaceLocal(tempoMin)}–${formatPaceLocal(tempoMax)}.`,
+        });
+      } else if (isEasy && slowest < easyMin) {
+        conflicts.push({
+          day: dayHeading,
+          segmentText: row,
+          label: "easy",
+          prescribedFastestPace: formatPaceLocal(fastest),
+          prescribedSlowestPace: formatPaceLocal(slowest),
+          expectedRangePace: `${formatPaceLocal(easyMin)} – ${formatPaceLocal(easyMax)}`,
+          reason: `Row labelled easy/recovery prescribes ${formatPaceLocal(slowest)} (slowest) which is faster than the easy band ${formatPaceLocal(easyMin)}–${formatPaceLocal(easyMax)}.`,
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Race-pace exposure validator.
+// Counts sessions containing a rep at race pace of at least
+// MIN_RACE_PACE_REP_SECONDS. Strides (rep < 90s) are excluded even if labelled
+// "race pace". Requires MIN_RACE_PACE_SESSIONS across the plan.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface RacePaceExposureResult {
+  ok: boolean;
+  qualifyingSessions: number;
+  requiredSessions: number;
+  minRepSeconds: number;
+  reason?: string;
+}
+
+function repDurationSeconds(row: string): number {
+  // "N × M min", "N × M sec", "N x M:SS"
+  const c = row.replace(/×/g, "x");
+  const rep = /(\d+)\s*x\s*([^|]+)/i.exec(c);
+  if (!rep) return 0;
+  const inner = rep[2];
+  const colon = /(\d{1,2}):(\d{2})/.exec(inner);
+  if (colon) return Number(colon[1]) * 60 + Number(colon[2]);
+  const min = /(\d+(?:\.\d+)?)\s*min/i.exec(inner);
+  if (min) return Number(min[1]) * 60;
+  const sec = /(\d+(?:\.\d+)?)\s*(?:sec|s\b)/i.exec(inner);
+  if (sec) return Number(sec[1]);
+  return 0;
+}
+
+export function validateRacePaceExposure(markdown: string): RacePaceExposureResult {
+  const min = PlanValidationConfig.MIN_RACE_PACE_REP_SECONDS;
+  const req = PlanValidationConfig.MIN_RACE_PACE_SESSIONS;
+  if (!markdown) return { ok: false, qualifyingSessions: 0, requiredSessions: req, minRepSeconds: min, reason: "empty plan" };
+  const dayRx = /^###\s+.+$/gm;
+  const headings: { idx: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = dayRx.exec(markdown)) !== null) headings.push({ idx: m.index, text: m[0] });
+  let qualifying = 0;
+  for (let i = 0; i < headings.length; i++) {
+    if (/race\s*day/i.test(headings[i].text)) continue;
+    const start = headings[i].idx;
+    const end = i + 1 < headings.length ? headings[i + 1].idx : markdown.length;
+    const section = markdown.slice(start, end);
+    let sessionQualifies = false;
+    for (const raw of section.split(/\r?\n/)) {
+      const row = raw.trim();
+      if (!row.startsWith("|")) continue;
+      if (!/race\s*pace|\bRP\b/i.test(row)) {
+        // Continuous "race pace" segment (no reps) also counts if long enough.
+        if (!/race\s*pace/i.test(row)) continue;
+      }
+      // continuous minutes at race pace
+      const minMatch = /(\d+(?:\.\d+)?)\s*min\b/i.exec(row);
+      const contSec = minMatch ? Number(minMatch[1]) * 60 : 0;
+      const repSec = repDurationSeconds(row);
+      const eff = Math.max(contSec, repSec);
+      if (eff >= min) { sessionQualifies = true; break; }
+    }
+    if (sessionQualifies) qualifying++;
+  }
+  if (qualifying >= req) return { ok: true, qualifyingSessions: qualifying, requiredSessions: req, minRepSeconds: min };
+  return {
+    ok: false,
+    qualifyingSessions: qualifying,
+    requiredSessions: req,
+    minRepSeconds: min,
+    reason: `Only ${qualifying}/${req} qualifying race-pace sessions (rep >= ${min}s, strides excluded).`,
+  };
+}
+
 
