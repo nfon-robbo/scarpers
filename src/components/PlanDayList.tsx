@@ -53,6 +53,9 @@ interface PlanDayListProps {
   planId?: string | null;
   /** Current user id — required for benchmark confirm/reject writes. */
   userId?: string | null;
+  /** Fired after a benchmark is confirmed + saved so the parent can regenerate
+   *  the plan using measured anchors. */
+  onBenchmarkConfirmed?: () => void | Promise<void>;
 }
 
 function pauseReasonMeta(reason?: string | null): { icon: string; label: string; bg: string } {
