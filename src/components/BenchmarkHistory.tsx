@@ -170,8 +170,8 @@ export default function BenchmarkHistory({ userId }: { userId: string }) {
                       <p className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">
                         Coach's take
                       </p>
-                      <div className="prose prose-invert prose-sm max-w-none text-[12px] leading-relaxed">
-                        <ReactMarkdown>{verdict}</ReactMarkdown>
+                      <div className="text-[12px] leading-relaxed text-foreground/90 whitespace-pre-line">
+                        {verdict}
                       </div>
                     </div>
                   )}
