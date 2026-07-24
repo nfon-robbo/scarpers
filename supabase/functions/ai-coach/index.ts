@@ -1859,7 +1859,14 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
 
       // HR zones via shared canonical resolver — same 180-day activity window
       // as useHrZones and intervals-sync. Never pass a bespoke slice here.
-      const zones = await resolveZonesForUser(supabase as any, user.id);
+      // Pass measured_threshold_hr through as measuredLthr so a confirmed
+      // benchmark drives the zones instead of the observed-max estimate.
+      const measuredLthrForZones =
+        typeof measured_threshold_hr === "number" && measured_threshold_hr > 0
+          ? Number(measured_threshold_hr) : null;
+      const zones = await resolveZonesForUser(supabase as any, user.id, {
+        measuredLthr: measuredLthrForZones,
+      });
 
       const maxHr = zones.maxHr;
       const z1Max = zones.z1Max;
