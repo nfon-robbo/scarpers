@@ -2737,8 +2737,11 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
       } catch (e) {
         console.error("[training-plan] buffered stream error:", e);
       } finally {
+        clearInterval(heartbeat);
+        writerClosed = true;
         try { await writer.close(); } catch { /* ignore */ }
       }
+
     })();
 
     return new Response(readable, { headers: sseHeaders });
