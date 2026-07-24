@@ -91,7 +91,7 @@ type Pending =
     };
 
 export default function BenchmarkConfirmCard({
-  userId, planId, scheduledDateIso, protocol, candidates, onDone,
+  userId, planId, scheduledDateIso, protocol, candidates, onDone, onBenchmarkConfirmed,
 }: Props) {
   const [index, setIndex] = useState(0);
   const [working, setWorking] = useState(false);
