@@ -1,0 +1,1 @@
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.plan_generation_jobs TO authenticated; GRANT ALL ON public.plan_generation_jobs TO service_role;
