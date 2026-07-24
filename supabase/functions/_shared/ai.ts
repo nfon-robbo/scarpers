@@ -118,12 +118,17 @@ async function logUsage(row: {
  * Errors propagate via response.status (429/402 preserved when possible).
  */
 export async function callAI(opts: AICallOpts): Promise<Response> {
-  const settings = await getAISettings();
+  const baseSettings = await getAISettings();
+  const settings: AISettings = {
+    provider: opts.providerOverride ?? baseSettings.provider,
+    claude_model: opts.claudeModelOverride ?? baseSettings.claude_model,
+  };
   const stream = !!opts.stream;
   const maxTokens = opts.maxTokens ?? 4096;
   const startedAt = Date.now();
   const inputText = opts.messages.map(m => m.content).join("\n");
   const inputTokenEstimate = approxTokens(inputText);
+
 
   if (settings.provider === "claude") {
     const key = Deno.env.get("ANTHROPIC_API_KEY");
