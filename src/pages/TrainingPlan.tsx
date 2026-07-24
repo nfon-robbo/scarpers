@@ -879,44 +879,86 @@ const TrainingPlanPage = () => {
       const measuredLthr = (bench as any)?.lthr ?? null;
       const { resolveZonesForUser } = await import("@shared/hr-zones");
       const zones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
-      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage } = await import("@/lib/plan-validation");
+      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage, validateTempoCoherence, validateLongRunProgression, validateRacePaceExposure } = await import("@/lib/plan-validation");
+      const { BenchmarkConfig } = await import("@/lib/benchmark-calculations");
       const scrubbed = scrubZoneBpm(planContent, zones);
+      const report: Record<string, unknown> = { scrubs: scrubbed.scrubs };
       if (scrubbed.scrubs.length > 0) {
-        console.warn(`[plan-save] rewrote ${scrubbed.scrubs.length} zone-bpm blocks to match resolver`, scrubbed.scrubs);
+        console.warn(`[plan-save] rewrote ${scrubbed.scrubs.length} zone-bpm blocks`, scrubbed.scrubs);
         planContent = scrubbed.content;
-        toast({ title: "Zone BPM auto-fixed", description: `Rewrote ${scrubbed.scrubs.length} zone label(s) to match your measured zones.` });
       }
-      // Pace/HR consistency — flag sessions where prescribed pace is faster
-      // than threshold pace while the HR ceiling sits at/under threshold HR.
-      try {
-        const { data: benchFull } = await supabase
-          .from("benchmark_results" as any)
-          .select("lthr, threshold_pace_s_per_km")
-          .eq("user_id", user.id)
-          .eq("status", "confirmed")
-          .eq("active", true)
-          .not("threshold_pace_s_per_km", "is", null)
-          .order("benchmark_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const thrHr = (benchFull as any)?.lthr ?? null;
-        const thrPace = (benchFull as any)?.threshold_pace_s_per_km ?? null;
-        if (thrHr && thrPace) {
-          const conflicts = validatePaceHrConsistency(planContent, { thresholdHr: thrHr, thresholdPaceSecPerKm: thrPace, marginBpm: 5 });
-          if (conflicts.length > 0) {
-            console.warn("[plan-save] pace/HR conflicts detected", conflicts);
-            toast({
-              title: `${conflicts.length} pace/HR conflict(s) detected`,
-              description: "Some sessions prescribe a pace faster than threshold while capping HR at/under threshold. Review before syncing.",
-              variant: "destructive",
-            });
-          }
+
+      // Pull threshold pace + HR for downstream validators.
+      const { data: benchFull } = await supabase
+        .from("benchmark_results" as any)
+        .select("lthr, threshold_pace_s_per_km")
+        .eq("user_id", user.id)
+        .eq("status", "confirmed")
+        .eq("active", true)
+        .not("threshold_pace_s_per_km", "is", null)
+        .order("benchmark_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const thrHr = (benchFull as any)?.lthr ?? null;
+      const thrPace = (benchFull as any)?.threshold_pace_s_per_km ?? null;
+
+      const blockingErrors: string[] = [];
+
+      if (thrHr && thrPace) {
+        const paceHr = validatePaceHrConsistency(planContent, { thresholdHr: thrHr, thresholdPaceSecPerKm: thrPace, marginBpm: 5 });
+        report.paceHrConflicts = paceHr;
+        if (paceHr.length > 0) {
+          console.warn("[plan-save] pace/HR conflicts", paceHr);
+          blockingErrors.push(`${paceHr.length} pace/HR conflict(s)`);
         }
-      } catch (e) {
-        console.warn("[plan-save] pace/HR validation skipped:", e);
+        const tempo = validateTempoCoherence(planContent, {
+          thresholdPaceSecPerKm: thrPace,
+          tempoBand: BenchmarkConfig.THRESHOLD_PACE_RATIOS.threshold,
+          easyBand: BenchmarkConfig.THRESHOLD_PACE_RATIOS.easy,
+        });
+        report.tempoConflicts = tempo;
+        if (tempo.length > 0) {
+          console.warn("[plan-save] tempo/easy coherence conflicts", tempo);
+          blockingErrors.push(`${tempo.length} tempo/easy label conflict(s)`);
+        }
+      }
+
+      const coverage = validateRaceCoverage(planContent, raceDistance || "", goalTime);
+      report.coverage = coverage;
+      if (!coverage.ok) {
+        console.warn("[plan-save] race-distance coverage failed", coverage);
+        blockingErrors.push(`race coverage: ${coverage.reason}`);
+      }
+
+      const progression = validateLongRunProgression(planContent);
+      report.progression = progression;
+      if (progression.length > 0) {
+        console.warn("[plan-save] long-run progression cap exceeded", progression);
+        blockingErrors.push(`${progression.length} week(s) exceed long-run progression cap`);
+      }
+
+      const rpExposure = validateRacePaceExposure(planContent);
+      report.racePaceExposure = rpExposure;
+      if (!rpExposure.ok) {
+        console.warn("[plan-save] race-pace exposure insufficient", rpExposure);
+        blockingErrors.push(`race-pace exposure: ${rpExposure.reason}`);
+      }
+
+      console.info("[plan-save] validator report", report);
+
+      if (blockingErrors.length > 0) {
+        toast({
+          title: `Plan blocked (${blockingErrors.length} issue${blockingErrors.length === 1 ? "" : "s"})`,
+          description: blockingErrors.join(" • "),
+          variant: "destructive",
+        });
+        return null;
+      }
+      if (scrubbed.scrubs.length > 0) {
+        toast({ title: "Zone BPM auto-fixed", description: `Rewrote ${scrubbed.scrubs.length} zone label(s).` });
       }
     } catch (e) {
-      console.warn("[plan-save] zone-bpm scrub skipped:", e);
+      console.warn("[plan-save] validator pipeline error (soft):", e);
     }
 
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
