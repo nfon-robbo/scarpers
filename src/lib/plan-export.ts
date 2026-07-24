@@ -52,22 +52,33 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
   const lines = markdown.split("\n");
   const workouts: ParsedWorkout[] = [];
 
-  // Pattern: **Day DD/MM/YYYY** or **Monday DD/MM/YYYY** followed by workout info
-  // Also matches: **DD/MM/YYYY** – Title
+  // Accepts either bold-wrapped headings:
+  //   **Monday 27/07/2026** — Title
+  //   **27/07/2026** – Title
+  // or H3-style headings written by newer models:
+  //   ### Monday 27/07/2026 — Title
+  //   ### 27/07/2026 – Title
   const datePattern = /\*\*(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\*\*/i;
   const altDatePattern = /\*\*(\d{1,2}\/\d{1,2}\/\d{4})[^*]*\*\*/i;
+  const h3DatePattern = /^###\s+(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\b/i;
 
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
-    const dateMatch = line.match(datePattern) || line.match(altDatePattern);
+    // Skip week headers so they never match as a workout day.
+    const isWeekHeader = /^###\s+Week\s+\d/i.test(line);
+    const dateMatch = isWeekHeader
+      ? null
+      : (line.match(datePattern) || line.match(altDatePattern) || line.match(h3DatePattern));
 
     if (dateMatch) {
       const dateStr = dateMatch[1];
-      // Extract title from the rest of the line
+      // Extract title from the rest of the line (works for both **bold** and ### headings)
       const titleMatch = line.match(/\*\*[^*]+\*\*\s*[-–:]\s*(.+)/) ||
-                         line.match(/\*\*[^*]+\*\*\s+(.+)/);
-      const title = titleMatch ? titleMatch[1].replace(/\*\*/g, "").trim() : line.replace(/\*\*/g, "").trim();
+                         line.match(/\*\*[^*]+\*\*\s+(.+)/) ||
+                         line.match(/^###\s+[^—–\-:]+[—–\-:]\s*(.+)/) ||
+                         line.match(/^###\s+\S+\s+\d{1,2}\/\d{1,2}\/\d{4}\s+(.+)/);
+      const title = titleMatch ? titleMatch[1].replace(/\*\*/g, "").trim() : line.replace(/^###\s+/, "").replace(/\*\*/g, "").trim();
 
       // Parse date (DD/MM/YYYY)
       const dateParts = dateStr.split("/");
@@ -88,7 +99,7 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
       // Look for a table with segments
       while (i < lines.length) {
         // Check if next workout starts
-        if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern))) {
+        if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern) || (lines[i].match(h3DatePattern) && !/^###\s+Week\s+\d/i.test(lines[i])))) {
           break;
         }
         // Also break on week headers
