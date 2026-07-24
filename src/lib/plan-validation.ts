@@ -791,19 +791,38 @@ export function validateRaceCoverage(
   let longestKm = 0;
   let longestMin = 0;
 
-  // Look at every table row that mentions km or min for continuous efforts.
-  // Skip anything that reads as intervals (× or "x" between numbers).
-  for (const raw of markdown.split(/\r?\n/)) {
-    const row = raw.trim();
-    if (!row.startsWith("|")) continue;
-    if (/\d+\s*[×x]\s*\d/.test(row)) continue; // interval row
+  // Walk day-by-day; skip the RACE DAY heading itself so the race entry
+  // can't satisfy its own coverage requirement.
+  const dayRx = /^###\s+.+$/gm;
+  const headings: { idx: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = dayRx.exec(markdown)) !== null) headings.push({ idx: m.index, text: m[0] });
+  for (let i = 0; i < headings.length; i++) {
+    const text = headings[i].text;
+    if (/race\s*day|🏁|\brace\b/i.test(text)) continue;
+    const start = headings[i].idx;
+    const end = i + 1 < headings.length ? headings[i + 1].idx : markdown.length;
+    const section = markdown.slice(start, end);
 
-    const kmMatch = /(\d+(?:\.\d+)?)\s*km/i.exec(row);
-    if (kmMatch) longestKm = Math.max(longestKm, Number(kmMatch[1]));
+    for (const raw of section.split(/\r?\n/)) {
+      const row = raw.trim();
+      if (!row.startsWith("|")) continue;
+      if (/^\|\s*-+/.test(row)) continue;
+      if (/\d+\s*[×x]\s*\d/.test(row)) continue; // interval row
+      // Only count "Easy run" / "Long run" / plain running segment rows —
+      // skip warm-up/cool-down/strength/etc.
+      const segCell = row.split("|")[1] || "";
+      if (!/run\b|tempo|long/i.test(segCell)) continue;
+      if (/warm.?up|cool.?down|walk|stride|strength|mobility/i.test(segCell)) continue;
 
-    const minMatch = /(\d+(?:\.\d+)?)\s*min\b/i.exec(row);
-    if (minMatch) longestMin = Math.max(longestMin, Number(minMatch[1]));
+      const kmMatch = /(\d+(?:\.\d+)?)\s*km/i.exec(row);
+      if (kmMatch) longestKm = Math.max(longestKm, Number(kmMatch[1]));
+
+      const minMatch = /(\d+(?:\.\d+)?)\s*min\b/i.exec(row);
+      if (minMatch) longestMin = Math.max(longestMin, Number(minMatch[1]));
+    }
   }
+
 
   if (raceKm == null && raceSec == null) {
     return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
