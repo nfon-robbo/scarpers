@@ -2927,6 +2927,8 @@ const TrainingPlanPage = () => {
             open={benchmarkFirstOpen}
             onOpenChange={setBenchmarkFirstOpen}
             scheduling={schedulingBenchmark}
+            existingBenchmarkDate={latestBenchmarkDate}
+            onUseExisting={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
             onSkip={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
             onScheduleBenchmark={async (dateIso, protocol) => {
               if (!user) return;
