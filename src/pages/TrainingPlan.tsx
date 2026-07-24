@@ -2755,7 +2755,18 @@ const TrainingPlanPage = () => {
       )}
       {(showConfig || loading) && (
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => { if (!loading) setBenchmarkFirstOpen(true); }} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (loading) return;
+              // Benchmark already done — skip the "benchmark first" dialog and
+              // build the full plan straight from the measured anchors.
+              if (hasConfirmedBenchmark) { void generatePlan(); return; }
+              setBenchmarkFirstOpen(true);
+            }}
+            disabled={loading || importing}
+            size="lg"
+            className="w-full sm:w-auto"
+          >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2764,7 +2775,7 @@ const TrainingPlanPage = () => {
             ) : (
               <>
                 <Calendar className="w-4 h-4 mr-2" />
-                Generate Plan
+                {hasConfirmedBenchmark && isBenchmarkStubPlan ? "Build Full Plan From Benchmark" : "Generate Plan"}
               </>
             )}
           </Button>
