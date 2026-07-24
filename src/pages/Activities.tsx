@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useUnits } from "@/hooks/useUnits";
 import { supabase } from "@/integrations/supabase/client";
+import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,23 @@ import UndoGarminImportButton from "@/components/UndoGarminImportButton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { getScheduledBenchmarksInRange } from "@/lib/benchmark-scheduled";
+import {
+  findBenchmarkCandidates,
+  type ActivityForDetection,
+  type CandidateActivity,
+} from "@/lib/benchmark-detection";
+import type { BenchmarkProtocol } from "@/lib/benchmark-token";
+
+type BenchmarkPrompt = {
+  isoDate: string;
+  protocol: BenchmarkProtocol;
+  candidates: CandidateActivity[];
+};
+
+function isoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
 
 const Activities = () => {
   const { user } = useAuth();
@@ -37,6 +55,7 @@ const Activities = () => {
   const [togglingPlan, setTogglingPlan] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"date" | "distance">("date");
+  const [benchmarkRefreshKey, setBenchmarkRefreshKey] = useState(0);
 
   const LIST_COLUMNS =
     "id,user_id,start_time,activity_type,source_file,training_effect,training_load,training_plan_id," +
@@ -179,6 +198,15 @@ const Activities = () => {
         </div>
       )}
 
+      {user && (
+        <ActivitiesBenchmarkPrompt
+          userId={user.id}
+          planId={currentPlanId}
+          refreshKey={benchmarkRefreshKey}
+          onDone={() => setBenchmarkRefreshKey((n) => n + 1)}
+        />
+      )}
+
       {visibleActivities.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -193,9 +221,17 @@ const Activities = () => {
             <Card key={a.id} className="hover:shadow-sm transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     className="flex-1 text-left cursor-pointer"
                     onClick={() => setOpenId(a.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpenId(a.id);
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm">
@@ -210,8 +246,8 @@ const Activities = () => {
                       )}
                       {a.training_effect && (
                         <Tooltip>
-                          <TooltipTrigger>
-                            <span className="cursor-help">
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help inline-flex">
                               <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
                             </span>
                           </TooltipTrigger>
@@ -224,7 +260,7 @@ const Activities = () => {
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{a.source_file}</p>
-                  </button>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {currentPlanId && (
@@ -305,6 +341,108 @@ const Activities = () => {
     </div>
   );
 };
+
+function ActivitiesBenchmarkPrompt({
+  userId,
+  planId,
+  refreshKey,
+  onDone,
+}: {
+  userId: string;
+  planId: string | null;
+  refreshKey: number;
+  onDone: () => void;
+}) {
+  const [prompt, setPrompt] = useState<BenchmarkPrompt | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const from = new Date();
+      from.setDate(from.getDate() - 7);
+      const to = new Date();
+      to.setDate(to.getDate() + 14);
+
+      const scheduled = await getScheduledBenchmarksInRange(userId, isoDate(from), isoDate(to)).catch(() => []);
+      if (scheduled.length === 0) {
+        if (!cancelled) setPrompt(null);
+        return;
+      }
+
+      const dates = Array.from(new Set(scheduled.map((b) => b.benchmark_date)));
+      const sortedDates = dates.slice().sort();
+      const activityFrom = new Date(`${sortedDates[0]}T12:00:00Z`);
+      activityFrom.setUTCDate(activityFrom.getUTCDate() - 3);
+      const activityTo = new Date(`${sortedDates[sortedDates.length - 1]}T12:00:00Z`);
+      activityTo.setUTCDate(activityTo.getUTCDate() + 3);
+
+      const [{ data: candidateActivities }, { data: rejections }, { data: confirmed }] = await Promise.all([
+        supabase
+          .from("activities")
+          .select("id, start_time, duration_seconds, distance_meters, avg_heart_rate, activity_type")
+          .eq("user_id", userId)
+          .gte("start_time", activityFrom.toISOString())
+          .lte("start_time", activityTo.toISOString()),
+        supabase
+          .from("benchmark_rejections" as any)
+          .select("activity_id")
+          .eq("user_id", userId),
+        supabase
+          .from("benchmark_results" as any)
+          .select("benchmark_date")
+          .eq("user_id", userId)
+          .eq("status", "confirmed")
+          .in("benchmark_date", dates),
+      ]);
+
+      if (cancelled) return;
+
+      const rejectedIds = new Set<string>((rejections ?? []).map((r: any) => r.activity_id));
+      const confirmedDates = new Set<string>((confirmed ?? []).map((r: any) => r.benchmark_date));
+      const activityPool = (candidateActivities ?? []) as ActivityForDetection[];
+
+      const prompts = scheduled
+        .filter((b) => !confirmedDates.has(b.benchmark_date))
+        .map((b) => ({
+          isoDate: b.benchmark_date,
+          protocol: b.benchmark_protocol,
+          candidates: findBenchmarkCandidates({
+            activities: activityPool,
+            scheduledDateIso: b.benchmark_date,
+            protocol: b.benchmark_protocol,
+            rejectedIds,
+          }),
+        }))
+        .filter((p) => p.candidates.length > 0)
+        .sort((a, b) => a.candidates[0].hoursFromScheduled - b.candidates[0].hoursFromScheduled);
+
+      setPrompt(prompts[0] ?? null);
+    })();
+
+    return () => { cancelled = true; };
+  }, [userId, refreshKey]);
+
+  if (!prompt) return null;
+
+  return (
+    <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+      <div>
+        <p className="text-sm font-semibold text-primary">Threshold run detected</p>
+        <p className="text-xs text-muted-foreground">
+          Confirm this activity to open the benchmark questions.
+        </p>
+      </div>
+      <BenchmarkConfirmCard
+        userId={userId}
+        planId={planId}
+        scheduledDateIso={prompt.isoDate}
+        protocol={prompt.protocol}
+        candidates={prompt.candidates}
+        onDone={async () => onDone()}
+      />
+    </div>
+  );
+}
 
 const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string; value: string | null; unit?: string }) => {
   if (!value) return null;
