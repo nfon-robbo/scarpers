@@ -50,6 +50,13 @@ interface Props {
   protocol: BenchmarkProtocol;
   candidates: CandidateActivity[];
   onDone: () => void | Promise<void>;
+  /**
+   * When present, the card SKIPS the pace-recalc dialog after a successful
+   * benchmark save (non-redo path) and instead invokes this callback so the
+   * parent can trigger a full plan generation using the measured anchors.
+   * Called after the zone-comparison dialog closes (if it was shown).
+   */
+  onBenchmarkConfirmed?: () => void | Promise<void>;
 }
 
 const PROTOCOL_LABEL: Record<BenchmarkProtocol, string> = {
@@ -84,7 +91,7 @@ type Pending =
     };
 
 export default function BenchmarkConfirmCard({
-  userId, planId, scheduledDateIso, protocol, candidates, onDone,
+  userId, planId, scheduledDateIso, protocol, candidates, onDone, onBenchmarkConfirmed,
 }: Props) {
   const [index, setIndex] = useState(0);
   const [working, setWorking] = useState(false);
@@ -214,9 +221,17 @@ export default function BenchmarkConfirmCard({
 
       if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
         setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
-        if (planContent) setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
-      } else if (planContent) {
+        // Skip the pace-recalc dialog when the parent will regenerate the plan
+        // from measured anchors (avoids the confusing "no pace tokens matched"
+        // dialog on stub benchmark-only plans).
+        if (planContent && !onBenchmarkConfirmed) {
+          setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
+        }
+      } else if (planContent && !onBenchmarkConfirmed) {
         setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
+      } else if (onBenchmarkConfirmed) {
+        // No zone dialog will open — trigger the parent regeneration now.
+        await onBenchmarkConfirmed();
       } else if (!injuryPrompt) {
         await onDone();
       }
@@ -418,7 +433,8 @@ export default function BenchmarkConfirmCard({
           onOpenChange={(o) => {
             if (!o) {
               setZoneDialog(null);
-              if (!recalcDialog) void onDone();
+              if (onBenchmarkConfirmed) void onBenchmarkConfirmed();
+              else if (!recalcDialog) void onDone();
             }
           }}
           userId={userId}

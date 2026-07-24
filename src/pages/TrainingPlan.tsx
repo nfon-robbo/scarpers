@@ -3208,7 +3208,12 @@ ${mainRow}
               planContent={content}
               planId={savedPlanId ?? null}
               userId={user?.id ?? null}
+              onBenchmarkConfirmed={async () => {
+                toast({ title: "Benchmark saved — building your full plan…" });
+                await generatePlan();
+              }}
             />
+
             <WorkoutEditDialog
               open={!!editingWorkout}
               onOpenChange={(o) => { if (!o) setEditingWorkout(null); }}
