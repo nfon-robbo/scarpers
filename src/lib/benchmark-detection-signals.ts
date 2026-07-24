@@ -27,15 +27,23 @@ export interface DetectionResult {
 }
 
 /**
- * Detect a second-half slowdown from laps: split laps by cumulative MOVING
- * time into first/second half, compute avg pace (s/km) using MOVING time,
- * return (second - first) / first. Positive means the second half was slower.
+ * Detect a second-half slowdown from laps: split laps at the MIDPOINT OF
+ * DISTANCE (with linear interpolation inside the lap where the midpoint
+ * falls), compute avg pace (s/km) per half using MOVING time, return
+ * (second - first) / first. Positive means the second half was slower.
+ *
+ * Distance midpoint — not time midpoint. Lap boundaries never fall exactly
+ * on the halfway mark, so a cumulative-time split gives one half more
+ * distance than the other and the pace comparison is not apples-to-apples.
+ * Interpolating on distance guarantees equal-distance halves regardless of
+ * lap boundaries.
  *
  * MOVING time — not elapsed. Timer stops (auto-pause, watch pauses) inflate
- * elapsed on affected laps and can make a genuine second-half fade look like
- * a first-half fade. The stoppage penalty is already scored separately via
- * TIMER_STOPPED_IN_EFFORT; this signal is about pacing, so it must ignore
- * paused time. Falls back to elapsed only when NO lap carries moving_time_s.
+ * elapsed on affected laps and can make a genuine second-half fade look
+ * like a first-half fade. The stoppage penalty is already scored separately
+ * via TIMER_STOPPED_IN_EFFORT; this signal is about pacing so it must
+ * ignore paused time. Falls back to elapsed only when NO lap carries
+ * moving_time_s.
  *
  * Uses the same threshold as the SECOND_HALF_SLOWDOWN deduction.
  */
@@ -53,36 +61,44 @@ export function detectSecondHalfSlowdownFromLaps(
   );
   if (valid.length < 2) return { detected: false, fraction: null };
 
-  const totalTime = valid.reduce((s, l) => s + timeOf(l), 0);
-  if (totalTime <= 0) return { detected: false, fraction: null };
+  const totalDist = valid.reduce((s, l) => s + Number(l.distance_m ?? 0), 0);
+  if (totalDist <= 0) return { detected: false, fraction: null };
 
-  const half = totalTime / 2;
-  let cum = 0;
-  const firstHalf: DetectionLap[] = [];
-  const secondHalf: DetectionLap[] = [];
+  const half = totalDist / 2;
+  let cumDist = 0;
+  let t1 = 0, d1 = 0, t2 = 0, d2 = 0;
   for (const l of valid) {
-    if (cum + timeOf(l) / 2 < half) firstHalf.push(l);
-    else secondHalf.push(l);
-    cum += timeOf(l);
+    const ld = Number(l.distance_m ?? 0);
+    const lt = timeOf(l);
+    if (ld <= 0 || lt <= 0) continue;
+    const lapEnd = cumDist + ld;
+    if (lapEnd <= half) {
+      // Entire lap is in first half.
+      t1 += lt; d1 += ld;
+    } else if (cumDist >= half) {
+      // Entire lap is in second half.
+      t2 += lt; d2 += ld;
+    } else {
+      // Lap straddles the midpoint — split by distance fraction and assume
+      // uniform pace inside the lap for the time allocation.
+      const distToMid = half - cumDist;
+      const frac = distToMid / ld;
+      t1 += lt * frac;      d1 += distToMid;
+      t2 += lt * (1 - frac); d2 += ld - distToMid;
+    }
+    cumDist = lapEnd;
   }
-  if (firstHalf.length === 0 || secondHalf.length === 0) {
-    return { detected: false, fraction: null };
-  }
+  if (d1 <= 0 || d2 <= 0) return { detected: false, fraction: null };
 
-  const pace = (arr: DetectionLap[]): number => {
-    const t = arr.reduce((s, l) => s + timeOf(l), 0);
-    const d = arr.reduce((s, l) => s + (l.distance_m ?? 0), 0);
-    if (d <= 0) return 0;
-    return t / (d / 1000);
-  };
-  const p1 = pace(firstHalf);
-  const p2 = pace(secondHalf);
+  const p1 = t1 / (d1 / 1000);
+  const p2 = t2 / (d2 / 1000);
   if (p1 <= 0) return { detected: false, fraction: null };
 
   const frac = (p2 - p1) / p1;
   const detected = frac >= BenchmarkConfig.SECOND_HALF_SLOWDOWN_THRESHOLD;
   return { detected, fraction: frac };
 }
+
 
 /**
  * Detect breaks from laps: sum(elapsed - moving) across laps. Requires
