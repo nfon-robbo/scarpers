@@ -77,8 +77,10 @@ function paceTarget(step: WorkoutStep): string {
     return "";
   }
   if (step.pace) return paceRange(step.pace);
-  if (normalized === "interval") return paceRange("5:00/km");
-  return paceRange("6:27/km");
+  // No pace supplied → emit no target. The client-side expander
+  // (plan-step-expand.ts) intentionally leaves pace empty for benchmark /
+  // all-out / time-trial efforts so the athlete decides intensity.
+  return "";
 }
 
 function zoneTarget(step: WorkoutStep): string {
