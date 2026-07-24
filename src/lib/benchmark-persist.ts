@@ -1,12 +1,11 @@
 /**
  * Confirm/reject writes for benchmark results.
  *
- * `confirmBenchmark` computes the effort window (Path 1/2/3 via
- * identifyEffortWindow / buildManualEffortWindow), scores confidence,
- * computes threshold pace + Riegel race predictions, snapshots the
- * activity, and inserts a benchmark_results row. It then upserts an
- * hr_zones row (source='measured') pinned to the new benchmark, and
- * advances profiles.next_benchmark_due by 6 weeks.
+ * `confirmBenchmark` computes the effort window, scores confidence (now
+ * including HR_SENSOR_WRIST and slowdown suppression), snapshots the
+ * activity, and inserts a benchmark_results row with the FULL structured
+ * post-benchmark interview payload. It also advances
+ * profiles.next_benchmark_due by 6 weeks.
  *
  * `rejectCandidate` writes a benchmark_rejections row so the same activity
  * is never re-offered.
@@ -25,11 +24,10 @@ import {
   thresholdPaceSecPerKm,
   predict5kSeconds,
 } from "@/lib/benchmark-calculations";
-import {
-  deriveLikelySubmaximal,
-  type RpeResponse,
-  type CouldContinueResponse,
-} from "@/lib/benchmark-rpe";
+import { deriveLikelySubmaximal } from "@/lib/benchmark-rpe";
+import type { InterviewAnswers } from "@/lib/benchmark-interview";
+import type { DetectionResult } from "@/lib/benchmark-detection-signals";
+import { INJURY_TAG } from "@/lib/benchmark-rpe";
 
 const NEXT_BENCHMARK_WEEKS = 6;
 
@@ -50,11 +48,15 @@ export interface ConfirmParams {
   /** Path 3 inputs; ignored when `activity` is provided. */
   manualDurationS?: number;
   manualDistanceM?: number;
-  /** Post-benchmark answers. When both provided, likely_submaximal is derived
-   *  ONCE via deriveLikelySubmaximal and used for BOTH the confidence-score
-   *  deduction and the stored flag — never re-evaluated separately. */
-  rpeResponse?: RpeResponse | null;
-  couldContinueResponse?: CouldContinueResponse | null;
+  /** Full post-benchmark interview payload. */
+  interview: InterviewAnswers;
+  /** Detection signals used to drive the interview branching. */
+  detection: DetectionResult;
+  /**
+   * hr_sensor_type resolved for scoring. Comes from Q9 if the athlete
+   * answered this sitting, otherwise from the stored profile value.
+   */
+  hrSensorType: string | null;
 }
 
 export async function confirmBenchmark(
@@ -65,15 +67,16 @@ export async function confirmBenchmark(
   thresholdPaceSecPerKm: number;
   protocol: BenchmarkProtocol;
   confidenceDeductions: Array<{ reason: string; points: number }>;
+  injuryFlagged: boolean;
 }> {
   const {
     userId, planId, scheduledDateIso, protocol,
     activity, laps, manualDurationS, manualDistanceM,
-    rpeResponse, couldContinueResponse,
+    interview, detection, hrSensorType,
   } = params;
 
   // Derived once — same boolean feeds scoreConfidence AND the stored flag.
-  const likelySubmaximal = deriveLikelySubmaximal(rpeResponse, couldContinueResponse);
+  const likelySubmaximal = deriveLikelySubmaximal(interview.rpe, interview.couldContinue);
 
   const isManual = !activity;
   const effort = isManual
@@ -99,14 +102,21 @@ export async function confirmBenchmark(
   const thresholdHr = activity?.avg_heart_rate ?? null;
   const lthr = thresholdHr;
 
+  const wristHrOnThresholdMeasurement =
+    hrSensorType === "Watch wrist sensor" && typeof thresholdHr === "number" && thresholdHr > 0;
+
   const conf = scoreConfidence({
     hrStreamAvailable: !!activity?.avg_heart_rate,
-    secondHalfSlowdown: 0,
+    // Use the same fraction that drove detection so the deduction only fires
+    // for detected fades. Suppression rule is applied inside scoreConfidence.
+    secondHalfSlowdown: detection.slowdownFraction ?? 0,
     cadencePresent: true,
     gpsConfidence: "High",
     rpeSubmaximal: likelySubmaximal,
     effortWindowSource: effort.source,
     protocol,
+    slowdownReason: interview.slowdownReason,
+    wristHrOnThresholdMeasurement,
   });
 
   const effortStartTime = activity?.start_time
@@ -134,10 +144,17 @@ export async function confirmBenchmark(
         captured_at: new Date().toISOString(),
       };
 
-  // benchmark_date is required (NOT NULL). For plan-scheduled benchmarks this
-  // matches scheduled_date; for standalone benchmarks it falls back to today.
   const benchmarkDateIso =
     scheduledDateIso ?? (activity?.start_time?.slice(0, 10)) ?? new Date().toISOString().slice(0, 10);
+
+  // Injury flag surfaces on its own — set true if "Old injury" was picked on
+  // Q2, Q5, or Q6.
+  const injuryFlagged =
+    (interview.heldBackReasons ?? []).includes(INJURY_TAG as any) ||
+    interview.slowdownReason === INJURY_TAG ||
+    (interview.breaksReasons ?? []).includes(INJURY_TAG as any);
+
+  const redoRequested = interview.redoChoice === "Yes, reschedule";
 
   const payload = {
     user_id: userId,
@@ -163,9 +180,31 @@ export async function confirmBenchmark(
     confidence_score: conf.score,
     confidence_band: conf.band,
     confidence_deductions: conf.deductions,
-    rpe_response: rpeResponse ?? null,
-    could_continue_response: couldContinueResponse ?? null,
+    // Legacy single-choice columns kept in sync with the interview payload.
+    rpe_response: interview.rpe,
+    could_continue_response: interview.couldContinue,
     likely_submaximal: likelySubmaximal,
+    // New structured columns.
+    held_back_reasons: interview.heldBackReasons,
+    slowdown_reason: interview.slowdownReason,
+    breaks_reasons: interview.breaksReasons,
+    stoppage_duration_band: interview.stoppageBand,
+    conditions: interview.conditions,
+    injury_flagged: injuryFlagged,
+    redo_requested: redoRequested,
+    post_benchmark_interview: {
+      // Only holds items that DO NOT drive scoring or history filtering
+      // (the verdict and any future free-form additions). Answers live in
+      // their own CHECK-constrained columns above.
+      captured_at: new Date().toISOString(),
+      detection: {
+        slowdown_detected: detection.slowdownDetected,
+        slowdown_fraction: detection.slowdownFraction,
+        breaks_detected: detection.breaksDetected,
+        total_stoppage_s: detection.totalStoppageS,
+      },
+      hr_sensor_type_at_capture: hrSensorType ?? null,
+    },
     activity_snapshot: snapshot,
   };
 
@@ -178,16 +217,50 @@ export async function confirmBenchmark(
 
   const id = (data as any).id as string;
 
+  // Persist hr_sensor_type on profile if Q9 was answered this sitting.
+  if (interview.hrSensorType) {
+    await supabase
+      .from("profiles")
+      .update({ hr_sensor_type: interview.hrSensorType } as any)
+      .eq("user_id", userId);
+  }
+
   // NOTE: hr_zones is written only via applyMeasuredZones (behind the zone
-  // comparison dialog). Threshold-pace push and plan pace recalc are both
-  // gated by separate user confirmations further downstream.
+  // comparison dialog).
 
   await supabase
     .from("profiles")
     .update({ next_benchmark_due: addWeeksIso(benchmarkDateIso, NEXT_BENCHMARK_WEEKS) } as any)
     .eq("user_id", userId);
 
-  return { id, lthr, thresholdPaceSecPerKm: pace, protocol, confidenceDeductions: conf.deductions };
+  return {
+    id, lthr, thresholdPaceSecPerKm: pace, protocol,
+    confidenceDeductions: conf.deductions, injuryFlagged,
+  };
+}
+
+/**
+ * Save the AI coach verdict onto an existing benchmark row. Failure to save
+ * it must never roll back the benchmark itself.
+ */
+export async function saveBenchmarkVerdict(
+  benchmarkId: string,
+  verdictMarkdown: string,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from("benchmark_results" as any)
+    .select("post_benchmark_interview")
+    .eq("id", benchmarkId)
+    .maybeSingle();
+  const merged = {
+    ...(((existing as any)?.post_benchmark_interview as Record<string, unknown>) ?? {}),
+    verdict: verdictMarkdown,
+    verdict_at: new Date().toISOString(),
+  };
+  await supabase
+    .from("benchmark_results" as any)
+    .update({ post_benchmark_interview: merged } as any)
+    .eq("id", benchmarkId);
 }
 
 export async function rejectCandidate(params: {
