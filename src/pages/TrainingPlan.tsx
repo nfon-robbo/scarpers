@@ -2830,7 +2830,11 @@ ${mainRow}
                     goal_time: goalTime || null,
                     training_days: (trainingDays && trainingDays.length ? trainingDays : [weekday.toLowerCase()]),
                     start_date: dateIso,
-                    race_date: dateIso,
+                    // Do NOT set race_date to the benchmark date — this stub
+                    // has no real race target. Leaving it null forces the user
+                    // to pick a real race (or "let AI decide") when they build
+                    // the full plan after confirming the benchmark.
+                    race_date: null,
                     content: benchmarkPlan,
                   } as any)
                   .select("id")
