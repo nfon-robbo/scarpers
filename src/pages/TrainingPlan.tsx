@@ -567,6 +567,7 @@ const TrainingPlanPage = () => {
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [hasConfirmedBenchmark, setHasConfirmedBenchmark] = useState(false);
+  const [latestBenchmarkDate, setLatestBenchmarkDate] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
 
@@ -588,7 +589,10 @@ const TrainingPlanPage = () => {
     let cancelled = false;
     (async () => {
       const b = await getLatestConfirmedBenchmark(user.id).catch(() => null);
-      if (!cancelled) setHasConfirmedBenchmark(!!b);
+      if (!cancelled) {
+        setHasConfirmedBenchmark(!!b);
+        setLatestBenchmarkDate(b?.benchmarkDate ?? null);
+      }
     })();
     return () => { cancelled = true; };
   }, [user, content]);
@@ -2923,6 +2927,8 @@ const TrainingPlanPage = () => {
             open={benchmarkFirstOpen}
             onOpenChange={setBenchmarkFirstOpen}
             scheduling={schedulingBenchmark}
+            existingBenchmarkDate={latestBenchmarkDate}
+            onUseExisting={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
             onSkip={() => { setBenchmarkFirstOpen(false); void generatePlan(); }}
             onScheduleBenchmark={async (dateIso, protocol) => {
               if (!user) return;
@@ -3255,9 +3261,9 @@ ${mainRow}
             <Button
               onClick={() => {
                 if (loading) return;
-                // Benchmark already done — skip the "benchmark first" dialog and
-                // build the full plan straight from the measured anchors.
-                if (hasConfirmedBenchmark) { void generatePlan(); return; }
+                // Always show the "benchmark first?" dialog so the athlete
+                // can choose between using their existing benchmark,
+                // scheduling a fresh one, or skipping to provisional pace.
                 setBenchmarkFirstOpen(true);
               }}
               disabled={loading || importing}
