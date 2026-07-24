@@ -1,261 +1,77 @@
-# Post-Benchmark Coach Interview
 
-Replace the current 2-question BenchmarkPostQuestionsDialog with a branching post-benchmark interview: multi-select answers, follow-ups triggered by what we detect from the run itself, and an AI coach verdict stored on the benchmark row.
-
-Verify every answer option in this spec against the existing CHECK constraints on benchmark_results before writing any code. Report any mismatch rather than working around it.
-
----
-
-## THE QUESTION TREE
-
-Two questions are single-choice (marked). All others are multi-select.
-
-**Q1. How hard did this feel?** (single)
-
-Easy | Moderate | Hard | Very Hard | Maximal
-
-Use "Maximal", not "All-out". The rpe_response CHECK constraint allows exactly: Easy, Moderate, Hard, Very Hard, Maximal. Any other wording fails on insert.
-
-**Q2. What held you back?** — only if Q1 is Easy or Moderate
-
-Legs | Breathing | Motivation | Misjudged the pace | Cut it short | Old injury
-
-**Q3. Could you have kept that pace going?** (single)
-
-Easily | Another 15 minutes | Another 10 minutes | Another 5 minutes | No
-
-These five values are CHECK-constrained. Use them verbatim.
-
-**Q4. Want to redo it?** — only if Q3 is Easily
-
-Yes, reschedule | No, use this result
-
-If "Yes, reschedule", ask the athlete for the date. Do not hardcode a default of seven days.
-
-**Q5. Your second half was slower — what happened?** — only if detection flags a slowdown
-
-Went out too hard | Hills or terrain | Ran out of legs | Deliberate, felt strong early | Something interrupted me | Old injury
-
-If the answer is "Deliberate, felt strong early" or "Hills or terrain", do not apply the SECOND_HALF_SLOWDOWN confidence deduction. The fade has an explanation that is not pacing failure.
-
-**Q6. We spotted breaks during your effort — what were they?** — only if detection flags pauses
-
-Traffic or crossings | Planned walk breaks | Needed to recover | Old injury | Something else
-
-**Q7. Roughly how long were you stopped in total?** — only if Q6 includes Traffic or crossings
-
-Under 30 seconds | 30 seconds to 1 minute | 1 to 2 minutes | Over 2 minutes
-
-If "Over 2 minutes", record that the threshold pace is affected by stoppage and surface that in history. Do not switch the calculation to moving time — elapsed time remains the basis, as already specified.
-
-**Q8. Anything unusual about the conditions?** — only if an HR stream is present
-
-Nothing notable | Windy | Hot | Cold | Treadmill
-
-This question exists to contextualise heart rate, not pace. Do not ask it when there is no HR stream.
-
-**Q9. How do you record heart rate?** — asked once ever, then stored
-
-Chest strap | Watch wrist sensor | Armband | I don't
-
-Store on profiles as hr_sensor_type. Ask only when unset. Make it editable in settings.
-
-### Question cap
-
-Show at most five questions in one sitting, including follow-ups. If more qualify, drop Q8 first, then Q6 and Q7.
-
-Every question is skippable. A skipped question stores null and applies no confidence deduction. Show questions one at a time, not as a single long form. Include a back button and progress indication.
-
-### likely_submaximal
-
-Unchanged: true if Q1 is Easy or Moderate, OR Q3 is Easily. Computed once and used for both the stored flag and the RPE_SUBMAXIMAL deduction, so they can never disagree.
-
----
-
-## DETECTION
-
-Pull whatever is available for the confirmed activity, in this order, stopping at the first signal:
-
-1. Laps from activity_laps — split by elapsed time into first and second half, compare average pace.
-
-2. Moving versus elapsed time on the activity row — a gap indicates stoppage.
-
-3. GPS/pace stream — only fetched when both cheaper signals are silent. Sliding-window pace drift and long low-speed gaps.
-
-If none yield a signal, Q5, Q6 and Q7 are not shown. Manual-entry benchmarks skip detection entirely and see only Q1 to Q4, Q8 if HR exists, and Q9.
-
-### ONE SLOWDOWN THRESHOLD
-
-Detection and the confidence deduction must use the same constant from BenchmarkConfig. Set it to 10%, matching the existing SECOND_HALF_SLOWDOWN deduction.
-
-Do not use 4% for detection and 10% for scoring — that asks the athlete what went wrong with a 6% fade and then applies no deduction. If you believe 4% is the better detection threshold, say so and let me decide, but there must be exactly one number.
-
-Stoppage detection threshold also goes in BenchmarkConfig. State the value you use.
-
----
-
-## STORAGE
-
-Anything that drives scoring, plan logic or history filtering gets its own column with a CHECK constraint. Do not put these in a jsonb blob — client-side shape enforcement is not enforcement, and these values need to be queryable.
-
-Existing columns, keep as they are:
-
-- rpe_response
-
-- could_continue_response
-
-- likely_submaximal
-
-New columns, all nullable, all CHECK-constrained to the option lists above:
-
-- held_back_reasons text[]
-
-- slowdown_reason text
-
-- breaks_reasons text[]
-
-- stoppage_duration_band text
-
-- conditions text[]
-
-- injury_flagged boolean, default false
-
-- redo_requested boolean, default false
-
-On profiles:
-
-- hr_sensor_type text, CHECK constrained, nullable
-
-New jsonb column post_benchmark_interview holds only the coach verdict text and any future questions that do not affect scoring. It is not the storage location for the answers above.
-
-benchmark_results has zero rows, so there is no backwards compatibility to preserve. Do not build compat shims.
-
----
-
-## INJURY FLAG
-
-If "Old injury" is selected on Q2, Q5 or Q6, set injury_flagged true on the row. Show it in benchmark history. After saving, prompt the athlete once asking whether they want to record more detail about it.
-
-Do not let this answer be absorbed silently into the coach verdict. It is the one response that should surface on its own.
-
----
-
-## CONFIDENCE DEDUCTIONS
-
-Add to BenchmarkConfig, alongside the existing deductions:
-
-- HR_SENSOR_WRIST: -10, applied when hr_sensor_type is "Watch wrist sensor" AND a threshold HR was calculated. Wrist optical heart rate is unreliable at threshold intensity, and threshold HR is the primary output of this test. No deduction for chest strap or armband.
-
-Existing deductions are unchanged. Do not re-tune any of them.
-
-The SECOND_HALF_SLOWDOWN deduction is suppressed when Q5 answers "Deliberate, felt strong early" or "Hills or terrain", per above.
-
----
-
-## REDO ACTION
-
-When Q4 is "Yes, reschedule":
-
-- Ask the athlete for the new date. Do not hardcode an offset.
-
-- Set the just-saved row to status 'discarded' and active false, with a note recording that the athlete requested a redo.
-
-- Do NOT use status 'rejected'. That value means "this activity was not my benchmark" and is consumed by candidate detection. Add 'discarded' to the status CHECK constraint: scheduled | pending | confirmed | rejected | discarded.
-
-- Insert a new benchmark_results row with status 'scheduled', the chosen date, the same protocol, training_plan_id null.
-
-- Do NOT rewrite plan markdown or place any token. Benchmarks are standalone rows; the token machinery is being removed.
-
-- Skip the pace recalculation and zone comparison dialogs — there is nothing to apply from a discarded result.
-
-- Toast confirming the new date and advising easy running until then.
-
----
-
-## COACH VERDICT
-
-After save, call a new edge function benchmark-coach-verdict with the answers, likely_submaximal, the confidence deductions that applied, and the detection results.
-
-Persona: an elite running coach with decades of experience training both Olympians and everyday runners. Direct, warm, no filler.
-
-Output: 120 words maximum, three to five bullets, Markdown. Store in post_benchmark_interview. Render in BenchmarkHistory as an expandable "Coach's take" per row.
-
-### The verdict does NOT feed plan generation
-
-Do not inject the generated verdict into the ai-coach prompt. Passing one model's prose into another model's context loses the specifics and cannot be validated.
-
-Instead, extend the benchmark context block in ai-coach to include the structured answers and detection flags directly: rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, conditions, injury_flagged, and the confidence band. The planner reasons from data, not from a summary of data.
-
-### Model identifier
-
-Confirm the model string resolves before shipping. Report the exact identifier you use and that a test call succeeded. If it fails, the interview must still save normally — the verdict is optional and its failure must never block or roll back the benchmark result.
-
----
-
-## FILES
-
-New:
-
-- src/lib/benchmark-detection-signals.ts — pure detection functions for slowdown, breaks, and the gated stream fetch
-
-- src/lib/benchmark-interview.ts — question tree, branching resolver, types
-
-- src/components/BenchmarkInterviewDialog.tsx — multi-step dialog, replaces BenchmarkPostQuestionsDialog
-
-- supabase/functions/benchmark-coach-verdict/index.ts
-
-- src/lib/benchmark-redo.ts — discard and reschedule
-
-Edited:
-
-- src/components/BenchmarkConfirmCard.tsx — run detection before opening the dialog, route the redo path, gate pace and zone dialogs behind "not redone"
-
-- src/lib/benchmark-persist.ts — persist the structured columns and the verdict
-
-- src/components/BenchmarkHistory.tsx — render answers, injury flag, and Coach's take
-
-- supabase/functions/ai-coach/index.ts — include structured answers in the benchmark context block
-
-Delete BenchmarkPostQuestionsDialog once nothing references it.
-
----
-
-## OUT OF SCOPE
-
-- Do not modify apply-measured-zones.ts. It remains the sole writer to hr_zones.
-
-- Do not modify the effort window identification logic, the Riegel calculation, or the zone band model.
-
-- Do not re-tune any existing confidence deduction values.
-
-- Do not add free-text fields anywhere in the interview.
-
-- Do not touch Running IQ, nutrition, sleep, readiness, or walk/run filtering.
-
----
-
-## VERIFICATION
-
-Report actual values, not descriptions.
-
-1. Every option in the tree validates against the live CHECK constraints. List any that did not and what you changed.
-
-2. Synthetic result with a 12% second-half slowdown, detected breaks, HR present, and no stored sensor type: report exactly which questions fired, in order, and confirm the five-question cap held.
-
-3. Same result with Q1 "Maximal" and Q3 "No": confirm likely_submaximal is false and no RPE_SUBMAXIMAL deduction applied.
-
-4. Same result with Q1 "Easy": confirm likely_submaximal is true, the deduction applied, and Q2 fired.
-
-5. Q5 answered "Hills or terrain": confirm the SECOND_HALF_SLOWDOWN deduction was suppressed. Show the score with and without.
-
-6. hr_sensor_type "Watch wrist sensor" with a threshold HR present: confirm the -10 deduction applied. Show the score.
-
-7. "Old injury" selected on Q2: confirm injury_flagged is true, it renders in history, and the follow-up prompt appeared.
-
-8. Q4 "Yes, reschedule": confirm the original row is 'discarded' not 'rejected', a new 'scheduled' row exists on the date I chose, no plan markdown was modified, and the pace and zone dialogs were skipped.
-
-9. Q9 asked only once — confirm it does not reappear on a second benchmark.
-
-10. A failed verdict call still saves the interview and the benchmark result intact.
-
-11. Confirm the same slowdown constant drives both detection and scoring, and state its value.
+## What I found in your data (verified)
+
+- **Confirmed benchmark row** `fe76a28e…` exists, `status=confirmed`, `active=true`, `benchmark_protocol=30min`, `effort_window_source=lap`.
+  - `effort_window_duration_s = 1855.126` (elapsed), `effort_window_distance_m = 3375.1`
+  - `threshold_pace_s_per_km = 549.65` → **9:09/km** — this is elapsed pace **including the 4:36 timer stop**
+  - `threshold_hr = 145`, `lthr = 145` — this is the **whole-activity average HR**, not the effort window's HR
+  - `confidence_score = 90`, deductions: `hr_sensor_wrist -10` only
+- **`hr_zones` table is empty for you** — `applyMeasuredZones` is never called on the auto-confirm path, so no measured band was ever written. Every zone consumer falls back to observed-max (186 bpm → LTHR 166 → the estimated bands you saw).
+- **Lap 2 evidence for the stop**: `elapsed 719.798s` vs `moving 444.03s` (275.8s of timer-stopped time). Recomputed on the 4 effort laps:
+  - moving-time pace ≈ **7:47/km**, threshold HR (moving-time-weighted over laps 1–4) ≈ **156 bpm** — matches what you're telling me.
+- **Plan gen** reads `resolveZonesForUser` without the measured LTHR; the "estimated" zones you see (<141, 142–149, 150–157, 158–168) are the observed-max path output.
+
+## Fixes (in this order)
+
+### 1. Effort-window pace and HR from moving time, not elapsed
+`src/lib/benchmark-persist.ts` + `src/lib/benchmark-detection.ts`:
+- `identifyEffortWindow` (lap path) already sums `duration_s`; switch the 30-min path to sum `moving_time_s` for the contiguous window, and record `elapsed_time_s - moving_time_s` per lap as `stoppedSeconds`. Return `{ durationSeconds (moving), distanceMeters, stoppedSeconds }`.
+- `confirmBenchmark`:
+  - `threshold_pace_s_per_km = duration_moving / (distance / 1000)`
+  - Replace `threshold_hr = activity.avg_heart_rate` with a **lap-weighted average of `avg_heart_rate` across the effort laps, weighted by moving time**. Falls back to activity avg only when no laps exist (derived path).
+  - Store `stoppedSeconds` on the row (new column `effort_window_stopped_s`).
+
+### 2. Timer-stop confidence deduction
+`src/lib/benchmark-calculations.ts` (`BenchmarkConfig.CONFIDENCE_DEDUCTIONS`):
+- Add `TIMER_STOPPED_IN_EFFORT: 15` and threshold constant `TIMER_STOPPED_MIN_S: 60`.
+- `scoreConfidence` gains `timerStoppedSInEffort`; when it exceeds `TIMER_STOPPED_MIN_S`, push `{reason: "timer_stopped_in_effort", points: 15}`.
+- `BenchmarkHistory` renders "Timer stopped: 4:36" when `effort_window_stopped_s > 0`.
+
+### 3. Migration
+```text
+ALTER TABLE benchmark_results ADD COLUMN effort_window_stopped_s numeric;
+```
+(No grant/policy changes — same access as siblings.)
+
+### 4. Measured LTHR must flow into every zone resolver
+Only one thing changes here — the client already passes `measured_threshold_hr` into `ai-coach`, but `resolveZonesForUser` inside `ai-coach` is called with **no `measuredLthr` option**, so the shared resolver still estimates from observed max.
+- `supabase/functions/ai-coach/index.ts` line 1862: pass `{ measuredLthr: measured_threshold_hr ?? null }`.
+- `supabase/functions/intervals-sync/index.ts` line 369: pull the latest confirmed `benchmark_results.lthr` for the user and pass it.
+- `useHrZones` hook: read the latest active-confirmed benchmark's `lthr` and pass it into `resolveZonesForUser`.
+- `resolveZonesForUser` already accepts `opts.measuredLthr` and hands off to `resolveZones`, which returns `lthrSource: "measured"` — no change needed there.
+- Also **write** `hr_zones` on confirmation: call `applyMeasuredZones` from `confirmBenchmark` for the 30-min protocol (it already refuses 3k/5k and enforces the 100–210 plausibility gate). This keeps the ZoneComparisonDialog for the "compare & apply" UX but ensures the canonical row exists.
+
+### 5. Model must not write bpm ranges
+`supabase/functions/ai-coach/index.ts` (plan-gen prompt around lines 2270–2300):
+- Add a hard rule: "Zones may be referenced by **label only** (`Z1`, `Z2`, `Z1–Z2`). Do not write bpm numbers next to zone labels — the app renders them from the resolver."
+- Add a post-processor after the stream completes: scan every generated segment for `\bZ[1-5](?:\s*[–-]\s*Z[1-5])?\s*\(\s*\d{2,3}\s*[-–]\s*\d{2,3}\s*bpm\s*\)` and rewrite the `(…bpm)` block using `zoneRangeLabel(zone, zones)`. Log any replacement (`{date, segment, model_bpm, resolver_bpm}`) and surface the diff to me on the next benchmark reprocess.
+- Same replacement pass runs in `plan-continuation` output.
+
+### 6. Race day "REST DAY" bug + race pace derivation
+- The 17/10/2026 rest-day header comes from the coach's rest-day boilerplate being emitted for the race date. Add a guardrail in the prompt: "If a date equals `race_date`, its header MUST be `Race Day` and it MUST contain the goal race workout — never `REST DAY`." Add a validator in `src/lib/plan-validation.ts` to catch a "REST DAY" header on race_date and re-request that day via `plan-continuation`.
+- Race pace target derivation: currently `goal_time` is user-supplied and, if missing, the model invents splits. Change:
+  - Predict race time from measured threshold via `predict5kSeconds` (already implemented) and the existing Riegel exponent for 10k/HM/M distances.
+  - Inject predicted target pace + acceptable window into the prompt and require the race day session to use it verbatim.
+  - Add "**race pace must be trained before race day**": require the plan to include at least 3 race-pace sessions (progressive dose) in the final 6 weeks. Validator flags plans that do not.
+
+### 7. Intervals.icu / watch description fixes
+`src/pages/TrainingPlan.tsx` benchmark stub (lines 2956–2965):
+- Change warm-up Notes to `Easy jog to loosen up` (remove "a few strides at the end").
+- Trim workout name — strip trailing whitespace when building `Scarpers Dash - …`.
+
+`supabase/functions/intervals-sync/index.ts` (`formatWorkoutDescription`):
+- Find the truncation (currently silent — likely a `.slice(0, N)` or Intervals' own 255-char cap). Change the description to a compact, complete instruction (≤240 chars) instead of the long freehand one. For a benchmark, emit the fixed verbatim protocol: "Threshold benchmark — hold the hardest even effort you can for 30 min. No pacing target. Warm up 5 min, cool down 5 min." Assert length in code and log a warning if it would exceed the cap.
+
+### 8. Reprocess your existing benchmark
+One-off script (not a migration):
+- Recompute `threshold_pace_s_per_km`, `threshold_hr`, `lthr`, `effort_window_duration_s`, `effort_window_stopped_s`, `confidence_score`, `confidence_deductions` for row `fe76a28e-…` using laps 1–4 of activity `c3ac0ea5-…`.
+- Insert the corresponding `hr_zones` row via `applyMeasuredZones`.
+- Report back to you:
+  - measured pace, HR, LTHR, zones (Z1–Z4 bounds)
+  - confidence score + every deduction (expect `hr_sensor_wrist -10`, `timer_stopped_in_effort -15`)
+  - effort-window path (`lap`)
+- Then regenerate the plan and show you the zone lines + race-day session.
+
+## Out of scope (say so if you want them)
+- Rewriting the derived-path (Path 2) to also subtract timer-stopped time from stream data — will file separately unless you want it now.
+- Auto-linking `hr_zones` rows to historic benchmarks that predate this change (only your latest is affected).
