@@ -2554,18 +2554,46 @@ ${upcoming.join("\n")}
     const encoder = new TextEncoder();
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 
-    (async () => {
+    // Wrap the generation IIFE in a Promise we can hand to EdgeRuntime.waitUntil
+    // so the work keeps running (and keeps mirroring to the DB) even after the
+    // client disconnects (navigation, refresh, closed tab).
+    const generationTask = (async () => {
       const writer = writable.getWriter();
       let fullText = "";
+
+      // Throttled mirror of accumulated content to plan_generation_jobs.content.
+      // Client subscribes to that row via Realtime and resumes seamlessly.
+      let lastJobWrite = 0;
+      let jobWriteInFlight: Promise<unknown> | null = null;
+      const flushJob = async (force = false) => {
+        if (!jobId) return;
+        const now = Date.now();
+        if (!force && now - lastJobWrite < 600) return;
+        lastJobWrite = now;
+        try {
+          jobWriteInFlight = serviceClient
+            .from("plan_generation_jobs")
+            .update({ content: fullText, updated_at: new Date().toISOString() })
+            .eq("id", jobId)
+            .then(() => {});
+          await jobWriteInFlight;
+        } catch (e) {
+          console.error("[plan-job] mirror write failed:", e);
+        }
+      };
 
       // Heartbeat: emit an SSE comment every 20s so the client's idle watchdog
       // never fires during long Claude continuation passes (which can go 60-120s
       // between the first token of one pass and the first token of the next).
+      // Also serves as a job-row heartbeat so the client can tell "still alive".
       let writerClosed = false;
       const heartbeat = setInterval(() => {
-        if (writerClosed) return;
-        writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => { /* ignore */ });
+        if (!writerClosed) {
+          writer.write(encoder.encode(`: keepalive\n\n`)).catch(() => { /* ignore */ });
+        }
+        void flushJob(true);
       }, 20_000);
+
 
 
       // Recompute plan-context locals (they live inside the plan branches above
