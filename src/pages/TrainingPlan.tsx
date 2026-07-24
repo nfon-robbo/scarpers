@@ -515,13 +515,21 @@ const TrainingPlanPage = () => {
           resolvedMaxHr: hrZones?.maxHr ?? null,
           z2MaxHr: hrZones?.z2Max ?? null,
         });
-        if (!cancelled) setProvisionalPace(seed);
+        if (cancelled) return;
+        setProvisionalPace(seed);
+        // Auto-fill the easy pace inputs when we have real data (tier1/tier2)
+        // and the user hasn't typed anything yet. Never fill from tier3 defaults.
+        if (seed.tier !== "tier3_default") {
+          setCurrentPaceMin((prev) => prev.trim() ? prev : seed.paceMin);
+          setCurrentPaceMax((prev) => prev.trim() ? prev : seed.paceMax);
+        }
       } catch (e) {
         console.warn("provisional pace load failed", e);
       }
     })();
     return () => { cancelled = true; };
   }, [user, hrZones?.maxHr, hrZones?.z2Max]);
+
   const [trainingDays, setTrainingDays] = useState<string[]>(["Mon", "Wed", "Fri", "Sat"]);
   const [startDate, setStartDate] = useState<Date>(() => {
     const d = new Date();
