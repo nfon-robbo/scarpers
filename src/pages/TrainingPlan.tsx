@@ -1590,6 +1590,7 @@ const TrainingPlanPage = () => {
 
     setLoading(true);
     setContent(prefix);
+    setBuildJobProgress(null);
 
     // ---- Progress tracker scaffolding -------------------------------------
     const initialSteps: BuildStep[] = [
@@ -1755,6 +1756,31 @@ const TrainingPlanPage = () => {
       },
     });
 
+    if (jobId) {
+      setBuildJobProgress({
+        jobId,
+        status: "running",
+        bytes: 0,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    const applyJobProgress = (row: PlanGenerationJob) => {
+      setBuildJobProgress({
+        jobId: row.id,
+        status: row.status,
+        bytes: typeof row.content === "string" ? row.content.length : 0,
+        updatedAt: row.updated_at ?? null,
+      });
+    };
+
+    let jobPoll: ReturnType<typeof window.setInterval> | null = null;
+    const stopJobPoll = () => {
+      if (!jobPoll) return;
+      window.clearInterval(jobPoll);
+      jobPoll = null;
+    };
+
     const handleDelta = (text: string) => {
       accumulated += text;
       setContent(prefix + accumulated);
@@ -1793,6 +1819,7 @@ const TrainingPlanPage = () => {
         usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
       });
       setLoading(false);
+      stopJobPoll();
       if (user) forgetJobId(user.id);
       toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
     };
@@ -1801,6 +1828,7 @@ const TrainingPlanPage = () => {
       updateStep("ai", { status: "warn", findings: [err] });
       toast({ title: "Plan generation failed", description: err, variant: "destructive" });
       setLoading(false);
+      stopJobPoll();
       if (user) forgetJobId(user.id);
     };
 
@@ -1809,10 +1837,18 @@ const TrainingPlanPage = () => {
     let jobSub: { unsubscribe: () => void } | null = null;
     if (jobId) {
       jobSub = subscribeToJob(jobId, "", {
+        onProgress: applyJobProgress,
         onDelta: (chunk) => handleDelta(chunk),
         onDone: () => { jobSub?.unsubscribe(); void handleDone(); },
         onError: (msg) => { jobSub?.unsubscribe(); handleError(msg); },
       });
+      jobPoll = window.setInterval(() => {
+        void fetchJob(jobId).then((row) => {
+          if (!row) return;
+          applyJobProgress(row);
+          if (row.status !== "running") stopJobPoll();
+        });
+      }, 5_000);
     }
 
     streamAICoach({
@@ -1924,6 +1960,12 @@ const TrainingPlanPage = () => {
       // Resume live progress from wherever the server got to.
       setLoading(true);
       setContent(prefix + (job.content || ""));
+      setBuildJobProgress({
+        jobId: job.id,
+        status: job.status,
+        bytes: job.content?.length ?? 0,
+        updatedAt: job.updated_at ?? null,
+      });
       toast({
         title: "Resuming your plan",
         description: "It kept building while you were away — picking up where the coach left off.",
@@ -1941,6 +1983,14 @@ const TrainingPlanPage = () => {
 
 
       const sub = subscribeToJob(job.id, job.content || "", {
+        onProgress: (row) => {
+          setBuildJobProgress({
+            jobId: row.id,
+            status: row.status,
+            bytes: row.content?.length ?? 0,
+            updatedAt: row.updated_at ?? null,
+          });
+        },
         onDelta: (chunk) => {
           setContent((prev) => (prev ?? "") + chunk);
         },
@@ -1960,6 +2010,19 @@ const TrainingPlanPage = () => {
           forgetJobId(user.id);
         },
       });
+
+      const poll = window.setInterval(() => {
+        void fetchJob(job.id).then((row) => {
+          if (!row) return;
+          setBuildJobProgress({
+            jobId: row.id,
+            status: row.status,
+            bytes: row.content?.length ?? 0,
+            updatedAt: row.updated_at ?? null,
+          });
+          if (row.status !== "running") window.clearInterval(poll);
+        });
+      }, 5_000);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, initialLoading]);
@@ -3774,7 +3837,7 @@ ${mainRow}
         )}
 
         {loading && buildSteps.length > 0 && (
-          <PlanBuildProgress steps={buildSteps} />
+          <PlanBuildProgress steps={buildSteps} jobProgress={buildJobProgress} />
         )}
 
         {!content && !loading && (
