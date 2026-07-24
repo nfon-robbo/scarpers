@@ -3482,7 +3482,11 @@ ${mainRow}
           </>
         )}
 
-        {!content && (
+        {loading && buildSteps.length > 0 && (
+          <PlanBuildProgress steps={buildSteps} />
+        )}
+
+        {!content && !loading && (
           <Card>
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
@@ -3492,12 +3496,7 @@ ${mainRow}
             </CardContent>
           </Card>
         )}
-        {loading && content && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>Still generating...</span>
-          </div>
-        )}
+
 
         {/* Plan Progress Review Dialog */}
         <Dialog
