@@ -1,6 +1,12 @@
+// Import.meta shim for the app client
+process.env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+(globalThis as any).importMetaEnv = {
+  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_PUBLISHABLE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY,
+};
+
 import { createClient } from "@supabase/supabase-js";
 
-// Inject the browser's Supabase client so reprocessBenchmark uses this session
 const url = process.env.VITE_SUPABASE_URL!;
 const anon = process.env.VITE_SUPABASE_ANON_KEY!;
 const session = JSON.parse(process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON!);
@@ -13,14 +19,10 @@ await client.auth.setSession({
   refresh_token: session.refresh_token,
 });
 
-// Monkey-patch the module import so reprocessBenchmark uses our client
-const mod = await import("../src/integrations/supabase/client.ts");
-// @ts-ignore
-mod.supabase = client;
-// Also replace the reference inside reprocess (ESM live bindings)
-Object.defineProperty(mod, "supabase", { value: client, writable: true, configurable: true });
+// Stub the app's supabase client module so the reprocess lib uses ours
+const clientMod = await import("../src/integrations/supabase/client.ts");
+Object.defineProperty(clientMod, "supabase", { value: client, writable: true, configurable: true });
 
 const { reprocessBenchmark } = await import("../src/lib/benchmark-reprocess.ts");
-
-const result = await reprocessBenchmark("fe76a28e-9b16-4205-b86d-6b890750f993");
-console.log(JSON.stringify(result, null, 2));
+const r = await reprocessBenchmark("fe76a28e-9b16-4205-b86d-6b890750f993");
+console.log(JSON.stringify(r, null, 2));
