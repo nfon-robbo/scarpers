@@ -567,6 +567,7 @@ const TrainingPlanPage = () => {
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [hasConfirmedBenchmark, setHasConfirmedBenchmark] = useState(false);
+  const [latestBenchmarkDate, setLatestBenchmarkDate] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
 
