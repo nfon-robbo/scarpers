@@ -129,7 +129,7 @@ export async function reprocessBenchmark(
       .eq("activity_id", row.activity_id)
       .order("lap_index", { ascending: true });
     if (lapErr) throw lapErr;
-    laps = (lapRows ?? []) as BenchmarkLap[];
+    laps = (lapRows ?? []) as unknown as BenchmarkLap[];
   }
 
   // Effort window — same helpers as confirmBenchmark.
