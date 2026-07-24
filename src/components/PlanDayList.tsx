@@ -504,6 +504,7 @@ export default function PlanDayList({
   planContent = null,
   planId = null,
   userId = null,
+  onBenchmarkConfirmed,
 }: PlanDayListProps) {
   const [selectedWorkout, setSelectedWorkout] = useState<ParsedWorkout | null>(null);
   const [reviewWorkout, setReviewWorkout] = useState<ParsedWorkout | null>(null);
