@@ -28,7 +28,9 @@ import { deriveLikelySubmaximal } from "@/lib/benchmark-rpe";
 import type { InterviewAnswers } from "@/lib/benchmark-interview";
 import type { DetectionResult } from "@/lib/benchmark-detection-signals";
 import { INJURY_TAG } from "@/lib/benchmark-rpe";
-import { applyMeasuredZones, MIN_PLAUSIBLE_LTHR_BPM, MAX_PLAUSIBLE_LTHR_BPM } from "@/lib/apply-measured-zones";
+// NOTE: applyMeasuredZones is intentionally NOT imported here — hr_zones writes
+// go exclusively through ZoneComparisonDialog. See end of confirmBenchmark.
+
 
 const NEXT_BENCHMARK_WEEKS = 6;
 
