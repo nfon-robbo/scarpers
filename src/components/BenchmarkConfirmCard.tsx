@@ -433,7 +433,8 @@ export default function BenchmarkConfirmCard({
           onOpenChange={(o) => {
             if (!o) {
               setZoneDialog(null);
-              if (!recalcDialog) void onDone();
+              if (onBenchmarkConfirmed) void onBenchmarkConfirmed();
+              else if (!recalcDialog) void onDone();
             }
           }}
           userId={userId}
