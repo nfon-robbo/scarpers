@@ -35,6 +35,12 @@ export const BenchmarkConfig = {
     RPE_SUBMAXIMAL: 15,
     /** Effort window derived from moving averages rather than watch laps. */
     EFFORT_WINDOW_DERIVED: 15,
+    /**
+     * Applied when threshold HR was measured AND the athlete records HR from
+     * a wrist optical sensor. Wrist optical HR is unreliable at threshold
+     * intensity — the primary output of this test.
+     */
+    HR_SENSOR_WRIST: 10,
   },
   /** Above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
   CONFIDENCE_BANDS: { HIGH_MIN: 70, MEDIUM_MIN: 40 },
