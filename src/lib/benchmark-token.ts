@@ -19,8 +19,10 @@ export function protocolDurationWindow(
 ): { minSeconds: number; maxSeconds: number } {
   switch (protocol) {
     case "30min":
-      // 40–55 min total run wrapping a ~30 min effort with warm-up/cool-down.
-      return { minSeconds: 40 * 60, maxSeconds: 55 * 60 };
+      // Scheduled threshold tests are a 30-min main effort plus optional
+      // warm-up/cool-down. Athletes may trim the easy bookends, so candidate
+      // matching must allow runs shorter than the ideal 40-min total.
+      return { minSeconds: 28 * 60, maxSeconds: 55 * 60 };
     case "3k":
       // Fast enough that the whole session sits inside ~20–45 min.
       return { minSeconds: 20 * 60, maxSeconds: 45 * 60 };
