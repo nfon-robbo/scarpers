@@ -1518,7 +1518,7 @@ const TrainingPlanPage = () => {
     };
 
     // Step 1 — profile / preferences
-    const raceLabel = letAIDecide ? "AI to recommend" : (raceDate ? format(raceDate, "dd/MM/yyyy") : "not set");
+    const raceLabel = effectiveRaceISO ? format(parseLocalISODate(effectiveRaceISO), "dd/MM/yyyy") : "not set";
     updateStep("profile", {
       status: "done",
       inputs: [
