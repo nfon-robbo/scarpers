@@ -183,6 +183,57 @@ export default function BenchmarkInterviewDialog({
               })}
             </div>
 
+            {(() => {
+              // Show follow-up inputs when the current question's answer
+              // includes "Old injury" or "Something else". Notes persist
+               // across question changes via `answers.injuryNote` /
+               // `answers.somethingElseNote`.
+              const selectedValues = Array.isArray(currentValue)
+                ? currentValue
+                : currentValue
+                  ? [currentValue as string]
+                  : [];
+              const showInjury = selectedValues.includes("Old injury");
+              const showSomethingElse = selectedValues.includes("Something else");
+              if (!showInjury && !showSomethingElse) return null;
+              return (
+                <div className="space-y-2">
+                  {showInjury && (
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-muted-foreground">
+                        What injury? (used to shape your plan)
+                      </label>
+                      <textarea
+                        value={answers.injuryNote ?? ""}
+                        onChange={(e) =>
+                          setAnswers((a) => ({ ...a, injuryNote: e.target.value || null }))
+                        }
+                        rows={2}
+                        placeholder="e.g. right achilles tendinopathy, flares on hills"
+                        className="w-full text-xs rounded-md border border-border/60 bg-background/60 px-2 py-1.5 focus:outline-none focus:border-primary/60"
+                      />
+                    </div>
+                  )}
+                  {showSomethingElse && (
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-muted-foreground">
+                        What was it? (used to shape your plan)
+                      </label>
+                      <textarea
+                        value={answers.somethingElseNote ?? ""}
+                        onChange={(e) =>
+                          setAnswers((a) => ({ ...a, somethingElseNote: e.target.value || null }))
+                        }
+                        rows={2}
+                        placeholder="Tell your coach what happened"
+                        className="w-full text-xs rounded-md border border-border/60 bg-background/60 px-2 py-1.5 focus:outline-none focus:border-primary/60"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex items-center gap-2 pt-1">
               <Button
                 size="sm"
