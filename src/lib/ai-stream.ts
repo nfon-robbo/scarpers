@@ -42,6 +42,8 @@ export async function streamAICoach({
   measuredThresholdHr,
   measuredBenchmarkDateIso,
   featureName,
+  jobId,
+
   onDelta,
   onDone,
   onError,
