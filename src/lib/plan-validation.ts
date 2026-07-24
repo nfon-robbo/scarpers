@@ -604,8 +604,8 @@ export interface ZoneBands {
 }
 
 function resolverLabelFor(zoneLabel: string, z: ZoneBands): string | null {
-  // Accept "Z1", "Z1-Z2", "Z2 – Z3", etc. Return the canonical "(N-M bpm)"
-  // / "(<N bpm)" / "(>N bpm)" block for the range the label spans.
+  // Accept "Z1", "Z1-Z2", "Z2 – Z3", "Z2 to Z3", etc. Return the canonical
+  // "(N-M bpm)" / "(<N bpm)" / "(>N bpm)" block for the range the label spans.
   const nums = Array.from(zoneLabel.matchAll(/Z([1-5])/gi)).map((m) => Number(m[1]));
   if (nums.length === 0) return null;
   const lo = Math.min(...nums);
@@ -621,8 +621,10 @@ function resolverLabelFor(zoneLabel: string, z: ZoneBands): string | null {
 export function scrubZoneBpm(markdown: string, zones: ZoneBands | null | undefined): { content: string; scrubs: ZoneBpmScrub[] } {
   if (!markdown || !zones) return { content: markdown, scrubs: [] };
   const scrubs: ZoneBpmScrub[] = [];
-  // Zone label followed by an optional non-word gap, then a bpm block.
-  const rx = /(Z[1-5](?:\s*[–-]\s*Z[1-5])?)\s*\((?:\s*<\s*\d{2,3}|\s*>\s*\d{2,3}|\s*\d{2,3}\s*[-–]\s*\d{2,3})\s*bpm\s*\)/gi;
+  // Zone label — either "Z1" or "Z1-Z2" / "Z1 – Z2" / "Z1 to Z2" — followed by
+  // an optional gap, then a bpm block that may open with "<", "≤", ">", "≥",
+  // or a numeric range using "-" or "–".
+  const rx = /(Z[1-5](?:\s*(?:to|[–-])\s*Z[1-5])?)\s*\((?:\s*[<≤]\s*\d{2,3}|\s*[>≥]\s*\d{2,3}|\s*\d{2,3}\s*[-–]\s*\d{2,3})\s*bpm\s*\)/gi;
   const content = markdown.replace(rx, (whole, label: string) => {
     const canonical = resolverLabelFor(label.replace(/\s+/g, ""), zones);
     if (!canonical) return whole;
@@ -634,3 +636,190 @@ export function scrubZoneBpm(markdown: string, zones: ZoneBands | null | undefin
   });
   return { content, scrubs };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pace/HR consistency validator.
+// Flags sessions where prescribed pace is faster than the athlete's measured
+// threshold pace while the HR ceiling sits at or below threshold HR + margin.
+// Such a target cannot physically be met — HR would have to spike above the
+// ceiling to hit the pace, or the pace has to slow.
+//
+// Strides shorter than 30 seconds are exempt (neuromuscular work, HR lags).
+// ─────────────────────────────────────────────────────────────────────────────
+export interface PaceHrConflict {
+  day: string;              // "### Monday 07/09/2026 — Race Pace Intervals"
+  segmentText: string;      // raw table row
+  prescribedPaceFastest: string; // e.g. "6:00/km"
+  prescribedPaceFastestS: number; // seconds per km
+  hrCeiling: number;        // bpm
+  thresholdPaceS: number;
+  thresholdHr: number;
+  marginBpm: number;
+  reason: string;
+}
+
+export interface PaceHrConflictOptions {
+  thresholdPaceSecPerKm: number;
+  thresholdHr: number;
+  marginBpm?: number;       // default 5
+}
+
+function paceStringToSeconds(s: string): number | null {
+  const m = /(\d{1,2}):(\d{2})/.exec(s);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/**
+ * Detect stride/neuromuscular rows we should exempt: pattern "N × <=29 sec"
+ * or "N × <=29s" anywhere in the row text.
+ */
+function isShortStrideRow(row: string): boolean {
+  const rx = /(\d+)\s*[×x]\s*(\d+)\s*(sec|s\b|seconds?)/i;
+  const m = rx.exec(row);
+  if (!m) return false;
+  const dur = Number(m[2]);
+  return dur > 0 && dur < 30;
+}
+
+export function validatePaceHrConsistency(
+  markdown: string,
+  opts: PaceHrConflictOptions,
+): PaceHrConflict[] {
+  if (!markdown) return [];
+  const margin = opts.marginBpm ?? 5;
+  const hrCeilingThreshold = opts.thresholdHr + margin;
+
+  const conflicts: PaceHrConflict[] = [];
+  // Split into day-sections at every "### " heading.
+  const dayRx = /^###\s+.+$/gm;
+  const headings: { idx: number; text: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = dayRx.exec(markdown)) !== null) headings.push({ idx: m.index, text: m[0] });
+
+  for (let i = 0; i < headings.length; i++) {
+    const start = headings[i].idx;
+    const end = i + 1 < headings.length ? headings[i + 1].idx : markdown.length;
+    const section = markdown.slice(start, end);
+    const dayHeading = headings[i].text;
+
+    // Iterate over table rows (lines starting/containing "|").
+    for (const raw of section.split(/\r?\n/)) {
+      const row = raw.trim();
+      if (!row.startsWith("|") || !row.includes("bpm")) continue;
+      if (/^\|\s*-+/.test(row)) continue; // separator row
+      if (isShortStrideRow(row)) continue;
+
+      // Pull every "M:SS/km" occurrence in this row. Fastest = smallest.
+      const paces = Array.from(row.matchAll(/(\d{1,2}:\d{2})\s*\/km/g)).map((mm) => ({
+        raw: mm[1] + "/km",
+        s: paceStringToSeconds(mm[1])!,
+      })).filter((p) => Number.isFinite(p.s));
+      if (paces.length === 0) continue;
+      const fastest = paces.reduce((a, b) => (a.s <= b.s ? a : b));
+      if (fastest.s >= opts.thresholdPaceSecPerKm) continue; // slower than threshold — fine
+
+      // Pull HR ceiling from the row. Accept "(N-M bpm)", "(<N bpm)",
+      // "(≤N bpm)", or bare "N-M bpm".
+      let ceiling: number | null = null;
+      const range = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*bpm/.exec(row);
+      if (range) ceiling = Number(range[2]);
+      if (ceiling == null) {
+        const upper = /[<≤]\s*(\d{2,3})\s*bpm/.exec(row);
+        if (upper) ceiling = Number(upper[1]) - (row.includes("≤") ? 0 : 1);
+      }
+      if (ceiling == null) continue;
+
+      if (ceiling <= hrCeilingThreshold) {
+        conflicts.push({
+          day: dayHeading,
+          segmentText: row,
+          prescribedPaceFastest: fastest.raw,
+          prescribedPaceFastestS: fastest.s,
+          hrCeiling: ceiling,
+          thresholdPaceS: opts.thresholdPaceSecPerKm,
+          thresholdHr: opts.thresholdHr,
+          marginBpm: margin,
+          reason: `Fastest prescribed pace ${fastest.raw} is ${opts.thresholdPaceSecPerKm - fastest.s}s/km faster than threshold pace, but HR ceiling ${ceiling} bpm is ≤ threshold HR (${opts.thresholdHr}) + ${margin} bpm margin.`,
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Race-distance coverage validator.
+// Every plan with a race target must include at least one session before race
+// day whose continuous work covers the race distance OR race duration.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface RaceCoverageResult {
+  ok: boolean;
+  raceDistanceKm: number | null;
+  raceDurationSec: number | null;
+  longestContinuousKm: number;
+  longestContinuousMin: number;
+  reason?: string;
+}
+
+function raceDistanceKm(label: string): number | null {
+  const l = (label || "").toLowerCase();
+  if (l.includes("5k")) return 5;
+  if (l.includes("10k")) return 10;
+  if (l.includes("half")) return 21.0975;
+  if (l.includes("marathon")) return 42.195;
+  const m = /(\d+(?:\.\d+)?)\s*k/.exec(l);
+  if (m) return Number(m[1]);
+  return null;
+}
+
+function goalTimeSec(goalTime: string | null | undefined): number | null {
+  if (!goalTime) return null;
+  const p = String(goalTime).trim().split(":").map((x) => Number(x));
+  if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+  if (p.length === 2) return p[0] * 60 + p[1];
+  return null;
+}
+
+export function validateRaceCoverage(
+  markdown: string,
+  raceLabel: string,
+  goalTime: string | null | undefined,
+): RaceCoverageResult {
+  const raceKm = raceDistanceKm(raceLabel);
+  const raceSec = goalTimeSec(goalTime);
+  let longestKm = 0;
+  let longestMin = 0;
+
+  // Look at every table row that mentions km or min for continuous efforts.
+  // Skip anything that reads as intervals (× or "x" between numbers).
+  for (const raw of markdown.split(/\r?\n/)) {
+    const row = raw.trim();
+    if (!row.startsWith("|")) continue;
+    if (/\d+\s*[×x]\s*\d/.test(row)) continue; // interval row
+
+    const kmMatch = /(\d+(?:\.\d+)?)\s*km/i.exec(row);
+    if (kmMatch) longestKm = Math.max(longestKm, Number(kmMatch[1]));
+
+    const minMatch = /(\d+(?:\.\d+)?)\s*min\b/i.exec(row);
+    if (minMatch) longestMin = Math.max(longestMin, Number(minMatch[1]));
+  }
+
+  if (raceKm == null && raceSec == null) {
+    return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
+  }
+  const distanceOk = raceKm != null && longestKm >= raceKm * 0.95;
+  const durationOk = raceSec != null && longestMin * 60 >= raceSec * 0.95;
+  if (distanceOk || durationOk) {
+    return { ok: true, raceDistanceKm: raceKm, raceDurationSec: raceSec, longestContinuousKm: longestKm, longestContinuousMin: longestMin };
+  }
+  return {
+    ok: false,
+    raceDistanceKm: raceKm,
+    raceDurationSec: raceSec,
+    longestContinuousKm: longestKm,
+    longestContinuousMin: longestMin,
+    reason: `Longest continuous run is ${longestKm.toFixed(1)} km / ${longestMin.toFixed(0)} min but race is ${raceKm ?? "?"} km${raceSec ? ` / goal ${Math.round(raceSec/60)} min` : ""}. Add at least one session covering race distance or race duration before race day.`,
+  };
+}
+
