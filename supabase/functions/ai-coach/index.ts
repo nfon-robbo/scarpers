@@ -446,6 +446,16 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    // Service-role client for writing plan_generation_jobs progress. We keep
+    // writing to this even after the client disconnects (see EdgeRuntime.waitUntil
+    // wrapping the plan streaming IIFE below), so plan generation never gets
+    // wasted on a page refresh / navigation / browser close.
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -466,6 +476,10 @@ serve(async (req) => {
     if (reqBody.planned_workout && typeof reqBody.planned_workout === "object" && typeof reqBody.planned_workout.title === "string") {
       reqBody.planned_workout.title = stripBenchmarkTokens(reqBody.planned_workout.title);
     }
+    // Optional client-supplied job id — when set, we mirror all streamed tokens
+    // to plan_generation_jobs.content so the client can resume after nav/refresh.
+    const jobId: string | undefined = typeof reqBody.job_id === "string" ? reqBody.job_id : undefined;
+
     const { type, race_distance, goal_time, current_pace_min, current_pace_max, training_days, start_date, race_date, current_plan, adjustment, review_text, messages: chatMessages, history: chatHistory, target_date, today_workout, activity_summary, planned_workout, timezone, preserve_past, plan_start_from_date, today_date_uk, target_is_not_today, geo, measured_threshold_pace_s_per_km, measured_threshold_hr, measured_benchmark_date } = reqBody;
     const tz = typeof timezone === "string" && timezone ? timezone : "UTC";
     const fmtLocal = (iso: string) => {
