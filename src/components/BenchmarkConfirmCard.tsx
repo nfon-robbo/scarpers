@@ -221,9 +221,17 @@ export default function BenchmarkConfirmCard({
 
       if (protocol === "30min" && saved.lthr != null && saved.lthr > 0) {
         setZoneDialog({ benchmarkId: saved.id, measuredLthr: saved.lthr });
-        if (planContent) setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
-      } else if (planContent) {
+        // Skip the pace-recalc dialog when the parent will regenerate the plan
+        // from measured anchors (avoids the confusing "no pace tokens matched"
+        // dialog on stub benchmark-only plans).
+        if (planContent && !onBenchmarkConfirmed) {
+          setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
+        }
+      } else if (planContent && !onBenchmarkConfirmed) {
         setRecalcDialog({ thresholdSecPerKm: saved.thresholdPaceSecPerKm, planContent });
+      } else if (onBenchmarkConfirmed) {
+        // No zone dialog will open — trigger the parent regeneration now.
+        await onBenchmarkConfirmed();
       } else if (!injuryPrompt) {
         await onDone();
       }
