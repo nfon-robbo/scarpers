@@ -58,6 +58,7 @@ import { enforceAndLog, validatePlanReachesRaceDay, recomputeAndLog, validatePla
 import { splitPlanByDate } from "@/lib/plan-split";
 import { getProvisionalPace, type ProvisionalPace } from "@/lib/provisional-pace";
 import { getLatestConfirmedBenchmark, scheduleStandaloneBenchmark } from "@/lib/benchmark-scheduled";
+import { maxWeeksForDistance, defaultWeeksForDistance, addWeeks, weeksBetween } from "@/lib/plan-length";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
 import BenchmarkFirstDialog from "@/components/BenchmarkFirstDialog";
 import { useHrZones } from "@/hooks/useHrZones";
@@ -1468,7 +1469,35 @@ const TrainingPlanPage = () => {
     const todayISO = toLocalISODate(new Date());
     const { preservedPast, splitWorked } = splitPlanByDate(previousContent, todayISO);
     const prefix = splitWorked && preservedPast ? preservedPast + "\n\n" : "";
-    const effectiveStartISO = prefix ? todayISO : toLocalISODate(startDate);
+    let effectiveStartISO = prefix ? todayISO : toLocalISODate(startDate);
+
+    // ── Plan-length cap per race distance ──────────────────────────────
+    // A 5K plan doesn't need 20 weeks. If "let AI decide" was chosen we
+    // pick a sensible default race date; otherwise we bump the start
+    // forward so the plan fits inside the cap for this race distance.
+    let effectiveRaceISO: string | null = letAIDecide
+      ? null
+      : (raceDate ? toLocalISODate(raceDate) : null);
+    if (letAIDecide) {
+      const wks = defaultWeeksForDistance(raceDistance);
+      effectiveRaceISO = toLocalISODate(addWeeks(new Date(), wks));
+      toast({
+        title: `Race target set ${wks} weeks out`,
+        description: `Default window for a ${raceDistance}. Pick an actual race date to change it.`,
+      });
+    }
+    if (effectiveRaceISO) {
+      const wks = weeksBetween(effectiveStartISO, effectiveRaceISO);
+      const cap = maxWeeksForDistance(raceDistance);
+      if (wks > cap) {
+        const newStart = toLocalISODate(addWeeks(new Date(effectiveRaceISO + "T00:00:00"), -cap));
+        effectiveStartISO = newStart;
+        toast({
+          title: `Plan capped to ${cap} weeks`,
+          description: `A ${raceDistance} doesn't need ${wks} weeks — starting ${format(parseLocalISODate(newStart), "dd/MM/yyyy")} instead.`,
+        });
+      }
+    }
 
     setLoading(true);
     setContent(prefix);
@@ -1489,7 +1518,7 @@ const TrainingPlanPage = () => {
     };
 
     // Step 1 — profile / preferences
-    const raceLabel = letAIDecide ? "AI to recommend" : (raceDate ? format(raceDate, "dd/MM/yyyy") : "not set");
+    const raceLabel = effectiveRaceISO ? format(parseLocalISODate(effectiveRaceISO), "dd/MM/yyyy") : "not set";
     updateStep("profile", {
       status: "done",
       inputs: [
@@ -1629,7 +1658,7 @@ const TrainingPlanPage = () => {
       currentPaceMax: seedPaceMax,
       trainingDays,
       startDate: effectiveStartISO,
-      raceDate: letAIDecide ? "ai-recommend" : (raceDate ? toLocalISODate(raceDate) : undefined),
+      raceDate: effectiveRaceISO ?? undefined,
       measuredThresholdPaceSecPerKm: measured?.thresholdPaceSecPerKm,
       measuredThresholdHr: measured?.thresholdHr ?? undefined,
       measuredBenchmarkDateIso: measured?.benchmarkDate,
