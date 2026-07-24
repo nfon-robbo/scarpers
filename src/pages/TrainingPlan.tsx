@@ -1476,15 +1476,15 @@ const TrainingPlanPage = () => {
       const since = new Date(); since.setDate(since.getDate() - 42);
       const { data: recent, count } = await supabase
         .from("activities")
-        .select("distance_km, duration_seconds, activity_date, activity_type", { count: "exact" })
+        .select("distance_meters, duration_seconds, start_time, activity_type", { count: "exact" })
         .eq("user_id", user.id)
-        .gte("activity_date", since.toISOString().slice(0, 10))
-        .order("activity_date", { ascending: false })
+        .gte("start_time", since.toISOString())
+        .order("start_time", { ascending: false })
         .limit(200);
       const runs = (recent ?? []).filter((r: any) => /run/i.test(r.activity_type ?? ""));
-      const totalKm = runs.reduce((a: number, r: any) => a + (Number(r.distance_km) || 0), 0);
-      const longest = runs.reduce((m: number, r: any) => Math.max(m, Number(r.distance_km) || 0), 0);
-      const lastDate = runs[0]?.activity_date;
+      const totalKm = runs.reduce((a: number, r: any) => a + ((Number(r.distance_meters) || 0) / 1000), 0);
+      const longest = runs.reduce((m: number, r: any) => Math.max(m, (Number(r.distance_meters) || 0) / 1000), 0);
+      const lastDate = runs[0]?.start_time;
       const daysSinceLast = lastDate ? Math.round((Date.now() - new Date(lastDate).getTime()) / 86400000) : null;
       updateStep("history", {
         status: "done",
@@ -1497,6 +1497,7 @@ const TrainingPlanPage = () => {
         ],
         usage: ["Sets weekly volume ceiling and ramp-back rules if you've had a layoff."],
       });
+
     } catch (e) {
       updateStep("history", { status: "warn", findings: ["Couldn't read activity history — coach will use defaults."] });
     }
