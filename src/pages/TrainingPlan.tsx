@@ -2420,8 +2420,9 @@ const TrainingPlanPage = () => {
         const baseName = descriptiveTitle
           .replace(/\(Total:\s*\d+\s*min\)/i, `(Total: ${totalMins} min)`)
           .replace(/^scarpers(?:\s+dash)?\s*[-–—]\s*/i, "") // strip any existing brand prefix
-          .replace(/^[\s\-–—]+/, ""); // strip leading dashes so we don't get "Scarpers Dash - — Walk"
-        const correctedName = `Scarpers Dash - ${baseName}`;
+          .replace(/^[\s\-–—]+/, "") // strip leading dashes so we don't get "Scarpers Dash - — Walk"
+          .replace(/\s+$/, ""); // strip trailing whitespace so the watch title doesn't end "…40min "
+        const correctedName = `Scarpers Dash - ${baseName}`.replace(/\s+$/, "");
         return {
           date: dateStr,
           name: correctedName,
@@ -2959,7 +2960,7 @@ const TrainingPlanPage = () => {
 
 | Segment | Duration | Target | HR Zone | Notes |
 |---------|----------|--------|---------|-------|
-| Warm-up | 5 min | Easy jog | Z1 | Loosen up, a few strides at the end |
+| Warm-up | 5 min | Easy jog | Z1 | Easy jog to loosen up |
 ${mainRow}
 | Cool-down | 5 min | Easy jog | Z1 | Easy jog to finish |
 `;
