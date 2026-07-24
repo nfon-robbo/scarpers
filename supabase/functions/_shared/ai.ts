@@ -40,7 +40,11 @@ interface AICallOpts {
   // Optional logging metadata
   userId?: string;
   label?: string;
+  // Optional per-call overrides — bypasses app_settings for this call only
+  providerOverride?: "lovable" | "claude";
+  claudeModelOverride?: string;
 }
+
 
 // ----- Pricing (USD per 1k tokens) -----
 // Rough public pricing; used only for monitoring/admin display.
