@@ -1951,7 +1951,7 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         try {
           const { data: bmRow } = await supabase
             .from("benchmark_results")
-            .select("rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, injury_flagged, confidence_band, likely_submaximal")
+            .select("rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, injury_flagged, confidence_band, likely_submaximal, post_benchmark_interview")
             .eq("user_id", user.id)
             .eq("status", "confirmed")
             .eq("benchmark_date", measured_benchmark_date)
