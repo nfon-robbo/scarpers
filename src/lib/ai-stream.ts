@@ -74,10 +74,14 @@ export async function streamAICoach({
   measuredBenchmarkDateIso?: string;
   /** Optional label for telemetry (e.g. "day-adjust", "chat"). */
   featureName?: string;
+  /** When set, edge fn mirrors accumulated tokens to plan_generation_jobs.id
+   *  so the client can resume after navigation / refresh / browser close. */
+  jobId?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
 }) {
+
   const startedAt = Date.now();
   const controller = new AbortController();
   let settled = false;
