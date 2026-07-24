@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { streamAICoach } from "@/lib/ai-stream";
+import { createPlanJob, findResumableJob, subscribeToJob, forgetJobId, type PlanGenerationJob } from "@/lib/plan-generation-job";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
