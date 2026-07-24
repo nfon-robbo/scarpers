@@ -41,12 +41,10 @@ export const QUESTIONS: Record<QuestionId, QuestionDef> = {
   q9_hr_sensor:      { id: "q9_hr_sensor",      kind: "single", title: "How do you record heart rate?",                  options: HR_SENSOR_OPTIONS,       skippable: true },
 } as const;
 
-export interface DetectionResult {
-  /** Second-half average pace slower than first-half by >= threshold. */
-  slowdownDetected: boolean;
-  /** Sum(elapsed - moving) across laps in effort window > threshold. */
-  breaksDetected: boolean;
-}
+// DetectionResult is defined in benchmark-detection-signals.ts and re-exported
+// here so consumers can import interview types from one place.
+export type { DetectionResult } from "@/lib/benchmark-detection-signals";
+import type { DetectionResult } from "@/lib/benchmark-detection-signals";
 
 export interface InterviewContext {
   /** True if activity has any HR data — gates Q8 (conditions is HR-contextual). */
