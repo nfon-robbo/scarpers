@@ -196,6 +196,17 @@ export interface ConfidenceInputs {
    * for that is unfair, so the deduction is suppressed.
    */
   protocol?: "30min" | "3k" | "5k";
+  /**
+   * Athlete's Q5 answer, if any. When it is "Deliberate, felt strong early"
+   * or "Hills or terrain" the SECOND_HALF_SLOWDOWN deduction is suppressed —
+   * the fade has an explanation that is not pacing failure.
+   */
+  slowdownReason?: string | null;
+  /**
+   * True if a threshold HR was measured AND the athlete records HR from a
+   * wrist optical sensor. Applies HR_SENSOR_WRIST deduction.
+   */
+  wristHrOnThresholdMeasurement?: boolean;
 }
 
 export interface ConfidenceDeduction {
@@ -216,7 +227,13 @@ export function scoreConfidence(inputs: ConfidenceInputs): ConfidenceResult {
   if (!inputs.hrStreamAvailable) {
     deductions.push({ reason: "no_hr_stream", points: D.NO_HR_STREAM });
   }
-  if (inputs.secondHalfSlowdown >= BenchmarkConfig.SECOND_HALF_SLOWDOWN_THRESHOLD) {
+  const slowdownSuppressed =
+    inputs.slowdownReason === "Deliberate, felt strong early" ||
+    inputs.slowdownReason === "Hills or terrain";
+  if (
+    inputs.secondHalfSlowdown >= BenchmarkConfig.SECOND_HALF_SLOWDOWN_THRESHOLD &&
+    !slowdownSuppressed
+  ) {
     deductions.push({ reason: "second_half_slowdown", points: D.SECOND_HALF_SLOWDOWN });
   }
   if (!inputs.cadencePresent) {
@@ -233,6 +250,9 @@ export function scoreConfidence(inputs: ConfidenceInputs): ConfidenceResult {
     (!inputs.protocol || inputs.protocol === "30min");
   if (derivedPenaltyApplies) {
     deductions.push({ reason: "effort_window_derived", points: D.EFFORT_WINDOW_DERIVED });
+  }
+  if (inputs.wristHrOnThresholdMeasurement) {
+    deductions.push({ reason: "hr_sensor_wrist", points: D.HR_SENSOR_WRIST });
   }
 
   const totalDeducted = deductions.reduce((a, d) => a + d.points, 0);
