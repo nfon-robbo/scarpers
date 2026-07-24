@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { streamAICoach } from "@/lib/ai-stream";
-import { createPlanJob, findResumableJob, subscribeToJob, forgetJobId, type PlanGenerationJob } from "@/lib/plan-generation-job";
+import { createPlanJob, findResumableJob, subscribeToJob, forgetJobId, fetchJob, type PlanGenerationJob } from "@/lib/plan-generation-job";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
-import PlanBuildProgress, { type BuildStep } from "@/components/PlanBuildProgress";
+import PlanBuildProgress, { type BuildStep, type BuildJobProgress } from "@/components/PlanBuildProgress";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
@@ -400,6 +400,7 @@ const TrainingPlanPage = () => {
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
   const [buildSteps, setBuildSteps] = useState<BuildStep[]>([]);
+  const [buildJobProgress, setBuildJobProgress] = useState<BuildJobProgress | null>(null);
 
   // Forward-declared ref so the undo/redo callbacks can read the latest race date
   // without depending on the (later-declared) `raceDate` state binding.
