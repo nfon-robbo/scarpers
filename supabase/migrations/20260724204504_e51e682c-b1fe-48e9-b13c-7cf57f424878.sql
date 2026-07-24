@@ -1,0 +1,1 @@
+UPDATE public.plan_generation_jobs SET status='cancelled', finished_at=now(), updated_at=now() WHERE status='running';
