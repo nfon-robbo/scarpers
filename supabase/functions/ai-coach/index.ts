@@ -2437,13 +2437,34 @@ ${upcoming.join("\n")}
       { role: "user" as const, content: userPrompt },
     ];
 
+    // Admin users get Claude Opus 4.5 for full plan generation (higher quality
+    // than Gemini 2.5 Pro on long, structured plans). Falls back to Lovable
+    // gateway if the admin check fails or ANTHROPIC_API_KEY is missing.
+    let isAdmin = false;
+    if (needsRaceDateContinuation) {
+      try {
+        const { data: adminRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        isAdmin = !!adminRow;
+      } catch { /* non-fatal */ }
+    }
+    const useClaudeForPlan = isAdmin && !!Deno.env.get("ANTHROPIC_API_KEY");
+    console.log(`[${type}] plan-gen model route: ${useClaudeForPlan ? "claude-opus-4-5" : (needsRaceDateContinuation ? planLovableModel : "gateway-default")}`);
+
     const response = await callAI({
       stream: true,
       maxTokens: 64000,
       label: `ai-coach:${type || "chat"}`,
       lovableModel: needsRaceDateContinuation ? planLovableModel : undefined,
+      providerOverride: useClaudeForPlan ? "claude" : undefined,
+      claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
       messages: initialMessages,
     });
+
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -2630,6 +2651,8 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
             maxTokens: 64000,
             label: `ai-coach:${type}:cont${attempts}`,
             lovableModel: planLovableModel,
+            providerOverride: useClaudeForPlan ? "claude" : undefined,
+            claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
             messages: [
               { role: "system", content: nowPrelude + systemPrompt },
               { role: "user", content: userPrompt },
@@ -2637,6 +2660,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
               { role: "user", content: continuationUser },
             ],
           });
+
 
           if (!contResp.ok || !contResp.body) {
             console.error(`[training-plan] continuation ${attempts} failed: ${contResp.status}`);
@@ -2674,6 +2698,8 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
                 maxTokens: 64000,
                 label: `ai-coach:${type}:final-validation`,
                 lovableModel: planLovableModel,
+                providerOverride: useClaudeForPlan ? "claude" : undefined,
+                claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
                 messages: [
                   { role: "system", content: nowPrelude + systemPrompt },
                   { role: "user", content: userPrompt },
@@ -2681,6 +2707,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
                   { role: "user", content: finalUser },
                 ],
               });
+
               if (finalResp.ok && finalResp.body) {
                 const beforeLen = fullText.length;
                 await consumeStream(finalResp.body);
