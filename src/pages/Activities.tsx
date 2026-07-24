@@ -425,14 +425,22 @@ function ActivitiesBenchmarkPrompt({
   if (!prompt) return null;
 
   return (
-    <BenchmarkConfirmCard
-      userId={userId}
-      planId={planId}
-      scheduledDateIso={prompt.isoDate}
-      protocol={prompt.protocol}
-      candidates={prompt.candidates}
-      onDone={async () => onDone()}
-    />
+    <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+      <div>
+        <p className="text-sm font-semibold text-primary">Threshold run detected</p>
+        <p className="text-xs text-muted-foreground">
+          Confirm this activity to open the benchmark questions.
+        </p>
+      </div>
+      <BenchmarkConfirmCard
+        userId={userId}
+        planId={planId}
+        scheduledDateIso={prompt.isoDate}
+        protocol={prompt.protocol}
+        candidates={prompt.candidates}
+        onDone={async () => onDone()}
+      />
+    </div>
   );
 }
 
