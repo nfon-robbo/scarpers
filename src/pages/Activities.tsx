@@ -342,6 +342,100 @@ const Activities = () => {
   );
 };
 
+function ActivitiesBenchmarkPrompt({
+  userId,
+  planId,
+  refreshKey,
+  onDone,
+}: {
+  userId: string;
+  planId: string | null;
+  refreshKey: number;
+  onDone: () => void;
+}) {
+  const [prompt, setPrompt] = useState<BenchmarkPrompt | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const from = new Date();
+      from.setDate(from.getDate() - 7);
+      const to = new Date();
+      to.setDate(to.getDate() + 14);
+
+      const scheduled = await getScheduledBenchmarksInRange(userId, isoDate(from), isoDate(to)).catch(() => []);
+      if (scheduled.length === 0) {
+        if (!cancelled) setPrompt(null);
+        return;
+      }
+
+      const dates = Array.from(new Set(scheduled.map((b) => b.benchmark_date)));
+      const sortedDates = dates.slice().sort();
+      const activityFrom = new Date(`${sortedDates[0]}T12:00:00Z`);
+      activityFrom.setUTCDate(activityFrom.getUTCDate() - 3);
+      const activityTo = new Date(`${sortedDates[sortedDates.length - 1]}T12:00:00Z`);
+      activityTo.setUTCDate(activityTo.getUTCDate() + 3);
+
+      const [{ data: candidateActivities }, { data: rejections }, { data: confirmed }] = await Promise.all([
+        supabase
+          .from("activities")
+          .select("id, start_time, duration_seconds, distance_meters, avg_heart_rate, activity_type")
+          .eq("user_id", userId)
+          .gte("start_time", activityFrom.toISOString())
+          .lte("start_time", activityTo.toISOString()),
+        supabase
+          .from("benchmark_rejections" as any)
+          .select("activity_id")
+          .eq("user_id", userId),
+        supabase
+          .from("benchmark_results" as any)
+          .select("benchmark_date")
+          .eq("user_id", userId)
+          .eq("status", "confirmed")
+          .in("benchmark_date", dates),
+      ]);
+
+      if (cancelled) return;
+
+      const rejectedIds = new Set<string>((rejections ?? []).map((r: any) => r.activity_id));
+      const confirmedDates = new Set<string>((confirmed ?? []).map((r: any) => r.benchmark_date));
+      const activityPool = (candidateActivities ?? []) as ActivityForDetection[];
+
+      const prompts = scheduled
+        .filter((b) => !confirmedDates.has(b.benchmark_date))
+        .map((b) => ({
+          isoDate: b.benchmark_date,
+          protocol: b.benchmark_protocol,
+          candidates: findBenchmarkCandidates({
+            activities: activityPool,
+            scheduledDateIso: b.benchmark_date,
+            protocol: b.benchmark_protocol,
+            rejectedIds,
+          }),
+        }))
+        .filter((p) => p.candidates.length > 0)
+        .sort((a, b) => a.candidates[0].hoursFromScheduled - b.candidates[0].hoursFromScheduled);
+
+      setPrompt(prompts[0] ?? null);
+    })();
+
+    return () => { cancelled = true; };
+  }, [userId, refreshKey]);
+
+  if (!prompt) return null;
+
+  return (
+    <BenchmarkConfirmCard
+      userId={userId}
+      planId={planId}
+      scheduledDateIso={prompt.isoDate}
+      protocol={prompt.protocol}
+      candidates={prompt.candidates}
+      onDone={async () => onDone()}
+    />
+  );
+}
+
 const Metric = ({ icon: Icon, label, value, unit }: { icon?: any; label: string; value: string | null; unit?: string }) => {
   if (!value) return null;
   return (
