@@ -2624,11 +2624,14 @@ ${upcoming.join("\n")}
       })();
 
       const emitDelta = async (delta: string) => {
-        // Swallow writer failures — client may have disconnected. We still keep
-        // generating and mirroring to the job row.
-        try {
-          await writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`));
-        } catch { writerClosed = true; }
+        // Swallow writer failures — client may have disconnected. IMPORTANT:
+        // never await the browser stream write here. If the user navigates away
+        // or closes the app, TransformStream backpressure can otherwise hang
+        // before the DB mirror runs, leaving the job at 0 persisted bytes.
+        if (!writerClosed) {
+          writer.write(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`))
+            .catch(() => { writerClosed = true; });
+        }
         void flushJob();
       };
 

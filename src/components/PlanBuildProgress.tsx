@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, Loader2, Circle, AlertTriangle, Database, Activity, Heart, Target, Sparkles, Save, Search } from "lucide-react";
+import { CheckCircle2, Loader2, Circle, AlertTriangle, Database, Activity, Heart, Target, Sparkles, Save, Search, HardDrive, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type BuildStepStatus = "pending" | "active" | "done" | "warn" | "skip";
@@ -15,6 +15,13 @@ export interface BuildStep {
   findings?: string[];
   /** How this feeds into the plan being built. */
   usage?: string[];
+}
+
+export interface BuildJobProgress {
+  bytes: number;
+  status: string;
+  updatedAt: string | null;
+  jobId?: string | null;
 }
 
 const ICONS = {
@@ -35,7 +42,30 @@ function StatusDot({ status }: { status: BuildStepStatus }) {
   return <Circle className="w-4 h-4 text-muted-foreground/40 shrink-0" />;
 }
 
-export default function PlanBuildProgress({ steps, title = "Building your plan" }: { steps: BuildStep[]; title?: string }) {
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 bytes";
+  if (bytes < 1024) return `${bytes.toLocaleString()} bytes`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function formatUpdatedAt(value: string | null) {
+  if (!value) return "not written yet";
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  return `${minutes}m ago`;
+}
+
+export default function PlanBuildProgress({
+  steps,
+  title = "Building your plan",
+  jobProgress,
+}: {
+  steps: BuildStep[];
+  title?: string;
+  jobProgress?: BuildJobProgress | null;
+}) {
   const total = steps.filter((s) => s.status !== "skip").length;
   const done = steps.filter((s) => s.status === "done").length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -53,6 +83,20 @@ export default function PlanBuildProgress({ steps, title = "Building your plan" 
         <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
+        {jobProgress ? (
+          <div className="grid gap-2 rounded-lg border border-border/80 bg-muted/30 p-3 text-xs sm:grid-cols-2">
+            <div className="flex items-center gap-2 text-foreground">
+              <HardDrive className="h-3.5 w-3.5 text-primary" />
+              <span className="font-medium">Persisted</span>
+              <span className="tabular-nums text-muted-foreground">{formatBytes(jobProgress.bytes)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-foreground sm:justify-end">
+              <Clock3 className="h-3.5 w-3.5 text-primary" />
+              <span className="font-medium">Last write</span>
+              <span className="tabular-nums text-muted-foreground">{formatUpdatedAt(jobProgress.updatedAt)}</span>
+            </div>
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
         {steps.map((step) => {
