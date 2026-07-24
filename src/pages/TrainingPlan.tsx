@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -555,8 +555,32 @@ const TrainingPlanPage = () => {
   const [postAnalyzing, setPostAnalyzing] = useState(false);
   const [postAnalysisPlanContent, setPostAnalysisPlanContent] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [hasConfirmedBenchmark, setHasConfirmedBenchmark] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fitInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect the "benchmark stub" plan — a 1-day plan whose only entry is the
+  // scheduled threshold/TT session. Once the athlete has completed and
+  // confirmed that benchmark, the config form must reappear so they can
+  // configure race + distance and generate their full plan.
+  const isBenchmarkStubPlan = useMemo(() => {
+    if (!content) return false;
+    const weeks = (content.match(/^##\s+Week\s/gmi) || []).length;
+    const workouts = (content.match(/^\*\*/gm) || []).length;
+    return /Benchmark:/i.test(content) && weeks <= 1 && workouts <= 1;
+  }, [content]);
+
+  // Poll for a confirmed benchmark on mount / whenever the plan reloads so the
+  // "Build full plan" CTA appears as soon as the questionnaire is saved.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const b = await getLatestConfirmedBenchmark(user.id).catch(() => null);
+      if (!cancelled) setHasConfirmedBenchmark(!!b);
+    })();
+    return () => { cancelled = true; };
+  }, [user, content]);
 
   // Auto-recalc race prediction when a new activity gets linked to a plan day.
   // Debounced 2s; uses linked-activity count as the change signal so any new
@@ -2474,7 +2498,7 @@ const TrainingPlanPage = () => {
     }
   };
 
-  const showConfig = !content && !loading;
+  const showConfig = (!content && !loading) || (isBenchmarkStubPlan && hasConfirmedBenchmark && !loading);
 
   if (initialLoading) {
     return (
@@ -2731,7 +2755,18 @@ const TrainingPlanPage = () => {
       )}
       {(showConfig || loading) && (
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => { if (!loading) setBenchmarkFirstOpen(true); }} disabled={loading || importing} size="lg" className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              if (loading) return;
+              // Benchmark already done — skip the "benchmark first" dialog and
+              // build the full plan straight from the measured anchors.
+              if (hasConfirmedBenchmark) { void generatePlan(); return; }
+              setBenchmarkFirstOpen(true);
+            }}
+            disabled={loading || importing}
+            size="lg"
+            className="w-full sm:w-auto"
+          >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -2740,7 +2775,7 @@ const TrainingPlanPage = () => {
             ) : (
               <>
                 <Calendar className="w-4 h-4 mr-2" />
-                Generate Plan
+                {hasConfirmedBenchmark && isBenchmarkStubPlan ? "Build Full Plan From Benchmark" : "Generate Plan"}
               </>
             )}
           </Button>
