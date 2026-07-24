@@ -879,15 +879,46 @@ const TrainingPlanPage = () => {
       const measuredLthr = (bench as any)?.lthr ?? null;
       const { resolveZonesForUser } = await import("@shared/hr-zones");
       const zones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
-      const { scrubZoneBpm } = await import("@/lib/plan-validation");
+      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage } = await import("@/lib/plan-validation");
       const scrubbed = scrubZoneBpm(planContent, zones);
       if (scrubbed.scrubs.length > 0) {
         console.warn(`[plan-save] rewrote ${scrubbed.scrubs.length} zone-bpm blocks to match resolver`, scrubbed.scrubs);
         planContent = scrubbed.content;
+        toast({ title: "Zone BPM auto-fixed", description: `Rewrote ${scrubbed.scrubs.length} zone label(s) to match your measured zones.` });
+      }
+      // Pace/HR consistency — flag sessions where prescribed pace is faster
+      // than threshold pace while the HR ceiling sits at/under threshold HR.
+      try {
+        const { data: benchFull } = await supabase
+          .from("benchmark_results" as any)
+          .select("lthr, threshold_pace_s_per_km")
+          .eq("user_id", user.id)
+          .eq("status", "confirmed")
+          .eq("active", true)
+          .not("threshold_pace_s_per_km", "is", null)
+          .order("benchmark_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const thrHr = (benchFull as any)?.lthr ?? null;
+        const thrPace = (benchFull as any)?.threshold_pace_s_per_km ?? null;
+        if (thrHr && thrPace) {
+          const conflicts = validatePaceHrConsistency(planContent, { thresholdHr: thrHr, thresholdPaceSecPerKm: thrPace, marginBpm: 5 });
+          if (conflicts.length > 0) {
+            console.warn("[plan-save] pace/HR conflicts detected", conflicts);
+            toast({
+              title: `${conflicts.length} pace/HR conflict(s) detected`,
+              description: "Some sessions prescribe a pace faster than threshold while capping HR at/under threshold. Review before syncing.",
+              variant: "destructive",
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[plan-save] pace/HR validation skipped:", e);
       }
     } catch (e) {
       console.warn("[plan-save] zone-bpm scrub skipped:", e);
     }
+
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
     const effectiveSaveTrainingDays = options.inPlace
