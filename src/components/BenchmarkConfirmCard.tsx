@@ -50,6 +50,13 @@ interface Props {
   protocol: BenchmarkProtocol;
   candidates: CandidateActivity[];
   onDone: () => void | Promise<void>;
+  /**
+   * When present, the card SKIPS the pace-recalc dialog after a successful
+   * benchmark save (non-redo path) and instead invokes this callback so the
+   * parent can trigger a full plan generation using the measured anchors.
+   * Called after the zone-comparison dialog closes (if it was shown).
+   */
+  onBenchmarkConfirmed?: () => void | Promise<void>;
 }
 
 const PROTOCOL_LABEL: Record<BenchmarkProtocol, string> = {
