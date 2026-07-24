@@ -204,6 +204,8 @@ export async function confirmBenchmark(
         total_stoppage_s: detection.totalStoppageS,
       },
       hr_sensor_type_at_capture: hrSensorType ?? null,
+      injury_note: interview.injuryNote ?? null,
+      something_else_note: interview.somethingElseNote ?? null,
     },
     activity_snapshot: snapshot,
   };
