@@ -49,6 +49,16 @@ const NO_QUALIFYING: BenchmarkLap[] = [
   { lap_index: 2, elapsed_time_s: 100 },
 ];
 
+const STOPPED_THRESHOLD_WITH_COOLDOWN: BenchmarkLap[] = [
+  { lap_index: 0, elapsed_time_s: 300, moving_time_s: 300, distance_m: 499.3 },
+  { lap_index: 1, elapsed_time_s: 439.237, moving_time_s: 439.237, distance_m: 1000 },
+  { lap_index: 2, elapsed_time_s: 719.798, moving_time_s: 444.03, distance_m: 1000 },
+  { lap_index: 3, elapsed_time_s: 488.226, moving_time_s: 488.226, distance_m: 1000 },
+  { lap_index: 4, elapsed_time_s: 207.865, moving_time_s: 207.865, distance_m: 375.1 },
+  { lap_index: 5, elapsed_time_s: 329.744, moving_time_s: 300, distance_m: 394.74 },
+  { lap_index: 6, elapsed_time_s: 4.922, moving_time_s: 4.922, distance_m: 4.79 },
+];
+
 describe("matchBenchmarkEffortWindow", () => {
   it("multi-lap primary: finds 6-lap 1800s run starting at 300s", () => {
     const m = matchBenchmarkEffortWindow(MULTI_LAP_45MIN);
@@ -82,6 +92,17 @@ describe("matchBenchmarkEffortWindow", () => {
   it("returns null when no contiguous run falls in 28–32 min", () => {
     expect(matchBenchmarkEffortWindow(NO_QUALIFYING)).toBeNull();
     expect(matchBenchmarkEffortWindow([])).toBeNull();
+  });
+
+  it("matches a stopped 30-minute step by elapsed time but returns moving performance", () => {
+    const m = matchBenchmarkEffortWindow(STOPPED_THRESHOLD_WITH_COOLDOWN);
+    expect(m?.startLapIndex).toBe(1);
+    expect(m?.endLapIndex).toBe(4);
+    expect(m?.startOffsetS).toBe(300);
+    expect(m?.elapsedS).toBeCloseTo(1855.126, 3);
+    expect(m?.durationS).toBeCloseTo(1579.358, 3);
+    expect(m?.stoppedS).toBeCloseTo(275.768, 3);
+    expect(m?.distanceM).toBeCloseTo(3375.1, 1);
   });
 });
 
