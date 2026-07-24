@@ -1951,7 +1951,7 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
         try {
           const { data: bmRow } = await supabase
             .from("benchmark_results")
-            .select("rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, injury_flagged, confidence_band, likely_submaximal")
+            .select("rpe_response, could_continue_response, held_back_reasons, slowdown_reason, breaks_reasons, stoppage_duration_band, conditions, injury_flagged, confidence_band, likely_submaximal, post_benchmark_interview")
             .eq("user_id", user.id)
             .eq("status", "confirmed")
             .eq("benchmark_date", measured_benchmark_date)
@@ -1966,7 +1966,12 @@ Generate the ${preservePast ? "revised future-only portion of the" : "complete r
             if (bmRow.slowdown_reason) bits.push(`Second-half fade reason: ${bmRow.slowdown_reason}`);
             if (Array.isArray(bmRow.breaks_reasons) && bmRow.breaks_reasons.length) bits.push(`Breaks: ${bmRow.breaks_reasons.join(", ")}${bmRow.stoppage_duration_band ? ` (${bmRow.stoppage_duration_band})` : ""}`);
             if (Array.isArray(bmRow.conditions) && bmRow.conditions.length) bits.push(`Conditions: ${bmRow.conditions.join(", ")}`);
-            if (bmRow.injury_flagged) bits.push("⚠️ OLD INJURY FLAGGED — regress volume/intensity and avoid aggravating patterns");
+            if (bmRow.injury_flagged) {
+              const injuryNote = (bmRow.post_benchmark_interview as any)?.injury_note;
+              bits.push(`⚠️ OLD INJURY FLAGGED${injuryNote ? ` (${injuryNote})` : ""} — regress volume/intensity and avoid aggravating patterns; add form/safety cues tied to this injury`);
+            }
+            const somethingElseNote = (bmRow.post_benchmark_interview as any)?.something_else_note;
+            if (somethingElseNote) bits.push(`Athlete note on breaks: ${somethingElseNote}`);
             if (bmRow.likely_submaximal) bits.push("Likely submaximal effort — treat threshold as a floor, not a ceiling");
             if (bmRow.confidence_band) bits.push(`Benchmark confidence: ${bmRow.confidence_band}`);
             if (bits.length) {
