@@ -879,7 +879,7 @@ const TrainingPlanPage = () => {
       const measuredLthr = (bench as any)?.lthr ?? null;
       const { resolveZonesForUser } = await import("@shared/hr-zones");
       const zones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
-      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage, validateTempoCoherence, validateLongRunProgression, validateRacePaceExposure } = await import("@/lib/plan-validation");
+      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage, validateTempoCoherence, validateLongRunProgression, validateRacePaceExposure, validateRaceDayStandalone } = await import("@/lib/plan-validation");
       const { BenchmarkConfig } = await import("@/lib/benchmark-calculations");
       const scrubbed = scrubZoneBpm(planContent, zones);
       const report: Record<string, unknown> = { scrubs: scrubbed.scrubs };
@@ -944,7 +944,20 @@ const TrainingPlanPage = () => {
         blockingErrors.push(`race-pace exposure: ${rpExposure.reason}`);
       }
 
+      // RACE DAY standalone: exactly one race-day block, on race_date, with no
+      // training rows borrowed from an adjacent session.
+      const raceDateIsoForStandalone = letAIDecide
+        ? (extractRaceDateFromMarkdown(planContent) || null)
+        : (raceDate ? toLocalISODate(raceDate) : null);
+      const raceStandalone = validateRaceDayStandalone(planContent, raceDateIsoForStandalone);
+      report.raceDayStandalone = raceStandalone;
+      if (!raceStandalone.ok) {
+        console.warn("[plan-save] race-day standalone failed", raceStandalone);
+        blockingErrors.push(`race-day standalone: ${raceStandalone.reason}`);
+      }
+
       console.info("[plan-save] validator report", report);
+
 
       if (blockingErrors.length > 0) {
         toast({
