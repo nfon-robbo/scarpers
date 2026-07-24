@@ -396,7 +396,7 @@ const TrainingPlanPage = () => {
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
   const [undoCount, setUndoCount] = useState(0);
   const [redoCount, setRedoCount] = useState(0);
-  const [buildSteps, setBuildSteps] = useState<import("@/components/PlanBuildProgress").BuildStep[]>([]);
+  const [buildSteps, setBuildSteps] = useState<BuildStep[]>([]);
 
   // Forward-declared ref so the undo/redo callbacks can read the latest race date
   // without depending on the (later-declared) `raceDate` state binding.
