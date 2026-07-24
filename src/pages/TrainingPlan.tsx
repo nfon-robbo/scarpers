@@ -1435,6 +1435,34 @@ const TrainingPlanPage = () => {
     setLoading(true);
     setContent(prefix);
 
+    // ---- Progress tracker scaffolding -------------------------------------
+    const initialSteps: BuildStep[] = [
+      { id: "profile",   label: "Reading your goals & schedule",       status: "active",  icon: "target" },
+      { id: "history",   label: "Scanning your recent activity history", status: "pending", icon: "activity" },
+      { id: "pace",      label: "Estimating your current running pace",   status: "pending", icon: "search" },
+      { id: "hr",        label: "Loading heart-rate zones",              status: "pending", icon: "heart" },
+      { id: "benchmark", label: "Checking for a confirmed benchmark",    status: "pending", icon: "target" },
+      { id: "ai",        label: "Coach is writing your plan",            status: "pending", icon: "sparkles" },
+      { id: "save",      label: "Validating and saving the plan",        status: "pending", icon: "save" },
+    ];
+    setBuildSteps(initialSteps);
+    const updateStep = (id: string, patch: Partial<BuildStep>) => {
+      setBuildSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    };
+
+    // Step 1 — profile / preferences
+    const raceLabel = letAIDecide ? "AI to recommend" : (raceDate ? format(raceDate, "dd/MM/yyyy") : "not set");
+    updateStep("profile", {
+      status: "done",
+      inputs: [
+        `Goal race: ${raceDistance}${goalTime ? ` in ${goalTime}` : ""}`,
+        `Race date: ${raceLabel}`,
+        `Training days: ${trainingDays.join(", ")}`,
+        `Plan starts: ${format(parseLocalISODate(effectiveStartISO), "dd/MM/yyyy")}`,
+      ],
+      usage: ["Frames the weekly structure and total plan length."],
+    });
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
@@ -1442,13 +1470,43 @@ const TrainingPlanPage = () => {
       return;
     }
 
-    // Provisional pace seed — always computed on mount so the athlete can
-    // see what their own history suggests. Typed values win: only inject the
-    // seed into the coach stream when both pace fields are empty. Never
-    // blocks generation.
+    // Step 2 — recent history
+    updateStep("history", { status: "active" });
+    try {
+      const since = new Date(); since.setDate(since.getDate() - 42);
+      const { data: recent, count } = await supabase
+        .from("activities")
+        .select("distance_km, duration_seconds, activity_date, activity_type", { count: "exact" })
+        .eq("user_id", user.id)
+        .gte("activity_date", since.toISOString().slice(0, 10))
+        .order("activity_date", { ascending: false })
+        .limit(200);
+      const runs = (recent ?? []).filter((r: any) => /run/i.test(r.activity_type ?? ""));
+      const totalKm = runs.reduce((a: number, r: any) => a + (Number(r.distance_km) || 0), 0);
+      const longest = runs.reduce((m: number, r: any) => Math.max(m, Number(r.distance_km) || 0), 0);
+      const lastDate = runs[0]?.activity_date;
+      const daysSinceLast = lastDate ? Math.round((Date.now() - new Date(lastDate).getTime()) / 86400000) : null;
+      updateStep("history", {
+        status: "done",
+        inputs: ["Last 42 days of activities from your log"],
+        findings: [
+          `${count ?? 0} activities total · ${runs.length} runs`,
+          `${totalKm.toFixed(1)} km run in the last 6 weeks`,
+          `Longest run: ${longest.toFixed(1)} km`,
+          daysSinceLast != null ? `Last run: ${daysSinceLast} day${daysSinceLast === 1 ? "" : "s"} ago` : "No runs found in window",
+        ],
+        usage: ["Sets weekly volume ceiling and ramp-back rules if you've had a layoff."],
+      });
+    } catch (e) {
+      updateStep("history", { status: "warn", findings: ["Couldn't read activity history — coach will use defaults."] });
+    }
+
+    // Step 3 — provisional pace
+    updateStep("pace", { status: "active" });
     let seedPaceMin = currentPaceMin;
     let seedPaceMax = currentPaceMax;
-    if (!currentPaceMin && !currentPaceMax) {
+    const typedPace = !!(currentPaceMin || currentPaceMax);
+    if (!typedPace) {
       let seed: ProvisionalPace | null = provisionalPace;
       try {
         if (!seed) {
@@ -1461,21 +1519,68 @@ const TrainingPlanPage = () => {
         }
         seedPaceMin = seed.paceMin;
         seedPaceMax = seed.paceMax;
-        toast({
-          title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`,
-          description: seed.detail,
+        updateStep("pace", {
+          status: "done",
+          inputs: [seed.detail],
+          findings: [`Seeded easy pace: ${seed.paceMin}–${seed.paceMax}/km`],
+          usage: ["Anchors easy-run paces until a measured benchmark overrides them."],
         });
+        toast({ title: `Provisional pace: ${seed.paceMin}–${seed.paceMax}/km`, description: seed.detail });
       } catch (e) {
+        updateStep("pace", { status: "warn", findings: ["Couldn't compute a seed — continuing with defaults."] });
         console.warn("provisional pace seed failed; continuing without", e);
       }
+    } else {
+      updateStep("pace", {
+        status: "done",
+        inputs: ["Pace you typed in the form"],
+        findings: [`Using ${currentPaceMin || "?"}–${currentPaceMax || "?"}/km`],
+        usage: ["Overrides the provisional seed."],
+      });
     }
 
-    // Measured benchmark override — if the athlete has a confirmed benchmark,
-    // its threshold pace/HR is passed as a HARD anchor to the coach and the
-    // provisional pace becomes advisory only.
-    const measured = await getLatestConfirmedBenchmark(user.id).catch(() => null);
+    // Step 4 — HR zones
+    if (hrZones?.maxHr || hrZones?.z2Max) {
+      updateStep("hr", {
+        status: "done",
+        inputs: ["Your saved heart-rate zones"],
+        findings: [
+          hrZones?.maxHr ? `Max HR: ${hrZones.maxHr} bpm` : "Max HR: not set",
+          hrZones?.z2Max ? `Z2 ceiling: ${hrZones.z2Max} bpm` : "Z2: not set",
+        ],
+        usage: ["Every workout's HR target is expressed in your personal zones."],
+      });
+    } else {
+      updateStep("hr", { status: "warn", findings: ["No HR zones on file — coach will use RPE only."] });
+    }
 
+    // Step 5 — measured benchmark
+    updateStep("benchmark", { status: "active" });
+    const measured = await getLatestConfirmedBenchmark(user.id).catch(() => null);
+    if (measured) {
+      const paceStr = measured.thresholdPaceSecPerKm
+        ? `${Math.floor(measured.thresholdPaceSecPerKm / 60)}:${String(Math.round(measured.thresholdPaceSecPerKm % 60)).padStart(2, "0")}/km`
+        : "n/a";
+      updateStep("benchmark", {
+        status: "done",
+        inputs: [`Confirmed benchmark from ${measured.benchmarkDate ? format(parseLocalISODate(measured.benchmarkDate), "dd/MM/yyyy") : "recently"}`],
+        findings: [
+          `Threshold pace: ${paceStr}`,
+          measured.thresholdHr ? `Threshold HR (LTHR): ${measured.thresholdHr} bpm` : "LTHR: not captured",
+        ],
+        usage: ["Hard anchor — overrides provisional pace and drives all workout targets."],
+      });
+    } else {
+      updateStep("benchmark", {
+        status: "skip",
+        findings: ["No confirmed benchmark yet — pace anchors come from the seed above."],
+      });
+    }
+
+    // Step 6 — streaming from AI
+    updateStep("ai", { status: "active", findings: ["Waiting for first tokens…"] });
     let accumulated = "";
+    let lastAiUpdate = 0;
     streamAICoach({
       type: "training-plan",
       token: session.access_token,
@@ -1492,20 +1597,50 @@ const TrainingPlanPage = () => {
       onDelta: (text) => {
         accumulated += text;
         setContent(prefix + accumulated);
+        const now = Date.now();
+        if (now - lastAiUpdate > 400) {
+          lastAiUpdate = now;
+          const weeks = (accumulated.match(/^##\s*week/gim) || []).length;
+          const days = (accumulated.match(/^###\s+/gim) || []).length;
+          const words = accumulated.trim().split(/\s+/).length;
+          updateStep("ai", {
+            status: "active",
+            findings: [
+              `${weeks} week${weeks === 1 ? "" : "s"} outlined · ${days} sessions drafted`,
+              `${words.toLocaleString()} words streamed`,
+            ],
+            usage: ["Weaves your history, seed pace, HR zones and benchmark into each session."],
+          });
+        }
       },
       onDone: async () => {
-        setLoading(false);
         const finalContent = prefix + accumulated;
+        const weeks = (finalContent.match(/^##\s*week/gim) || []).length;
+        const days = (finalContent.match(/^###\s+/gim) || []).length;
+        updateStep("ai", {
+          status: "done",
+          findings: [`${weeks} week${weeks === 1 ? "" : "s"} · ${days} sessions written`],
+          usage: ["Full plan drafted — moving to validation."],
+        });
+        updateStep("save", { status: "active" });
         setContent(finalContent);
         const planId = await savePlan(finalContent, { undoLabel: "plan generation", prevContent: previousContent });
+        updateStep("save", {
+          status: "done",
+          findings: ["Plan validated and saved to your diary."],
+          usage: ["Ready to sync to Intervals.icu / Garmin from the plan actions menu."],
+        });
+        setLoading(false);
         toastPlanChange("Plan saved", prefix ? "Past workouts preserved; future rebuilt." : "Your training plan has been saved.", previousContent ? planId : null);
       },
       onError: (err) => {
+        updateStep("ai", { status: "warn", findings: [err] });
         toast({ title: "Plan generation failed", description: err, variant: "destructive" });
         setLoading(false);
       },
     });
   };
+
 
   // Auto-generate after onboarding redirect. Runs once when the initial plan
   // load resolves with no existing plan.
