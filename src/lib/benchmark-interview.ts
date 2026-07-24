@@ -70,12 +70,17 @@ export interface InterviewAnswers {
   stoppageBand: StoppageBand | null;
   conditions: Condition[] | null;
   hrSensorType: HrSensorType | null;
+  /** Free-text follow-up when any question's answer includes "Old injury". */
+  injuryNote: string | null;
+  /** Free-text follow-up when Q6 (breaks) includes "Something else". */
+  somethingElseNote: string | null;
 }
 
 export const EMPTY_ANSWERS: InterviewAnswers = {
   rpe: null, heldBackReasons: null, couldContinue: null, redoChoice: null,
   slowdownReason: null, breaksReasons: null, stoppageBand: null,
   conditions: null, hrSensorType: null,
+  injuryNote: null, somethingElseNote: null,
 };
 
 /** Cap total questions shown in one sitting. Priority-drop from the end. */
