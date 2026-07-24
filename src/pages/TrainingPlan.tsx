@@ -879,7 +879,7 @@ const TrainingPlanPage = () => {
       const measuredLthr = (bench as any)?.lthr ?? null;
       const { resolveZonesForUser } = await import("@shared/hr-zones");
       const zones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
-      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage, validateTempoCoherence, validateLongRunProgression, validateRacePaceExposure } = await import("@/lib/plan-validation");
+      const { scrubZoneBpm, validatePaceHrConsistency, validateRaceCoverage, validateTempoCoherence, validateLongRunProgression, validateRacePaceExposure, validateRaceDayStandalone } = await import("@/lib/plan-validation");
       const { BenchmarkConfig } = await import("@/lib/benchmark-calculations");
       const scrubbed = scrubZoneBpm(planContent, zones);
       const report: Record<string, unknown> = { scrubs: scrubbed.scrubs };
