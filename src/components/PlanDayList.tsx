@@ -845,7 +845,9 @@ export default function PlanDayList({
                             protocol={benchmarkProtocol!}
                             candidates={benchmarkList}
                             onDone={refreshBenchmarks}
+                            onBenchmarkConfirmed={onBenchmarkConfirmed}
                           />
+
                         </div>
                       </div>
                     )}
