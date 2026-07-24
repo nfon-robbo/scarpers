@@ -291,9 +291,17 @@ const Activities = () => {
             <Card key={a.id} className="hover:shadow-sm transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     className="flex-1 text-left cursor-pointer"
                     onClick={() => setOpenId(a.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpenId(a.id);
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm">
@@ -308,8 +316,8 @@ const Activities = () => {
                       )}
                       {a.training_effect && (
                         <Tooltip>
-                          <TooltipTrigger>
-                            <span className="cursor-help">
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help inline-flex">
                               <Badge variant="outline" className="text-xs">TE {Number(a.training_effect).toFixed(1)}</Badge>
                             </span>
                           </TooltipTrigger>
@@ -322,7 +330,7 @@ const Activities = () => {
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{a.source_file}</p>
-                  </button>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {currentPlanId && (
