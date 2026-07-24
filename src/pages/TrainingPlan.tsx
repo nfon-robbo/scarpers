@@ -589,7 +589,10 @@ const TrainingPlanPage = () => {
     let cancelled = false;
     (async () => {
       const b = await getLatestConfirmedBenchmark(user.id).catch(() => null);
-      if (!cancelled) setHasConfirmedBenchmark(!!b);
+      if (!cancelled) {
+        setHasConfirmedBenchmark(!!b);
+        setLatestBenchmarkDate(b?.benchmarkDate ?? null);
+      }
     })();
     return () => { cancelled = true; };
   }, [user, content]);
