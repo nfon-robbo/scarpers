@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
+import PlanBuildProgress, { type BuildStep } from "@/components/PlanBuildProgress";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
