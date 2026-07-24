@@ -65,7 +65,7 @@ export async function applyMeasuredZones(params: {
 
   const payload = {
     user_id: userId,
-    source: "measured" as const,
+    source: "benchmark" as const,
     benchmark_result_id: benchmarkId,
     lthr: Math.round(measuredLthr),
     z1_max: bands.z1Max,

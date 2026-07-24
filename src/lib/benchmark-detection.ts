@@ -32,10 +32,15 @@ export type EffortWindowSource = "lap" | "derived" | "manual";
 export interface EffortWindow {
   startSeconds: number;   // seconds from activity start
   endSeconds: number;
-  durationSeconds: number;
+  durationSeconds: number;      // MOVING seconds when laps carry moving_time_s; else elapsed
+  elapsedSeconds?: number;      // ELAPSED seconds — always >= durationSeconds
+  stoppedSeconds?: number;      // elapsedSeconds - durationSeconds (timer-stopped time)
   distanceMeters: number;
   source: EffortWindowSource;
-  note?: string;          // populated when Path 1 attempted but failed
+  note?: string;                // populated when Path 1 attempted but failed
+  /** Effort-only laps used to compute this window (Path 1 only). Empty on
+   *  derived/manual paths. Callers use these for lap-weighted HR. */
+  effortLaps?: BenchmarkLap[];
 }
 
 export interface ActivityForDetection {
@@ -127,17 +132,24 @@ export function identifyEffortWindow(params: {
   //   30-min protocol → contiguous laps summing to 28–32 min.
   //   3k / 5k protocol → single lap whose distance matches ±5 %.
   if (laps && laps.length > 0) {
+    const orderedLaps = [...laps].sort((a, b) => a.lap_index - b.lap_index);
     if (protocol === "30min") {
-      const match = matchBenchmarkEffortWindow(laps);
+      const match = matchBenchmarkEffortWindow(orderedLaps);
       if (match) {
         const distanceMeters = match.distanceM ??
           (activityDurationS > 0 ? (activityDistanceM * match.durationS) / activityDurationS : 0);
+        const effortLaps = orderedLaps.filter(
+          (l) => l.lap_index >= match.startLapIndex && l.lap_index <= match.endLapIndex,
+        );
         return {
           startSeconds: match.startOffsetS,
-          endSeconds: match.startOffsetS + match.durationS,
+          endSeconds: match.startOffsetS + (match.elapsedS ?? match.durationS),
           durationSeconds: match.durationS,
+          elapsedSeconds: match.elapsedS ?? match.durationS,
+          stoppedSeconds: match.stoppedS ?? 0,
           distanceMeters,
           source: "lap",
+          effortLaps,
         };
       }
       return buildDerivedWindow({
@@ -148,14 +160,20 @@ export function identifyEffortWindow(params: {
 
     const target = PROTOCOL_DISTANCE_M[protocol];
     if (target != null) {
-      const match = matchLapByDistance(laps, target);
+      const match = matchLapByDistance(orderedLaps, target);
       if (match) {
+        const effortLaps = orderedLaps.filter(
+          (l) => l.lap_index >= match.startLapIndex && l.lap_index <= match.endLapIndex,
+        );
         return {
           startSeconds: match.startOffsetS,
-          endSeconds: match.startOffsetS + match.durationS,
+          endSeconds: match.startOffsetS + (match.elapsedS ?? match.durationS),
           durationSeconds: match.durationS,
+          elapsedSeconds: match.elapsedS ?? match.durationS,
+          stoppedSeconds: match.stoppedS ?? 0,
           distanceMeters: match.distanceM ?? target,
           source: "lap",
+          effortLaps,
         };
       }
       return buildDerivedWindow({

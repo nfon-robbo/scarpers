@@ -131,7 +131,7 @@ export default function BenchmarkConfirmCard({
     try {
       const { data: laps } = await supabase
         .from("activity_laps" as any)
-        .select("lap_index, elapsed_time_s, moving_time_s, distance_m")
+        .select("lap_index, elapsed_time_s, moving_time_s, distance_m, avg_heart_rate")
         .eq("activity_id", current.id)
         .order("lap_index", { ascending: true });
       const lapsArr = (laps as unknown as any[]) ?? [];

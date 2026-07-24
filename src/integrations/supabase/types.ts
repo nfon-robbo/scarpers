@@ -417,6 +417,7 @@ export type Database = {
           effort_window_note: string | null
           effort_window_source: string
           effort_window_start_time: string | null
+          effort_window_stopped_s: number | null
           held_back_reasons: string[] | null
           id: string
           injury_flagged: boolean
@@ -458,6 +459,7 @@ export type Database = {
           effort_window_note?: string | null
           effort_window_source: string
           effort_window_start_time?: string | null
+          effort_window_stopped_s?: number | null
           held_back_reasons?: string[] | null
           id?: string
           injury_flagged?: boolean
@@ -499,6 +501,7 @@ export type Database = {
           effort_window_note?: string | null
           effort_window_source?: string
           effort_window_start_time?: string | null
+          effort_window_stopped_s?: number | null
           held_back_reasons?: string[] | null
           id?: string
           injury_flagged?: boolean

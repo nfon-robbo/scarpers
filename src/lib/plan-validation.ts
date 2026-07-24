@@ -580,3 +580,57 @@ export function validatePlanForSave(markdown: string, opts: ValidatePlanOptions 
     },
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zone bpm scrubber.
+// The LLM sometimes writes its own bpm range alongside a zone label
+// ("Z1-Z2 (130-145 bpm)") which drifts from the canonical resolver's values.
+// This scrubber rewrites every "(NNN-NNN bpm)" / "(<NNN bpm)" / "(>NNN bpm)"
+// block that appears right after a zone label ("Z1", "Z2", "Z1-Z2", …) so the
+// numbers always match the resolver. Returns the rewritten content + a diff
+// list for logging.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ZoneBpmScrub {
+  before: string;
+  after: string;
+  zoneLabel: string;
+}
+
+export interface ZoneBands {
+  z1Max: number;
+  z2Max: number;
+  z3Max: number;
+  z4Max: number;
+}
+
+function resolverLabelFor(zoneLabel: string, z: ZoneBands): string | null {
+  // Accept "Z1", "Z1-Z2", "Z2 – Z3", etc. Return the canonical "(N-M bpm)"
+  // / "(<N bpm)" / "(>N bpm)" block for the range the label spans.
+  const nums = Array.from(zoneLabel.matchAll(/Z([1-5])/gi)).map((m) => Number(m[1]));
+  if (nums.length === 0) return null;
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  const rangeLo = lo === 1 ? null : ({ 2: z.z1Max + 1, 3: z.z2Max + 1, 4: z.z3Max + 1, 5: z.z4Max + 1 } as Record<number, number>)[lo];
+  const rangeHi = hi === 5 ? null : ({ 1: z.z1Max, 2: z.z2Max, 3: z.z3Max, 4: z.z4Max } as Record<number, number>)[hi];
+  if (rangeLo == null && rangeHi != null) return `(<${rangeHi + 1} bpm)`;
+  if (rangeLo != null && rangeHi == null) return `(>${rangeLo - 1} bpm)`;
+  if (rangeLo != null && rangeHi != null) return `(${rangeLo}-${rangeHi} bpm)`;
+  return null;
+}
+
+export function scrubZoneBpm(markdown: string, zones: ZoneBands | null | undefined): { content: string; scrubs: ZoneBpmScrub[] } {
+  if (!markdown || !zones) return { content: markdown, scrubs: [] };
+  const scrubs: ZoneBpmScrub[] = [];
+  // Zone label followed by an optional non-word gap, then a bpm block.
+  const rx = /(Z[1-5](?:\s*[–-]\s*Z[1-5])?)\s*\((?:\s*<\s*\d{2,3}|\s*>\s*\d{2,3}|\s*\d{2,3}\s*[-–]\s*\d{2,3})\s*bpm\s*\)/gi;
+  const content = markdown.replace(rx, (whole, label: string) => {
+    const canonical = resolverLabelFor(label.replace(/\s+/g, ""), zones);
+    if (!canonical) return whole;
+    const rewritten = `${label} ${canonical}`;
+    if (rewritten !== whole) {
+      scrubs.push({ before: whole, after: rewritten, zoneLabel: label });
+    }
+    return rewritten;
+  });
+  return { content, scrubs };
+}

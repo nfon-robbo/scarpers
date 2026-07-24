@@ -366,7 +366,18 @@ serve(async (req) => {
     // bands instead of the legacy hard-coded universal ladder.
     let userZones: Zones | null = null;
     try {
-      userZones = await resolveZonesForUser(supabase as any, user.id);
+      const { data: bench } = await supabase
+        .from("benchmark_results" as any)
+        .select("lthr")
+        .eq("user_id", user.id)
+        .eq("status", "confirmed")
+        .eq("active", true)
+        .not("lthr", "is", null)
+        .order("benchmark_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const measuredLthr = (bench as any)?.lthr ?? null;
+      userZones = await resolveZonesForUser(supabase as any, user.id, { measuredLthr });
     } catch (e) {
       console.warn("[intervals-sync] zone resolution failed, using fallback ladder:", e);
     }

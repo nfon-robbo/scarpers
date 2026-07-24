@@ -27,7 +27,11 @@
 export type BenchmarkLap = {
   lap_index: number;
   elapsed_time_s: number;
+  /** Optional — when present, effort-window duration is summed from this
+   *  (excludes timer-stopped time). Falls back to elapsed_time_s. */
+  moving_time_s?: number | null;
   distance_m?: number | null;
+  avg_heart_rate?: number | null;
 };
 
 export type BenchmarkMatch = {
@@ -35,7 +39,12 @@ export type BenchmarkMatch = {
   endLapIndex: number;
   lapCount: number;
   startOffsetS: number;
+  /** Preferred (moving) duration when moving_time_s was available on the laps. */
   durationS: number;
+  /** Elapsed duration for the same window (>= durationS). */
+  elapsedS?: number;
+  /** Total timer-stopped time inside the window (elapsedS - durationS). */
+  stoppedS?: number;
   distanceM?: number;
 };
 
@@ -51,26 +60,42 @@ export function matchBenchmarkEffortWindow(
 
   const ordered = [...laps].sort((a, b) => a.lap_index - b.lap_index);
 
+  // Effort window is measured in MOVING time so a timer-stop mid-effort
+  // (e.g. a shoelace stop where the athlete pressed pause) does not inflate
+  // the 28-32 min window. When moving_time_s is missing we fall back to
+  // elapsed_time_s; the two values are then identical anyway.
+  const movingOf = (l: BenchmarkLap): number => {
+    const mv = l.moving_time_s;
+    if (typeof mv === "number" && mv > 0) return mv;
+    return l.elapsed_time_s || 0;
+  };
+
   const offsets: number[] = new Array(ordered.length + 1).fill(0);
   for (let i = 0; i < ordered.length; i++) {
+    // Offsets stay in ELAPSED so startOffsetS on the returned window matches
+    // wall-clock time from activity start.
     offsets[i + 1] = offsets[i] + (ordered[i].elapsed_time_s || 0);
   }
 
   const candidates: BenchmarkMatch[] = [];
   for (let i = 0; i < ordered.length; i++) {
-    let sum = 0;
+    let moving = 0;
+    let elapsed = 0;
     let dist = 0;
     for (let j = i; j < ordered.length; j++) {
-      sum += ordered[j].elapsed_time_s || 0;
+      moving += movingOf(ordered[j]);
+      elapsed += ordered[j].elapsed_time_s || 0;
       dist += ordered[j].distance_m || 0;
-      if (sum > BENCHMARK_EFFORT_MAX_S) break;
-      if (sum >= BENCHMARK_EFFORT_MIN_S) {
+      if (moving > BENCHMARK_EFFORT_MAX_S) break;
+      if (moving >= BENCHMARK_EFFORT_MIN_S) {
         candidates.push({
           startLapIndex: ordered[i].lap_index,
           endLapIndex: ordered[j].lap_index,
           lapCount: j - i + 1,
           startOffsetS: offsets[i],
-          durationS: sum,
+          durationS: moving,
+          elapsedS: elapsed,
+          stoppedS: Math.max(0, elapsed - moving),
           distanceM: dist > 0 ? dist : undefined,
         });
       }

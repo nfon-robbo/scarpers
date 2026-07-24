@@ -28,6 +28,7 @@ import { deriveLikelySubmaximal } from "@/lib/benchmark-rpe";
 import type { InterviewAnswers } from "@/lib/benchmark-interview";
 import type { DetectionResult } from "@/lib/benchmark-detection-signals";
 import { INJURY_TAG } from "@/lib/benchmark-rpe";
+import { applyMeasuredZones, MIN_PLAUSIBLE_LTHR_BPM, MAX_PLAUSIBLE_LTHR_BPM } from "@/lib/apply-measured-zones";
 
 const NEXT_BENCHMARK_WEEKS = 6;
 
@@ -99,7 +100,30 @@ export async function confirmBenchmark(
   const pace = thresholdPaceSecPerKm(effort.distanceMeters, effort.durationSeconds);
   const predicted5k = Math.round(predict5kSeconds(effort.distanceMeters, effort.durationSeconds));
 
-  const thresholdHr = activity?.avg_heart_rate ?? null;
+  // Threshold HR: prefer a lap-weighted average across the effort laps
+  // (weight = MOVING seconds). Falls back to the activity's overall avg HR
+  // only when no lap HR data is available — the derived/manual path.
+  let thresholdHr: number | null = null;
+  const effortLaps = effort.effortLaps ?? [];
+  const lapsWithHr = effortLaps.filter(
+    (l) => typeof l.avg_heart_rate === "number" && (l.avg_heart_rate as number) > 0,
+  );
+  if (lapsWithHr.length > 0) {
+    let weight = 0;
+    let hrSum = 0;
+    for (const l of lapsWithHr) {
+      const w = typeof l.moving_time_s === "number" && l.moving_time_s > 0
+        ? Number(l.moving_time_s) : Number(l.elapsed_time_s || 0);
+      if (w > 0) {
+        weight += w;
+        hrSum += Number(l.avg_heart_rate) * w;
+      }
+    }
+    if (weight > 0) thresholdHr = Math.round(hrSum / weight);
+  }
+  if (thresholdHr == null) {
+    thresholdHr = activity?.avg_heart_rate ?? null;
+  }
   const lthr = thresholdHr;
 
   const wristHrOnThresholdMeasurement =
@@ -117,6 +141,7 @@ export async function confirmBenchmark(
     protocol,
     slowdownReason: interview.slowdownReason,
     wristHrOnThresholdMeasurement,
+    timerStoppedSInEffort: effort.stoppedSeconds ?? 0,
   });
 
   const effortStartTime = activity?.start_time
@@ -169,6 +194,7 @@ export async function confirmBenchmark(
     effort_window_distance_m: effort.distanceMeters,
     effort_window_source: effort.source,
     effort_window_note: effort.note ?? null,
+    effort_window_stopped_s: effort.stoppedSeconds ?? 0,
     threshold_pace_s_per_km: pace,
     threshold_hr: thresholdHr,
     lthr,
@@ -227,8 +253,29 @@ export async function confirmBenchmark(
       .eq("user_id", userId);
   }
 
-  // NOTE: hr_zones is written only via applyMeasuredZones (behind the zone
-  // comparison dialog).
+  // Auto-write hr_zones for the 30-min protocol so every downstream zone
+  // consumer sees the measured LTHR immediately. The ZoneComparisonDialog
+  // remains as an upgrade UX for legacy paths. 3K/5K are refused inside
+  // applyMeasuredZones (their peak-HR-based LTHR is not trustworthy).
+  if (
+    protocol === "30min" &&
+    typeof lthr === "number" &&
+    lthr >= MIN_PLAUSIBLE_LTHR_BPM &&
+    lthr <= MAX_PLAUSIBLE_LTHR_BPM
+  ) {
+    try {
+      await applyMeasuredZones({
+        userId,
+        benchmarkId: id,
+        protocol,
+        measuredLthr: lthr,
+      });
+    } catch (e) {
+      // Never let a zone-write failure roll back the benchmark itself.
+      console.warn("[confirmBenchmark] applyMeasuredZones failed:", e);
+    }
+  }
+
 
   await supabase
     .from("profiles")
