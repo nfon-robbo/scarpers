@@ -91,16 +91,19 @@ export function matchBenchmarkEffortWindow(
       dist += ordered[j].distance_m || 0;
       if (elapsed > BENCHMARK_EFFORT_MAX_S) break;
       if (elapsed >= BENCHMARK_EFFORT_MIN_S) {
-        candidates.push({
+        const candidate: BenchmarkMatch = {
           startLapIndex: ordered[i].lap_index,
           endLapIndex: ordered[j].lap_index,
           lapCount: j - i + 1,
           startOffsetS: offsets[i],
           durationS: moving,
-          elapsedS: elapsed,
-          stoppedS: Math.max(0, elapsed - moving),
-          distanceM: dist > 0 ? dist : undefined,
-        });
+        };
+        if (Math.abs(elapsed - moving) > 0.001) {
+          candidate.elapsedS = elapsed;
+          candidate.stoppedS = Math.max(0, elapsed - moving);
+        }
+        if (dist > 0) candidate.distanceM = dist;
+        candidates.push(candidate);
       }
     }
   }
