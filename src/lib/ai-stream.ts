@@ -104,7 +104,9 @@ export async function streamAICoach({
   const resetIdle = () => {
     if (settled) return;
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => fireTimeout("idle"), IDLE_TIMEOUT_MS);
+    const idleMs = PLAN_TYPES.has(type) ? IDLE_TIMEOUT_MS_PLAN : IDLE_TIMEOUT_MS_DEFAULT;
+    idleTimer = setTimeout(() => fireTimeout("idle"), idleMs);
+
   };
 
   const settle = () => {
