@@ -1874,6 +1874,97 @@ const TrainingPlanPage = () => {
   }, [raceDistance, trainingDays, raceDate, letAIDecide]);
 
 
+  // ── Durable plan-generation resume ────────────────────────────────────
+  // If a plan is still generating on the server (because the user navigated
+  // away, refreshed, or closed the browser), pick it back up on mount.
+  // Also auto-save any completed-but-unacknowledged plan.
+  const resumeTriedRef = useRef(false);
+  useEffect(() => {
+    if (resumeTriedRef.current) return;
+    if (!user) return;
+    if (initialLoading) return;
+    if (loading) return;
+    resumeTriedRef.current = true;
+
+    (async () => {
+      const job = await findResumableJob(user.id);
+      if (!job) return;
+
+      const request = (job.request ?? {}) as {
+        prefix?: string;
+        previousContent?: string;
+      };
+      const prefix = request.prefix ?? "";
+      const previousContent = request.previousContent ?? "";
+
+      const applyFinal = async (finalContent: string) => {
+        if (!finalContent.trim()) return;
+        const full = finalContent.startsWith(prefix) ? finalContent : (prefix + finalContent);
+        setContent(full);
+        try {
+          const planId = await savePlan(full, { undoLabel: "plan generation (resumed)", prevContent: previousContent });
+          toastPlanChange("Plan saved", "We finished your plan in the background while you were away.", previousContent ? planId : null);
+        } catch (e) {
+          console.error("[plan-resume] savePlan failed:", e);
+        } finally {
+          setLoading(false);
+          forgetJobId(user.id);
+        }
+      };
+
+      if (job.status === "done") {
+        toast({ title: "Plan ready", description: "We finished your plan in the background. Saving now…" });
+        void applyFinal(job.content || "");
+        return;
+      }
+
+      if (job.status !== "running") return;
+
+      // Resume live progress from wherever the server got to.
+      setLoading(true);
+      setContent(prefix + (job.content || ""));
+      toast({
+        title: "Resuming your plan",
+        description: "It kept building while you were away — picking up where the coach left off.",
+      });
+      const resumeSteps: BuildStep[] = [
+        { id: "profile",   label: "Reading your goals & schedule",       status: "done", icon: "target" },
+        { id: "history",   label: "Scanning your recent activity history", status: "done", icon: "activity" },
+        { id: "pace",      label: "Estimating your current running pace",   status: "done", icon: "search" },
+        { id: "hr",        label: "Loading heart-rate zones",              status: "done", icon: "heart" },
+        { id: "benchmark", label: "Checking for a confirmed benchmark",    status: "done", icon: "target" },
+        { id: "ai",        label: "Coach is writing your plan",            status: "active", icon: "sparkles", findings: ["Resuming background generation…"] },
+        { id: "save",      label: "Validating and saving the plan",        status: "pending", icon: "save" },
+      ];
+      setBuildSteps(resumeSteps);
+      setBuildPanelOpen(true);
+
+      const sub = subscribeToJob(job.id, job.content || "", {
+        onDelta: (chunk) => {
+          setContent((prev) => (prev ?? "") + chunk);
+        },
+        onDone: (finalContent) => {
+          sub.unsubscribe();
+          void applyFinal(finalContent);
+        },
+        onError: (msg) => {
+          sub.unsubscribe();
+          setLoading(false);
+          forgetJobId(user.id);
+          toast({ title: "Plan generation failed", description: msg, variant: "destructive" });
+        },
+        onCancelled: () => {
+          sub.unsubscribe();
+          setLoading(false);
+          forgetJobId(user.id);
+        },
+      });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, initialLoading]);
+
+
+
 
   const [reviewing, setReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState<string | null>(null);
