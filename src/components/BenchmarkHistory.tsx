@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { AlertTriangle, ChevronDown, ChevronRight, HeartHandshake } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
