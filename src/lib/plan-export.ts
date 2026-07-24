@@ -99,7 +99,7 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
       // Look for a table with segments
       while (i < lines.length) {
         // Check if next workout starts
-        if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern))) {
+        if (i > startLine + 1 && (lines[i].match(datePattern) || lines[i].match(altDatePattern) || (lines[i].match(h3DatePattern) && !/^###\s+Week\s+\d/i.test(lines[i])))) {
           break;
         }
         // Also break on week headers
