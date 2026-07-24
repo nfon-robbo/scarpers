@@ -1937,7 +1937,7 @@ const TrainingPlanPage = () => {
         { id: "save",      label: "Validating and saving the plan",        status: "pending", icon: "save" },
       ];
       setBuildSteps(resumeSteps);
-      setBuildPanelOpen(true);
+
 
       const sub = subscribeToJob(job.id, job.content || "", {
         onDelta: (chunk) => {
