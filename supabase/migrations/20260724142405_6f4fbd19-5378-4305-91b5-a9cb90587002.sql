@@ -1,0 +1,1 @@
+ALTER TABLE public.benchmark_results ADD COLUMN IF NOT EXISTS effort_window_stopped_s numeric;
