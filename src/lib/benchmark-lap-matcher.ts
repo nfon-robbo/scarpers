@@ -12,7 +12,8 @@
  * Rules (locked by product spec):
  *   30-min protocol
  *     - Outer gate: 40–55 min total activity. Caller enforces.
- *     - Effort window target: 28–32 minutes (1680–1920 s).
+ *     - Effort window target: 28–32 minutes (1680–1920 s) of elapsed step time.
+ *       Timer-stopped time is still subtracted from the returned moving duration.
  *     - Preference among qualifying ranges: start offset closest to 300 s
  *       (5 min warm-up). Tie broken by longer duration.
  *   3k / 5k protocol
@@ -60,10 +61,12 @@ export function matchBenchmarkEffortWindow(
 
   const ordered = [...laps].sort((a, b) => a.lap_index - b.lap_index);
 
-  // Effort window is measured in MOVING time so a timer-stop mid-effort
-  // (e.g. a shoelace stop where the athlete pressed pause) does not inflate
-  // the 28-32 min window. When moving_time_s is missing we fall back to
-  // elapsed_time_s; the two values are then identical anyway.
+  // The benchmark workout step is prescribed as a 30 minute elapsed block.
+  // Therefore the 28-32 min matcher must use elapsed lap time to find the
+  // workout step. Once found, the returned performance duration remains
+  // MOVING time so timer stops do not inflate threshold pace. This prevents
+  // stopped efforts from failing the step match and then expanding into
+  // warm-up/cool-down laps just to reach 28 minutes of moving time.
   const movingOf = (l: BenchmarkLap): number => {
     const mv = l.moving_time_s;
     if (typeof mv === "number" && mv > 0) return mv;
@@ -86,18 +89,21 @@ export function matchBenchmarkEffortWindow(
       moving += movingOf(ordered[j]);
       elapsed += ordered[j].elapsed_time_s || 0;
       dist += ordered[j].distance_m || 0;
-      if (moving > BENCHMARK_EFFORT_MAX_S) break;
-      if (moving >= BENCHMARK_EFFORT_MIN_S) {
-        candidates.push({
+      if (elapsed > BENCHMARK_EFFORT_MAX_S) break;
+      if (elapsed >= BENCHMARK_EFFORT_MIN_S) {
+        const candidate: BenchmarkMatch = {
           startLapIndex: ordered[i].lap_index,
           endLapIndex: ordered[j].lap_index,
           lapCount: j - i + 1,
           startOffsetS: offsets[i],
           durationS: moving,
-          elapsedS: elapsed,
-          stoppedS: Math.max(0, elapsed - moving),
-          distanceM: dist > 0 ? dist : undefined,
-        });
+        };
+        if (Math.abs(elapsed - moving) > 0.001) {
+          candidate.elapsedS = elapsed;
+          candidate.stoppedS = Math.max(0, elapsed - moving);
+        }
+        if (dist > 0) candidate.distanceM = dist;
+        candidates.push(candidate);
       }
     }
   }
@@ -108,7 +114,9 @@ export function matchBenchmarkEffortWindow(
     const da = Math.abs(a.startOffsetS - BENCHMARK_PREFERRED_START_OFFSET_S);
     const db = Math.abs(b.startOffsetS - BENCHMARK_PREFERRED_START_OFFSET_S);
     if (da !== db) return da - db;
-    return b.durationS - a.durationS;
+    const elapsedA = a.elapsedS ?? a.durationS;
+    const elapsedB = b.elapsedS ?? b.durationS;
+    return elapsedB - elapsedA;
   });
 
   return candidates[0];
