@@ -41,7 +41,19 @@ export const BenchmarkConfig = {
      * intensity — the primary output of this test.
      */
     HR_SENSOR_WRIST: 10,
+    /**
+     * Applied when the FIT timer was STOPPED for longer than
+     * `TIMER_STOPPED_MIN_S` inside the effort window. A timer stop means the
+     * athlete paused their watch mid-effort — the test is no longer
+     * continuous and the resulting threshold estimate is less trustworthy.
+     * Walk breaks with the timer STILL RUNNING are fine and do not trigger
+     * this deduction.
+     */
+    TIMER_STOPPED_IN_EFFORT: 15,
   },
+  /** Threshold (seconds) of timer-stopped time inside the effort window
+   *  that triggers the TIMER_STOPPED_IN_EFFORT deduction. */
+  TIMER_STOPPED_MIN_S: 60,
   /** Above HIGH_MIN => High; at or above MEDIUM_MIN => Medium; else Low. */
   CONFIDENCE_BANDS: { HIGH_MIN: 70, MEDIUM_MIN: 40 },
 
@@ -207,6 +219,14 @@ export interface ConfidenceInputs {
    * wrist optical sensor. Applies HR_SENSOR_WRIST deduction.
    */
   wristHrOnThresholdMeasurement?: boolean;
+  /**
+   * Timer-stopped seconds inside the effort window. When >
+   * `BenchmarkConfig.TIMER_STOPPED_MIN_S` the TIMER_STOPPED_IN_EFFORT
+   * deduction fires. Detected from the elapsed-vs-moving gap on the effort
+   * laps, NOT from a speed threshold — a walk break with the timer running
+   * has elapsed == moving and does not qualify.
+   */
+  timerStoppedSInEffort?: number;
 }
 
 export interface ConfidenceDeduction {
@@ -253,6 +273,12 @@ export function scoreConfidence(inputs: ConfidenceInputs): ConfidenceResult {
   }
   if (inputs.wristHrOnThresholdMeasurement) {
     deductions.push({ reason: "hr_sensor_wrist", points: D.HR_SENSOR_WRIST });
+  }
+  if (
+    typeof inputs.timerStoppedSInEffort === "number" &&
+    inputs.timerStoppedSInEffort > BenchmarkConfig.TIMER_STOPPED_MIN_S
+  ) {
+    deductions.push({ reason: "timer_stopped_in_effort", points: D.TIMER_STOPPED_IN_EFFORT });
   }
 
   const totalDeducted = deductions.reduce((a, d) => a + d.points, 0);
