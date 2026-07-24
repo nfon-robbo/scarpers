@@ -3259,9 +3259,9 @@ ${mainRow}
             <Button
               onClick={() => {
                 if (loading) return;
-                // Benchmark already done — skip the "benchmark first" dialog and
-                // build the full plan straight from the measured anchors.
-                if (hasConfirmedBenchmark) { void generatePlan(); return; }
+                // Always show the "benchmark first?" dialog so the athlete
+                // can choose between using their existing benchmark,
+                // scheduling a fresh one, or skipping to provisional pace.
                 setBenchmarkFirstOpen(true);
               }}
               disabled={loading || importing}
