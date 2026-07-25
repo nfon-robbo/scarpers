@@ -246,14 +246,15 @@ export function recomputeSessionTotals(markdown: string): {
       daySecs = 0;
       continue;
     }
-    // 5-col table row: | Segment | Duration | ... | ... |
-    const row = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|/);
+    // 5-col table row: | Segment | Duration | Target (HR/Pace) | Notes |
+    const row = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|/);
     if (!row) continue;
     const seg = row[1];
     const dur = row[2];
+    const target = row[3] || "";
     if (/^segment$/i.test(seg) || /^[-:\s]+$/.test(seg)) continue;
     if (/mobility|stretch|foam|yoga/i.test(seg)) continue;
-    const secs = parseSegmentSeconds(dur);
+    const secs = parseSegmentSeconds(dur, target);
     if (secs > 0) daySecs += secs;
   }
   flush();
