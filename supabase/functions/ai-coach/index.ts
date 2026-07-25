@@ -2476,7 +2476,7 @@ ${upcoming.join("\n")}
       } catch { /* non-fatal */ }
     }
     const useClaudeForPlan = isAdmin && !!Deno.env.get("ANTHROPIC_API_KEY");
-    console.log(`[${type}] plan-gen model route: ${useClaudeForPlan ? "claude-opus-4-5" : (needsRaceDateContinuation ? planLovableModel : "gateway-default")}`);
+    console.log(`[${type}] plan-gen model route: ${useClaudeForPlan ? "claude-sonnet-4-5" : (needsRaceDateContinuation ? planLovableModel : "gateway-default")}`);
 
     const response = await callAI({
       stream: true,
@@ -2484,7 +2484,7 @@ ${upcoming.join("\n")}
       label: `ai-coach:${type || "chat"}`,
       lovableModel: needsRaceDateContinuation ? planLovableModel : undefined,
       providerOverride: useClaudeForPlan ? "claude" : undefined,
-      claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
+      claudeModelOverride: useClaudeForPlan ? "claude-sonnet-4-5" : undefined,
       messages: initialMessages,
     });
 
@@ -2722,7 +2722,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
             label: `ai-coach:${type}:cont${attempts}`,
             lovableModel: planLovableModel,
             providerOverride: useClaudeForPlan ? "claude" : undefined,
-            claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
+            claudeModelOverride: useClaudeForPlan ? "claude-sonnet-4-5" : undefined,
             messages: [
               { role: "system", content: nowPrelude + systemPrompt },
               { role: "user", content: userPrompt },
@@ -2769,7 +2769,7 @@ The FINAL entry MUST be the race itself on ${targetIso}: "🏁 RACE DAY — ${_r
                 label: `ai-coach:${type}:final-validation`,
                 lovableModel: planLovableModel,
                 providerOverride: useClaudeForPlan ? "claude" : undefined,
-                claudeModelOverride: useClaudeForPlan ? "claude-opus-4-5" : undefined,
+                claudeModelOverride: useClaudeForPlan ? "claude-sonnet-4-5" : undefined,
                 messages: [
                   { role: "system", content: nowPrelude + systemPrompt },
                   { role: "user", content: userPrompt },
