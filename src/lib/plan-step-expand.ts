@@ -24,19 +24,49 @@ export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
   const hourMatch = duration.match(/(\d+(?:\.\d+)?)\s*h(?:r|our)?s?\b/i);
-  const minMatch = duration.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?\b/i);
+  // Minutes: prefer "min" spelled out. Fall back to bare "m" only when the value is
+  // small (< 100) so "400m" (metres) isn't misread as 400 minutes.
+  const minLongMatch = duration.match(/(\d+(?:\.\d+)?)\s*min(?:ute)?s?\b/i);
+  const bareMMatch = !minLongMatch ? duration.match(/(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i) : null;
+  const minMatch = minLongMatch || (bareMMatch && parseFloat(bareMMatch[1]) < 100 ? bareMMatch : null);
   const secMatch = duration.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?\b/i);
   let total = 0;
   if (hourMatch) total += parseFloat(hourMatch[1]) * 3600;
   if (minMatch) total += parseFloat(minMatch[1]) * 60;
   if (secMatch) total += parseFloat(secMatch[1]);
   if (total === 0) {
-    const kmMatch = duration.match(/([\d.]+)\s*km/i);
+    const kmMatch = duration.match(/([\d.]+)\s*km\b/i);
     if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
+  }
+  if (total === 0) {
+    // Bare metres like "400m" / "800 meters" → approximate at ~6:00/km (360 s/km).
+    const mMatch = duration.match(/(\d+(?:\.\d+)?)\s*m(?:eters?|etres?)?\b(?!in)/i);
+    if (mMatch && parseFloat(mMatch[1]) >= 100) total = Math.round(parseFloat(mMatch[1]) * 0.36);
   }
   if (total === 0 && /^\d+(?:\.\d+)?$/.test(duration.trim())) total = Math.round(parseFloat(duration.trim()) * 60);
   return total || 600;
 }
+
+/** Duration for a single interval-rep token. If it's bare metres (e.g. "400m"),
+ *  convert using the supplied pace (m:ss/km) for accuracy. Otherwise fall back
+ *  to parseDurationSeconds. */
+function durationFromRep(raw: string, pace: string | undefined): number {
+  const trimmed = raw.trim();
+  const metres = trimmed.match(/^(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i);
+  if (metres) {
+    const m = parseFloat(metres[1]);
+    const paceSec = pace ? paceToSeconds(pace) : null;
+    if (paceSec && m >= 50) return Math.round((m / 1000) * paceSec);
+  }
+  const km = trimmed.match(/^(\d+(?:\.\d+)?)\s*km\b/i);
+  if (km) {
+    const d = parseFloat(km[1]);
+    const paceSec = pace ? paceToSeconds(pace) : null;
+    if (paceSec) return Math.round(d * paceSec);
+  }
+  return parseDurationSeconds(trimmed);
+}
+
 
 function zoneNumberToBpm(zone: number): { low: number; high: number } {
   switch (zone) {
@@ -309,12 +339,12 @@ export function expandWorkoutSteps(
     const repeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
     if (repeatMatch) {
       const reps = parseInt(repeatMatch[1], 10);
-      const workDuration = parseDurationSeconds(repeatMatch[2]);
-      const restDuration = parseDurationSeconds(repeatMatch[3]);
       const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
       const restZone = `Z${Math.max(1, workZoneNumber - 1)}`;
       const restBpm = hrZoneToBpm(restZone);
       const workPace = maybeClamp(paceForSegment(seg, "Interval"));
+      const workDuration = durationFromRep(repeatMatch[2], workPace);
+      const restDuration = durationFromRep(repeatMatch[3], WALK_PACE);
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
@@ -329,12 +359,12 @@ export function expandWorkoutSteps(
     const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
     if (simpleRepeatMatch) {
       const reps = parseInt(simpleRepeatMatch[1], 10);
-      const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
+      const workPace = maybeClamp(paceForSegment(seg, "Interval"));
+      const workDuration = durationFromRep(simpleRepeatMatch[2], workPace);
       const restMatch = seg.target?.match(/([\d.]+)\s*(?:min|sec)/i);
       const restDuration = restMatch ? parseDurationSeconds(restMatch[0]) : 60;
       const restZone = "Z1";
       const restBpm = hrZoneToBpm(restZone);
-      const workPace = maybeClamp(paceForSegment(seg, "Interval"));
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
