@@ -1027,11 +1027,9 @@ const TrainingPlanPage = () => {
         }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
-            title: "Couldn't extend the plan to race day",
-            description: "No changes saved. Please try again.",
-            variant: "destructive",
+            title: "Plan saved short of race day",
+            description: "Couldn't auto-extend to race day. Saved anyway so you don't lose it — adjust from the plan.",
           });
-          return null;
         }
         // Keep on-screen content in sync with the extended version.
         setContent(planContent);
