@@ -129,8 +129,9 @@ function extractDuration(w: ParsedWorkout, customExtraSecs = 0): string | null {
   const txt = `${w.title} ${w.rawText}`;
 
   // Race day: detail view shows ONLY the race effort (warm-up/cool-down stripped).
-  // Match it: extract just the race leg's time.
-  const isRaceDay = /race\s*day|🏁/i.test(txt);
+  // Only inspect the TITLE — a Wednesday "race pace sharpener" whose notes
+  // mention "race day" is not a race day.
+  const isRaceDay = /race\s*day|🏁/i.test(w.title || "");
   if (isRaceDay) {
     const raceSeg = (w.segments || []).find(
       (s) => !/warm|cool|rest|recover|stride/i.test(s.segment || "")
