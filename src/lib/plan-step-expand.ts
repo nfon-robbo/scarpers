@@ -47,6 +47,25 @@ export function parseDurationSeconds(duration: string): number {
   return total || 600;
 }
 
+/** Duration for a single interval-rep token. If it's bare metres (e.g. "400m"),
+ *  convert using the supplied pace (m:ss/km) for accuracy. Otherwise fall back
+ *  to parseDurationSeconds. */
+function durationFromRep(raw: string, pace: string | undefined): number {
+  const trimmed = raw.trim();
+  const metres = trimmed.match(/^(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i);
+  if (metres) {
+    const m = parseFloat(metres[1]);
+    const paceSec = pace ? parsePaceToSecPerKm(pace) : null;
+    if (paceSec && m >= 50) return Math.round((m / 1000) * paceSec);
+  }
+  const km = trimmed.match(/^(\d+(?:\.\d+)?)\s*km\b/i);
+  if (km) {
+    const d = parseFloat(km[1]);
+    const paceSec = pace ? parsePaceToSecPerKm(pace) : null;
+    if (paceSec) return Math.round(d * paceSec);
+  }
+  return parseDurationSeconds(trimmed);
+
 function zoneNumberToBpm(zone: number): { low: number; high: number } {
   switch (zone) {
     case 1: return { low: 100, high: 120 };
