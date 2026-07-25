@@ -58,9 +58,10 @@ export function parseWorkoutsFromPlan(markdown: string): ParsedWorkout[] {
   // or H3-style headings written by newer models:
   //   ### Monday 27/07/2026 — Title
   //   ### 27/07/2026 – Title
-  const datePattern = /\*\*(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\*\*/i;
-  const altDatePattern = /\*\*(\d{1,2}\/\d{1,2}\/\d{4})[^*]*\*\*/i;
-  const h3DatePattern = /^###\s+(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\b/i;
+  const datePattern = /\*\*(?:[^*a-zA-Z0-9]*\s*)?(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\*\*/i;
+  // Broadened: allow any non-* characters (emoji, weekday name, spaces) before the date within the bold heading.
+  const altDatePattern = /\*\*[^*]*?\b(\d{1,2}\/\d{1,2}\/\d{4})\b[^*]*\*\*/i;
+  const h3DatePattern = /^###\s+(?:[^a-zA-Z0-9]*\s*)?(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+)?(\d{1,2}\/\d{1,2}\/\d{4})\b/i;
 
   let i = 0;
   while (i < lines.length) {
