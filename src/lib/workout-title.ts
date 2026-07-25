@@ -232,17 +232,22 @@ export function deriveWorkoutTitleFromSegments(
 
 /**
  * Render the in-app plan-list label, prefixed with the brand name.
+ *
+ * IMPORTANT: We always use the plan-authored title verbatim (just cleaned of
+ * markdown / "(Total: …)" suffix). Previously we re-derived the label from
+ * segments, which could diverge from the actual workout body (e.g. a
+ * "Race Pace Sharpener" being relabelled as a plain easy run because the
+ * duration cell contained a distance). Title and workout must always match —
+ * so trust the title the plan wrote.
  */
-export function describeWorkoutLabel(originalTitle: string, segments: SegmentLike[]): string {
+export function describeWorkoutLabel(originalTitle: string, _segments: SegmentLike[]): string {
   const cleaned = (originalTitle || "")
     .replace(/\s*\(Total:[^)]*\)/i, "")
     .replace(/\*\*/g, "")
     .replace(/^\s*[—–\-]+\s*/, "")
     .trim();
   if (!cleaned || /^rest\b/i.test(cleaned)) return cleaned;
-  const desc = deriveWorkoutTitleFromSegments(originalTitle, segments || []);
-  if (!desc) return `${BRAND_PREFIX} - ${cleaned}`;
-  return `${BRAND_PREFIX} - ${desc}`;
+  return `${BRAND_PREFIX} - ${cleaned}`;
 }
 
 function capitalize(s: string) {
