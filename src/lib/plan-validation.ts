@@ -148,31 +148,60 @@ export function validatePlanReachesRaceDay(content: string, raceDateIso: string 
 // derived label and the heading agree, on every write path.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const parseDurSecs = (text: string): number => {
+const paceCellToSecondsPerKm = (cell: string): number | null => {
+  // Range "6:00-6:15/km" — take the slower bound.
+  const range = cell.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+  if (range) return parseInt(range[3], 10) * 60 + parseInt(range[4], 10);
+  const m = cell.match(/(\d{1,2}):(\d{2})\s*\/\s*(?:km|mi)/i);
+  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  return null;
+};
+
+const parseDurSecs = (text: string, paceSecPerKm?: number | null): number => {
   const cleaned = text.replace(/[()]/g, " ").trim();
   const colon = cleaned.match(/(\d{1,3}):(\d{2})/);
   if (colon) return parseInt(colon[1], 10) * 60 + parseInt(colon[2], 10);
   const hour = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)s?\b/i);
-  const min = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:m|min|minute)s?\b/i);
+  // Prefer spelled-out "min"; bare "m" only counts as minutes if value < 100
+  // (so "400m" for metres isn't mistaken for 400 minutes — matches
+  // plan-step-expand's parser).
+  const minLong = cleaned.match(/(\d+(?:\.\d+)?)\s*min(?:ute)?s?\b/i);
+  const bareM = !minLong ? cleaned.match(/(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i) : null;
+  const min = minLong || (bareM && parseFloat(bareM[1]) < 100 ? bareM : null);
   const sec = cleaned.match(/(\d+(?:\.\d+)?)\s*(?:s|sec|second)s?\b/i);
   let total = 0;
   if (hour) total += parseFloat(hour[1]) * 3600;
   if (min) total += parseFloat(min[1]) * 60;
   if (sec) total += parseFloat(sec[1]);
-  return Math.round(total);
+  if (total > 0) return Math.round(total);
+  // Distance fallbacks — convert with pace when supplied, else assume 6:00/km.
+  const km = cleaned.match(/(\d+(?:\.\d+)?)\s*km\b/i);
+  if (km) {
+    const d = parseFloat(km[1]);
+    const p = paceSecPerKm ?? 360;
+    return Math.round(d * p);
+  }
+  const metres = cleaned.match(/(\d+(?:\.\d+)?)\s*m(?:eters?|etres?)?\b(?!in)/i);
+  if (metres && parseFloat(metres[1]) >= 50) {
+    const d = parseFloat(metres[1]) / 1000;
+    const p = paceSecPerKm ?? 360;
+    return Math.round(d * p);
+  }
+  return 0;
 };
 
-const parseSegmentSeconds = (cell: string): number => {
+const parseSegmentSeconds = (cell: string, paceCell?: string): number => {
   const c = cell.replace(/×/g, "x");
+  const paceSec = paceCell ? paceCellToSecondsPerKm(paceCell) : null;
   const repeat = c.match(/(\d+)\s*x\s*(.+)$/i);
   if (repeat) {
     const reps = parseInt(repeat[1], 10);
     const [workPart, restPart] = repeat[2].split(/\s*\/\s*/);
-    const w = parseDurSecs(workPart || "");
-    const r = parseDurSecs(restPart || "");
+    const w = parseDurSecs(workPart || "", paceSec);
+    const r = parseDurSecs(restPart || "", paceSec);
     if (reps && w) return reps * (w + r);
   }
-  return parseDurSecs(c);
+  return parseDurSecs(c, paceSec);
 };
 
 export interface TotalCorrection {
