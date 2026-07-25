@@ -55,13 +55,13 @@ function durationFromRep(raw: string, pace: string | undefined): number {
   const metres = trimmed.match(/^(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i);
   if (metres) {
     const m = parseFloat(metres[1]);
-    const paceSec = pace ? parsePaceToSecPerKm(pace) : null;
+    const paceSec = pace ? paceToSeconds(pace) : null;
     if (paceSec && m >= 50) return Math.round((m / 1000) * paceSec);
   }
   const km = trimmed.match(/^(\d+(?:\.\d+)?)\s*km\b/i);
   if (km) {
     const d = parseFloat(km[1]);
-    const paceSec = pace ? parsePaceToSecPerKm(pace) : null;
+    const paceSec = pace ? paceToSeconds(pace) : null;
     if (paceSec) return Math.round(d * paceSec);
   }
   return parseDurationSeconds(trimmed);
