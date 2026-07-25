@@ -65,6 +65,8 @@ function durationFromRep(raw: string, pace: string | undefined): number {
     if (paceSec) return Math.round(d * paceSec);
   }
   return parseDurationSeconds(trimmed);
+}
+
 
 function zoneNumberToBpm(zone: number): { low: number; high: number } {
   switch (zone) {
