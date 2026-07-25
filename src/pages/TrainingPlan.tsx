@@ -963,12 +963,12 @@ const TrainingPlanPage = () => {
 
 
       if (blockingErrors.length > 0) {
+        // Never lose a built plan — save it anyway and surface the issues so
+        // the user can iterate rather than burning tokens on a regenerate.
         toast({
-          title: `Plan blocked (${blockingErrors.length} issue${blockingErrors.length === 1 ? "" : "s"})`,
+          title: `Plan saved with ${blockingErrors.length} issue${blockingErrors.length === 1 ? "" : "s"}`,
           description: blockingErrors.join(" • "),
-          variant: "destructive",
         });
-        return null;
       }
       if (scrubbed.scrubs.length > 0) {
         toast({ title: "Zone BPM auto-fixed", description: `Rewrote ${scrubbed.scrubs.length} zone label(s).` });
