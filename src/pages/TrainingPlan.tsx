@@ -963,12 +963,12 @@ const TrainingPlanPage = () => {
 
 
       if (blockingErrors.length > 0) {
+        // Never lose a built plan — save it anyway and surface the issues so
+        // the user can iterate rather than burning tokens on a regenerate.
         toast({
-          title: `Plan blocked (${blockingErrors.length} issue${blockingErrors.length === 1 ? "" : "s"})`,
+          title: `Plan saved with ${blockingErrors.length} issue${blockingErrors.length === 1 ? "" : "s"}`,
           description: blockingErrors.join(" • "),
-          variant: "destructive",
         });
-        return null;
       }
       if (scrubbed.scrubs.length > 0) {
         toast({ title: "Zone BPM auto-fixed", description: `Rewrote ${scrubbed.scrubs.length} zone label(s).` });
@@ -1027,11 +1027,9 @@ const TrainingPlanPage = () => {
         }
         if (!validatePlanReachesRaceDay(planContent, raceIsoForGuard)) {
           toast({
-            title: "Couldn't extend the plan to race day",
-            description: "No changes saved. Please try again.",
-            variant: "destructive",
+            title: "Plan saved short of race day",
+            description: "Couldn't auto-extend to race day. Saved anyway so you don't lose it — adjust from the plan.",
           });
-          return null;
         }
         // Keep on-screen content in sync with the extended version.
         setContent(planContent);
