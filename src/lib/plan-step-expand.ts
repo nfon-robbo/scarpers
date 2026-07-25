@@ -24,15 +24,24 @@ export function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (clockMatch) return parseInt(clockMatch[1], 10) * 60 + parseInt(clockMatch[2], 10);
   const hourMatch = duration.match(/(\d+(?:\.\d+)?)\s*h(?:r|our)?s?\b/i);
-  const minMatch = duration.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?\b/i);
+  // Minutes: prefer "min" spelled out. Fall back to bare "m" only when the value is
+  // small (< 100) so "400m" (metres) isn't misread as 400 minutes.
+  const minLongMatch = duration.match(/(\d+(?:\.\d+)?)\s*min(?:ute)?s?\b/i);
+  const bareMMatch = !minLongMatch ? duration.match(/(\d+(?:\.\d+)?)\s*m(?!in|eter|etre)\b/i) : null;
+  const minMatch = minLongMatch || (bareMMatch && parseFloat(bareMMatch[1]) < 100 ? bareMMatch : null);
   const secMatch = duration.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ond)?s?)?\b/i);
   let total = 0;
   if (hourMatch) total += parseFloat(hourMatch[1]) * 3600;
   if (minMatch) total += parseFloat(minMatch[1]) * 60;
   if (secMatch) total += parseFloat(secMatch[1]);
   if (total === 0) {
-    const kmMatch = duration.match(/([\d.]+)\s*km/i);
+    const kmMatch = duration.match(/([\d.]+)\s*km\b/i);
     if (kmMatch) total = Math.round(parseFloat(kmMatch[1]) * 360);
+  }
+  if (total === 0) {
+    // Bare metres like "400m" / "800 meters" → approximate at ~6:00/km (360 s/km).
+    const mMatch = duration.match(/(\d+(?:\.\d+)?)\s*m(?:eters?|etres?)?\b(?!in)/i);
+    if (mMatch && parseFloat(mMatch[1]) >= 100) total = Math.round(parseFloat(mMatch[1]) * 0.36);
   }
   if (total === 0 && /^\d+(?:\.\d+)?$/.test(duration.trim())) total = Math.round(parseFloat(duration.trim()) * 60);
   return total || 600;
