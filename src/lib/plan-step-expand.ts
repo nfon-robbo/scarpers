@@ -318,12 +318,12 @@ export function expandWorkoutSteps(
     const repeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
     if (repeatMatch) {
       const reps = parseInt(repeatMatch[1], 10);
-      const workDuration = parseDurationSeconds(repeatMatch[2]);
-      const restDuration = parseDurationSeconds(repeatMatch[3]);
       const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
       const restZone = `Z${Math.max(1, workZoneNumber - 1)}`;
       const restBpm = hrZoneToBpm(restZone);
       const workPace = maybeClamp(paceForSegment(seg, "Interval"));
+      const workDuration = durationFromRep(repeatMatch[2], workPace);
+      const restDuration = durationFromRep(repeatMatch[3], WALK_PACE);
       for (let i = 0; i < reps; i++) {
         runIdx++;
         pushStep({ duration: workDuration, hrLow: low, hrHigh: high, hrZone, intensity: "Interval", pace: workPace }, `Run ${runIdx}`);
