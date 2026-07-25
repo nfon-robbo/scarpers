@@ -1004,7 +1004,7 @@ export default function PlanDayList({
                           <p className="text-sm font-semibold break-words">{shortLabel(workout)}</p>
                           {(() => {
                             const customs = customSteps[workoutKey(workout)] || [];
-                            const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
+                            const isRace = /race\s*day|🏁/i.test(workout.title || "");
                             const extraSecs = isRace ? 0 : customs.reduce((acc, s) => {
                               const m = s.duration.match(/^(\d{1,3}):(\d{2})$/);
                               if (m) return acc + parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
