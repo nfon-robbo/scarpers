@@ -175,7 +175,12 @@ export function expandWorkoutSteps(
 
   // Race day = one continuous race effort. Strip any warm-up / walk-run intervals
   // the AI may have appended and emit a single step at goal pace.
-  const isRaceDay = /race\s*day|🏁/i.test(`${workoutTitle} ${rawText}`);
+  // NOTE: we deliberately only inspect the *title* here — notes can say things
+  // like "visualise race day success" on non-race days, which used to hijack
+  // regular workouts (e.g. a Wednesday race-pace sharpener) into a single
+  // goal-pace bar.
+  const isRaceDay = /race\s*day|🏁/i.test(workoutTitle);
+
   if (isRaceDay) {
     const ref = segments.find((s) => !/warm|cool|rest|recover/i.test(s.segment)) || segments[0];
 

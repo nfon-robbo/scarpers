@@ -129,8 +129,9 @@ function extractDuration(w: ParsedWorkout, customExtraSecs = 0): string | null {
   const txt = `${w.title} ${w.rawText}`;
 
   // Race day: detail view shows ONLY the race effort (warm-up/cool-down stripped).
-  // Match it: extract just the race leg's time.
-  const isRaceDay = /race\s*day|🏁/i.test(txt);
+  // Only inspect the TITLE — a Wednesday "race pace sharpener" whose notes
+  // mention "race day" is not a race day.
+  const isRaceDay = /race\s*day|🏁/i.test(w.title || "");
   if (isRaceDay) {
     const raceSeg = (w.segments || []).find(
       (s) => !/warm|cool|rest|recover|stride/i.test(s.segment || "")
@@ -1003,7 +1004,7 @@ export default function PlanDayList({
                           <p className="text-sm font-semibold break-words">{shortLabel(workout)}</p>
                           {(() => {
                             const customs = customSteps[workoutKey(workout)] || [];
-                            const isRace = /race\s*day|🏁/i.test(`${workout.title} ${workout.rawText}`);
+                            const isRace = /race\s*day|🏁/i.test(workout.title || "");
                             const extraSecs = isRace ? 0 : customs.reduce((acc, s) => {
                               const m = s.duration.match(/^(\d{1,3}):(\d{2})$/);
                               if (m) return acc + parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
@@ -1257,7 +1258,7 @@ export default function PlanDayList({
                 </p>
               )}
 
-              {/race\s*day|🏁/i.test(`${selectedWorkout.title} ${selectedWorkout.rawText}`) && (
+              {/race\s*day|🏁/i.test(selectedWorkout.title || "") && (
                 <RaceStrategyBlock raceDistance={raceDistance} workouts={workouts} />
               )}
             </>
