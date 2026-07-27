@@ -81,12 +81,13 @@ const HealthConnectCard = () => {
   const handleSync = async () => {
     if (!user) return;
     try {
-      const result = await startHealthConnectSync(user.id, 3650);
+      const result = await startHealthConnectSync(user.id, 365);
       if ("skipped" in result) return;
       const { metricsCount, sleepCount, readErrors } = result;
+      const oneYearAgo = new Date(Date.now() - 365 * 86400000);
       toast({
         title: "Health Connect synced",
-        description: `From 01/01/2024 · ${metricsCount} days updated · ${sleepCount} sleep segments${
+        description: `From ${oneYearAgo.toLocaleDateString("en-GB")} · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
