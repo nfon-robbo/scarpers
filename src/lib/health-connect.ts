@@ -265,6 +265,7 @@ export async function syncHealthConnect(
   const stageRows: SleepStageInsert[] = [];
   const dailyTotals: Record<string, SleepStageTotals> = {};
   const nightDates = new Set<string>();
+  const nightsWithSpecific = new Set<string>();
   let sleepCount = 0;
 
   for (const session of sleepRecs) {
@@ -275,7 +276,15 @@ export async function syncHealthConnect(
     nightDates.add(wakeDate);
 
     const stages = Array.isArray(session.stages) ? session.stages : [];
+    // If a session has specific stages (deep/rem/light/awake), ignore any
+    // coarse SLEEPING/UNKNOWN segments some writers emit alongside them —
+    // otherwise those minutes get double-counted into the totals.
+    const hasSpecificStages = stages.some((seg) => {
+      const n = HC_STAGE_MAP[seg.stage];
+      return n === "deep" || n === "rem" || n === "light" || n === "awake";
+    });
     let writtenForSession = 0;
+    let sessionHadSpecific = false;
 
     for (const seg of stages) {
       const segStart = new Date(seg.startTime);
@@ -283,8 +292,10 @@ export async function syncHealthConnect(
       if (Number.isNaN(segStart.getTime()) || Number.isNaN(segEnd.getTime())) continue;
       const stageName = HC_STAGE_MAP[seg.stage];
       if (!stageName || stageName === "out_of_bed") continue;
+      if (hasSpecificStages && stageName === "sleep") continue;
       const durationSeconds = Math.max(0, Math.round((segEnd.getTime() - segStart.getTime()) / 1000));
       if (durationSeconds <= 0) continue;
+      if (stageName !== "sleep") sessionHadSpecific = true;
 
       stageRows.push({
         user_id: userId,
@@ -299,6 +310,8 @@ export async function syncHealthConnect(
       if (!dailyTotals[wakeDate]) dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
       dailyTotals[wakeDate][stageName as SleepStageName] += durationSeconds;
     }
+    if (sessionHadSpecific) nightsWithSpecific.add(wakeDate);
+
 
     // Fallback: session with no per-stage breakdown — record one generic 'sleep' row.
     if (writtenForSession === 0) {
@@ -343,15 +356,23 @@ export async function syncHealthConnect(
     }
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
+    const hasSpecific = nightsWithSpecific.has(date);
     const patch: DailyMetricPatch = {
       user_id: userId,
       date,
-      deep_sleep_minutes: Math.round(t.deep / 60),
-      rem_sleep_minutes: Math.round(t.rem / 60),
-      light_sleep_minutes: Math.round((t.light + t.sleep) / 60),
-      awake_during_night_minutes: Math.round(t.awake / 60),
       sleep_duration_seconds: totalSecs,
     };
+    if (hasSpecific) {
+      // Real staged data — overwrite fine-grained fields.
+      patch.deep_sleep_minutes = Math.round(t.deep / 60);
+      patch.rem_sleep_minutes = Math.round(t.rem / 60);
+      patch.light_sleep_minutes = Math.round(t.light / 60);
+      patch.awake_during_night_minutes = Math.round(t.awake / 60);
+    }
+    // If hasSpecific is false, only sleep_duration_seconds is written and any
+    // previously-imported deep/rem/light values (e.g. from Google Fit) are
+    // preserved rather than overwritten with zeros.
+
     const { data: existing } = await supabase
       .from("daily_metrics")
       .select("id")
