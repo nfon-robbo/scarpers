@@ -63,6 +63,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [carbs, setCarbs] = useState(0);
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
+  const [satFats, setSatFats] = useState(0);
+  const [salt, setSalt] = useState(0);
   const [kcal, setKcal] = useState(0);
   const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
@@ -84,7 +86,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setGrams(100);
       setQty(1);
       setUnit("g");
-      setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
+      setCarbs(0); setProtein(0); setFat(0); setSatFats(0); setSalt(0); setKcal(0); setAlcohol(0);
       setFoodName("");
       setScanning(false);
       setScanLookup(false);
@@ -138,6 +140,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setCarbs(scaled.carbs_g);
     setProtein(scaled.protein_g);
     setFat(scaled.fat_g);
+    setSatFats(scaled.sat_fats_g);
+    setSalt(scaled.salt_mg);
     setKcal(scaled.calories);
   }, [selected, qty, unit]);
 
@@ -172,6 +176,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         carbs: Number(q.carbs_100g) || 0,
         protein: Number(q.protein_100g) || 0,
         fat: Number(q.fat_100g) || 0,
+        satFats: 0,
+        salt: 0,
         kcal: Number(q.kcal_100g) || 0,
       },
       servingG: q.serving_g ? Number(q.serving_g) : null,
@@ -309,6 +315,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         carbs_g: carbs,
         protein_g: protein,
         fat_g: fat,
+        sat_fats_g: satFats,
+        salt_mg: salt,
         calories: kcal,
         alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
@@ -478,7 +486,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                       </div>
                       <div className="text-xs text-muted-foreground line-clamp-1">
                         {f.brand ? `${f.brand} · ` : ""}
-                        {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P / 100g
+                        {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P · {f.per100g.fat}g F{f.per100g.satFats ? ` · ${f.per100g.satFats}g Sat` : ""}{f.per100g.salt ? ` · ${f.per100g.salt}g Salt` : ""} / 100g
                       </div>
                     </div>
                   </button>
@@ -506,7 +514,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   />
                   <div className="text-xs text-muted-foreground">
                     {selected.brand ? <div className="font-medium text-foreground">{selected.brand}</div> : null}
-                    <div>{Math.round(selected.per100g.kcal)} kcal · {selected.per100g.carbs}g C · {selected.per100g.protein}g P · {selected.per100g.fat}g F / 100g</div>
+                    <div>{Math.round(selected.per100g.kcal)} kcal · {selected.per100g.carbs}g C · {selected.per100g.protein}g P · {selected.per100g.fat}g F · {selected.per100g.satFats || 0}g Sat · {selected.per100g.salt || 0}g Salt / 100g</div>
                   </div>
                 </div>
               )}
@@ -553,7 +561,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     </div>
                     {/* size chips removed; users save their own quick adds */}
                     <div className="text-xs text-muted-foreground">
-                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F · {satFats}g Sat · {salt}mg Salt
                     </div>
                   </div>
                 );
@@ -571,7 +579,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   />
                 </div>
               )}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <Label className="text-xs">Carbs (g)</Label>
                   <Input type="number" value={carbs} onChange={(e) => setCarbs(parseFloat(e.target.value) || 0)} />
@@ -585,14 +593,22 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   <Input type="number" value={fat} onChange={(e) => setFat(parseFloat(e.target.value) || 0)} />
                 </div>
                 <div>
+                  <Label className="text-xs">Sat fats (g)</Label>
+                  <Input type="number" value={satFats} onChange={(e) => setSatFats(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Salt (mg)</Label>
+                  <Input type="number" value={salt} onChange={(e) => setSalt(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
                   <Label className="text-xs">kcal</Label>
                   <Input type="number" value={kcal} onChange={(e) => setKcal(parseFloat(e.target.value) || 0)} />
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Alcohol (UK units)</Label>
                 <Input type="number" step="0.1" value={alcohol} onChange={(e) => setAlcohol(parseFloat(e.target.value) || 0)} />
               </div>
-            </div>
             </div>
           )}
         </div>

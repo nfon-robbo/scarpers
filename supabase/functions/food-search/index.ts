@@ -35,6 +35,8 @@ function mapHit(h: any) {
       carbohydrates_100g: n.carbohydrates_100g,
       proteins_100g: n.proteins_100g,
       fat_100g: n.fat_100g,
+      'saturated-fat_100g': n['saturated-fat_100g'],
+      salt_100g: n.salt_100g,
       'energy-kcal_100g': n['energy-kcal_100g'],
       energy_100g: n.energy_100g,
     },
@@ -60,6 +62,8 @@ interface Normalised {
   carbs: number;
   protein: number;
   fat: number;
+  satFats: number;
+  salt: number;
   countries: string[];
   lang: string;
   popularity: number;
@@ -77,6 +81,9 @@ function normalise(p: any): Normalised | null {
   const carbs = num(n.carbohydrates_100g);
   const protein = num(n.proteins_100g);
   const fat = num(n.fat_100g);
+  const satFats = num(n['saturated-fat_100g']);
+  const salt = num(n.salt_100g);
+
 
   // Drop junk: zero kcal OR missing all 3 macros
   if (!kcal || kcal <= 0) return null;
@@ -94,6 +101,8 @@ function normalise(p: any): Normalised | null {
     carbs,
     protein,
     fat,
+    satFats,
+    salt,
     countries,
     lang: (p.lang || '').toLowerCase(),
     popularity,

@@ -20,6 +20,8 @@ interface NutritionLog {
   carbs_g: number;
   protein_g: number;
   fat_g: number;
+  sat_fats_g: number;
+  salt_mg: number;
   calories: number;
   alcohol_units: number;
   source: string;
@@ -60,7 +62,7 @@ export default function NutritionPage() {
     setLoading(true);
     const { data } = await supabase
       .from("nutrition_logs")
-      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, calories, alcohol_units, source")
+      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, sat_fats_g, salt_mg, calories, alcohol_units, source")
       .eq("user_id", user.id)
       .eq("log_date", date)
       .order("created_at", { ascending: true });
@@ -83,10 +85,12 @@ export default function NutritionPage() {
         carbs: acc.carbs + (l.carbs_g || 0),
         protein: acc.protein + (l.protein_g || 0),
         fat: acc.fat + (l.fat_g || 0),
+        satFats: acc.satFats + (l.sat_fats_g || 0),
+        salt: acc.salt + (l.salt_mg || 0),
         kcal: acc.kcal + (l.calories || 0),
         alcohol: acc.alcohol + (l.alcohol_units || 0),
       }),
-      { carbs: 0, protein: 0, fat: 0, kcal: 0, alcohol: 0 },
+      { carbs: 0, protein: 0, fat: 0, satFats: 0, salt: 0, kcal: 0, alcohol: 0 },
     );
   }, [logs]);
 
@@ -180,10 +184,12 @@ export default function NutritionPage() {
       </Card>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />
         <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />
         <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />
+        <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />
+        <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />
         <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />
         <MacroCard
           label="Alcohol"
@@ -225,6 +231,8 @@ export default function NutritionPage() {
                             <div className="text-sm font-medium truncate">{l.food_name}</div>
                             <div className="text-xs text-muted-foreground">
                               {Math.round(l.quantity_g)}g · {Math.round(l.carbs_g)}g C · {Math.round(l.protein_g)}g P · {Math.round(l.calories)} kcal
+                              {l.sat_fats_g > 0 ? ` · ${Math.round(l.sat_fats_g)}g Sat` : ""}
+                              {l.salt_mg > 0 ? ` · ${Math.round(l.salt_mg)}mg Salt` : ""}
                               {l.alcohol_units > 0 ? ` · ${l.alcohol_units} u alcohol` : ""}
                             </div>
                           </div>

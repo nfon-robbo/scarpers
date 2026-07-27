@@ -9,6 +9,8 @@ export interface OffFood {
     carbs: number;
     protein: number;
     fat: number;
+    satFats: number;
+    salt: number;
     kcal: number;
   };
   servingG: number | null;
@@ -44,6 +46,8 @@ function normalise(p: any): OffFood | null {
       carbs,
       protein: num(nutr.proteins_100g),
       fat: num(nutr.fat_100g),
+      satFats: num(nutr["saturated-fat_100g"]),
+      salt: num(nutr.salt_100g),
       kcal: num(nutr["energy-kcal_100g"]),
     },
     servingG: num(p.serving_quantity) || null,
@@ -94,6 +98,8 @@ export function scaleFood(food: OffFood, grams: number) {
     carbs_g: +(food.per100g.carbs * f).toFixed(1),
     protein_g: +(food.per100g.protein * f).toFixed(1),
     fat_g: +(food.per100g.fat * f).toFixed(1),
+    sat_fats_g: +(food.per100g.satFats * f).toFixed(1),
+    salt_mg: Math.round(food.per100g.salt * f * 1000),
     calories: Math.round(food.per100g.kcal * f),
   };
 }
