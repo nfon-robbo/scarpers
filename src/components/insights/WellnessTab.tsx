@@ -151,10 +151,15 @@ const WellnessTab = () => {
           <p className="text-sm mb-4 text-center max-w-xs">
             Sync from Intervals.icu or upload FIT monitoring files. On Android, set up Health Connect in Settings → Integrations.
           </p>
-          <Button onClick={syncWellness} disabled={syncing}>
-            {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            Sync Wellness Data
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button asChild variant="outline">
+              <Link to="/settings/integrations">Settings → Integrations</Link>
+            </Button>
+            <Button onClick={syncWellness} disabled={syncing}>
+              {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Sync Wellness Data
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );

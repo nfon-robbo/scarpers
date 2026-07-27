@@ -93,6 +93,7 @@ const HC_STAGE_MAP: Record<string, SleepStageName | "out_of_bed"> = {
   STAGE_TYPE_DEEP: "deep",
   STAGE_TYPE_REM: "rem",
   STAGE_TYPE_UNKNOWN: "sleep",
+  "0": "sleep",
   "1": "awake",
   "2": "sleep",
   "3": "out_of_bed",
