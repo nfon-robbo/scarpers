@@ -310,6 +310,8 @@ export async function syncHealthConnect(
       if (!dailyTotals[wakeDate]) dailyTotals[wakeDate] = { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 };
       dailyTotals[wakeDate][stageName as SleepStageName] += durationSeconds;
     }
+    if (sessionHadSpecific) nightsWithSpecific.add(wakeDate);
+
 
     // Fallback: session with no per-stage breakdown — record one generic 'sleep' row.
     if (writtenForSession === 0) {
