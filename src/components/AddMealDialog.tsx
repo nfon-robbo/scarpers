@@ -454,17 +454,32 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   <button
                     key={f.id}
                     onClick={() => pickFood(f)}
-                    className="w-full text-left p-2 rounded hover:bg-muted/60 border border-border"
+                    className="w-full text-left p-2 rounded hover:bg-muted/60 border border-border flex items-center gap-3"
                   >
-                    <div className="text-sm font-medium line-clamp-1">
-                      {f.name}
-                      {f.entriesMerged && f.entriesMerged > 1 ? (
-                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">({f.entriesMerged} entries)</span>
-                      ) : null}
-                    </div>
-                    <div className="text-xs text-muted-foreground line-clamp-1">
-                      {f.brand ? `${f.brand} · ` : ""}
-                      {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P / 100g
+                    {f.imageSmallUrl ? (
+                      <img
+                        src={f.imageSmallUrl}
+                        alt={f.name}
+                        className="h-12 w-12 rounded-md object-cover bg-muted shrink-0"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <span className="text-lg">🍽</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium line-clamp-1">
+                        {f.name}
+                        {f.entriesMerged && f.entriesMerged > 1 ? (
+                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">({f.entriesMerged} entries)</span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground line-clamp-1">
+                        {f.brand ? `${f.brand} · ` : ""}
+                        {Math.round(f.per100g.kcal)} kcal · {f.per100g.carbs}g C · {f.per100g.protein}g P / 100g
+                      </div>
                     </div>
                   </button>
                 ))}
