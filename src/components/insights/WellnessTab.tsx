@@ -162,8 +162,6 @@ const WellnessTab = () => {
 
   return (
     <div className="space-y-4">
-      <HealthConnectCard />
-
       <div className="flex justify-between items-center gap-2">
         <Link to="/nutrition">
           <Button variant="outline" size="sm">
