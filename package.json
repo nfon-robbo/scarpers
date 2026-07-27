@@ -10,7 +10,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "android:fix-health-connect": "node scripts/fix-android-health-connect.mjs",
-    "android:sync": "npm run build && npx cap sync android && node scripts/fix-android-health-connect.mjs",
+    "android:sync": "node scripts/android-clean-web-assets.mjs && npm run build && npx cap sync android && node scripts/fix-android-health-connect.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",

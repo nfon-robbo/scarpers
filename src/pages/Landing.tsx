@@ -381,7 +381,9 @@ const Landing = () => {
               autoPlay={index === 0}
               muted
               playsInline
+              loop
               preload="auto"
+              controls={false}
               onEnded={() => handleHeroEnded(index)}
               aria-hidden="true"
               className={`absolute inset-0 w-full h-full object-cover ${index === heroIdx ? "opacity-100" : "opacity-0"}`}
