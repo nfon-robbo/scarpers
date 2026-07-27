@@ -85,10 +85,12 @@ export default function NutritionPage() {
         carbs: acc.carbs + (l.carbs_g || 0),
         protein: acc.protein + (l.protein_g || 0),
         fat: acc.fat + (l.fat_g || 0),
+        satFats: acc.satFats + (l.sat_fats_g || 0),
+        salt: acc.salt + (l.salt_mg || 0),
         kcal: acc.kcal + (l.calories || 0),
         alcohol: acc.alcohol + (l.alcohol_units || 0),
       }),
-      { carbs: 0, protein: 0, fat: 0, kcal: 0, alcohol: 0 },
+      { carbs: 0, protein: 0, fat: 0, satFats: 0, salt: 0, kcal: 0, alcohol: 0 },
     );
   }, [logs]);
 
