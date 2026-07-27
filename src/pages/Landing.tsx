@@ -32,6 +32,7 @@ import CoachClaireCard from "@/components/CoachClaireCard";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
+import { assetUrl } from "@/lib/asset-url";
 
 import watchFenix8 from "@/assets/watch-frame.png";
 import watchScreen1 from "@/assets/watch-screens/screen1.png";
@@ -43,7 +44,7 @@ import watchScreen6 from "@/assets/watch-screens/screen6.png";
 import watchScreen7 from "@/assets/watch-screens/screen7.png";
 import watchScreen8 from "@/assets/watch-screens/screen8.png";
 
-const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
+const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url].map(assetUrl);
 
 const WATCH_SCREENS = [
   watchScreen2,
