@@ -496,6 +496,20 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                 <Label>Food</Label>
                 <Input value={foodName} onChange={(e) => setFoodName(e.target.value)} />
               </div>
+              {selected?.imageUrl && (
+                <div className="flex items-center gap-3 rounded-md border border-border p-2 bg-muted/30">
+                  <img
+                    src={selected.imageUrl}
+                    alt={selected.name}
+                    className="h-16 w-16 rounded-md object-cover bg-muted shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    {selected.brand ? <div className="font-medium text-foreground">{selected.brand}</div> : null}
+                    <div>{Math.round(selected.per100g.kcal)} kcal · {selected.per100g.carbs}g C · {selected.per100g.protein}g P · {selected.per100g.fat}g F / 100g</div>
+                  </div>
+                </div>
+              )}
               {selected && (() => {
                 const sG = selected.servingG && selected.servingG > 0 ? selected.servingG : null;
                 const pG = selected.productG && selected.productG > 0 ? selected.productG : null;
