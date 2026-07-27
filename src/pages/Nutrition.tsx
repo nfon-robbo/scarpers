@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Heart } from "lucide-react";
+import { Apple, Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Heart, GripVertical, Check } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import AddMealDialog from "@/components/AddMealDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -184,21 +184,26 @@ export default function NutritionPage() {
       </Card>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />
-        <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />
-        <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />
-        <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />
-        <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />
-        <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />
-        <MacroCard
-          label="Alcohol"
-          value={`${totals.alcohol.toFixed(1)} units`}
-          target="≤ 2/day"
-          pct={totals.alcohol / 2}
-          color={totals.alcohol > 4 ? "bg-destructive" : "bg-purple-500"}
-        />
-      </div>
+      <MacroGrid
+        cards={{
+          carbs: <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />,
+          protein: <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />,
+          fat: <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />,
+          satFats: <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />,
+          salt: <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />,
+          calories: <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />,
+          alcohol: (
+            <MacroCard
+              label="Alcohol"
+              value={`${totals.alcohol.toFixed(1)} units`}
+              target="≤ 2/day"
+              pct={totals.alcohol / 2}
+              color={totals.alcohol > 4 ? "bg-destructive" : "bg-purple-500"}
+            />
+          ),
+        }}
+      />
+
 
       {/* Quick adds are now user-managed inside the Add meal dialog */}
 
@@ -269,7 +274,7 @@ export default function NutritionPage() {
 function MacroCard({ label, value, target, pct, color }: { label: string; value: string; target?: string; pct: number | null; color: string }) {
   const p = pct == null ? null : Math.max(0, Math.min(1, pct));
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="p-3">
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="text-xl font-bold">{value}</div>
@@ -283,3 +288,89 @@ function MacroCard({ label, value, target, pct, color }: { label: string; value:
     </Card>
   );
 }
+
+const MACRO_ORDER_KEY = "nutrition:macro-order:v1";
+const DEFAULT_MACRO_ORDER = ["carbs", "protein", "fat", "satFats", "salt", "calories", "alcohol"];
+
+function MacroGrid({ cards }: { cards: Record<string, React.ReactNode> }) {
+  const allKeys = Object.keys(cards);
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(MACRO_ORDER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        const filtered = parsed.filter((k) => allKeys.includes(k));
+        const missing = allKeys.filter((k) => !filtered.includes(k));
+        return [...filtered, ...missing];
+      }
+    } catch {}
+    return DEFAULT_MACRO_ORDER.filter((k) => allKeys.includes(k));
+  });
+  const [editing, setEditing] = useState(false);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+
+  function persist(next: string[]) {
+    setOrder(next);
+    try { localStorage.setItem(MACRO_ORDER_KEY, JSON.stringify(next)); } catch {}
+  }
+
+  function move(key: string, dir: -1 | 1) {
+    const idx = order.indexOf(key);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= order.length) return;
+    const next = order.slice();
+    [next[idx], next[j]] = [next[j], next[idx]];
+    persist(next);
+  }
+
+  function onDrop(target: string) {
+    if (!dragKey || dragKey === target) return;
+    const next = order.filter((k) => k !== dragKey);
+    const idx = next.indexOf(target);
+    next.splice(idx, 0, dragKey);
+    persist(next);
+    setDragKey(null);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+          {editing ? (<><Check className="w-4 h-4 mr-1" /> Done</>) : (<><GripVertical className="w-4 h-4 mr-1" /> Rearrange</>)}
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {order.map((key, i) => (
+          <div
+            key={key}
+            draggable={editing}
+            onDragStart={() => setDragKey(key)}
+            onDragOver={(e) => { if (editing) e.preventDefault(); }}
+            onDrop={() => onDrop(key)}
+            onDragEnd={() => setDragKey(null)}
+            className={`relative ${editing ? "cursor-move" : ""} ${dragKey === key ? "opacity-50" : ""}`}
+          >
+            {cards[key]}
+            {editing && (
+              <div className="absolute top-1 right-1 flex gap-0.5 bg-background/90 rounded border border-border">
+                <button
+                  className="px-1 text-xs disabled:opacity-30"
+                  onClick={() => move(key, -1)}
+                  disabled={i === 0}
+                  aria-label="Move earlier"
+                >‹</button>
+                <button
+                  className="px-1 text-xs disabled:opacity-30"
+                  onClick={() => move(key, 1)}
+                  disabled={i === order.length - 1}
+                  aria-label="Move later"
+                >›</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
