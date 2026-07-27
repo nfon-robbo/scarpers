@@ -36,7 +36,7 @@ const getErrorMessage = (error: unknown) => {
 const HealthConnectCard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [supported, setSupported] = useState(false);
+  const [isAndroidApp, setIsAndroidApp] = useState(() => isHealthConnectPlatform());
   const [availability, setAvailability] = useState<string>("");
   const [granted, setGranted] = useState(false);
   const [hasHistoryAccess, setHasHistoryAccess] = useState(false);
@@ -47,14 +47,19 @@ const HealthConnectCard = () => {
   const { syncing, progress, errors, fatalError } = syncState;
 
   const refreshGranted = async () => {
+    if (!isHealthConnectPlatform()) return;
     const list = await getGrantedHealthConnectPermissions();
     setGranted(list.length > 0);
     setHasHistoryAccess(list.includes(HEALTH_CONNECT_HISTORY_PERMISSION));
   };
 
   useEffect(() => {
-    if (!isHealthConnectPlatform()) return;
-    setSupported(true);
+    const androidApp = isHealthConnectPlatform();
+    setIsAndroidApp(androidApp);
+    if (!androidApp) {
+      setAvailability("AndroidAppRequired");
+      return;
+    }
     ensureHealthConnectAvailable()
       .then((a) => {
         setAvailability(a);
@@ -63,9 +68,11 @@ const HealthConnectCard = () => {
       .catch(() => setAvailability("NotSupported"));
   }, []);
 
-  if (!supported) return null;
-
   const handleConnect = async () => {
+    if (!isAndroidApp || availability !== "Available") {
+      toast({ title: "Health Connect unavailable", description: "Open the installed Android app to grant access.", variant: "destructive" });
+      return;
+    }
     try {
       await requestHealthConnectPermissions();
       await refreshGranted();
@@ -79,6 +86,10 @@ const HealthConnectCard = () => {
 
   const handleSync = async () => {
     if (!user) return;
+    if (!isAndroidApp || availability !== "Available") {
+      toast({ title: "Health Connect unavailable", description: "Open the installed Android app to sync Health Connect data.", variant: "destructive" });
+      return;
+    }
     try {
       const result = await startHealthConnectSync(user.id, 365);
       if ("skipped" in result) return;
@@ -106,6 +117,8 @@ const HealthConnectCard = () => {
         <CardDescription>
           {availability === "Available"
             ? "Sync sleep stages, resting HR, steps and active calories from Garmin Connect (via Health Connect)."
+            : availability === "AndroidAppRequired"
+            ? "Open this screen in the installed Android app to grant Health Connect access."
             : availability === "NotInstalled"
             ? "Install Health Connect from the Play Store first"
             : availability === "NotSupported"
@@ -115,10 +128,10 @@ const HealthConnectCard = () => {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-3">
-          <Button size="sm" onClick={handleConnect} disabled={availability !== "Available"}>
+          <Button size="sm" onClick={handleConnect} disabled={!isAndroidApp || availability !== "Available"}>
             Grant access
           </Button>
-          <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing || availability !== "Available"}>
+          <Button size="sm" variant="outline" onClick={handleSync} disabled={!isAndroidApp || syncing || availability !== "Available"}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
             Sync past year
           </Button>
