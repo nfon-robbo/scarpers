@@ -528,7 +528,7 @@ const Settings = () => {
         icon={Plug}
         description="Connect Android Health Connect and other services for sleep, wellness, and activity data"
         contentClassName="space-y-4"
-        defaultOpen={showIntegrations || true}
+        defaultOpen={showIntegrations || location.pathname === "/settings"}
       >
         <HealthConnectCard />
         <p className="text-xs text-muted-foreground">
