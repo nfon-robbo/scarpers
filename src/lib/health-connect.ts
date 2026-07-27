@@ -100,7 +100,6 @@ export async function getGrantedHealthConnectPermissions(): Promise<string[]> {
   }
 }
 
-export const HEALTH_CONNECT_ALL_HISTORY_START_ISO = "2024-01-01T00:00:00.000Z";
 export const HEALTH_CONNECT_HISTORY_PERMISSION = "android.permission.health.READ_HEALTH_DATA_HISTORY";
 
 export type HealthConnectProgress = {
@@ -124,7 +123,7 @@ const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")
 
 export async function syncHealthConnect(
   userId: string,
-  daysBack = 3650,
+  daysBack = 365,
   onProgress?: HealthConnectProgressCallback,
 ) {
   const report = (phase: string, percent: number) => {

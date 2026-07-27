@@ -47,7 +47,7 @@ export type StartHealthConnectSyncResult = Awaited<
 
 export const startHealthConnectSync = async (
   userId: string,
-  days = 3650,
+  days = 365,
 ): Promise<StartHealthConnectSyncResult | { skipped: true }> => {
   if (state.syncing) return { skipped: true };
   setState({

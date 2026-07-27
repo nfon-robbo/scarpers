@@ -10,7 +10,6 @@ import {
   ensureHealthConnectAvailable,
   requestHealthConnectPermissions,
   getGrantedHealthConnectPermissions,
-  HEALTH_CONNECT_ALL_HISTORY_START_ISO,
   HEALTH_CONNECT_HISTORY_PERMISSION,
 } from "@/lib/health-connect";
 import {
@@ -81,12 +80,13 @@ const HealthConnectCard = () => {
   const handleSync = async () => {
     if (!user) return;
     try {
-      const result = await startHealthConnectSync(user.id, 3650);
+      const result = await startHealthConnectSync(user.id, 365);
       if ("skipped" in result) return;
       const { metricsCount, sleepCount, readErrors } = result;
+      const oneYearAgo = new Date(Date.now() - 365 * 86400000);
       toast({
         title: "Health Connect synced",
-        description: `From 01/01/2024 · ${metricsCount} days updated · ${sleepCount} sleep segments${
+        description: `From ${oneYearAgo.toLocaleDateString("en-GB")} · ${metricsCount} days updated · ${sleepCount} sleep segments${
           readErrors?.length ? ` · ${readErrors.length} type(s) failed` : ""
         }`,
       });
@@ -120,7 +120,7 @@ const HealthConnectCard = () => {
           </Button>
           <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing || availability !== "Available"}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            Sync all history
+            Sync past year
           </Button>
         </div>
 
@@ -161,7 +161,7 @@ const HealthConnectCard = () => {
         )}
 
         <p className="text-xs text-muted-foreground mt-3">
-          Pulls history from {new Date(HEALTH_CONNECT_ALL_HISTORY_START_ISO).toLocaleDateString("en-GB")}. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
+          Pulls the last 365 days of history. {hasHistoryAccess ? "History access is granted." : "Tap Grant access and approve history access, otherwise Android may only return recent data."}
         </p>
       </CardContent>
     </Card>
