@@ -20,6 +20,8 @@ interface NutritionLog {
   carbs_g: number;
   protein_g: number;
   fat_g: number;
+  sat_fats_g: number;
+  salt_mg: number;
   calories: number;
   alcohol_units: number;
   source: string;
