@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     const barcode = (url.searchParams.get('barcode') || '').trim();
 
     if (barcode) {
-      const BARCODE_FIELDS = 'code,product_name,brands,nutriments,serving_quantity,serving_size,product_quantity,countries_tags,lang';
+      const BARCODE_FIELDS = 'code,product_name,brands,nutriments,serving_quantity,serving_size,product_quantity,countries_tags,lang,image_url,image_small_url,image_front_url,image_front_small_url';
       const hosts = ['https://world.openfoodfacts.org', 'https://uk.openfoodfacts.org'];
       for (const h of hosts) {
         const r = await fetchJson(`${h}/api/v2/product/${encodeURIComponent(barcode)}.json?lc=en&fields=${BARCODE_FIELDS}`);
