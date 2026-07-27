@@ -579,7 +579,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   />
                 </div>
               )}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <Label className="text-xs">Carbs (g)</Label>
                   <Input type="number" value={carbs} onChange={(e) => setCarbs(parseFloat(e.target.value) || 0)} />
@@ -593,14 +593,22 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   <Input type="number" value={fat} onChange={(e) => setFat(parseFloat(e.target.value) || 0)} />
                 </div>
                 <div>
+                  <Label className="text-xs">Sat fats (g)</Label>
+                  <Input type="number" value={satFats} onChange={(e) => setSatFats(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label className="text-xs">Salt (mg)</Label>
+                  <Input type="number" value={salt} onChange={(e) => setSalt(parseFloat(e.target.value) || 0)} />
+                </div>
+                <div>
                   <Label className="text-xs">kcal</Label>
                   <Input type="number" value={kcal} onChange={(e) => setKcal(parseFloat(e.target.value) || 0)} />
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Alcohol (UK units)</Label>
                 <Input type="number" step="0.1" value={alcohol} onChange={(e) => setAlcohol(parseFloat(e.target.value) || 0)} />
               </div>
-            </div>
             </div>
           )}
         </div>
