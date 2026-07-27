@@ -172,6 +172,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         carbs: Number(q.carbs_100g) || 0,
         protein: Number(q.protein_100g) || 0,
         fat: Number(q.fat_100g) || 0,
+        satFats: 0,
+        salt: 0,
         kcal: Number(q.kcal_100g) || 0,
       },
       servingG: q.serving_g ? Number(q.serving_g) : null,
