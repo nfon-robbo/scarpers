@@ -149,12 +149,9 @@ const WellnessTab = () => {
           <Moon className="w-12 h-12 mb-4 opacity-30" />
           <p className="text-lg font-medium">No wellness data yet</p>
           <p className="text-sm mb-4 text-center max-w-xs">
-            Sync from Intervals.icu or upload FIT monitoring files. On Android, set up Health Connect in Settings → Integrations.
+            Sync from Intervals.icu or upload FIT monitoring files.
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button asChild variant="outline">
-              <Link to="/settings/integrations">Settings → Integrations</Link>
-            </Button>
             <Button onClick={syncWellness} disabled={syncing}>
               {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               Sync Wellness Data

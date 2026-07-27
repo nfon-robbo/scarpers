@@ -33,7 +33,7 @@ const fmtH = (secs: number) => {
 };
 
 const sourceLabel = (s: SourceKey) =>
-  s === "health_connect" ? "Health Connect" : "Manual";
+  s === "health_connect" ? "Android sync" : "Manual";
 
 const sleepScoreFor = (t: StageTotals) => calculateSleepScore({
   deep: t.deep,
@@ -539,7 +539,7 @@ const SleepSourcesPanel = () => {
     if (file.size > 8 * 1024 * 1024) { toast.error("Image too large (max 8MB)"); return; }
     if (!user) { toast.error("Not signed in"); return; }
 
-    // Find the most recent existing sleep night (Health Connect or manual) and
+    // Find the most recent existing sleep night (Android sync or manual) and
     // attach vitals there — never create a brand-new night from a screenshot.
     const { data: latest } = await supabase
       .from("sleep_stages")
@@ -580,7 +580,7 @@ const SleepSourcesPanel = () => {
     <Card>
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
         <div>
-          <CardTitle className="text-base">Sleep — Health Connect</CardTitle>
+          <CardTitle className="text-base">Sleep sources</CardTitle>
           <CardDescription>
             Last 7 nights · per-source duration & stage breakdown.
             <span className="block mt-1">Works with Garmin, Whoop, Oura, Fitbit screenshots — we'll auto-fill stages + vitals.</span>
