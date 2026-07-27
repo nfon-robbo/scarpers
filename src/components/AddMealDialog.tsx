@@ -404,7 +404,11 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     <Star className="w-3 h-3" /> Your quick adds
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {quickFoods.map((q) => (
+                    {quickFoods.map((q) => {
+                      const quickKcal = q.default_unit === "g"
+                        ? Math.round(Number(q.kcal_100g) * (Number(q.default_grams) || 100) / 100)
+                        : Math.round(Number(q.kcal_100g) * (Number(q.default_grams) || 100) / 100);
+                      return (
                       <div key={q.id} className="group flex items-center rounded-full border border-border bg-muted/40 hover:bg-muted text-xs">
                         <button
                           type="button"
@@ -413,7 +417,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                           title={`${Math.round(Number(q.kcal_100g))} kcal / 100g`}
                         >
                           {q.food_name}
-                          <span className="ml-1 text-muted-foreground">· {q.default_unit === "g" ? `${q.default_grams}g` : `${q.default_qty} ${q.default_unit}`}</span>
+                          <span className="ml-1 text-muted-foreground">· {q.default_unit === "g" ? `${q.default_grams}g` : `${q.default_qty} ${q.default_unit}`} · {quickKcal} kcal</span>
                         </button>
                         <button
                           type="button"
