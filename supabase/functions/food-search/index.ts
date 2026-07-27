@@ -45,6 +45,10 @@ function mapHit(h: any) {
     lang: h.lang ?? '',
     unique_scans_n: h.unique_scans_n,
     popularity_key: h.popularity_key,
+    image_url: h.image_url,
+    image_small_url: h.image_small_url,
+    image_front_url: h.image_front_url,
+    image_front_small_url: h.image_front_small_url,
   };
 }
 
