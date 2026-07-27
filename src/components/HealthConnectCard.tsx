@@ -10,7 +10,6 @@ import {
   ensureHealthConnectAvailable,
   requestHealthConnectPermissions,
   getGrantedHealthConnectPermissions,
-  HEALTH_CONNECT_ALL_HISTORY_START_ISO,
   HEALTH_CONNECT_HISTORY_PERMISSION,
 } from "@/lib/health-connect";
 import {
