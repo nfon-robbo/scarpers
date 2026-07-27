@@ -140,6 +140,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
     setCarbs(scaled.carbs_g);
     setProtein(scaled.protein_g);
     setFat(scaled.fat_g);
+    setSatFats(scaled.sat_fats_g);
+    setSalt(scaled.salt_mg);
     setKcal(scaled.calories);
   }, [selected, qty, unit]);
 
