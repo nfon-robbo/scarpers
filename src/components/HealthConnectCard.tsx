@@ -128,8 +128,20 @@ const HealthConnectCard = () => {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-3">
-          <Button size="sm" onClick={handleConnect} disabled={!isAndroidApp || availability !== "Available"}>
-            Grant access
+          <Button
+            size="sm"
+            onClick={handleConnect}
+            disabled={!isAndroidApp || availability !== "Available" || granted}
+            variant={granted ? "secondary" : "default"}
+          >
+            {granted ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Access granted
+              </>
+            ) : (
+              "Grant access"
+            )}
           </Button>
           <Button size="sm" variant="outline" onClick={handleSync} disabled={!isAndroidApp || syncing || availability !== "Available"}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
