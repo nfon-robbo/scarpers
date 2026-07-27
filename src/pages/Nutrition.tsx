@@ -184,21 +184,26 @@ export default function NutritionPage() {
       </Card>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />
-        <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />
-        <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />
-        <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />
-        <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />
-        <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />
-        <MacroCard
-          label="Alcohol"
-          value={`${totals.alcohol.toFixed(1)} units`}
-          target="≤ 2/day"
-          pct={totals.alcohol / 2}
-          color={totals.alcohol > 4 ? "bg-destructive" : "bg-purple-500"}
-        />
-      </div>
+      <MacroGrid
+        cards={{
+          carbs: <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />,
+          protein: <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />,
+          fat: <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />,
+          satFats: <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />,
+          salt: <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />,
+          calories: <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />,
+          alcohol: (
+            <MacroCard
+              label="Alcohol"
+              value={`${totals.alcohol.toFixed(1)} units`}
+              target="≤ 2/day"
+              pct={totals.alcohol / 2}
+              color={totals.alcohol > 4 ? "bg-destructive" : "bg-purple-500"}
+            />
+          ),
+        }}
+      />
+
 
       {/* Quick adds are now user-managed inside the Add meal dialog */}
 
