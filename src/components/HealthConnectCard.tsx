@@ -121,7 +121,7 @@ const HealthConnectCard = () => {
           </Button>
           <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing || availability !== "Available"}>
             {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            Sync all history
+            Sync past year
           </Button>
         </div>
 
