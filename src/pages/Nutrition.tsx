@@ -184,10 +184,12 @@ export default function NutritionPage() {
       </Card>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MacroCard label="Carbs" value={`${Math.round(totals.carbs)}g`} target={`${carbsTarget}g`} pct={totals.carbs / carbsTarget} color="bg-primary" />
         <MacroCard label="Protein" value={`${Math.round(totals.protein)}g`} target={`${proteinTarget}g`} pct={totals.protein / proteinTarget} color="bg-emerald-500" />
         <MacroCard label="Fat" value={`${Math.round(totals.fat)}g`} pct={null} color="bg-amber-500" />
+        <MacroCard label="Sat fats" value={`${Math.round(totals.satFats)}g`} pct={null} color="bg-orange-500" />
+        <MacroCard label="Salt" value={`${Math.round(totals.salt)}mg`} target="≤ 6g/day" pct={totals.salt / 6000} color="bg-cyan-500" />
         <MacroCard label="Calories" value={`${Math.round(totals.kcal)}`} pct={null} color="bg-rose-500" />
         <MacroCard
           label="Alcohol"
