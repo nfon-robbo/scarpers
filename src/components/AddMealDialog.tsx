@@ -514,7 +514,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                   />
                   <div className="text-xs text-muted-foreground">
                     {selected.brand ? <div className="font-medium text-foreground">{selected.brand}</div> : null}
-                    <div>{Math.round(selected.per100g.kcal)} kcal · {selected.per100g.carbs}g C · {selected.per100g.protein}g P · {selected.per100g.fat}g F / 100g</div>
+                    <div>{Math.round(selected.per100g.kcal)} kcal · {selected.per100g.carbs}g C · {selected.per100g.protein}g P · {selected.per100g.fat}g F · {selected.per100g.satFats || 0}g Sat · {selected.per100g.salt || 0}g Salt / 100g</div>
                   </div>
                 </div>
               )}
