@@ -15,7 +15,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
 
-import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
 import SleepSourcesPanel from "@/components/insights/SleepSourcesPanel";
