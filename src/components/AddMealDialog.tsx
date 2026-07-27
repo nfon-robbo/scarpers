@@ -63,6 +63,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
   const [carbs, setCarbs] = useState(0);
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
+  const [satFats, setSatFats] = useState(0);
+  const [salt, setSalt] = useState(0);
   const [kcal, setKcal] = useState(0);
   const [alcohol, setAlcohol] = useState(0);
   const [foodName, setFoodName] = useState("");
@@ -84,7 +86,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       setGrams(100);
       setQty(1);
       setUnit("g");
-      setCarbs(0); setProtein(0); setFat(0); setKcal(0); setAlcohol(0);
+      setCarbs(0); setProtein(0); setFat(0); setSatFats(0); setSalt(0); setKcal(0); setAlcohol(0);
       setFoodName("");
       setScanning(false);
       setScanLookup(false);
