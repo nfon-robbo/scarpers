@@ -12,8 +12,9 @@ import scarpersWordmark from "@/assets/scarpers-wordmark.png";
 import heroRunnerVideo from "@/assets/hero-runner.mp4.asset.json";
 import heroFeetVideo from "@/assets/hero-feet-10s.mp4.asset.json";
 import heroMarathonVideo from "@/assets/hero-marathon-10s.mp4.asset.json";
+import { assetUrl } from "@/lib/asset-url";
 
-const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url];
+const HERO_VIDEOS = [heroRunnerVideo.url, heroFeetVideo.url, heroMarathonVideo.url].map(assetUrl);
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -103,7 +104,9 @@ const Auth = () => {
             autoPlay={index === 0}
             muted
             playsInline
+            loop
             preload="auto"
+            controls={false}
             onEnded={() => setVideoIdx((i) => (i + 1) % HERO_VIDEOS.length)}
             aria-hidden="true"
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${index === videoIdx ? "opacity-100" : "opacity-0"}`}
