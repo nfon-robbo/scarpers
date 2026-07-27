@@ -97,6 +97,7 @@ const App = () => (
               <Route path="/training-plan" element={<TrainingPlanPage />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/integrations" element={<Settings />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="*" element={<NotFound />} />

@@ -11,6 +11,7 @@ import {
 } from "@/lib/health-connect";
 import { startHealthConnectSync } from "@/lib/health-connect-sync-store";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const THROTTLE_MS = 60 * 60 * 1000; // 1 hour
 const KEY = (uid: string) => `hcAutoSync:${uid}`;
@@ -37,9 +38,14 @@ const tryAutoSync = async (uid: string) => {
     const granted = await getGrantedHealthConnectPermissions();
     if (granted.length === 0) return; // user hasn't granted access yet
     markRan(uid);
-    // 3-day lookback is enough to catch the latest night plus any missed
-    // sync, without re-reading historical data we already have.
-    await startHealthConnectSync(uid, 3);
+    const { count } = await supabase
+      .from("sleep_stages")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", uid)
+      .eq("source", "health_connect");
+    // First Health Connect sync: backfill up to 365 days. After that, keep the
+    // morning sync small so it only catches the latest night/stages.
+    await startHealthConnectSync(uid, count && count > 0 ? 3 : 365);
   } catch {
     // Silent — manual sync card is still available as a fallback.
   }
