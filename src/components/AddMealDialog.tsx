@@ -561,7 +561,7 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     </div>
                     {/* size chips removed; users save their own quick adds */}
                     <div className="text-xs text-muted-foreground">
-                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F
+                      = {grams}{unitWord} · {kcal} kcal · {carbs}g C · {protein}g P · {fat}g F · {satFats}g Sat · {salt}mg Salt
                     </div>
                   </div>
                 );
