@@ -315,6 +315,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
         carbs_g: carbs,
         protein_g: protein,
         fat_g: fat,
+        sat_fats_g: satFats,
+        salt_mg: salt,
         calories: kcal,
         alcohol_units: alcohol,
         source: selected ? "open_food_facts" : "manual",
