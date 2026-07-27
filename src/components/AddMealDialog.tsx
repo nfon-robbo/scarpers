@@ -177,6 +177,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
       servingG: q.serving_g ? Number(q.serving_g) : null,
       productG: q.product_g ? Number(q.product_g) : null,
       servingSize: q.serving_size,
+      imageUrl: null,
+      imageSmallUrl: null,
     };
     setSelected(f);
     setFoodName(q.food_name);
