@@ -265,6 +265,7 @@ export async function syncHealthConnect(
   const stageRows: SleepStageInsert[] = [];
   const dailyTotals: Record<string, SleepStageTotals> = {};
   const nightDates = new Set<string>();
+  const nightsWithSpecific = new Set<string>();
   let sleepCount = 0;
 
   for (const session of sleepRecs) {
