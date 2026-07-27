@@ -316,7 +316,6 @@ const WellnessTab = () => {
       </Card>
 
       <SleepStagesChart />
-      <HealthConnectCard />
     </div>
   );
 };
