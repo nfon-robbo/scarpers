@@ -356,15 +356,23 @@ export async function syncHealthConnect(
     }
     const totalSecs = t.deep + t.rem + t.light + t.sleep;
     if (totalSecs <= 0) continue;
+    const hasSpecific = nightsWithSpecific.has(date);
     const patch: DailyMetricPatch = {
       user_id: userId,
       date,
-      deep_sleep_minutes: Math.round(t.deep / 60),
-      rem_sleep_minutes: Math.round(t.rem / 60),
-      light_sleep_minutes: Math.round((t.light + t.sleep) / 60),
-      awake_during_night_minutes: Math.round(t.awake / 60),
       sleep_duration_seconds: totalSecs,
     };
+    if (hasSpecific) {
+      // Real staged data — overwrite fine-grained fields.
+      patch.deep_sleep_minutes = Math.round(t.deep / 60);
+      patch.rem_sleep_minutes = Math.round(t.rem / 60);
+      patch.light_sleep_minutes = Math.round(t.light / 60);
+      patch.awake_during_night_minutes = Math.round(t.awake / 60);
+    }
+    // If hasSpecific is false, only sleep_duration_seconds is written and any
+    // previously-imported deep/rem/light values (e.g. from Google Fit) are
+    // preserved rather than overwritten with zeros.
+
     const { data: existing } = await supabase
       .from("daily_metrics")
       .select("id")
