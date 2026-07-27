@@ -83,8 +83,9 @@ const SleepCalendar = () => {
 
   const fetchSleepData = useCallback(async () => {
     if (!user) return;
-    // Pull the user's full sleep history so every night with data shows a score on the calendar.
-    const since = "2015-01-01";
+    // Keep the sleep calendar to the last 365 days so old imported data (e.g.
+    // 2024 exports) does not drive current sleep/readiness views.
+    const since = format(subDays(new Date(), 365), "yyyy-MM-dd");
 
     // Pull staged sleep plus legacy duration-only sleep. Manual/staged data wins;
     // daily_metrics is only used where no sleep_stages row exists for that date.

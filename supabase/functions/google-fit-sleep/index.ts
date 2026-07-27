@@ -83,14 +83,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const ALL_HISTORY_DAYS = 3650; // effectively unlimited available Google Fit history (~10 years)
+  const ALL_HISTORY_DAYS = 365; // cap first-time/historical sleep sync to the past year
   let daysBack = ALL_HISTORY_DAYS;
   let debug = false;
   try {
     const body = await req.clone().json();
-    // Always sync all available sleep history. Older mobile bundles may still
-    // send { days: 7 }; ignore that so the backend can no longer be capped by
-    // stale clients.
+    // Older mobile bundles may still send { days: 7 }; cap any historical sync
+    // at one year so stale clients cannot pull 2024-era sleep into the app.
     if (body?.days) daysBack = ALL_HISTORY_DAYS;
     debug = body?.debug === true;
   } catch { /* no body, use default */ }

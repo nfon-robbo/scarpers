@@ -61,16 +61,24 @@ type SleepStageName = "deep" | "rem" | "light" | "awake" | "sleep";
 type SleepStageTotals = Record<SleepStageName, number>;
 
 type RestingHrRecord = { time: string; beatsPerMinute: number };
-type SleepStageSegment = { startTime: string; endTime: string; stage: string };
+type SleepStageSegment = { startTime: string; endTime: string; stage?: string | number; stageType?: string | number; type?: string | number; name?: string | number };
 type SleepSessionRecord = {
   startTime: string;
   endTime: string;
   stages?: SleepStageSegment[];
+  sleepStages?: SleepStageSegment[];
 };
 
 // Stage string → our normalized name. devmaxime plugin returns Health Connect
 // stage constants like "SLEEP_STAGE_DEEP".
 const HC_STAGE_MAP: Record<string, SleepStageName | "out_of_bed"> = {
+  AWAKE: "awake",
+  DEEP: "deep",
+  LIGHT: "light",
+  REM: "rem",
+  SLEEPING: "sleep",
+  SLEEP: "sleep",
+  UNKNOWN: "sleep",
   SLEEP_STAGE_AWAKE: "awake",
   SLEEP_STAGE_SLEEPING: "sleep",
   SLEEP_STAGE_OUT_OF_BED: "out_of_bed",
@@ -78,6 +86,39 @@ const HC_STAGE_MAP: Record<string, SleepStageName | "out_of_bed"> = {
   SLEEP_STAGE_DEEP: "deep",
   SLEEP_STAGE_REM: "rem",
   SLEEP_STAGE_UNKNOWN: "sleep",
+  STAGE_TYPE_AWAKE: "awake",
+  STAGE_TYPE_SLEEPING: "sleep",
+  STAGE_TYPE_OUT_OF_BED: "out_of_bed",
+  STAGE_TYPE_LIGHT: "light",
+  STAGE_TYPE_DEEP: "deep",
+  STAGE_TYPE_REM: "rem",
+  STAGE_TYPE_UNKNOWN: "sleep",
+  "1": "awake",
+  "2": "sleep",
+  "3": "out_of_bed",
+  "4": "light",
+  "5": "deep",
+  "6": "rem",
+};
+
+const PERMISSION_ALIASES: Record<AnyType, string[]> = {
+  Steps: ["Steps", "android.permission.health.READ_STEPS"],
+  ActiveCaloriesBurned: ["ActiveCaloriesBurned", "android.permission.health.READ_ACTIVE_CALORIES_BURNED"],
+  RestingHeartRate: ["RestingHeartRate", "HeartRate", "android.permission.health.READ_RESTING_HEART_RATE", "android.permission.health.READ_HEART_RATE"],
+  SleepSession: ["SleepSession", "Sleep", "android.permission.health.READ_SLEEP"],
+};
+
+const hasPermission = (grantedSet: Set<string>, type: AnyType) =>
+  PERMISSION_ALIASES[type].some((perm) => grantedSet.has(perm));
+
+const normalizeSleepStage = (raw: unknown): SleepStageName | "out_of_bed" | null => {
+  if (raw == null) return null;
+  const normalized = String(raw)
+    .trim()
+    .replace(/^SleepStage\./i, "")
+    .replace(/^SLEEP_STAGE_TYPE_/i, "STAGE_TYPE_")
+    .toUpperCase();
+  return HC_STAGE_MAP[normalized] ?? null;
 };
 
 export async function ensureHealthConnectAvailable() {
@@ -157,7 +198,7 @@ export async function syncHealthConnect(
   for (let i = 0; i < AGGREGATE_TYPES.length; i++) {
     const t = AGGREGATE_TYPES[i];
     report(aggLabels[t], 5 + (i * 10));
-    if (!grantedSet.has(t)) continue;
+    if (!hasPermission(grantedSet, t)) continue;
     try {
       const res = await HC.aggregateRecords({ start: startIso, end: endIso, type: t, groupBy: "day" });
       for (const a of res?.aggregates ?? []) {
@@ -181,7 +222,7 @@ export async function syncHealthConnect(
   for (let i = 0; i < READ_RECORD_TYPES.length; i++) {
     const t = READ_RECORD_TYPES[i];
     report(readLabels[t], 25 + (i * 15));
-    if (!grantedSet.has(t)) {
+    if (!hasPermission(grantedSet, t)) {
       readErrors.push({ type: t, message: `Permission not granted for ${t}.` });
       continue;
     }
@@ -274,12 +315,16 @@ export async function syncHealthConnect(
     const wakeDate = dayBucket(sessionEnd);
     nightDates.add(wakeDate);
 
-    const stages = Array.isArray(session.stages) ? session.stages : [];
+    const stages = Array.isArray(session.stages)
+      ? session.stages
+      : Array.isArray(session.sleepStages)
+      ? session.sleepStages
+      : [];
     // If a session has specific stages (deep/rem/light/awake), ignore any
     // coarse SLEEPING/UNKNOWN segments some writers emit alongside them —
     // otherwise those minutes get double-counted into the totals.
     const hasSpecificStages = stages.some((seg) => {
-      const n = HC_STAGE_MAP[seg.stage];
+      const n = normalizeSleepStage(seg.stage ?? seg.stageType ?? seg.type ?? seg.name);
       return n === "deep" || n === "rem" || n === "light" || n === "awake";
     });
     let writtenForSession = 0;
@@ -289,7 +334,7 @@ export async function syncHealthConnect(
       const segStart = new Date(seg.startTime);
       const segEnd = new Date(seg.endTime);
       if (Number.isNaN(segStart.getTime()) || Number.isNaN(segEnd.getTime())) continue;
-      const stageName = HC_STAGE_MAP[seg.stage];
+      const stageName = normalizeSleepStage(seg.stage ?? seg.stageType ?? seg.type ?? seg.name);
       if (!stageName || stageName === "out_of_bed") continue;
       if (hasSpecificStages && stageName === "sleep") continue;
       const durationSeconds = Math.max(0, Math.round((segEnd.getTime() - segStart.getTime()) / 1000));

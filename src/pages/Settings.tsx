@@ -13,8 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, Sun, Monitor, LogOut, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle, Palette, Plug, Smartphone } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
@@ -120,6 +119,10 @@ const Settings = () => {
   const { preference: themePreference, setPreference: setThemePreference } = useTheme();
   const { profile, refresh: refreshProfile } = useProfile();
   const { toast } = useToast();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const targetSection = params.get("section");
+  const showIntegrations = location.pathname.endsWith("/integrations") || targetSection === "integrations";
   const [syncing, setSyncing] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -520,6 +523,20 @@ const Settings = () => {
         <p className="text-muted-foreground mt-1">Customize how your data is displayed</p>
       </div>
 
+      <CollapsibleSection
+        title="Integrations"
+        icon={Plug}
+        description="Connect Android Health Connect and other services for sleep, wellness, and activity data"
+        contentClassName="space-y-4"
+        defaultOpen={showIntegrations || true}
+      >
+        <HealthConnectCard />
+        <p className="text-xs text-muted-foreground">
+          <Smartphone className="w-3 h-3 inline mr-1" />
+          Android-only. Health Connect pulls the latest sleep stages, resting HR, steps and active calories from Garmin Connect via Health Connect. First-time sync is capped at the past year.
+        </p>
+      </CollapsibleSection>
+
       {isAdmin && (
         <Link to="/admin" className="block">
           <Card className="hover:border-primary/40 transition-colors cursor-pointer">
@@ -772,19 +789,6 @@ const Settings = () => {
             </Select>
           </div>
         ))}
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="Integrations"
-        icon={Plug}
-        description="Connect external apps and services to sync sleep, wellness, and activity data"
-        contentClassName="space-y-4"
-      >
-        <HealthConnectCard />
-        <p className="text-xs text-muted-foreground">
-          <Smartphone className="w-3 h-3 inline mr-1" />
-          Android-only. Health Connect pulls sleep stages, resting HR, steps and active calories from Garmin Connect (via Health Connect).
-        </p>
       </CollapsibleSection>
 
       {/* Previous Plans */}

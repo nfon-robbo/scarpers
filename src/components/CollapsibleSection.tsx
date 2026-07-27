@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChevronDown, LucideIcon } from "lucide-react";
 
@@ -26,6 +26,11 @@ const CollapsibleSection = ({
   children,
 }: CollapsibleSectionProps) => {
   const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
   return (
     <Card className={className}>
       <button
