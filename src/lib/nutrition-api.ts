@@ -14,6 +14,8 @@ export interface OffFood {
   servingG: number | null;
   productG: number | null;
   servingSize: string | null;
+  imageUrl: string | null;
+  imageSmallUrl: string | null;
   entriesMerged?: number;
   fromBarcode?: boolean;
 }
