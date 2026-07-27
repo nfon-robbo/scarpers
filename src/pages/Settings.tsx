@@ -774,6 +774,19 @@ const Settings = () => {
         ))}
       </CollapsibleSection>
 
+      <CollapsibleSection
+        title="Integrations"
+        icon={Plug}
+        description="Connect external apps and services to sync sleep, wellness, and activity data"
+        contentClassName="space-y-4"
+      >
+        <HealthConnectCard />
+        <p className="text-xs text-muted-foreground">
+          <Smartphone className="w-3 h-3 inline mr-1" />
+          Android-only. Health Connect pulls sleep stages, resting HR, steps and active calories from Garmin Connect (via Health Connect).
+        </p>
+      </CollapsibleSection>
+
       {/* Previous Plans */}
       <CollapsibleSection
         title="Previous Plans"
