@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, Sun, Monitor, LogOut, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle, Palette } from "lucide-react";
+import { Ruler, Gauge, Mountain, Thermometer, Weight, Moon, Sun, Monitor, LogOut, RefreshCw, Loader2, Timer, CheckCircle2, AlertCircle, Apple, Copy, Check, User, Archive, Play, RotateCcw, Trash2, Shield, ChevronRight, MessageCircle, Palette, Plug, Smartphone } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
 import PastChats from "@/components/PastChats";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import HealthConnectCard from "@/components/HealthConnectCard";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
@@ -771,6 +772,19 @@ const Settings = () => {
             </Select>
           </div>
         ))}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Integrations"
+        icon={Plug}
+        description="Connect external apps and services to sync sleep, wellness, and activity data"
+        contentClassName="space-y-4"
+      >
+        <HealthConnectCard />
+        <p className="text-xs text-muted-foreground">
+          <Smartphone className="w-3 h-3 inline mr-1" />
+          Android-only. Health Connect pulls sleep stages, resting HR, steps and active calories from Garmin Connect (via Health Connect).
+        </p>
       </CollapsibleSection>
 
       {/* Previous Plans */}

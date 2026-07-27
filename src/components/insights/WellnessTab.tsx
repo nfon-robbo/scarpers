@@ -15,7 +15,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format, subDays, parseISO } from "date-fns";
 
-import HealthConnectCard from "@/components/HealthConnectCard";
 import SleepStagesChart from "@/components/SleepStagesChart";
 import SleepCalendar from "@/components/SleepCalendar";
 import SleepSourcesPanel from "@/components/insights/SleepSourcesPanel";
@@ -145,29 +144,24 @@ const WellnessTab = () => {
 
   if (metrics.length === 0) {
     return (
-      <div className="space-y-4">
-        <HealthConnectCard />
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Moon className="w-12 h-12 mb-4 opacity-30" />
-            <p className="text-lg font-medium">No wellness data yet</p>
-            <p className="text-sm mb-4 text-center max-w-xs">
-              On Android, connect Health Connect below. Or sync from Intervals.icu and upload FIT monitoring files.
-            </p>
-            <Button onClick={syncWellness} disabled={syncing}>
-              {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              Sync Wellness Data
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <Moon className="w-12 h-12 mb-4 opacity-30" />
+          <p className="text-lg font-medium">No wellness data yet</p>
+          <p className="text-sm mb-4 text-center max-w-xs">
+            Sync from Intervals.icu or upload FIT monitoring files. On Android, set up Health Connect in Settings → Integrations.
+          </p>
+          <Button onClick={syncWellness} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Sync Wellness Data
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <div className="space-y-4">
-      <HealthConnectCard />
-
       <div className="flex justify-between items-center gap-2">
         <Link to="/nutrition">
           <Button variant="outline" size="sm">
