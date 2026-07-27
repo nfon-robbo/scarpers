@@ -275,7 +275,15 @@ export async function syncHealthConnect(
     nightDates.add(wakeDate);
 
     const stages = Array.isArray(session.stages) ? session.stages : [];
+    // If a session has specific stages (deep/rem/light/awake), ignore any
+    // coarse SLEEPING/UNKNOWN segments some writers emit alongside them —
+    // otherwise those minutes get double-counted into the totals.
+    const hasSpecificStages = stages.some((seg) => {
+      const n = HC_STAGE_MAP[seg.stage];
+      return n === "deep" || n === "rem" || n === "light" || n === "awake";
+    });
     let writtenForSession = 0;
+    let sessionHadSpecific = false;
 
     for (const seg of stages) {
       const segStart = new Date(seg.startTime);
@@ -283,8 +291,10 @@ export async function syncHealthConnect(
       if (Number.isNaN(segStart.getTime()) || Number.isNaN(segEnd.getTime())) continue;
       const stageName = HC_STAGE_MAP[seg.stage];
       if (!stageName || stageName === "out_of_bed") continue;
+      if (hasSpecificStages && stageName === "sleep") continue;
       const durationSeconds = Math.max(0, Math.round((segEnd.getTime() - segStart.getTime()) / 1000));
       if (durationSeconds <= 0) continue;
+      if (stageName !== "sleep") sessionHadSpecific = true;
 
       stageRows.push({
         user_id: userId,
