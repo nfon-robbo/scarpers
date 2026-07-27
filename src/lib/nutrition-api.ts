@@ -14,6 +14,8 @@ export interface OffFood {
   servingG: number | null;
   productG: number | null;
   servingSize: string | null;
+  imageUrl: string | null;
+  imageSmallUrl: string | null;
   entriesMerged?: number;
   fromBarcode?: boolean;
 }
@@ -32,6 +34,8 @@ function normalise(p: any): OffFood | null {
   if (!nutr.carbohydrates_100g && !nutr.proteins_100g && !nutr["energy-kcal_100g"]) return null;
   const name = (p.product_name || "").trim();
   if (!name) return null;
+  const img = (p.image_url || p.image_front_url || "").trim() || null;
+  const imgSmall = (p.image_small_url || p.image_front_small_url || "").trim() || null;
   return {
     id: String(p.code ?? ""),
     name,
@@ -45,6 +49,8 @@ function normalise(p: any): OffFood | null {
     servingG: num(p.serving_quantity) || null,
     productG: num(p.product_quantity) || null,
     servingSize: (p.serving_size || "").trim() || null,
+    imageUrl: img,
+    imageSmallUrl: imgSmall || img,
     entriesMerged: typeof p.entries_merged === "number" ? p.entries_merged : undefined,
   };
 }

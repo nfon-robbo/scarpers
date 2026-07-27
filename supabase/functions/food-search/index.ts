@@ -3,7 +3,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const UA = 'Scarpers/1.0 (https://scarpers.co.uk; contact@scarpers.co.uk)';
-const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,product_quantity,countries_tags,lang,unique_scans_n,popularity_key';
+const FIELDS = 'code,product_name,brands,nutriments,serving_size,serving_quantity,product_quantity,countries_tags,lang,unique_scans_n,popularity_key,image_url,image_small_url,image_front_url,image_front_small_url';
 const PAGE_SIZE = 50;
 const RETURN_LIMIT = 15;
 
@@ -45,6 +45,10 @@ function mapHit(h: any) {
     lang: h.lang ?? '',
     unique_scans_n: h.unique_scans_n,
     popularity_key: h.popularity_key,
+    image_url: h.image_url,
+    image_small_url: h.image_small_url,
+    image_front_url: h.image_front_url,
+    image_front_small_url: h.image_front_small_url,
   };
 }
 
@@ -186,7 +190,7 @@ Deno.serve(async (req) => {
     const barcode = (url.searchParams.get('barcode') || '').trim();
 
     if (barcode) {
-      const BARCODE_FIELDS = 'code,product_name,brands,nutriments,serving_quantity,serving_size,product_quantity,countries_tags,lang';
+      const BARCODE_FIELDS = 'code,product_name,brands,nutriments,serving_quantity,serving_size,product_quantity,countries_tags,lang,image_url,image_small_url,image_front_url,image_front_small_url';
       const hosts = ['https://world.openfoodfacts.org', 'https://uk.openfoodfacts.org'];
       for (const h of hosts) {
         const r = await fetchJson(`${h}/api/v2/product/${encodeURIComponent(barcode)}.json?lc=en&fields=${BARCODE_FIELDS}`);
