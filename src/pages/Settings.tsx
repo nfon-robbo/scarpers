@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import IntervalsCredentials from "@/components/IntervalsCredentials";
 import PastChats from "@/components/PastChats";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import HealthConnectCard from "@/components/HealthConnectCard";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
