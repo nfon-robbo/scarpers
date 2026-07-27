@@ -124,7 +124,7 @@ const dayBucket = (iso: string | Date) => new Date(iso).toISOString().split("T")
 
 export async function syncHealthConnect(
   userId: string,
-  daysBack = 3650,
+  daysBack = 365,
   onProgress?: HealthConnectProgressCallback,
 ) {
   const report = (phase: string, percent: number) => {
