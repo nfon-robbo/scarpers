@@ -62,7 +62,7 @@ export default function NutritionPage() {
     setLoading(true);
     const { data } = await supabase
       .from("nutrition_logs")
-      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, calories, alcohol_units, source")
+      .select("id, log_date, meal_type, food_name, brand, quantity_g, carbs_g, protein_g, fat_g, sat_fats_g, salt_mg, calories, alcohol_units, source")
       .eq("user_id", user.id)
       .eq("log_date", date)
       .order("created_at", { ascending: true });
