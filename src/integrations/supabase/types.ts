@@ -827,6 +827,8 @@ export type Database = {
           total_carbs_g: number
           total_fat_g: number
           total_protein_g: number
+          total_salt_mg: number
+          total_sat_fats_g: number
           updated_at: string
           user_id: string
         }
@@ -838,6 +840,8 @@ export type Database = {
           total_carbs_g?: number
           total_fat_g?: number
           total_protein_g?: number
+          total_salt_mg?: number
+          total_sat_fats_g?: number
           updated_at?: string
           user_id: string
         }
@@ -849,6 +853,8 @@ export type Database = {
           total_carbs_g?: number
           total_fat_g?: number
           total_protein_g?: number
+          total_salt_mg?: number
+          total_sat_fats_g?: number
           updated_at?: string
           user_id?: string
         }
@@ -1137,6 +1143,8 @@ export type Database = {
           portion_label: string | null
           protein_g: number
           quantity_g: number
+          salt_mg: number
+          sat_fats_g: number
           source: string
           updated_at: string
           user_id: string
@@ -1157,6 +1165,8 @@ export type Database = {
           portion_label?: string | null
           protein_g?: number
           quantity_g?: number
+          salt_mg?: number
+          sat_fats_g?: number
           source?: string
           updated_at?: string
           user_id: string
@@ -1177,6 +1187,8 @@ export type Database = {
           portion_label?: string | null
           protein_g?: number
           quantity_g?: number
+          salt_mg?: number
+          sat_fats_g?: number
           source?: string
           updated_at?: string
           user_id?: string
