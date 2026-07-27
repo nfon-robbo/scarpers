@@ -496,8 +496,8 @@ export default function AddMealDialog({ open, onOpenChange, logDate, defaultMeal
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
-                        min={unit === "g" ? 1 : 0.5}
-                        step={unit === "g" ? 1 : 0.5}
+                        min={0.1}
+                        step={unit === "g" ? 0.1 : 0.5}
                         value={qty}
                         onChange={(e) => setQty(Math.max(0, parseFloat(e.target.value) || 0))}
                         className="w-24"
