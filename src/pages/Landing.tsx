@@ -275,10 +275,29 @@ const Landing = () => {
   const heroVideoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   useEffect(() => {
+    // Ensure the homepage has a self-referential canonical (index.html no longer ships one,
+    // so deep pages set their own via MarketingPageLayout without the static default winning).
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    const created = !canonical;
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    const prev = canonical.href;
+    canonical.href = "https://www.scarpers.co.uk/";
+    return () => {
+      if (created) canonical?.remove();
+      else if (canonical) canonical.href = prev;
+    };
+  }, []);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) navigate("/dashboard", { replace: true });
     });
   }, [navigate]);
+
 
   useEffect(() => {
     const id = window.setInterval(() => {
