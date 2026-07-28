@@ -47,8 +47,10 @@
     <meta name="author" content="Scarpers" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <meta name="googlebot" content="index, follow" />
-    <!-- Sitewide default canonical; per-route pages (MarketingPageLayout) override this client-side. -->
-    <link rel="canonical" href="https://www.scarpers.co.uk/" />
+    <!-- No sitewide canonical: per-route pages set their own via MarketingPageLayout / Landing.
+         A static canonical pointing to the homepage causes Google to mark deep pages as
+         "Duplicate without user-selected canonical" because JS-updated canonicals aren't always honoured. -->
+
     <!-- Apex/lovable-app → www redirect (belt-and-braces; real 301 should be at edge/Cloudflare). -->
     <script>
       (function () {
