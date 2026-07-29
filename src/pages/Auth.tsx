@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,23 @@ const Auth = () => {
   const [videoIdx, setVideoIdx] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  // Same-origin relative next path (preserves OAuth consent flow etc.)
+  const rawNext = searchParams.get("next");
+  const nextPath = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const postAuthTarget = nextPath ?? "/dashboard";
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) navigate("/dashboard");
+      if (session) navigate(postAuthTarget);
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/dashboard");
+      if (session) navigate(postAuthTarget);
     });
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, postAuthTarget]);
 
   useEffect(() => {
     videoRefs.current.forEach((v, i) => {
@@ -59,7 +65,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: `${window.location.origin}${postAuthTarget}` },
         });
         if (error) throw error;
         toast({
@@ -82,7 +88,7 @@ const Auth = () => {
     setLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/dashboard`,
+        redirect_uri: `${window.location.origin}${postAuthTarget}`,
       });
       if (result.redirected) return;
       if (result.error) throw result.error;
