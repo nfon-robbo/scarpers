@@ -31,6 +31,7 @@ import TenKTrainingPlan from "./pages/TenKTrainingPlan";
 import AIRunningCoach from "./pages/AIRunningCoach";
 import CompareAlternative from "./pages/CompareAlternative";
 import NotFound from "./pages/NotFound";
+import OAuthConsent from "./pages/OAuthConsent";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import SupabaseErrorBanner from "./components/SupabaseErrorBanner";
@@ -50,6 +51,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
