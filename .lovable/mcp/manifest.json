@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "sdk_version": "0.25.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://datdwxsugeobqigtopnz.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "scarpers-mcp",
+      "version": "0.1.0",
+      "title": "Scarpers"
+    },
+    "tools": [
+      {
+        "name": "list_activities",
+        "title": "List recent activities",
+        "description": "List the signed-in user's recent Scarpers activities (runs, rides, etc.), newest first. Returns id, start_time, activity_type, distance in km, duration in minutes, and average heart rate.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Max activities to return (default 10).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_activity",
+        "title": "Get activity detail",
+        "description": "Fetch full detail for a single activity by id (must belong to the signed-in user).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Activity UUID from list_activities."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_current_training_plan",
+        "title": "Get current training plan",
+        "description": "Return the signed-in user's current (non-archived) Scarpers training plan, including race distance, race date, start date, and the full markdown plan content.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_sleep",
+        "title": "List recent sleep",
+        "description": "Return the signed-in user's daily sleep summaries (duration, deep/light/REM minutes, sleep score, HRV, resting HR) for the last N days.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "days": {
+              "description": "Number of past days to include (default 14).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_readiness_today",
+        "title": "Get today's readiness",
+        "description": "Return the signed-in user's most recent Scarpers readiness snapshot: score, contributing factors, coach insight and recommendation.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "log_nutrition",
+        "title": "Log a nutrition entry",
+        "description": "Add a food entry to the signed-in user's Scarpers nutrition diary. Values are for the actual portion consumed (not per 100g).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "food_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "meal_type": {
+              "type": "string",
+              "enum": [
+                "breakfast",
+                "lunch",
+                "dinner",
+                "snack"
+              ]
+            },
+            "quantity_g": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "calories": {
+              "type": "number",
+              "minimum": 0
+            },
+            "carbs_g": {
+              "type": "number",
+              "minimum": 0
+            },
+            "protein_g": {
+              "type": "number",
+              "minimum": 0
+            },
+            "fat_g": {
+              "type": "number",
+              "minimum": 0
+            },
+            "sat_fats_g": {
+              "type": "number",
+              "minimum": 0
+            },
+            "salt_mg": {
+              "type": "number",
+              "minimum": 0
+            },
+            "alcohol_units": {
+              "type": "number",
+              "minimum": 0
+            },
+            "brand": {
+              "type": "string"
+            },
+            "log_date": {
+              "description": "YYYY-MM-DD; defaults to today.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "food_name",
+            "meal_type",
+            "quantity_g",
+            "calories"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
