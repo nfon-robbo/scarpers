@@ -16,6 +16,7 @@ import {
   applyMoveSession,
   applyReplaceWithRecovery,
   applyEditWorkout,
+  applyPaceUpdate,
   getMoveTargetDate,
   formatMoveTargetLabel,
   previewMoveCascade,
