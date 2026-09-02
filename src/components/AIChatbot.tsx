@@ -563,7 +563,7 @@ const AIChatbot = () => {
         ...prev,
         {
           role: "assistant",
-          content: `✅ ${result!.summary}${raceNote}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
+          content: `${actionNotice ? `${actionNotice}\n\n` : ""}✅ ${result!.summary}${raceNote}\n\nUse the **Undo** button at the top of the Training Plan to revert.`,
         },
       ]);
       toast({ title: "Plan updated", description: result.summary });
