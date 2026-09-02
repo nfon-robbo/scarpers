@@ -532,7 +532,29 @@ Total length: 150 words max. Do not include the original next-session table agai
             <ChoiceRow label="How difficult was it?" options={["Too easy","Just right","Hard","Too hard"]} value={difficulty} onChange={setDifficulty} />
             <ChoiceRow label="Were the run paces…" options={["Too slow","Just right","Too fast"]} value={pace} onChange={setPace} />
             <ChoiceRow label="How do you feel?" options={["Fresh","OK","Tired","Exhausted"]} value={feel} onChange={setFeel} />
-            <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={setInjury} />
+            <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={(v) => { setInjury(v); if (v === "No injuries") { setNiggleLocation(null); setNiggleOther(""); } }} />
+            {hasNiggle && (
+              <div className="pt-1 border-t border-border/60 space-y-2">
+                <ChoiceRow
+                  label="Where is it?"
+                  options={[...knownAreas, ...NIGGLE_AREAS.filter((a) => !knownAreas.includes(a)), "Somewhere else"]}
+                  value={niggleLocation === "__other__" ? "Somewhere else" : niggleLocation}
+                  onChange={(v: string) => setNiggleLocation(v === "Somewhere else" ? "__other__" : v)}
+                />
+                {knownAreas.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">Your previously reported areas are listed first.</p>
+                )}
+                {niggleLocation === "__other__" && (
+                  <Input
+                    autoFocus
+                    placeholder="e.g. left peroneal tendon"
+                    value={niggleOther}
+                    onChange={(e) => setNiggleOther(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                )}
+              </div>
+            )}
             <Button
               onClick={submitFeedback}
               disabled={!feedbackComplete || coachLoading || !canRequestCoach}
