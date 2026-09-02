@@ -234,7 +234,24 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     return () => clearTimeout(t);
   }, [open, activity, difficulty, pace, feel, injury]);
 
-  const feedbackComplete = !!(difficulty && pace && feel && injury);
+  const feedbackComplete = !!(difficulty && pace && feel && injury) && (!hasNiggle || !!resolvedNiggleLocation);
+
+  // Load the athlete's previously-reported injury areas so the niggle
+  // follow-up can offer them as one-tap answers.
+  useEffect(() => {
+    if (!open || !hasNiggle || knownAreas.length) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: prof } = await supabase
+        .from("profiles").select("athlete_context").eq("user_id", user.id).maybeSingle();
+      const prior = extractProfileInjuryAreas(prof?.athlete_context);
+      const { data: existing } = await supabase
+        .from("niggles" as any).select("location").eq("user_id", user.id).eq("status", "active");
+      const previous = ((existing as any[]) || []).map((n) => n.location as string);
+      setKnownAreas(Array.from(new Set([...previous, ...prior])));
+    })();
+  }, [open, hasNiggle, knownAreas.length]);
 
   const submitFeedback = async () => {
     if (!workout || !activity || !feedbackComplete || !canRequestCoach) return;
