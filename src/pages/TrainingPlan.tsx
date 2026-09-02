@@ -2475,7 +2475,7 @@ const TrainingPlanPage = () => {
     }
     // Pick the next workout that has NOT already been completed. Today counts
     // only if it's a real (non-rest) session with no linked completed activity.
-    const picked = pickUpcomingWorkout();
+    const picked = pickUpcomingWorkout({ afterDate: completedWorkoutDate });
     if (!picked) {
       toast({ title: "No upcoming workout", description: "Couldn't find an un-completed future workout in your plan.", variant: "destructive" });
       return;
