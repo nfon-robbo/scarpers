@@ -82,6 +82,28 @@ export function enforceWarmupCooldownMinimums(markdown: string): PlanValidationR
 }
 
 /**
+ * Fix day-name labels that don't match their calendar date. Long AI
+ * generations drift (e.g. "**Monday 09/09/2026**" when 09/09 is a
+ * Wednesday), which breaks day-of-week rendering and date matching.
+ */
+export function fixDayNameLabels(markdown: string): { content: string; fixes: string[] } {
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const fixes: string[] = [];
+  const content = markdown.replace(
+    /\*\*([A-Za-z]+) (\d{1,2})\/(\d{1,2})\/(\d{4})\*\*/g,
+    (whole, name: string, dd: string, mm: string, yyyy: string) => {
+      const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      if (isNaN(d.getTime())) return whole;
+      const correct = DAY_NAMES[d.getDay()];
+      if (correct.toLowerCase() === name.toLowerCase()) return whole;
+      fixes.push(`${name} ${dd}/${mm}/${yyyy} → ${correct}`);
+      return `**${correct} ${dd}/${mm}/${yyyy}**`;
+    },
+  );
+  return { content, fixes };
+}
+
+/**
  * Remove duplicate day blocks. A failed in-place edit can leave two blocks
  * headed with the same date (e.g. two "**Friday 04/09/2026**" sections). The
  * LAST block for a date wins — later blocks come from more recent edits.
