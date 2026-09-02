@@ -27,13 +27,15 @@ import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
 import PlanPauseDialog, { type RaceDateMode } from "@/components/PlanPauseDialog";
 import PlanPausedBanner from "@/components/PlanPausedBanner";
+import PlanRestartDialog from "@/components/PlanRestartDialog";
 import {
   isPauseActive,
+  restartPlanDates,
   isPauseReadyToResume,
   pauseResumeDeltaDays,
   resumePlanAfterPause,
 } from "@/lib/plan-utils";
-import { Pause as PauseIcon, Play as PlayIcon } from "lucide-react";
+import { Pause as PauseIcon, Play as PlayIcon, RotateCcw as RestartIcon } from "lucide-react";
 
 import RaceEstimateTabs from "@/components/RaceEstimateTabs";
 import { parseWorkoutsFromPlan, ParsedSegment, ParsedWorkout, generateIcsCalendar, downloadText } from "@/lib/plan-export";
@@ -548,6 +550,7 @@ const TrainingPlanPage = () => {
   const [pauseReason, setPauseReason] = useState<string | null>(null);
   const [pauseRaceDateMode, setPauseRaceDateMode] = useState<RaceDateMode | null>(null);
   const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const isPlanPaused = isPauseActive(pausedUntil, pauseRaceDateMode);
   const pauseWindow = pausedAt && pausedUntil ? { start: pausedAt, end: pausedUntil } : null;
@@ -1266,6 +1269,56 @@ const TrainingPlanPage = () => {
     } finally {
       setUpdatingDates(false);
     }
+  };
+
+
+  // ─── Restart plan ────────────────────────────────────────────────
+  // Keeps every workout that was generated and slides the whole plan onto a
+  // new start date: same number of weeks, same requested training days.
+  const handleConfirmRestart = async (restartDate: Date) => {
+    const newStartIso = toLocalISODate(restartDate);
+    const result = restartPlanDates(content, newStartIso, trainingDays);
+    if (!result) {
+      toast({ title: "Couldn't restart plan", description: "No dated workouts found in this plan.", variant: "destructive" });
+      return;
+    }
+    const previousContent = content;
+    const newStart = parseLocalISODate(result.startIso);
+    const newRace = result.raceDateIso ? parseLocalISODate(result.raceDateIso) : undefined;
+    setContent(result.content);
+    setStartDate(newStart);
+    if (newRace) setRaceDate(newRace);
+
+    if (savedPlanId && user) {
+      const { error } = await supabase
+        .from("training_plans")
+        .update({
+          start_date: result.startIso,
+          race_date: result.raceDateIso,
+          content: result.content,
+          paused_at: null,
+          paused_until: null,
+          pause_reason: null,
+          race_date_mode: null,
+        } as any)
+        .eq("id", savedPlanId);
+      if (error) {
+        setContent(previousContent);
+        toast({ title: "Couldn't restart plan", description: error.message, variant: "destructive" });
+        return;
+      }
+      setPausedAt(null);
+      setPausedUntil(null);
+      setPauseReason(null);
+      setPauseRaceDateMode(null);
+      if (previousContent !== result.content) pushUndoEntry(savedPlanId, previousContent, "plan restart");
+    }
+
+    toastPlanChange(
+      "Plan restarted",
+      `All workouts moved — now starts ${format(restartDate, "dd/MM/yyyy")}${result.raceDateIso ? ` and finishes ${format(parseLocalISODate(result.raceDateIso), "dd/MM/yyyy")}` : ""}.`,
+      savedPlanId ?? null,
+    );
   };
 
   // ─── Pause / Resume ───────────────────────────────────────────────
@@ -3718,6 +3771,15 @@ ${mainRow}
                       Pause plan
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setRestartDialogOpen(true)}
+                    className="gap-2 bg-white/15 hover:bg-white/25 text-primary-foreground border-0 backdrop-blur"
+                  >
+                    <RestartIcon className="w-3.5 h-3.5" />
+                    Restart plan
+                  </Button>
                 </div>
               }
             />
@@ -4218,6 +4280,14 @@ ${mainRow}
           )}
         </Card>
       </>)}
+      <PlanRestartDialog
+        open={restartDialogOpen}
+        onOpenChange={setRestartDialogOpen}
+        currentStart={startDate}
+        currentRaceDate={raceDate ?? null}
+        trainingDays={trainingDays}
+        onConfirm={handleConfirmRestart}
+      />
       <PlanPauseDialog
         open={pauseDialogOpen}
         onOpenChange={setPauseDialogOpen}
