@@ -2464,7 +2464,7 @@ const TrainingPlanPage = () => {
 
 
   // Apply an elite-coach recommendation to the NEXT planned workout (skips today)
-  const adjustNextWorkout = useCallback(async (recommendation: string) => {
+  const adjustNextWorkout = useCallback(async (recommendation: string, completedWorkoutDate?: string) => {
     if (!user || !content) {
       toast({ title: "No active plan", description: "There's no plan to adjust.", variant: "destructive" });
       return;
