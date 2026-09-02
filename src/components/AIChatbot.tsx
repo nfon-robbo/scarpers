@@ -484,6 +484,14 @@ const AIChatbot = () => {
         return;
       }
 
+      // Never act on a session that's already completed — retarget forward.
+      const resolved = await resolveActionableDate(session.user.id, plan.content, dateUk);
+      let actionNotice: string | null = null;
+      if (resolved.dateUk !== dateUk) {
+        dateUk = resolved.dateUk;
+        actionNotice = resolved.notice;
+      }
+
       // Race-date conflict gate: when the user taps the plain "move" button
       // and the cascade would push sessions past race day, surface the three
       // resolution options in chat instead of writing silently.
