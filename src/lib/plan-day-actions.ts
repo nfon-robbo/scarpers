@@ -448,6 +448,44 @@ export function applyEditWorkout(
   };
 }
 
+/**
+ * Deterministic pace-only update: rewrites every pace target (e.g.
+ * "8:55-9:15/km") in the target day's table rows to `newPace` (e.g.
+ * "8:30-8:50/km"). Warm-up / cool-down / walk-only rows are left untouched
+ * (they should never carry a pace anyway). Used when the chat recommendation
+ * is a pace change without a full replacement workout, so the number the
+ * coach states is the number that lands in the plan — no LLM round-trip.
+ */
+export function applyPaceUpdate(
+  planContent: string,
+  dateUk: string,
+  newPace: string,
+): DayActionResult | null {
+  const loc = locateTargetBlock(planContent, dateUk);
+  if (!loc) return null;
+  const PACE_GLOBAL = /\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?\s*(?:\/|per\s*)km/gi;
+  const PACE_TEST = /\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?\s*(?:\/|per\s*)km/i;
+  let changed = false;
+  const lines = loc.target.rawText!.split("\n").map((line) => {
+    if (!line.trim().startsWith("|")) return line;
+    const firstCell = (line.split("|")[1] ?? "").trim();
+    // Skip pure warm-up / cool-down / walk rows — never paced.
+    if (/warm|cool/i.test(firstCell)) return line;
+    if (/^walk/i.test(firstCell) && !/run|interval|main|rep/i.test(firstCell)) return line;
+    if (!PACE_TEST.test(line)) return line;
+    changed = true;
+    return line.replace(PACE_GLOBAL, newPace);
+  });
+  if (!changed) return null;
+  const newBlock = lines.join("\n");
+  const updated =
+    planContent.slice(0, loc.idx) + newBlock + planContent.slice(loc.idx + loc.target.rawText!.length);
+  return {
+    updatedPlan: updated,
+    summary: `Session on ${dateUk} pace updated to ${newPace}.`,
+  };
+}
+
 // -------------------------------------------------------------------------
 // Race-date conflict detection + resolution helpers (chatbot "Move" flow).
 // -------------------------------------------------------------------------

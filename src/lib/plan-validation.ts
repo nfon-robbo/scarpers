@@ -82,11 +82,76 @@ export function enforceWarmupCooldownMinimums(markdown: string): PlanValidationR
 }
 
 /**
+ * Fix day-name labels that don't match their calendar date. Long AI
+ * generations drift (e.g. "**Monday 09/09/2026**" when 09/09 is a
+ * Wednesday), which breaks day-of-week rendering and date matching.
+ */
+export function fixDayNameLabels(markdown: string): { content: string; fixes: string[] } {
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const fixes: string[] = [];
+  const content = markdown.replace(
+    /\*\*([A-Za-z]+) (\d{1,2})\/(\d{1,2})\/(\d{4})\*\*/g,
+    (whole, name: string, dd: string, mm: string, yyyy: string) => {
+      const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      if (isNaN(d.getTime())) return whole;
+      const correct = DAY_NAMES[d.getDay()];
+      if (correct.toLowerCase() === name.toLowerCase()) return whole;
+      fixes.push(`${name} ${dd}/${mm}/${yyyy} → ${correct}`);
+      return `**${correct} ${dd}/${mm}/${yyyy}**`;
+    },
+  );
+  return { content, fixes };
+}
+
+/**
+ * Remove duplicate day blocks. A failed in-place edit can leave two blocks
+ * headed with the same date (e.g. two "**Friday 04/09/2026**" sections). The
+ * LAST block for a date wins — later blocks come from more recent edits.
+ * Returns the cleaned markdown plus the dates that were deduped.
+ */
+export function removeDuplicateDayBlocks(markdown: string): { content: string; dedupedDates: string[] } {
+  const DAY_HEADER_RE = /^(#{1,4}\s*)?\*\*[A-Za-z]+\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/;
+  const lines = markdown.split("\n");
+
+  interface Block { date: string; start: number; end: number } // [start, end)
+  const blocks: Block[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(DAY_HEADER_RE);
+    if (!m) continue;
+    let end = lines.length;
+    for (let j = i + 1; j < lines.length; j++) {
+      const l = lines[j];
+      if (DAY_HEADER_RE.test(l) || /^#{1,4}\s+\S/.test(l) || /^---\s*$/.test(l)) { end = j; break; }
+    }
+    blocks.push({ date: m[2], start: i, end });
+    i = end - 1;
+  }
+
+  const lastByDate = new Map<string, Block>();
+  for (const b of blocks) lastByDate.set(b.date, b);
+  const drop = blocks.filter((b) => lastByDate.get(b.date) !== b);
+  if (!drop.length) return { content: markdown, dedupedDates: [] };
+
+  const dropSet = new Set<number>();
+  for (const b of drop) for (let i = b.start; i < b.end; i++) dropSet.add(i);
+  const kept = lines.filter((_, i) => !dropSet.has(i));
+  return { content: kept.join("\n"), dedupedDates: drop.map((b) => b.date) };
+}
+
+/**
  * Convenience wrapper that also logs each correction to the console so there's
  * an audit trail of what the guardrail changed and why.
  */
 export function enforceAndLog(markdown: string, source: string): PlanValidationResult {
-  const result = enforceWarmupCooldownMinimums(markdown);
+  const relabelled = fixDayNameLabels(markdown);
+  for (const f of relabelled.fixes) {
+    console.warn(`[plan-validation] ${source}: fixed day-name label ${f}`);
+  }
+  const deduped = removeDuplicateDayBlocks(relabelled.content);
+  for (const d of deduped.dedupedDates) {
+    console.warn(`[plan-validation] ${source}: removed duplicate day block for ${d} (kept last)`);
+  }
+  const result = enforceWarmupCooldownMinimums(deduped.content);
   for (const c of result.corrections) {
     console.warn(
       `[plan-validation] ${source}: bumped ${c.segment} on ${c.day} from ${c.from} min → ${c.to} min (minimum 5)`

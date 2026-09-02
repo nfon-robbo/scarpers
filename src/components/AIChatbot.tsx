@@ -16,6 +16,7 @@ import {
   applyMoveSession,
   applyReplaceWithRecovery,
   applyEditWorkout,
+  applyPaceUpdate,
   getMoveTargetDate,
   formatMoveTargetLabel,
   previewMoveCascade,
@@ -25,7 +26,7 @@ import {
   formatRaceDateLabel,
 } from "@/lib/plan-day-actions";
 import { logPlanEdit } from "@/lib/plan-edit-log";
-import { parseChatRecommendation } from "@/lib/chat-recommendation-parser";
+import { parseChatRecommendation, parsePaceChangeRecommendation } from "@/lib/chat-recommendation-parser";
 
 interface Message {
   role: "user" | "assistant";
@@ -339,6 +340,47 @@ const AIChatbot = () => {
         }
       }
 
+      // ── PACE-ONLY CHANGE ──
+      // "9:15 is too slow" style recommendations state a new pace in prose but
+      // no structured workout. Patch the pace cells directly so the number the
+      // coach announced is exactly what lands in the plan — an LLM round-trip
+      // can (and did) leave the old pace in the table.
+      const paceChange = parsePaceChangeRecommendation(recommendationText);
+      if (paceChange) {
+        // Dedupe first so a stale duplicate block can't shadow the real one.
+        const base = enforceAndLog(plan.content, "chat pace update pre-edit").content;
+        const result = applyPaceUpdate(base, scope.dateUk, paceChange);
+        if (result) {
+          const updated = result.updatedPlan;
+          try {
+            const rawOverrides = localStorage.getItem("plan-step-overrides");
+            const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+            if (overrides && typeof overrides === "object") {
+              delete overrides[isoDate];
+              localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
+              window.dispatchEvent(new CustomEvent("plan-step-overrides-cleared", { detail: { date: isoDate } }));
+            }
+          } catch {}
+          pushUndoEntry(plan.id, plan.content, `${scope.dateUk} session`);
+          await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
+          setLastUndo({ planId: plan.id, prevContent: plan.content, dateUk: scope.dateUk });
+          await logPlanEdit({
+            planId: plan.id,
+            userId: session.user.id,
+            dateUk: scope.dateUk,
+            action: "edit",
+            template: null,
+            beforeTitle: target.title,
+            afterTitle: target.title,
+            summary: `Pace updated to ${paceChange} on ${scope.dateUk}`,
+            details: { source: "chatbot_pace_update", newPace: paceChange, recommendation: recommendationText.slice(0, 2000) },
+          });
+          finishWith(`✅ Done — the run pace for your **${scope.dateUk}** session is now **${paceChange}** in the plan. Use the **Undo** button at the top of the Training Plan to revert.`);
+          toast({ title: `Pace updated to ${paceChange}`, description: `${scope.dateUk} — applied directly` });
+          return;
+        }
+      }
+
       // Build today_workout block (same shape the day-adjust prompt expects).
       let todayWorkoutBlock = `**${target.title}**\n`;
       if (target.segments.length > 0) {
@@ -395,6 +437,15 @@ const AIChatbot = () => {
           const updatedRaw = plan.content!.slice(0, idx) + replacement + plan.content!.slice(idx + target.rawText!.length);
           const updated = enforceAndLog(updatedRaw, "day-ahead in-place edit").content;
 
+          try {
+            const rawOverrides = localStorage.getItem("plan-step-overrides");
+            const overrides = rawOverrides ? JSON.parse(rawOverrides) : {};
+            if (overrides && typeof overrides === "object") {
+              delete overrides[isoDate];
+              localStorage.setItem("plan-step-overrides", JSON.stringify(overrides));
+              window.dispatchEvent(new CustomEvent("plan-step-overrides-cleared", { detail: { date: isoDate } }));
+            }
+          } catch {}
           pushUndoEntry(plan.id, plan.content!, `${scope.dateUk} session`);
           await supabase.from("training_plans").update({ content: updated }).eq("id", plan.id);
           setLastUndo({ planId: plan.id, prevContent: plan.content!, dateUk: scope.dateUk });
