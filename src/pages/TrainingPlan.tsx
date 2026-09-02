@@ -2548,7 +2548,8 @@ const TrainingPlanPage = () => {
     const rec = (location.state as any)?.applyRecommendation as string | undefined;
     if (!rec || appliedRecRef.current || !content || initialLoading) return;
     appliedRecRef.current = true;
-    adjustNextWorkout(rec);
+    const doneDate = (location.state as any)?.completedWorkoutDate as string | undefined;
+    adjustNextWorkout(rec, doneDate);
     // Clear state so refresh/back doesn't re-trigger
     navigate(location.pathname, { replace: true });
   }, [location.state, content, initialLoading, adjustNextWorkout, navigate, location.pathname]);
