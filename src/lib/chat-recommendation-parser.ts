@@ -308,3 +308,35 @@ export function parseChatRecommendation(text: string): ParsedRecommendation | nu
     },
   };
 }
+
+// ── Pace-change-only recommendations ────────────────────────────────────────
+// The chatbot often replies to "9:15 is too slow" with a prose recommendation
+// like "I will increase your target run pace to 8:30-8:50/km" — no structured
+// workout. Piping that through the day-adjust LLM risks the old pace surviving
+// in the table while the prose claims the new one. This extracts the new pace
+// so the caller can patch the existing block's Target cells deterministically.
+
+/**
+ * Extract a pace change target from a chat recommendation, e.g.
+ * "increase your target run pace to 8:30-8:50/km" → "8:30-8:50/km".
+ * Returns null when no explicit new pace is stated.
+ */
+export function parsePaceChangeRecommendation(text: string): string | null {
+  if (!text) return null;
+  // "pace ... to 8:30-8:50/km" / "target run pace to 8:30/km" / "pace of 8:30–8:50 per km"
+  const m =
+    text.match(/pace[^\n]{0,60}?\bto\s+(\d{1,2}:\d{2})(?:\s*[-–]\s*(\d{1,2}:\d{2}))?\s*(?:\/|per\s*)km/i) ||
+    text.match(/pace\s+of\s+(\d{1,2}:\d{2})(?:\s*[-–]\s*(\d{1,2}:\d{2}))?\s*(?:\/|per\s*)km/i);
+  if (!m) return null;
+  const a = m[1];
+  const b = m[2];
+  if (b) {
+    // Normalise order: faster (smaller) pace first.
+    const toSec = (p: string) => {
+      const [mm, ss] = p.split(":").map(Number);
+      return mm * 60 + ss;
+    };
+    return toSec(a) <= toSec(b) ? `${a}-${b}/km` : `${b}-${a}/km`;
+  }
+  return `${a}/km`;
+}
