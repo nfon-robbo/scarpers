@@ -46,6 +46,64 @@ const isConcreteWorkoutEdit = (text: string) => {
 
 const stripActionMarkers = (text: string) => text.replace(ACTION_MARKER_REGEX, "").trim();
 
+const ukToIso = (dateUk: string): string | null => {
+  const m = dateUk.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+};
+const isoToUk = (iso: string): string => {
+  const [y, mo, d] = iso.split("-");
+  return `${d}/${mo}/${y}`;
+};
+
+/**
+ * If the targeted date already has a completed session, retarget the change to
+ * the next un-completed, non-rest workout in the plan. Returns the dateUk to
+ * act on plus an optional notice to surface to the user.
+ */
+const resolveActionableDate = async (
+  userId: string,
+  planContent: string,
+  dateUk: string,
+): Promise<{ dateUk: string; notice: string | null }> => {
+  const iso = ukToIso(dateUk);
+  if (!iso) return { dateUk, notice: null };
+  const { data: acts } = await supabase
+    .from("activities")
+    .select("date, distance_meters, duration_seconds")
+    .eq("user_id", userId)
+    .gte("date", iso);
+  const completed = new Set<string>();
+  for (const a of acts || []) {
+    const d = (a.date || "").slice(0, 10);
+    if (!d) continue;
+    if (Number(a.distance_meters || 0) >= 500 && Number(a.duration_seconds || 0) >= 60) {
+      completed.add(d);
+    }
+  }
+  if (!completed.has(iso)) return { dateUk, notice: null };
+
+  // Date is done — walk forward to the next un-completed, non-rest session.
+  const isRest = (title: string, segCount: number) => segCount === 0 || /\brest\b/i.test(title);
+  const workouts = parseWorkoutsFromPlan(planContent)
+    .filter(w => w.dateObj)
+    .sort((a, b) => a.dateObj!.getTime() - b.dateObj!.getTime());
+  for (const w of workouts) {
+    const y = w.dateObj!.getFullYear();
+    const mo = String(w.dateObj!.getMonth() + 1).padStart(2, "0");
+    const d = String(w.dateObj!.getDate()).padStart(2, "0");
+    const wIso = `${y}-${mo}-${d}`;
+    if (wIso <= iso) continue;
+    if (completed.has(wIso)) continue;
+    if (isRest(w.title, w.segments.length)) continue;
+    return {
+      dateUk: isoToUk(wIso),
+      notice: `⚠️ Your ${dateUk} session is already completed — applying this to your next session on ${d}/${mo}/${y} instead.`,
+    };
+  }
+  return { dateUk, notice: null };
+};
+
 const AIChatbot = () => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
