@@ -112,24 +112,33 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   // was never auto-detected — either way the AI review + check-in questions
   // then run from the FIT numbers.
   const applyParsed = async (userId: string, parsed: any) => {
+    // A FIT (re)import means fresh numbers: wipe the cached review AND any
+    // cached coach recommendation + previous check-in answers so the
+    // questionnaire is asked again from the FIT data.
+    const resetForFreshReview = () => {
+      setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
+      setNiggleLocation(null); setNiggleOther("");
+      setCoachContent(""); setCoachDone(false); setCoachLoading(false);
+      setReviewContent(""); setReviewError(null); setCoachError(null);
+      hydratedRef.current = null;
+    };
     if (activity?.id) {
       const { enrichActivityFromParsed } = await import("@/lib/fit-enrich-activity");
       const res = await enrichActivityFromParsed(userId, activity.id, parsed);
-      // Drop the cached AI summary so the review is rebuilt from FIT numbers.
       await supabase.from("workout_reviews")
-        .update({ ai_summary: null } as any)
+        .update({ ai_summary: null, coach_recommendation: null, difficulty: null, pace: null, feel: null, injury: null } as any)
         .eq("activity_id", activity.id);
       const { data: fresh } = await supabase
         .from("activities").select("*").eq("id", activity.id).maybeSingle();
       setFitDone(`Updated from FIT — ${res.lapCount} laps, ${res.gpsPoints} GPS points. Analysing…`);
-      if (fresh) setActivity(fresh);
+      if (fresh) { resetForFreshReview(); setActivity(fresh); }
     } else {
       const { createActivityFromParsed } = await import("@/lib/fit-enrich-activity");
       const { activityId, lapCount } = await createActivityFromParsed(userId, parsed);
       const { data: fresh } = await supabase
         .from("activities").select("*").eq("id", activityId).maybeSingle();
       setFitDone(`Workout imported from FIT — ${lapCount} laps. Analysing…`);
-      if (fresh) setActivity(fresh);
+      if (fresh) { resetForFreshReview(); setActivity(fresh); }
     }
   };
 
