@@ -143,7 +143,11 @@ export function removeDuplicateDayBlocks(markdown: string): { content: string; d
  * an audit trail of what the guardrail changed and why.
  */
 export function enforceAndLog(markdown: string, source: string): PlanValidationResult {
-  const deduped = removeDuplicateDayBlocks(markdown);
+  const relabelled = fixDayNameLabels(markdown);
+  for (const f of relabelled.fixes) {
+    console.warn(`[plan-validation] ${source}: fixed day-name label ${f}`);
+  }
+  const deduped = removeDuplicateDayBlocks(relabelled.content);
   for (const d of deduped.dedupedDates) {
     console.warn(`[plan-validation] ${source}: removed duplicate day block for ${d} (kept last)`);
   }
