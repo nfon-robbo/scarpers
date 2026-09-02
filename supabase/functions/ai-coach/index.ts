@@ -1258,6 +1258,30 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
           };
           const todayInfo = dateInTz(0);
           const tomorrowInfo = dateInTz(1);
+          const activityDateInTz = (iso: string) => {
+            try {
+              const parts = new Intl.DateTimeFormat("en-GB", {
+                timeZone: tz,
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }).formatToParts(new Date(iso));
+              const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+              return `${get("day")}/${get("month")}/${get("year")}`;
+            } catch {
+              return "";
+            }
+          };
+          const completedActivityDates = new Set(
+            (activities || [])
+              .filter((a: any) =>
+                typeof a.start_time === "string"
+                && Number(a.distance_meters || 0) >= 500
+                && Number(a.duration_seconds || 0) >= 60
+              )
+              .map((a: any) => activityDateInTz(a.start_time))
+              .filter(Boolean),
+          );
           const planEntries = String(activePlan.content)
             .split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi)
             .filter((entry) => /^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b/m.test(entry.split("\n")[0] || ""));
@@ -1271,13 +1295,23 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
             if (!entry) return `${date}: NO SESSION SCHEDULED — rest day / blank diary day.`;
             const heading = entry.split("\n")[0]?.replace(/[#*_`]/g, "").trim() || date;
             const title = entry.split("\n").find((line) => /total:|run|walk|interval|easy|long|rest|race/i.test(line) && !/^\s*\|/.test(line))?.replace(/[#*_`]/g, "").trim();
-            return `${date}: ${heading}${title && title !== heading ? ` — ${title}` : ""}`;
+            const status = completedActivityDates.has(date) ? " [COMPLETED — NOT ACTIONABLE]" : " [NOT COMPLETED]";
+            return `${date}: ${heading}${title && title !== heading ? ` — ${title}` : ""}${status}`;
           };
           const diaryLookup = Array.from({ length: 14 }, (_, i) => {
             const info = dateInTz(i);
             return `- ${i === 0 ? "Today" : i === 1 ? "Tomorrow" : `+${i}d`} (${info.weekday} ${info.date}): ${summariseEntry(info.date)}`;
           }).join("\n");
           const todayStr = todayInfo.date;
+          const nextActionableEntry = Array.from({ length: 90 }, (_, i) => dateInTz(i + 1))
+            .find((info) => {
+              const entry = findPlanEntry(info.date);
+              if (!entry || completedActivityDates.has(info.date)) return false;
+              return !/\brest\b/i.test(entry);
+            });
+          const completionDirective = completedActivityDates.has(todayStr)
+            ? `\nTODAY COMPLETION OVERRIDE (AUTHORITATIVE):\n- The athlete has already completed a run today, ${todayInfo.weekday} ${todayStr}.\n- Today's planned session is finished and MUST be discussed only in the past tense. Never say they "have a scheduled workout for today", never suggest doing or changing it today, and never emit [[ACTION:day:${todayStr}]].\n- Any proposed plan edit must target the next un-completed scheduled workout${nextActionableEntry ? ` on ${nextActionableEntry.weekday} ${nextActionableEntry.date}` : " after today"}, and the reply must explicitly say today's run is already complete.\n`
+            : "";
           chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
 - Start date: ${activePlan.start_date || "n/a"}
 - Race date: ${activePlan.race_date || "n/a"}
@@ -1294,6 +1328,7 @@ ${diaryLookup}
 TODAY/TOMORROW STATUS:
 - Today is ${todayInfo.weekday} ${todayInfo.date}: ${summariseEntry(todayInfo.date)}
 - Tomorrow is ${tomorrowInfo.weekday} ${tomorrowInfo.date}: ${summariseEntry(tomorrowInfo.date)}
+${completionDirective}
 
 When the user asks about a future or past session (e.g. "next Friday", "this Wednesday", "16/05/2026"), look it up in the plan content above and answer with the actual scheduled workout. Never claim you don't have access to the plan — it is provided here.`;
         } else {
