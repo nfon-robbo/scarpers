@@ -311,6 +311,18 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
     plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+    if (hasNiggle && resolvedNiggleLocation) {
+      plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
+      // Log the niggle so we can check in on it on the next training day.
+      try {
+        await recordNiggle({
+          userId,
+          location: resolvedNiggleLocation,
+          severity: injury,
+          activityId: activity.id,
+        });
+      } catch (e) { console.error("[review] failed to record niggle", e); }
+    }
     plannedWorkout += `\n## Current Readiness Score\n${readiness != null ? `${readiness}/100` : "Unknown"}\n`;
 
     if (nextWk) {
