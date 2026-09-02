@@ -391,6 +391,9 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       } catch (e) { console.error("[review] failed to record niggle", e); }
     }
     plannedWorkout += `\n## Current Readiness Score\n${readiness != null ? `${readiness}/100` : "Unknown"}\n`;
+    if (injuryHistory) {
+      plannedWorkout += `\n## Athlete's Injury History (from their profile)\n${injuryHistory}\n`;
+    }
 
     if (nextWk) {
       plannedWorkout += `\n## NEXT Planned Session (${nextWk.date})\nTitle: ${nextWk.title}\n`;
