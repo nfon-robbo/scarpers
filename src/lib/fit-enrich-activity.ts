@@ -91,3 +91,51 @@ export async function enrichActivityFromParsed(
     gpsPoints: a.gps_track?.length ?? 0,
   };
 }
+
+/**
+ * Create a brand-new activity row from a parsed FIT session. Used when a
+ * workout was planned but never auto-detected — the user supplies the watch
+ * file and we build the activity from it (same shape as the Upload page).
+ * Returns the new activity id.
+ */
+export async function createActivityFromParsed(
+  userId: string,
+  a: ParsedActivity,
+): Promise<{ activityId: string; lapCount: number }> {
+  const { data: inserted, error } = await supabase
+    .from("activities")
+    .insert({
+      user_id: userId,
+      activity_type: a.activity_type,
+      start_time: a.start_time,
+      duration_seconds: a.duration_seconds,
+      distance_meters: a.distance_meters,
+      avg_heart_rate: a.avg_heart_rate,
+      max_heart_rate: a.max_heart_rate,
+      avg_speed: a.avg_speed,
+      max_speed: a.max_speed,
+      avg_power: a.avg_power,
+      max_power: a.max_power,
+      avg_cadence: a.avg_cadence,
+      total_ascent: a.total_ascent,
+      total_descent: a.total_descent,
+      calories: a.calories,
+      avg_temperature: a.avg_temperature,
+      training_effect: a.training_effect,
+      training_load: a.training_load,
+      source_file: a.source_file,
+      raw_data: { ...(a.raw_data as object), gps_track: a.gps_track },
+    } as any)
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  let lapCount = 0;
+  const lapRows = buildFitLapRows(userId, inserted.id, a.laps || []);
+  if (lapRows.length > 0) {
+    const { error: lapErr } = await supabase.from("activity_laps").insert(lapRows as any);
+    if (lapErr) console.warn("[fit-enrich] lap insert failed (non-fatal):", lapErr);
+    else lapCount = lapRows.length;
+  }
+  return { activityId: inserted.id, lapCount };
+}
