@@ -66,46 +66,70 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   useEffect(() => { setActivity(activityProp); setFitError(null); setFitDone(null); }, [activityProp, open]);
 
   const handleFitFile = async (file: File | null) => {
-    if (!file || !activity?.id) return;
+    if (!file) return;
     setFitBusy(true); setFitError(null); setFitDone(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("You need to be signed in.");
-      let res;
+
+      // Parse the upload up-front: a single .fit, or a .zip where we pick the
+      // session closest to this workout's time/date.
+      const targetMs = activity?.start_time
+        ? new Date(activity.start_time).getTime()
+        : workoutDate?.getTime() ?? null;
+      const pickClosest = (acts: any[]) =>
+        acts.reduce((b, cur) => {
+          if (!targetMs) {
+            return (cur.distance_meters ?? 0) + (cur.duration_seconds ?? 0) >
+              (b.distance_meters ?? 0) + (b.duration_seconds ?? 0) ? cur : b;
+          }
+          const d = (x: any) => Math.abs(new Date(x.start_time).getTime() - targetMs);
+          return d(cur) < d(b) ? cur : b;
+        });
+
       if (file.name.toLowerCase().endsWith(".zip")) {
-        // ZIP archive of FIT files: pick the session closest to this workout's start time.
         const { parseZipFile } = await import("@/lib/fit-parser");
-        const { enrichActivityFromParsed } = await import("@/lib/fit-enrich-activity");
         const zr = await parseZipFile(file);
         if (!zr.activities.length) {
           throw new Error(zr.errors[0] || "No FIT activities found in that ZIP.");
         }
-        const target = activity.start_time ? new Date(activity.start_time).getTime() : null;
-        const best = zr.activities.reduce((b, cur) => {
-          if (!target) {
-            return (cur.distance_meters ?? 0) + (cur.duration_seconds ?? 0) >
-              (b.distance_meters ?? 0) + (b.duration_seconds ?? 0) ? cur : b;
-          }
-          const d = (x: any) => Math.abs(new Date(x.start_time).getTime() - target);
-          return d(cur) < d(b) ? cur : b;
-        });
-        res = await enrichActivityFromParsed(user.id, activity.id, best);
+        await applyParsed(user.id, pickClosest(zr.activities));
       } else {
-        res = await enrichActivityFromFitFile(user.id, activity.id, file);
+        const { parseFitBuffer } = await import("@/lib/fit-parser");
+        const parsed = await parseFitBuffer(await file.arrayBuffer(), file.name);
+        if (!parsed.length) throw new Error("No activity data found in that FIT file.");
+        await applyParsed(user.id, pickClosest(parsed));
       }
+    } catch (e: any) {
+      setFitError(e?.message || "Could not read that FIT file.");
+    } finally {
+      setFitBusy(false);
+      if (fitInputRef.current) fitInputRef.current.value = "";
+    }
+  };
+
+  // Enrich the detected activity, or create one from scratch when the workout
+  // was never auto-detected — either way the AI review + check-in questions
+  // then run from the FIT numbers.
+  const applyParsed = async (userId: string, parsed: any) => {
+    if (activity?.id) {
+      const { enrichActivityFromParsed } = await import("@/lib/fit-enrich-activity");
+      const res = await enrichActivityFromParsed(userId, activity.id, parsed);
       // Drop the cached AI summary so the review is rebuilt from FIT numbers.
       await supabase.from("workout_reviews")
         .update({ ai_summary: null } as any)
         .eq("activity_id", activity.id);
       const { data: fresh } = await supabase
         .from("activities").select("*").eq("id", activity.id).maybeSingle();
-      setFitDone(`Updated from FIT — ${res.lapCount} laps, ${res.gpsPoints} GPS points.`);
+      setFitDone(`Updated from FIT — ${res.lapCount} laps, ${res.gpsPoints} GPS points. Analysing…`);
       if (fresh) setActivity(fresh);
-    } catch (e: any) {
-      setFitError(e?.message || "Could not read that FIT file.");
-    } finally {
-      setFitBusy(false);
-      if (fitInputRef.current) fitInputRef.current.value = "";
+    } else {
+      const { createActivityFromParsed } = await import("@/lib/fit-enrich-activity");
+      const { activityId, lapCount } = await createActivityFromParsed(userId, parsed);
+      const { data: fresh } = await supabase
+        .from("activities").select("*").eq("id", activityId).maybeSingle();
+      setFitDone(`Workout imported from FIT — ${lapCount} laps. Analysing…`);
+      if (fresh) setActivity(fresh);
     }
   };
 
