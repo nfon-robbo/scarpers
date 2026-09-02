@@ -262,7 +262,7 @@ export function expandWorkoutSteps(
   // then we trust the segments. Otherwise fall back to parsing the title for "10x1min".
   const segHasOwnSpec = segments.some((s) => {
     const cleaned = s.duration.replace(/[()]/g, "").trim();
-    return /(\d+)\s*[x×]\s*[\d.]+\s*(?:m(?:in)?|sec|h)/i.test(cleaned);
+    return /(\d+)\s*[x×]\s*[\d.]+\s*(?:m(?:in)?|sec|s|h)/i.test(cleaned);
   });
   // Detect if the segment list itself already represents the expanded reps —
   // i.e. multiple "Main" rows of equal short duration. Common for ~~~intervals
@@ -336,7 +336,7 @@ export function expandWorkoutSteps(
     const cleanDuration = seg.duration.replace(/[()]/g, "").trim();
 
     // Inline "Nx Awork / Brest" pattern (accept both ASCII x and Unicode ×)
-    const repeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
+    const repeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b.*)/i);
     if (repeatMatch) {
       const reps = parseInt(repeatMatch[1], 10);
       const workZoneNumber = parseInt(hrZone.match(/Z(\d)/i)?.[1] || "2", 10);
@@ -356,7 +356,7 @@ export function expandWorkoutSteps(
     }
 
     // Inline "Nx Awork" without rest (accept both ASCII x and Unicode ×)
-    const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
+    const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*[x×]\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b)/i);
     if (simpleRepeatMatch) {
       const reps = parseInt(simpleRepeatMatch[1], 10);
       const workPace = maybeClamp(paceForSegment(seg, "Interval"));
