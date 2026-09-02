@@ -235,7 +235,7 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   const cleanDuration = seg.duration.replace(/[()]/g, "").trim();
 
   // Check for repeat/interval pattern: "10 x 1m Run / 1m Walk", "5 x 2 min / 1 min", etc.
-  const repeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b.*)/i);
+  const repeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b[^/]*?)\s*\/\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b.*)/i);
   if (repeatMatch) {
     const reps = parseInt(repeatMatch[1], 10);
     const workDuration = parseDurationSeconds(repeatMatch[2]);
@@ -253,7 +253,7 @@ function expandSegmentToSteps(seg: ParsedSegment): ApiStep[] {
   }
 
   // Also check for "5 x 2 min" without rest component
-  const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:m(?:in)?|sec|h|km)\b)/i);
+  const simpleRepeatMatch = cleanDuration.match(/(\d+)\s*x\s*([\d.]+\s*(?:km|m(?:in)?|sec|s|h)\b)/i);
   if (simpleRepeatMatch) {
     const reps = parseInt(simpleRepeatMatch[1], 10);
     const workDuration = parseDurationSeconds(simpleRepeatMatch[2]);
