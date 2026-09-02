@@ -70,12 +70,12 @@ const resolveActionableDate = async (
   if (!iso) return { dateUk, notice: null };
   const { data: acts } = await supabase
     .from("activities")
-    .select("date, distance_meters, duration_seconds")
+    .select("start_time, distance_meters, duration_seconds")
     .eq("user_id", userId)
-    .gte("date", iso);
+    .gte("start_time", `${iso}T00:00:00`);
   const completed = new Set<string>();
   for (const a of acts || []) {
-    const d = (a.date || "").slice(0, 10);
+    const d = (a.start_time || "").slice(0, 10);
     if (!d) continue;
     if (Number(a.distance_meters || 0) >= 500 && Number(a.duration_seconds || 0) >= 60) {
       completed.add(d);
