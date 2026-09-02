@@ -425,6 +425,41 @@ Total length: 150 words max. Do not include the original next-session table agai
           </div>
         )}
 
+        {/* Optional: enrich this detected workout with the original FIT file */}
+        {activity?.id && (
+          <div className="mt-3 p-3 rounded-lg border border-border bg-muted/20 space-y-2">
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <FileUp className="w-4 h-4 text-primary" />
+              Got the FIT file for this run?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Upload it and we'll rebuild this workout's stats, laps and GPS track from the watch data.
+            </p>
+            <input
+              ref={fitInputRef}
+              type="file"
+              accept=".fit"
+              className="hidden"
+              onChange={(e) => handleFitFile(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={fitBusy}
+              onClick={() => fitInputRef.current?.click()}
+            >
+              {fitBusy
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reading FIT file…</>
+                : <><FileUp className="w-4 h-4 mr-2" />Upload FIT file</>}
+            </Button>
+            {fitDone && <p className="text-xs text-primary">{fitDone}</p>}
+            {fitError && <p className="text-xs text-destructive">{fitError}</p>}
+          </div>
+        )}
+
+
+
         <div className="mt-3">
           {reviewLoading && !reviewContent && (
             <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
