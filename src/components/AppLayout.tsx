@@ -243,6 +243,7 @@ const AppLayout = () => {
       </main>
 
       <AIChatbot />
+      <NiggleCheckInDialog userId={user?.id} />
       <BackendHealthIndicator />
     </div>
   );
