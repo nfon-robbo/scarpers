@@ -2283,18 +2283,23 @@ const TrainingPlanPage = () => {
 
   // Pick the workout to assess: today's, unless today is already complete
   // (or today is a rest day) — then skip forward to the next non-rest session.
-  const pickUpcomingWorkout = (): { workout: ParsedWorkout; dateObj: Date; shifted: boolean } | null => {
+  const pickUpcomingWorkout = (opts?: { afterDate?: string }): { workout: ParsedWorkout; dateObj: Date; shifted: boolean } | null => {
     if (!content) return null;
     const workouts = parseWorkoutsFromPlan(content)
       .filter(w => w.dateObj)
       .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()));
     const today = new Date();
-    const todayStr = format(today, "yyyy-MM-dd");
+    // When a specific day is already accounted for (e.g. the session we just
+    // reviewed), never consider it or anything before it.
+    const todayStr = opts?.afterDate && opts.afterDate > format(today, "yyyy-MM-dd")
+      ? opts.afterDate
+      : format(today, "yyyy-MM-dd");
+    const skipToday = Boolean(opts?.afterDate);
     const todaysWorkout = workouts.find(w => format(w.dateObj!, "yyyy-MM-dd") === todayStr);
     const isRest = (w: ParsedWorkout) => w.segments.length === 0 || /\brest\b/i.test(w.title);
 
     // If today has a real (non-rest) planned session AND it isn't completed yet, use it
-    if (todaysWorkout && !isRest(todaysWorkout) && !hasCompletedSession(todayStr)) {
+    if (!skipToday && todaysWorkout && !isRest(todaysWorkout) && !hasCompletedSession(todayStr)) {
       return { workout: todaysWorkout, dateObj: todaysWorkout.dateObj!, shifted: false };
     }
 
@@ -2459,7 +2464,7 @@ const TrainingPlanPage = () => {
 
 
   // Apply an elite-coach recommendation to the NEXT planned workout (skips today)
-  const adjustNextWorkout = useCallback(async (recommendation: string) => {
+  const adjustNextWorkout = useCallback(async (recommendation: string, completedWorkoutDate?: string) => {
     if (!user || !content) {
       toast({ title: "No active plan", description: "There's no plan to adjust.", variant: "destructive" });
       return;
@@ -2470,7 +2475,7 @@ const TrainingPlanPage = () => {
     }
     // Pick the next workout that has NOT already been completed. Today counts
     // only if it's a real (non-rest) session with no linked completed activity.
-    const picked = pickUpcomingWorkout();
+    const picked = pickUpcomingWorkout({ afterDate: completedWorkoutDate });
     if (!picked) {
       toast({ title: "No upcoming workout", description: "Couldn't find an un-completed future workout in your plan.", variant: "destructive" });
       return;
@@ -2543,7 +2548,8 @@ const TrainingPlanPage = () => {
     const rec = (location.state as any)?.applyRecommendation as string | undefined;
     if (!rec || appliedRecRef.current || !content || initialLoading) return;
     appliedRecRef.current = true;
-    adjustNextWorkout(rec);
+    const doneDate = (location.state as any)?.completedWorkoutDate as string | undefined;
+    adjustNextWorkout(rec, doneDate);
     // Clear state so refresh/back doesn't re-trigger
     navigate(location.pathname, { replace: true });
   }, [location.state, content, initialLoading, adjustNextWorkout, navigate, location.pathname]);
