@@ -2283,18 +2283,23 @@ const TrainingPlanPage = () => {
 
   // Pick the workout to assess: today's, unless today is already complete
   // (or today is a rest day) — then skip forward to the next non-rest session.
-  const pickUpcomingWorkout = (): { workout: ParsedWorkout; dateObj: Date; shifted: boolean } | null => {
+  const pickUpcomingWorkout = (opts?: { afterDate?: string }): { workout: ParsedWorkout; dateObj: Date; shifted: boolean } | null => {
     if (!content) return null;
     const workouts = parseWorkoutsFromPlan(content)
       .filter(w => w.dateObj)
       .sort((a, b) => (a.dateObj!.getTime() - b.dateObj!.getTime()));
     const today = new Date();
-    const todayStr = format(today, "yyyy-MM-dd");
+    // When a specific day is already accounted for (e.g. the session we just
+    // reviewed), never consider it or anything before it.
+    const todayStr = opts?.afterDate && opts.afterDate > format(today, "yyyy-MM-dd")
+      ? opts.afterDate
+      : format(today, "yyyy-MM-dd");
+    const skipToday = Boolean(opts?.afterDate);
     const todaysWorkout = workouts.find(w => format(w.dateObj!, "yyyy-MM-dd") === todayStr);
     const isRest = (w: ParsedWorkout) => w.segments.length === 0 || /\brest\b/i.test(w.title);
 
     // If today has a real (non-rest) planned session AND it isn't completed yet, use it
-    if (todaysWorkout && !isRest(todaysWorkout) && !hasCompletedSession(todayStr)) {
+    if (!skipToday && todaysWorkout && !isRest(todaysWorkout) && !hasCompletedSession(todayStr)) {
       return { workout: todaysWorkout, dateObj: todaysWorkout.dateObj!, shifted: false };
     }
 
