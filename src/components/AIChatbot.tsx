@@ -255,12 +255,20 @@ const AIChatbot = () => {
       return;
     }
 
+    // Never act on a session that's already completed — retarget forward.
+    let notice: string | null = null;
+    if (scope.kind === "day") {
+      const resolved = await resolveActionableDate(session.user.id, plan.content, scope.dateUk);
+      notice = resolved.notice;
+      if (resolved.dateUk !== scope.dateUk) scope = { kind: "day", dateUk: resolved.dateUk };
+    }
+
     setLoading(true);
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: scope.kind === "day"
+      content: (notice ? `${notice}\n\n` : "") + (scope.kind === "day"
         ? `✏️ Updating your ${scope.dateUk} session…`
-        : "✏️ Applying the change to your plan…",
+        : "✏️ Applying the change to your plan…"),
     }]);
 
     const finishWith = (msg: string) => {
