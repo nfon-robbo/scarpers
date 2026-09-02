@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import AIChatbot from "@/components/AIChatbot";
+import NiggleCheckInDialog from "@/components/NiggleCheckInDialog";
 import EmailVerifyBanner from "@/components/EmailVerifyBanner";
 import BackendHealthIndicator from "@/components/BackendHealthIndicator";
 import NotificationBell from "@/components/NotificationBell";
