@@ -422,7 +422,7 @@ If the athlete reports a niggle, think like a real elite coach:
 
 Format your response as markdown:
 - Start with a heading: "### Verdict: Endorse" or "### Verdict: Modify" or "### Verdict: Swap"
-- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers and readiness score
+- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers, readiness score, and — when a niggle is reported — the niggle location and any matching injury history
 - A bullet list titled "**Coach's recommended next session:**" with: intended intensity, approximate distance/duration, key target (pace/HR description, no specific BPM zones), and one cue to focus on
 - End with: "Tap 'Yes, adjust my plan' below to apply this change, or 'Keep as planned' to stick with the original."
 
