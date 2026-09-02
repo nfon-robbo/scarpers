@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles, Lock } from "lucide-react";
+import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles, Lock, FileUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
+import { enrichActivityFromFitFile } from "@/lib/fit-enrich-activity";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
@@ -47,10 +48,44 @@ const ChoiceRow = ({ label, options, value, onChange }: { label: string; options
   </div>
 );
 
-export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity, workoutDate, workoutTitle, canRequestCoach = true }: Props) {
+export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity: activityProp, workoutDate, workoutTitle, canRequestCoach = true }: Props) {
   const navigate = useNavigate();
+  // Local copy so a FIT upload can refresh the metrics in place.
+  const [activity, setActivity] = useState<any | null>(activityProp);
   const [reviewContent, setReviewContent] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+
+  // FIT enrichment state
+  const fitInputRef = useRef<HTMLInputElement | null>(null);
+  const [fitBusy, setFitBusy] = useState(false);
+  const [fitError, setFitError] = useState<string | null>(null);
+  const [fitDone, setFitDone] = useState<string | null>(null);
+
+  useEffect(() => { setActivity(activityProp); setFitError(null); setFitDone(null); }, [activityProp, open]);
+
+  const handleFitFile = async (file: File | null) => {
+    if (!file || !activity?.id) return;
+    setFitBusy(true); setFitError(null); setFitDone(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You need to be signed in.");
+      const res = await enrichActivityFromFitFile(user.id, activity.id, file);
+      // Drop the cached AI summary so the review is rebuilt from FIT numbers.
+      await supabase.from("workout_reviews")
+        .update({ ai_summary: null } as any)
+        .eq("activity_id", activity.id);
+      const { data: fresh } = await supabase
+        .from("activities").select("*").eq("id", activity.id).maybeSingle();
+      setFitDone(`Updated from FIT — ${res.lapCount} laps, ${res.gpsPoints} GPS points.`);
+      if (fresh) setActivity(fresh);
+    } catch (e: any) {
+      setFitError(e?.message || "Could not read that FIT file.");
+    } finally {
+      setFitBusy(false);
+      if (fitInputRef.current) fitInputRef.current.value = "";
+    }
+  };
+
 
   // Feedback state
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -389,6 +424,41 @@ Total length: 150 words max. Do not include the original next-session table agai
             )}
           </div>
         )}
+
+        {/* Optional: enrich this detected workout with the original FIT file */}
+        {activity?.id && (
+          <div className="mt-3 p-3 rounded-lg border border-border bg-muted/20 space-y-2">
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <FileUp className="w-4 h-4 text-primary" />
+              Got the FIT file for this run?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Upload it and we'll rebuild this workout's stats, laps and GPS track from the watch data.
+            </p>
+            <input
+              ref={fitInputRef}
+              type="file"
+              accept=".fit"
+              className="hidden"
+              onChange={(e) => handleFitFile(e.target.files?.[0] ?? null)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={fitBusy}
+              onClick={() => fitInputRef.current?.click()}
+            >
+              {fitBusy
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reading FIT file…</>
+                : <><FileUp className="w-4 h-4 mr-2" />Upload FIT file</>}
+            </Button>
+            {fitDone && <p className="text-xs text-primary">{fitDone}</p>}
+            {fitError && <p className="text-xs text-destructive">{fitError}</p>}
+          </div>
+        )}
+
+
 
         <div className="mt-3">
           {reviewLoading && !reviewContent && (
