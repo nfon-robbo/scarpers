@@ -247,3 +247,94 @@ export function intelligentResumePoint(currentWeek: number, weeksRemaining: numb
   // Speed / race-pace phase (mid-plan) — keep them where they are if they still fit
   return Math.min(totalWeeks, Math.max(currentWeek, totalWeeks - weeksRemaining + 1));
 }
+
+/**
+ * Restart an existing plan on a new date.
+ *
+ * Every workout in the plan is kept exactly as written — only the dates move.
+ * The whole plan slides so that its first day lands on `newStartIso`, which
+ * preserves the plan length (same number of weeks) and the gaps between
+ * sessions. If `trainingDays` are supplied, any shifted day that no longer
+ * falls on a requested training day is snapped to the nearest allowed weekday
+ * (without colliding with another session). Race day is never snapped.
+ */
+export function restartPlanDates(
+  markdown: string,
+  newStartIso: string,
+  trainingDays?: string[] | null,
+): { content: string; startIso: string; raceDateIso: string | null } | null {
+  const newStart = parseIsoDateLocal(newStartIso);
+  if (!newStart) return null;
+
+  const found: Date[] = [];
+  const seen = new Set<string>();
+  const scan = /(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
+  let m: RegExpExecArray | null;
+  while ((m = scan.exec(markdown)) !== null) {
+    const d = parseDmy(m[1], m[2], m[3]);
+    if (!d) continue;
+    const key = formatDmy(d);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push(d);
+  }
+  if (!found.length) return null;
+
+  found.sort((a, b) => a.getTime() - b.getTime());
+  const first = found[0];
+  const last = found[found.length - 1];
+  const deltaDays = Math.round((startOfLocalDayMs(newStart) - startOfLocalDayMs(first)) / 86_400_000);
+
+  const allowed = (trainingDays || [])
+    .map((d) => TRAINING_DAY_INDEX[d])
+    .filter((d): d is number => typeof d === "number");
+
+  const used = new Set<string>();
+  const mapping = new Map<string, Date>();
+
+  for (const orig of found) {
+    const shifted = new Date(orig);
+    shifted.setHours(0, 0, 0, 0);
+    shifted.setDate(shifted.getDate() + deltaDays);
+
+    const isRaceDay = orig.getTime() === last.getTime();
+    let target = shifted;
+    if (allowed.length && !isRaceDay && !allowed.includes(shifted.getDay())) {
+      const offsets = [1, -1, 2, -2, 3, -3];
+      for (const off of offsets) {
+        const cand = new Date(shifted);
+        cand.setDate(cand.getDate() + off);
+        if (allowed.includes(cand.getDay()) && !used.has(toLocalISODate(cand))) {
+          target = cand;
+          break;
+        }
+      }
+    }
+    while (used.has(toLocalISODate(target)) && target.getTime() !== shifted.getTime()) {
+      target = new Date(shifted);
+      break;
+    }
+    used.add(toLocalISODate(target));
+    mapping.set(formatDmy(orig), target);
+  }
+
+  const WEEKDAY_RE = /(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sun|Mon|Tues|Tue|Weds|Wed|Thurs|Thur|Thu|Fri|Sat)?(\s*)(\d{1,2})\/(\d{1,2})\/(\d{4})/g;
+  const content = markdown.replace(WEEKDAY_RE, (whole, weekday, gap, d, mo, y) => {
+    const orig = parseDmy(d, mo, y);
+    if (!orig) return whole;
+    const next = mapping.get(formatDmy(orig));
+    if (!next) return whole;
+    const dateText = formatDmy(next);
+    if (!weekday) return `${gap}${dateText}`;
+    const short = weekday.length <= 5;
+    const name = WEEKDAY_NAMES[next.getDay()];
+    return `${short ? name.slice(0, 3) : name}${gap}${dateText}`;
+  });
+
+  const shiftedDates = Array.from(mapping.values()).sort((a, b) => a.getTime() - b.getTime());
+  return {
+    content,
+    startIso: toLocalISODate(shiftedDates[0]),
+    raceDateIso: toLocalISODate(shiftedDates[shiftedDates.length - 1]),
+  };
+}
