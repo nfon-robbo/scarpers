@@ -557,7 +557,14 @@ Total length: 150 words max. Do not include the original next-session table agai
                   className="flex-1"
                   onClick={() => {
                     onOpenChange(false);
-                    navigate("/training-plan", { state: { applyRecommendation: coachContent } });
+                    navigate("/training-plan", {
+                      state: {
+                        applyRecommendation: coachContent,
+                        // The reviewed session is already done — adjust the NEXT
+                        // session after this date, never the reviewed day itself.
+                        completedWorkoutDate: workoutDate ? format(workoutDate, "yyyy-MM-dd") : undefined,
+                      },
+                    });
                   }}
                 >
                   Yes, adjust my plan
