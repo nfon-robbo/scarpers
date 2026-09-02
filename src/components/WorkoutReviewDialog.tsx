@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
 import { enrichActivityFromFitFile } from "@/lib/fit-enrich-activity";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { Input } from "@/components/ui/input";
+import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/niggles";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
 interface Props {
