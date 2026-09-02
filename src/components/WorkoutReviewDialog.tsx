@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Link, useNavigate } from "react-router-dom";
-import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles, Lock } from "lucide-react";
+import { CheckCircle2, Activity, Clock, Heart, Zap, Loader2, ExternalLink, Sparkles, Lock, FileUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
+import { enrichActivityFromFitFile } from "@/lib/fit-enrich-activity";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
