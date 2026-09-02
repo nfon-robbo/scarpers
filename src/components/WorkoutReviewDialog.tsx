@@ -367,6 +367,17 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
     plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+
+    // Athlete's own injury history from their profile — the coach must weigh
+    // this like a real elite coach, not treat the niggle in isolation.
+    let injuryHistory = "";
+    try {
+      const { data: prof } = await supabase
+        .from("profiles").select("athlete_context").eq("user_id", userId).maybeSingle();
+      const m = prof?.athlete_context?.match(/injur(?:y|ies)[^:]*(?:\/\s*niggles?)?\s*:\s*(.+)/i);
+      if (m?.[1]) injuryHistory = m[1].trim();
+    } catch { /* non-fatal */ }
+
     if (hasNiggle && resolvedNiggleLocation) {
       plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
       // Log the niggle so we can check in on it on the next training day.
