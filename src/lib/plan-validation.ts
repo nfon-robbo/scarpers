@@ -89,7 +89,6 @@ export function enforceWarmupCooldownMinimums(markdown: string): PlanValidationR
  */
 export function removeDuplicateDayBlocks(markdown: string): { content: string; dedupedDates: string[] } {
   const DAY_HEADER_RE = /^(#{1,4}\s*)?\*\*[A-Za-z]+\s+(\d{1,2}\/\d{1,2}\/\d{4})\*\*/;
-  const BLOCK_END_RE = /^(#{1,4}\s*\*?\*?[A-Za-z#]|---\s*$|\*\*[A-Za-z]+\s+\d{1,2}\/\d{1,2}\/\d{4}\*\*)/;
   const lines = markdown.split("\n");
 
   interface Block { date: string; start: number; end: number } // [start, end)

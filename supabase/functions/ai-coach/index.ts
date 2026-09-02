@@ -1118,6 +1118,7 @@ If the user prompt contains a "COACH RECOMMENDATION TO APPLY" block, you are NOT
 - 🚫 Warm-up and cool-down rows MUST NEVER include a pace target (no "9:00-10:00/km", no "10:00/km+", no numeric min/km). Their Target column is HR zone only (e.g. "Z1"). If you are writing a recovery / very-light session, the Main block is also walk-or-jog HR-only — no pace numbers. Pace targets are reserved for tempo / threshold / interval / race-pace work.
 - Output the COMPLETE modified workout under "## 📝 Recommended Workout" using the same table format. Skip the readiness assessment fluff — go straight to Decision (always "ADJUSTED") and the workout.
 - 🔥 EXCEPTION — FULL REPLACEMENT: If the recommendation block begins with "FULL REPLACEMENT:" then the user has explicitly confirmed a complete session swap. In that case IGNORE the "preserve session type / title / segments" rules above and output the new workout verbatim as described — new title, new segments, new pace, new everything. Do NOT keep any of the original session's structure.
+- 🔢 NUMERIC TARGETS ARE BINDING: any pace, HR limit, or duration stated in the recommendation (e.g. "pace to 8:30-8:50/km", "HR under 145 bpm") MUST appear verbatim in the Recommended Workout table's Target column. NEVER copy the old pace/HR numbers from the original workout into the adjusted table when the recommendation states new ones — if the recommendation says the pace changes, the table's pace cells change.
 
 
 
