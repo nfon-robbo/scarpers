@@ -71,7 +71,28 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("You need to be signed in.");
-      const res = await enrichActivityFromFitFile(user.id, activity.id, file);
+      let res;
+      if (file.name.toLowerCase().endsWith(".zip")) {
+        // ZIP archive of FIT files: pick the session closest to this workout's start time.
+        const { parseZipFile } = await import("@/lib/fit-parser");
+        const { enrichActivityFromParsed } = await import("@/lib/fit-enrich-activity");
+        const zr = await parseZipFile(file);
+        if (!zr.activities.length) {
+          throw new Error(zr.errors[0] || "No FIT activities found in that ZIP.");
+        }
+        const target = activity.start_time ? new Date(activity.start_time).getTime() : null;
+        const best = zr.activities.reduce((b, cur) => {
+          if (!target) {
+            return (cur.distance_meters ?? 0) + (cur.duration_seconds ?? 0) >
+              (b.distance_meters ?? 0) + (b.duration_seconds ?? 0) ? cur : b;
+          }
+          const d = (x: any) => Math.abs(new Date(x.start_time).getTime() - target);
+          return d(cur) < d(b) ? cur : b;
+        });
+        res = await enrichActivityFromParsed(user.id, activity.id, best);
+      } else {
+        res = await enrichActivityFromFitFile(user.id, activity.id, file);
+      }
       // Drop the cached AI summary so the review is rebuilt from FIT numbers.
       await supabase.from("workout_reviews")
         .update({ ai_summary: null } as any)
@@ -471,12 +492,12 @@ Total length: 150 words max. Do not include the original next-session table agai
               Got the FIT file for this run?
             </p>
             <p className="text-xs text-muted-foreground">
-              Upload it and we'll rebuild this workout's stats, laps and GPS track from the watch data.
+              Upload the .fit file (or a .zip containing it) and we'll rebuild this workout's stats, laps and GPS track from the watch data.
             </p>
             <input
               ref={fitInputRef}
               type="file"
-              accept=".fit"
+              accept=".fit,.zip"
               className="hidden"
               onChange={(e) => handleFitFile(e.target.files?.[0] ?? null)}
             />
@@ -489,7 +510,7 @@ Total length: 150 words max. Do not include the original next-session table agai
             >
               {fitBusy
                 ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Reading FIT file…</>
-                : <><FileUp className="w-4 h-4 mr-2" />Upload FIT file</>}
+                : <><FileUp className="w-4 h-4 mr-2" />Upload FIT file or ZIP</>}
             </Button>
             {fitDone && <p className="text-xs text-primary">{fitDone}</p>}
             {fitError && <p className="text-xs text-destructive">{fitError}</p>}
