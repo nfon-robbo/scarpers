@@ -1515,6 +1515,7 @@ RECOMMENDATION ACTIONS:
 - For questions like "Is it too intense?", "Was that okay?", "How did my workout go?", or any post-hoc review of a completed workout, NEVER emit an action marker unless you explicitly tell the user a future planned workout should be changed.
 - Examples that must NOT have a marker: "The intensity was appropriate", "This looks well-managed", "You're on track", "No change needed", "continue prioritising soft surfaces", "monitor your knee", "keep cadence light".
 - Never wrap the marker in code fences. Always plain text on the last line.
+- 🚨 NEVER TARGET A COMPLETED SESSION: Before emitting [[ACTION:day:...]], check the athlete's recent activities. If a completed activity already exists on that date (the session is done), do NOT propose changing it. Target the NEXT scheduled un-completed workout instead, and say so explicitly ("you've already done today's session, so this applies to your next run on DD/MM/YYYY").
 
 CONVERSATION CONTEXT (CRITICAL):
 - The earlier messages in this conversation are real prior turns. Use them.
