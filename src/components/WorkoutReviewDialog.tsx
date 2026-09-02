@@ -92,6 +92,12 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [pace, setPace] = useState<Pace | null>(null);
   const [feel, setFeel] = useState<Feel | null>(null);
   const [injury, setInjury] = useState<Injury | null>(null);
+  // Niggle follow-up: where is it? Seeded from the athlete's known injury history.
+  const [niggleLocation, setNiggleLocation] = useState<string | null>(null);
+  const [niggleOther, setNiggleOther] = useState("");
+  const [knownAreas, setKnownAreas] = useState<string[]>([]);
+  const hasNiggle = !!injury && injury !== "No injuries";
+  const resolvedNiggleLocation = niggleLocation === "__other__" ? niggleOther.trim() : (niggleLocation || "");
 
   // Elite coach recommendation
   const [coachContent, setCoachContent] = useState("");
