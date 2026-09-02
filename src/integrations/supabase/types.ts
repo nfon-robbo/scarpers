@@ -1126,6 +1126,95 @@ export type Database = {
         }
         Relationships: []
       }
+      niggle_checkins: {
+        Row: {
+          advice: string | null
+          checkin_on: string
+          created_at: string
+          id: string
+          niggle_id: string
+          response: string
+          user_id: string
+          workout_title: string | null
+        }
+        Insert: {
+          advice?: string | null
+          checkin_on: string
+          created_at?: string
+          id?: string
+          niggle_id: string
+          response: string
+          user_id: string
+          workout_title?: string | null
+        }
+        Update: {
+          advice?: string | null
+          checkin_on?: string
+          created_at?: string
+          id?: string
+          niggle_id?: string
+          response?: string
+          user_id?: string
+          workout_title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "niggle_checkins_niggle_id_fkey"
+            columns: ["niggle_id"]
+            isOneToOne: false
+            referencedRelation: "niggles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      niggles: {
+        Row: {
+          activity_id: string | null
+          created_at: string
+          id: string
+          last_checkin_on: string | null
+          last_trend: string | null
+          location: string
+          notes: string | null
+          reported_on: string
+          severity: string | null
+          source: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          created_at?: string
+          id?: string
+          last_checkin_on?: string | null
+          last_trend?: string | null
+          location: string
+          notes?: string | null
+          reported_on?: string
+          severity?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          created_at?: string
+          id?: string
+          last_checkin_on?: string | null
+          last_trend?: string | null
+          location?: string
+          notes?: string | null
+          reported_on?: string
+          severity?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nutrition_logs: {
         Row: {
           alcohol_units: number

@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { streamAICoach } from "@/lib/ai-stream";
 import { enrichActivityFromFitFile } from "@/lib/fit-enrich-activity";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { Input } from "@/components/ui/input";
+import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/niggles";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 
 interface Props {
@@ -92,6 +94,12 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [pace, setPace] = useState<Pace | null>(null);
   const [feel, setFeel] = useState<Feel | null>(null);
   const [injury, setInjury] = useState<Injury | null>(null);
+  // Niggle follow-up: where is it? Seeded from the athlete's known injury history.
+  const [niggleLocation, setNiggleLocation] = useState<string | null>(null);
+  const [niggleOther, setNiggleOther] = useState("");
+  const [knownAreas, setKnownAreas] = useState<string[]>([]);
+  const hasNiggle = !!injury && injury !== "No injuries";
+  const resolvedNiggleLocation = niggleLocation === "__other__" ? niggleOther.trim() : (niggleLocation || "");
 
   // Elite coach recommendation
   const [coachContent, setCoachContent] = useState("");
@@ -118,6 +126,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     setReviewError(null);
     setCoachError(null);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
+    setNiggleLocation(null); setNiggleOther("");
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
     setNextSession(null); setReadinessScore(null);
     hydratedRef.current = null;
@@ -227,7 +236,24 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     return () => clearTimeout(t);
   }, [open, activity, difficulty, pace, feel, injury]);
 
-  const feedbackComplete = !!(difficulty && pace && feel && injury);
+  const feedbackComplete = !!(difficulty && pace && feel && injury) && (!hasNiggle || !!resolvedNiggleLocation);
+
+  // Load the athlete's previously-reported injury areas so the niggle
+  // follow-up can offer them as one-tap answers.
+  useEffect(() => {
+    if (!open || !hasNiggle || knownAreas.length) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: prof } = await supabase
+        .from("profiles").select("athlete_context").eq("user_id", user.id).maybeSingle();
+      const prior = extractProfileInjuryAreas(prof?.athlete_context);
+      const { data: existing } = await supabase
+        .from("niggles" as any).select("location").eq("user_id", user.id).eq("status", "active");
+      const previous = ((existing as any[]) || []).map((n) => n.location as string);
+      setKnownAreas(Array.from(new Set([...previous, ...prior])));
+    })();
+  }, [open, hasNiggle, knownAreas.length]);
 
   const submitFeedback = async () => {
     if (!workout || !activity || !feedbackComplete || !canRequestCoach) return;
@@ -287,6 +313,18 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
     plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+    if (hasNiggle && resolvedNiggleLocation) {
+      plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
+      // Log the niggle so we can check in on it on the next training day.
+      try {
+        await recordNiggle({
+          userId,
+          location: resolvedNiggleLocation,
+          severity: injury,
+          activityId: activity.id,
+        });
+      } catch (e) { console.error("[review] failed to record niggle", e); }
+    }
     plannedWorkout += `\n## Current Readiness Score\n${readiness != null ? `${readiness}/100` : "Unknown"}\n`;
 
     if (nextWk) {
@@ -496,7 +534,29 @@ Total length: 150 words max. Do not include the original next-session table agai
             <ChoiceRow label="How difficult was it?" options={["Too easy","Just right","Hard","Too hard"]} value={difficulty} onChange={setDifficulty} />
             <ChoiceRow label="Were the run paces…" options={["Too slow","Just right","Too fast"]} value={pace} onChange={setPace} />
             <ChoiceRow label="How do you feel?" options={["Fresh","OK","Tired","Exhausted"]} value={feel} onChange={setFeel} />
-            <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={setInjury} />
+            <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={(v) => { setInjury(v); if (v === "No injuries") { setNiggleLocation(null); setNiggleOther(""); } }} />
+            {hasNiggle && (
+              <div className="pt-1 border-t border-border/60 space-y-2">
+                <ChoiceRow
+                  label="Where is it?"
+                  options={[...knownAreas, ...NIGGLE_AREAS.filter((a) => !knownAreas.includes(a)), "Somewhere else"]}
+                  value={niggleLocation === "__other__" ? "Somewhere else" : niggleLocation}
+                  onChange={(v: string) => setNiggleLocation(v === "Somewhere else" ? "__other__" : v)}
+                />
+                {knownAreas.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground">Your previously reported areas are listed first.</p>
+                )}
+                {niggleLocation === "__other__" && (
+                  <Input
+                    autoFocus
+                    placeholder="e.g. left peroneal tendon"
+                    value={niggleOther}
+                    onChange={(e) => setNiggleOther(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                )}
+              </div>
+            )}
             <Button
               onClick={submitFeedback}
               disabled={!feedbackComplete || coachLoading || !canRequestCoach}
