@@ -367,6 +367,17 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
     plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+
+    // Athlete's own injury history from their profile — the coach must weigh
+    // this like a real elite coach, not treat the niggle in isolation.
+    let injuryHistory = "";
+    try {
+      const { data: prof } = await supabase
+        .from("profiles").select("athlete_context").eq("user_id", userId).maybeSingle();
+      const m = prof?.athlete_context?.match(/injur(?:y|ies)[^:]*(?:\/\s*niggles?)?\s*:\s*(.+)/i);
+      if (m?.[1]) injuryHistory = m[1].trim();
+    } catch { /* non-fatal */ }
+
     if (hasNiggle && resolvedNiggleLocation) {
       plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
       // Log the niggle so we can check in on it on the next training day.
@@ -380,6 +391,9 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       } catch (e) { console.error("[review] failed to record niggle", e); }
     }
     plannedWorkout += `\n## Current Readiness Score\n${readiness != null ? `${readiness}/100` : "Unknown"}\n`;
+    if (injuryHistory) {
+      plannedWorkout += `\n## Athlete's Injury History (from their profile)\n${injuryHistory}\n`;
+    }
 
     if (nextWk) {
       plannedWorkout += `\n## NEXT Planned Session (${nextWk.date})\nTitle: ${nextWk.title}\n`;
@@ -392,17 +406,23 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
 
     plannedWorkout += `
 
-You are an elite running coach. The athlete has just completed the session above. You must judge the **next planned session** against their check-in answers and current readiness, then return EXACTLY ONE of three recommendations:
+You are an elite running coach. The athlete has just completed the session above. You must judge the **next planned session** against their check-in answers, their current readiness, AND their injury history, then return EXACTLY ONE of three recommendations.
 
-**ENDORSE** — Use when check-in answers and readiness (>=55) indicate they are recovering well. Confirm the next planned session as appropriate and explain in 2 short sentences why it is right for where they are in the plan.
+If the athlete reports a niggle, think like a real elite coach:
+- Weigh the niggle LOCATION against the demands of the next session (e.g. a calf or Achilles niggle makes intervals/hills risky; a hamstring niggle rules out strides and fast work; knee/shin niggles worsen with consecutive impact days).
+- Check whether the niggle location matches or sits near an area in their injury history — a recurring site is a red flag: err toward MODIFY or SWAP even when readiness is decent.
+- "Minor niggle" usually means MODIFY (keep the session but strip intensity); "Sore" or "Painful" means SWAP to easy aerobic or rest.
+- Never endorse a high-intensity session over an active niggle without explicitly addressing the risk.
 
-**MODIFY** — Use when check-in answers suggest mild fatigue OR readiness is between 40 and 55. Keep the next session but suggest specific, concrete modifications (e.g. reduce duration by 15%, drop target pace by 15-20 sec/km, convert intervals to easy running). Be precise about the change.
+**ENDORSE** — Use when check-in answers and readiness (>=55) indicate they are recovering well AND any reported niggle is trivial for the planned session type. Confirm the next planned session as appropriate and explain in 2 short sentences why it is right for where they are in the plan.
 
-**SWAP** — Use when check-in answers flag significant fatigue, "Sore"/"Painful" injuries, "Exhausted" feel, OR readiness < 40. Recommend swapping the next planned session entirely for an easy recovery run or rest day, and explain the reason clearly.
+**MODIFY** — Use when check-in answers suggest mild fatigue, a minor niggle, OR readiness is between 40 and 55. Keep the next session but suggest specific, concrete modifications (e.g. reduce duration by 15%, drop target pace by 15-20 sec/km, convert intervals to easy running). Be precise about the change.
+
+**SWAP** — Use when check-in answers flag significant fatigue, "Sore"/"Painful" injuries, "Exhausted" feel, a niggle in a historically injured area, OR readiness < 40. Recommend swapping the next planned session entirely for an easy recovery run or rest day, and explain the reason clearly.
 
 Format your response as markdown:
 - Start with a heading: "### Verdict: Endorse" or "### Verdict: Modify" or "### Verdict: Swap"
-- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers and readiness score
+- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers, readiness score, and — when a niggle is reported — the niggle location and any matching injury history
 - A bullet list titled "**Coach's recommended next session:**" with: intended intensity, approximate distance/duration, key target (pace/HR description, no specific BPM zones), and one cue to focus on
 - End with: "Tap 'Yes, adjust my plan' below to apply this change, or 'Keep as planned' to stick with the original."
 
