@@ -508,15 +508,18 @@ Total length: 150 words max. Do not include the original next-session table agai
           </div>
         )}
 
-        {/* Optional: enrich this detected workout with the original FIT file */}
-        {activity?.id && (
+        {/* Optional: enrich this workout with the original FIT file — or import
+            it from scratch when the workout was never auto-detected. */}
+        {workout && (
           <div className="mt-3 p-3 rounded-lg border border-border bg-muted/20 space-y-2">
             <p className="text-sm font-semibold flex items-center gap-1.5">
               <FileUp className="w-4 h-4 text-primary" />
-              Got the FIT file for this run?
+              {activity?.id ? "Got the FIT file for this run?" : "We couldn't detect this workout"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Upload the .fit file (or a .zip containing it) and we'll rebuild this workout's stats, laps and GPS track from the watch data.
+              {activity?.id
+                ? "Upload the .fit file (or a .zip containing it) and we'll rebuild this workout's stats, laps and GPS track from the watch data, then re-analyse it."
+                : "Upload the .fit file (or a .zip containing it) and we'll import the workout from your watch data, analyse it and ask you the usual check-in questions."}
             </p>
             <input
               ref={fitInputRef}
