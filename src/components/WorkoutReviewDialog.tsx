@@ -47,10 +47,44 @@ const ChoiceRow = ({ label, options, value, onChange }: { label: string; options
   </div>
 );
 
-export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity, workoutDate, workoutTitle, canRequestCoach = true }: Props) {
+export default function WorkoutReviewDialog({ open, onOpenChange, workout, activity: activityProp, workoutDate, workoutTitle, canRequestCoach = true }: Props) {
   const navigate = useNavigate();
+  // Local copy so a FIT upload can refresh the metrics in place.
+  const [activity, setActivity] = useState<any | null>(activityProp);
   const [reviewContent, setReviewContent] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
+
+  // FIT enrichment state
+  const fitInputRef = useRef<HTMLInputElement | null>(null);
+  const [fitBusy, setFitBusy] = useState(false);
+  const [fitError, setFitError] = useState<string | null>(null);
+  const [fitDone, setFitDone] = useState<string | null>(null);
+
+  useEffect(() => { setActivity(activityProp); setFitError(null); setFitDone(null); }, [activityProp, open]);
+
+  const handleFitFile = async (file: File | null) => {
+    if (!file || !activity?.id) return;
+    setFitBusy(true); setFitError(null); setFitDone(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You need to be signed in.");
+      const res = await enrichActivityFromFitFile(user.id, activity.id, file);
+      // Drop the cached AI summary so the review is rebuilt from FIT numbers.
+      await supabase.from("workout_reviews")
+        .update({ ai_summary: null } as any)
+        .eq("activity_id", activity.id);
+      const { data: fresh } = await supabase
+        .from("activities").select("*").eq("id", activity.id).maybeSingle();
+      setFitDone(`Updated from FIT — ${res.lapCount} laps, ${res.gpsPoints} GPS points.`);
+      if (fresh) setActivity(fresh);
+    } catch (e: any) {
+      setFitError(e?.message || "Could not read that FIT file.");
+    } finally {
+      setFitBusy(false);
+      if (fitInputRef.current) fitInputRef.current.value = "";
+    }
+  };
+
 
   // Feedback state
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
