@@ -1,4 +1,4 @@
-import { parseFitBuffer } from "@/lib/fit-parser";
+import { parseFitBuffer, type ParsedActivity } from "@/lib/fit-parser";
 import { buildFitLapRows } from "@/lib/fit-lap-rows";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,6 +29,19 @@ export async function enrichActivityFromFitFile(
       ? cur
       : best,
   );
+  return enrichActivityFromParsed(userId, activityId, a);
+}
+
+/**
+ * Enrich an already-detected activity from an already-parsed FIT session
+ * (e.g. picked out of a ZIP archive). Same overwrite semantics as
+ * enrichActivityFromFitFile.
+ */
+export async function enrichActivityFromParsed(
+  userId: string,
+  activityId: string,
+  a: ParsedActivity,
+): Promise<FitEnrichResult> {
 
   const patch: Record<string, unknown> = {};
   const map: Record<string, unknown> = {
