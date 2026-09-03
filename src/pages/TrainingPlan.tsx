@@ -982,9 +982,11 @@ const TrainingPlanPage = () => {
 
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
-    const effectiveSaveTrainingDays = options.inPlace
-      ? Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]))
-      : trainingDays;
+    // Always enforce the user's chosen training days — previously we unioned in
+    // every weekday already present in the plan, which let stray sessions (e.g.
+    // Sundays left over from an earlier schedule) survive every later save.
+    const effectiveSaveTrainingDays = trainingDays;
+
     const validatedPlan = validatePlanForSave(planContent, {
       trainingDays: effectiveSaveTrainingDays,
       source: options.inPlace ? "in-place save" : "new plan save",
