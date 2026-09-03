@@ -1194,7 +1194,7 @@ const TrainingPlanPage = () => {
           return;
         }
       }
-      // Include every weekday already present in the current plan plus the
+      
       // Allow the target weekday for this move, but do not re-admit every
       // weekday already present in the plan — that is how off-schedule days
       // (e.g. Sunday) used to survive validation.
