@@ -1195,10 +1195,12 @@ const TrainingPlanPage = () => {
         }
       }
       // Include every weekday already present in the current plan plus the
-      // target weekday, so previous manual moves are not stripped by the
-      // validator during a later move.
-      const moveDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent), toWeekday]));
+      // Allow the target weekday for this move, but do not re-admit every
+      // weekday already present in the plan — that is how off-schedule days
+      // (e.g. Sunday) used to survive validation.
+      const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
       newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
+
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
         pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
