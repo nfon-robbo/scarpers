@@ -982,9 +982,11 @@ const TrainingPlanPage = () => {
 
     // Run the full validator pipeline: dedupe dates, drop off-schedule sessions,
     // inject missing Warm-up/Cool-down rows, bump short warm-ups, recompute totals.
-    const effectiveSaveTrainingDays = options.inPlace
-      ? Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(planContent)]))
-      : trainingDays;
+    // Always enforce the user's chosen training days — previously we unioned in
+    // every weekday already present in the plan, which let stray sessions (e.g.
+    // Sundays left over from an earlier schedule) survive every later save.
+    const effectiveSaveTrainingDays = trainingDays;
+
     const validatedPlan = validatePlanForSave(planContent, {
       trainingDays: effectiveSaveTrainingDays,
       source: options.inPlace ? "in-place save" : "new plan save",
@@ -1192,11 +1194,13 @@ const TrainingPlanPage = () => {
           return;
         }
       }
-      // Include every weekday already present in the current plan plus the
-      // target weekday, so previous manual moves are not stripped by the
-      // validator during a later move.
-      const moveDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent), toWeekday]));
+      
+      // Allow the target weekday for this move, but do not re-admit every
+      // weekday already present in the plan — that is how off-schedule days
+      // (e.g. Sunday) used to survive validation.
+      const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
       newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
+
       const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
       if (!error) {
         pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
@@ -1250,7 +1254,8 @@ const TrainingPlanPage = () => {
             return;
           }
         }
-        const effectiveShiftDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent)]));
+        const effectiveShiftDays = trainingDays;
+
         newContent = validatePlanForSave(newContent, { trainingDays: effectiveShiftDays, source: "start-date shift" }).content;
         const { error } = await supabase.from("training_plans")
           .update({
