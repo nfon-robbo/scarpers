@@ -1254,7 +1254,8 @@ const TrainingPlanPage = () => {
             return;
           }
         }
-        const effectiveShiftDays = Array.from(new Set([...(trainingDays || []), ...weekdaysPresentInPlan(newContent)]));
+        const effectiveShiftDays = trainingDays;
+
         newContent = validatePlanForSave(newContent, { trainingDays: effectiveShiftDays, source: "start-date shift" }).content;
         const { error } = await supabase.from("training_plans")
           .update({
