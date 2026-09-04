@@ -1283,9 +1283,15 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
               .map((a: any) => activityDateInTz(a.start_time))
               .filter(Boolean),
           );
+          // Day headings appear either as markdown headings ("### Friday 04/09/2026")
+          // or as bold lines ("**Friday 04/09/2026** — Walk/Run Intervals…").
+          // Match both, otherwise the diary looks empty and the coach wrongly
+          // tells the athlete nothing is scheduled today.
+          const DAY_HEADING = /^\s*(?:#{2,4}\s+|\*\*)\s*[^\n]*?\b\d{1,2}\/\d{1,2}\/\d{4}\b/;
           const planEntries = String(activePlan.content)
-            .split(/(?=^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b.*$)/gmi)
-            .filter((entry) => /^#{2,4}\s+.*?\b\d{1,2}\/\d{1,2}\/\d{4}\b/m.test(entry.split("\n")[0] || ""));
+            .split(/(?=^\s*(?:#{2,4}\s+|\*\*)\s*[^\n]*?\b\d{1,2}\/\d{1,2}\/\d{4}\b)/gm)
+            .filter((entry) => DAY_HEADING.test(entry.split("\n")[0] || ""));
+
           const findPlanEntry = (date: string) => planEntries.find((entry) => {
             const match = entry.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
             if (!match) return false;
