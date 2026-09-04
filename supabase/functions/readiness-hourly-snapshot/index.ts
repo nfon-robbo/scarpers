@@ -23,7 +23,7 @@ interface ReadinessData {
   baselineSleepAvgHours: number | null;
   weeklyLoadAvg: number | null;
   monthlyLoadAvg: number | null;
-  activeTrainingDays28: number | null;
+  activeTrainingDays28?: number | null;
   wakeTimeIso: string | null;
   todayActivities: { startIso: string; durationSec: number; intensityLoad: number }[];
 }

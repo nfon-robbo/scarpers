@@ -25,7 +25,7 @@ export interface ReadinessData {
   stressHistory: number[]; // last 3 days
   weeklyLoadAvg: number | null; // 7-day daily avg minutes
   monthlyLoadAvg: number | null; // 28-day daily avg minutes
-  activeTrainingDays28: number | null; // distinct days with any logged activity in last 28
+  activeTrainingDays28?: number | null; // distinct days with any logged activity in last 28
   currentHour: number;
 
   // Body battery drain
