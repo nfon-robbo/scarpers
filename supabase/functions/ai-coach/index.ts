@@ -1,4 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+// Devices often report running cadence as single-leg RPM (~55-90) instead of
+// total steps per minute. Normalise so the coach never sees a bogus low value
+// (or treats a real reading as "cadence not captured").
+function toSpm(raw: number | null | undefined): number | null {
+  if (raw == null) return null;
+  const n = Number(raw);
+  if (!isFinite(n) || n <= 0) return null;
+  return Math.round(n < 120 ? n * 2 : n);
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
   classifyTodayActivities,
