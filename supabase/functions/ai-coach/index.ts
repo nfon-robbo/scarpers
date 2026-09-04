@@ -1,4 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+// Devices often report running cadence as single-leg RPM (~55-90) instead of
+// total steps per minute. Normalise so the coach never sees a bogus low value
+// (or treats a real reading as "cadence not captured").
+function toSpm(raw: number | null | undefined): number | null {
+  if (raw == null) return null;
+  const n = Number(raw);
+  if (!isFinite(n) || n <= 0) return null;
+  return Math.round(n < 120 ? n * 2 : n);
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import {
   classifyTodayActivities,
@@ -699,7 +709,7 @@ serve(async (req) => {
       avg_power: a.avg_power ? Math.round(a.avg_power) : null,
       calories: a.calories ? Math.round(a.calories) : null,
       total_ascent: a.total_ascent ? Math.round(a.total_ascent) : null,
-      cadence: a.avg_cadence ? Math.round(a.avg_cadence) : null,
+      cadence: toSpm(a.avg_cadence),
       training_effect: a.training_effect,
     }));
 
@@ -1091,7 +1101,7 @@ Mention the gap in the Coach's Note. If TODAY PLANNED INTENSITY = hard, Decision
       ];
       let cadenceContext = "";
       if (recentRuns && recentRuns.length > 0) {
-        const cadences = recentRuns.map(r => r.avg_cadence!);
+        const cadences = recentRuns.map(r => toSpm(r.avg_cadence)!).filter((c) => c != null);
         const avgCadence = Math.round(cadences.reduce((a, b) => a + b, 0) / cadences.length);
         const latestCadence = Math.round(cadences[0]);
         const trend = cadences.length >= 3 
