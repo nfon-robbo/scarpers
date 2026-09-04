@@ -514,6 +514,13 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
       const weeklyLoadAvg = weeklyTotal / 7;
       const monthlyLoadAvg = monthlyTotal / 28;
 
+      // Distinct days with any logged activity in the 28-day window
+      const activeTrainingDays28 = new Set(
+        allActivities
+          .map((a: any) => (a.start_time ? String(a.start_time).slice(0, 10) : null))
+          .filter((d: string | null) => d != null)
+      ).size;
+
       // Determine wake time from sleep stages (latest end_time on most recent date)
       const endTimes = todaysStageRows
         .filter((s: any) => s.end_time)
@@ -547,6 +554,7 @@ const ReadinessWidget = ({ todayContext, onReviewPlan }: ReadinessWidgetProps = 
         stressHistory,
         weeklyLoadAvg: weeklyTotal > 0 ? weeklyLoadAvg : null,
         monthlyLoadAvg: monthlyTotal > 0 ? monthlyLoadAvg : null,
+        activeTrainingDays28,
         currentHour: now.getHours(),
         wakeTimeIso,
         todayActivities: todayActivityList,
