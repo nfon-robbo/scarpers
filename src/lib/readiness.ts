@@ -25,6 +25,7 @@ export interface ReadinessData {
   stressHistory: number[]; // last 3 days
   weeklyLoadAvg: number | null; // 7-day daily avg minutes
   monthlyLoadAvg: number | null; // 28-day daily avg minutes
+  activeTrainingDays28?: number | null; // distinct days with any logged activity in last 28
   currentHour: number;
 
   // Body battery drain
@@ -306,21 +307,36 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
 
 
   // Training monotony (7d vs 28d)
+  // Guard: skip the ramp/freshness ratio entirely when training history is
+  // too thin to make the 28-day baseline meaningful. Two independent
+  // conditions — either one alone triggers the skip:
+  //   1) 28-day average below 15 min/day
+  //   2) fewer than 10 of the last 28 days have any logged activity
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
-    const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
-    if (ratio > 1.4) {
-      const penalty = -Math.round(Math.min(10, (ratio - 1.4) * 10)); // softened
+    const lowBaseline = d.monthlyLoadAvg < 15;
+    const tooFewActiveDays = d.activeTrainingDays28 != null && d.activeTrainingDays28 < 10;
+    if (lowBaseline || tooFewActiveDays) {
       modifiers.push({
         label: "Training Ramp",
-        adj: penalty,
-        detail: `${ratio.toFixed(1)}x vs monthly avg`,
+        adj: 0,
+        detail: "Skipped — insufficient training history",
       });
-    } else if (ratio < 0.5 && d.weeklyLoadAvg > 0) {
-      modifiers.push({
-        label: "Freshness",
-        adj: 3,
-        detail: `${ratio.toFixed(1)}x vs monthly avg`,
-      });
+    } else {
+      const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
+      if (ratio > 1.4) {
+        const penalty = -Math.round(Math.min(10, (ratio - 1.4) * 10)); // softened
+        modifiers.push({
+          label: "Training Ramp",
+          adj: penalty,
+          detail: `${ratio.toFixed(1)}x vs monthly avg`,
+        });
+      } else if (ratio < 0.5 && d.weeklyLoadAvg > 0) {
+        modifiers.push({
+          label: "Freshness",
+          adj: 3,
+          detail: `${ratio.toFixed(1)}x vs monthly avg`,
+        });
+      }
     }
   }
 
@@ -376,7 +392,11 @@ export function computeReadiness(d: ReadinessData, mode: ReadinessMode = "eod"):
 
   // Add visible modifiers to factors (only if |adj| >= 3)
   for (const m of modifiers) {
-    if (Math.abs(m.adj) >= 3 || (m.label === "Recovery" && m.adj === 0)) {
+    if (
+      Math.abs(m.adj) >= 3 ||
+      (m.label === "Recovery" && m.adj === 0) ||
+      (m.label === "Training Ramp" && m.adj === 0) // insufficient-history marker — always shown
+    ) {
       factors.push({
         label: m.label,
         status: m.adj >= 0 ? "good" : m.adj >= -5 ? "warning" : "poor",

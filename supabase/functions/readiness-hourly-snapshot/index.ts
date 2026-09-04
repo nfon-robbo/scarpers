@@ -23,6 +23,7 @@ interface ReadinessData {
   baselineSleepAvgHours: number | null;
   weeklyLoadAvg: number | null;
   monthlyLoadAvg: number | null;
+  activeTrainingDays28?: number | null;
   wakeTimeIso: string | null;
   todayActivities: { startIso: string; durationSec: number; intensityLoad: number }[];
 }
@@ -231,9 +232,17 @@ function computeReadiness(d: ReadinessData, mode: "morning" | "eod") {
     if (debt < -0.3) modifiers.push({ label: "Sleep Debt", adj: Math.round(Math.max(-15, debt * 8)), detail: `${debt.toFixed(1)}h vs avg (3 nights)` });
   }
   if (d.weeklyLoadAvg != null && d.monthlyLoadAvg != null && d.monthlyLoadAvg > 0) {
-    const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
-    if (ratio > 1.4) modifiers.push({ label: "Training Ramp", adj: -Math.round(Math.min(10, (ratio - 1.4) * 10)), detail: `${ratio.toFixed(1)}x vs monthly avg` });
-    else if (ratio < 0.5 && d.weeklyLoadAvg > 0) modifiers.push({ label: "Freshness", adj: 3, detail: `${ratio.toFixed(1)}x vs monthly avg` });
+    // Guard: skip when history is too thin for a meaningful 28-day baseline.
+    // Two independent conditions — either one alone triggers the skip.
+    const lowBaseline = d.monthlyLoadAvg < 15;
+    const tooFewActiveDays = d.activeTrainingDays28 != null && d.activeTrainingDays28 < 10;
+    if (lowBaseline || tooFewActiveDays) {
+      modifiers.push({ label: "Training Ramp", adj: 0, detail: "Skipped — insufficient training history" });
+    } else {
+      const ratio = d.weeklyLoadAvg / d.monthlyLoadAvg;
+      if (ratio > 1.4) modifiers.push({ label: "Training Ramp", adj: -Math.round(Math.min(10, (ratio - 1.4) * 10)), detail: `${ratio.toFixed(1)}x vs monthly avg` });
+      else if (ratio < 0.5 && d.weeklyLoadAvg > 0) modifiers.push({ label: "Freshness", adj: 3, detail: `${ratio.toFixed(1)}x vs monthly avg` });
+    }
   }
   if (d.todayLoad != null && d.todayLoad > 0) {
     modifiers.push({ label: "Today's Effort", adj: -Math.round(Math.min(12, (d.todayLoad / 60) * 8)), detail: `${Math.floor(d.todayLoad / 60)}:${String(Math.round(d.todayLoad % 60)).padStart(2, "0")} (intensity-weighted)` });
@@ -255,7 +264,7 @@ function computeReadiness(d: ReadinessData, mode: "morning" | "eod") {
   }
 
   for (const m of modifiers) {
-    if (Math.abs(m.adj) >= 3 || (m.label === "Recovery" && m.adj === 0)) {
+    if (Math.abs(m.adj) >= 3 || (m.label === "Recovery" && m.adj === 0) || (m.label === "Training Ramp" && m.adj === 0)) {
       factors.push({ label: m.label, status: m.adj >= 0 ? "good" : m.adj >= -5 ? "warning" : "poor", detail: m.detail });
     }
   }
@@ -353,6 +362,7 @@ async function assembleData(supabase: any, userId: string): Promise<ReadinessDat
   // Weekly/monthly load avg
   let week = 0, month = 0;
   loadByDate.forEach((v, d) => { if (d >= back7 && d < todayStr) week += v; if (d >= back28 && d < todayStr) month += v; });
+  const activeTrainingDays28 = [...loadByDate].filter(([d, v]) => d >= back28 && d < todayStr && v > 0).length;
 
   // Recovery hours since last hard session (intensity > 50, before today)
   let recoveryHours: number | null = null, lastIntensity: number | null = null;
@@ -381,6 +391,7 @@ async function assembleData(supabase: any, userId: string): Promise<ReadinessDat
     baselineSleepAvgHours: avg(baselineSleepDurations),
     weeklyLoadAvg: week > 0 ? week / 7 : null,
     monthlyLoadAvg: month > 0 ? month / 28 : null,
+    activeTrainingDays28,
     wakeTimeIso,
     todayActivities,
   };
