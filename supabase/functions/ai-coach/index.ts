@@ -699,7 +699,7 @@ serve(async (req) => {
       avg_power: a.avg_power ? Math.round(a.avg_power) : null,
       calories: a.calories ? Math.round(a.calories) : null,
       total_ascent: a.total_ascent ? Math.round(a.total_ascent) : null,
-      cadence: a.avg_cadence ? Math.round(a.avg_cadence) : null,
+      cadence: toSpm(a.avg_cadence),
       training_effect: a.training_effect,
     }));
 
@@ -1091,7 +1091,7 @@ Mention the gap in the Coach's Note. If TODAY PLANNED INTENSITY = hard, Decision
       ];
       let cadenceContext = "";
       if (recentRuns && recentRuns.length > 0) {
-        const cadences = recentRuns.map(r => r.avg_cadence!);
+        const cadences = recentRuns.map(r => toSpm(r.avg_cadence)!).filter((c) => c != null);
         const avgCadence = Math.round(cadences.reduce((a, b) => a + b, 0) / cadences.length);
         const latestCadence = Math.round(cadences[0]);
         const trend = cadences.length >= 3 

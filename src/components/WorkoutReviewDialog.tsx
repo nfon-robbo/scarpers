@@ -11,6 +11,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { Input } from "@/components/ui/input";
 import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/niggles";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
+import { toStepsPerMinute } from "@/lib/cadence";
 
 interface Props {
   open: boolean;
@@ -224,7 +225,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
       const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
       const avgHr = activity.avg_heart_rate || "N/A";
       const maxHr = activity.max_heart_rate || "N/A";
-      const avgCad = activity.avg_cadence || "N/A";
+      const avgCad = toStepsPerMinute(activity.avg_cadence) ?? "N/A";
       const cals = activity.calories || "N/A";
       const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
 
@@ -529,7 +530,7 @@ Total length: 150 words max. Do not include the original next-session table agai
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
                 <Zap className="w-4 h-4 text-amber-500 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold">{Math.round(activity.avg_cadence * 2)} spm</p>
+                  <p className="text-sm font-semibold">{toStepsPerMinute(activity.avg_cadence)} spm</p>
                   <p className="text-[10px] text-muted-foreground">Cadence</p>
                 </div>
               </div>
