@@ -170,6 +170,12 @@ ratio > 1.4 → adj = −min(10, (ratio − 1.4) × 10)     // ramp penalty
 ratio < 0.5 → adj = +3                               // freshness
 ```
 
+**History guard:** the ratio is not computed at all when either
+`monthlyLoadAvg < 15` min/day **or** fewer than 10 of the last 28 days have
+any logged activity (each checked independently). In that case the modifier
+contributes 0 and a `Training Ramp · Skipped — insufficient training history`
+factor is shown instead.
+
 ### 5d. Today's effort
 
 ```ts
