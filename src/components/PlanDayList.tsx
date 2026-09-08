@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays, Gauge } from "lucide-react";
+import { paceContextForWorkout } from "@/lib/pace-adjustment";
 import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
 import { supabase } from "@/integrations/supabase/client";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
@@ -44,6 +45,8 @@ interface PlanDayListProps {
   goalTime?: string;
   raceDistance?: string;
   onEditWorkout?: (workout: ParsedWorkout) => void;
+  /** Open the cross-plan pace adjustment dialog for this day (DD/MM/YYYY). */
+  onAdjustPace?: (dateUk: string) => void;
   isPaused?: boolean;
   pauseWindow?: { start: Date; end: Date } | null;
   pauseReason?: string | null;
@@ -499,6 +502,7 @@ export default function PlanDayList({
   goalTime,
   raceDistance,
   onEditWorkout,
+  onAdjustPace,
   isPaused = false,
   pauseWindow = null,
   pauseReason = null,
@@ -1098,6 +1102,18 @@ export default function PlanDayList({
                       }}
                     >
                       <Pencil className="w-3 h-3 mr-1" /> Edit / Replace
+                    </Button>
+                  )}
+                  {onAdjustPace && paceContextForWorkout(selectedWorkout) && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const w = selectedWorkout;
+                        setSelectedWorkout(null);
+                        onAdjustPace(w!.date);
+                      }}
+                    >
+                      <Gauge className="w-3 h-3 mr-1" /> Adjust pace
                     </Button>
                   )}
                 </DialogTitle>

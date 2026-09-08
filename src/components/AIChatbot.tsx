@@ -27,6 +27,8 @@ import {
 } from "@/lib/plan-day-actions";
 import { logPlanEdit } from "@/lib/plan-edit-log";
 import { parseChatRecommendation, parsePaceChangeRecommendation } from "@/lib/chat-recommendation-parser";
+import PaceAdjustDialog from "@/components/PaceAdjustDialog";
+import { getPaceContextForDate } from "@/lib/pace-adjustment";
 
 interface Message {
   role: "user" | "assistant";
@@ -114,6 +116,9 @@ const AIChatbot = () => {
   const [lastUndo, setLastUndo] = useState<{ planId: string; prevContent: string; prevRaceDate?: string | null; dateUk: string } | null>(null);
   const [activePlanContent, setActivePlanContent] = useState<string | null>(null);
   const [activePlanRaceDate, setActivePlanRaceDate] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [activePlanUserId, setActivePlanUserId] = useState<string | null>(null);
+  const [paceAdjust, setPaceAdjust] = useState<{ dateUk: string; feedback: string } | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -219,7 +224,7 @@ const AIChatbot = () => {
       if (!session?.user) return;
       const { data: plan } = await supabase
         .from("training_plans")
-        .select("content, race_date")
+        .select("id, content, race_date")
         .eq("user_id", session.user.id)
         .eq("archived", false)
         .order("created_at", { ascending: false })
@@ -227,6 +232,8 @@ const AIChatbot = () => {
         .maybeSingle();
       if (cancelled) return;
       if (plan?.content) setActivePlanContent(plan.content);
+      setActivePlanId((plan as any)?.id ?? null);
+      setActivePlanUserId(session.user.id);
       setActivePlanRaceDate(plan?.race_date ?? null);
     })();
     return () => { cancelled = true; };
@@ -954,6 +961,20 @@ const AIChatbot = () => {
                         >
                           ✨ Apply suggested workout
                         </Button>
+                        {activePlanContent && getPaceContextForDate(activePlanContent, scope.dateUk) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs justify-start"
+                            disabled={loading}
+                            onClick={() => setPaceAdjust({
+                              dateUk: scope.dateUk,
+                              feedback: [...messages].reverse().find((mm) => mm.role === "user")?.content ?? "",
+                            })}
+                          >
+                            🏃 Adjust pace across my plan
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -1152,6 +1173,16 @@ const AIChatbot = () => {
           )}
         </div>
       </CardContent>
+      <PaceAdjustDialog
+        open={!!paceAdjust}
+        onOpenChange={(o) => { if (!o) setPaceAdjust(null); }}
+        planId={activePlanId}
+        planContent={activePlanContent ?? ""}
+        dateUk={paceAdjust?.dateUk ?? ""}
+        userId={activePlanUserId}
+        feedback={paceAdjust?.feedback}
+        onApplied={(newContent) => setActivePlanContent(newContent)}
+      />
     </Card>
   );
 };

@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import PlanDayList from "@/components/PlanDayList";
+import PaceAdjustDialog from "@/components/PaceAdjustDialog";
 import PlanBuildProgress, { type BuildStep, type BuildJobProgress } from "@/components/PlanBuildProgress";
 import PlanOverview from "@/components/PlanOverview";
 import { PlanStatsBar } from "@/components/PlanStatsBar";
@@ -575,6 +576,7 @@ const TrainingPlanPage = () => {
   const racePredictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const racePredictSeededRef = useRef(false);
   const [editingWorkout, setEditingWorkout] = useState<ParsedWorkout | null>(null);
+  const [paceAdjustDate, setPaceAdjustDate] = useState<string | null>(null);
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
   const [postAnalyzing, setPostAnalyzing] = useState(false);
@@ -3829,6 +3831,7 @@ ${mainRow}
               goalTime={goalTime}
               raceDistance={raceDistance}
               onEditWorkout={(w) => setEditingWorkout(w)}
+              onAdjustPace={(dateUk) => setPaceAdjustDate(dateUk)}
               isPaused={isPlanPaused}
               pauseWindow={pauseWindow}
               pauseReason={pauseReason}
@@ -3839,6 +3842,17 @@ ${mainRow}
                 toast({ title: "Benchmark saved — building your full plan…" });
                 await generatePlan();
               }}
+            />
+
+            <PaceAdjustDialog
+              open={!!paceAdjustDate}
+              onOpenChange={(o) => { if (!o) setPaceAdjustDate(null); }}
+              planId={savedPlanId ?? null}
+              planContent={content}
+              dateUk={paceAdjustDate ?? ""}
+              userId={user?.id ?? null}
+              completedIso={completedDates}
+              onApplied={(newContent) => { setContent(newContent); }}
             />
 
             <WorkoutEditDialog
