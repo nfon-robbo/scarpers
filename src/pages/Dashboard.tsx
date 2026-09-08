@@ -1018,7 +1018,7 @@ const Dashboard = () => {
           {/* ── Quick Actions ── */}
           <div className="grid gap-3 sm:grid-cols-3">
             <ActionCard icon={Upload} title="Import Data" desc="Upload FIT files" to="/upload" navigate={navigate} />
-            <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/analysis" navigate={navigate} />
+            <ActionCard icon={Brain} title="AI Analysis" desc="Get training insights" to="/insights?tab=analysis" navigate={navigate} />
             <ActionCard icon={Calendar} title="Training Plan" desc="Generate your plan" to="/training-plan" navigate={navigate} />
           </div>
 
