@@ -137,7 +137,13 @@ function workoutContentKey(w: ParsedWorkout, dateStr: string): string {
 function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
   if (!markdown) return [];
   const days = new Set<string>();
-  const headingRe = /^#{1,6}\s+\*\*[^*]*?(\d{1,2})\/(\d{1,2})\/(\d{4})[^*]*\*\*/gm;
+  // Day headings appear in several authored shapes:
+  //   "### **Monday 07/09/2026** — ..."   "**Monday 07/09/2026** — ..."
+  //   "### Monday 07/09/2026 — ..."       "Monday 07/09/2026 — ..."
+  // Match any line that starts (optionally after #'s / bold) with a weekday
+  // name followed by a UK date, so user-initiated moves to an off-schedule
+  // weekday are never stripped as "off-schedule" on reload.
+  const headingRe = /^\s*(?:#{1,6}\s*)?\*{0,2}\s*[A-Za-z]+\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/gm;
   let match: RegExpExecArray | null;
   while ((match = headingRe.exec(markdown)) !== null) {
     const [, d, m, y] = match;
@@ -146,6 +152,7 @@ function weekdaysPresentInPlan(markdown: string | null | undefined): string[] {
   }
   return Array.from(days);
 }
+
 
 function parseDurationSeconds(duration: string): number {
   const clockMatch = duration.trim().match(/^(\d{1,2}):(\d{2})$/);
