@@ -1283,16 +1283,25 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
               return "";
             }
           };
+          // Only RUNNING activities can complete a scheduled run. A walk, ride,
+          // swim or hike on the same day must NEVER be reported as "you already
+          // did today's run" — that produced flatly false coaching replies.
+          const isRunType = (t: unknown) => /\brun|jog|treadmill|trail/i.test(String(t || ""));
+          const isWalkType = (t: unknown) => /walk|hike/i.test(String(t || ""));
+          const meaningful = (a: any) =>
+            typeof a.start_time === "string"
+            && Number(a.distance_meters || 0) >= 500
+            && Number(a.duration_seconds || 0) >= 60;
           const completedActivityDates = new Set(
             (activities || [])
-              .filter((a: any) =>
-                typeof a.start_time === "string"
-                && Number(a.distance_meters || 0) >= 500
-                && Number(a.duration_seconds || 0) >= 60
-              )
+              .filter((a: any) => meaningful(a) && isRunType(a.activity_type))
               .map((a: any) => activityDateInTz(a.start_time))
               .filter(Boolean),
           );
+          const todayNonRunActivities = (activities || []).filter(
+            (a: any) => meaningful(a) && !isRunType(a.activity_type),
+          );
+
           // Day headings appear either as markdown headings ("### Friday 04/09/2026")
           // or as bold lines ("**Friday 04/09/2026** — Walk/Run Intervals…").
           // Match both, otherwise the diary looks empty and the coach wrongly
@@ -1326,9 +1335,16 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
               if (!entry || completedActivityDates.has(info.date)) return false;
               return !/\brest\b/i.test(entry);
             });
-          const completionDirective = completedActivityDates.has(todayStr)
-            ? `\nTODAY COMPLETION OVERRIDE (AUTHORITATIVE):\n- The athlete has already completed a run today, ${todayInfo.weekday} ${todayStr}.\n- Today's planned session is finished and MUST be discussed only in the past tense. Never say they "have a scheduled workout for today", never suggest doing or changing it today, and never emit [[ACTION:day:${todayStr}]].\n- Any proposed plan edit must target the next un-completed scheduled workout${nextActionableEntry ? ` on ${nextActionableEntry.weekday} ${nextActionableEntry.date}` : " after today"}, and the reply must explicitly say today's run is already complete.\n`
+          const todayNonRunToday = todayNonRunActivities.filter(
+            (a: any) => activityDateInTz(a.start_time) === todayInfo.date,
+          );
+          const nonRunDirective = todayNonRunToday.length
+            ? `\nTODAY'S NON-RUN ACTIVITY (FACTUAL):\n${todayNonRunToday.map((a: any) => `- ${a.activity_type || "activity"}, ${(Number(a.distance_meters || 0) / 1000).toFixed(2)} km, ${Math.round(Number(a.duration_seconds || 0) / 60)} min`).join("\n")}\n- These are NOT runs and do NOT complete a scheduled running session. Never describe a walk/hike/ride as "your run for today".\n`
             : "";
+          const completionDirective = completedActivityDates.has(todayStr)
+            ? `\nTODAY COMPLETION OVERRIDE (AUTHORITATIVE):\n- The athlete has already completed a RUN today, ${todayInfo.weekday} ${todayStr}.\n- Today's planned session is finished and MUST be discussed only in the past tense. Never say they "have a scheduled workout for today", never suggest doing or changing it today, and never emit [[ACTION:day:${todayStr}]].\n- Any proposed plan edit must target the next un-completed scheduled workout${nextActionableEntry ? ` on ${nextActionableEntry.weekday} ${nextActionableEntry.date}` : " after today"}, and the reply must explicitly say today's run is already complete.\n${nonRunDirective}`
+            : `\nTODAY COMPLETION STATUS (AUTHORITATIVE):\n- NO run has been recorded today, ${todayInfo.weekday} ${todayStr}. Never claim the athlete has already run today.\n- If the diary lookup above shows a session scheduled for today, that session is STILL TO DO. Never say "you do not have a scheduled run today" when the diary shows one.\n${nonRunDirective}`;
+
           chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
 - Start date: ${activePlan.start_date || "n/a"}
 - Race date: ${activePlan.race_date || "n/a"}
@@ -1555,6 +1571,8 @@ SESSION VALUE FIDELITY (MANDATORY — applies whenever you describe a specific s
 - PACE TARGETS: Only quote pace values that are printed in that session's own segment table. If a segment has no pace column or no pace value, describe effort using the HR zone, RPE, or notes column from that same row instead. NEVER invent, estimate, average, or extrapolate a pace figure that is not written in that session's table.
 - NO CONTRADICTIONS: Never state a duration, distance, pace, or HR zone for a session that disagrees with the plan markdown for that exact date. If the title and the segment rows disagree, trust the rows for the workout structure and quote the heading total only for the overall duration. Flag the discrepancy to the user.
 - MISSING VALUES: If the plan markdown does not specify a duration or pace for the session, say "the plan doesn't specify a [duration/pace] for this session" — do NOT fill the gap with a guess.
+- 🚨 FACTS ONLY — NEVER INVENT COMPLETION: The "TODAY COMPLETION" block above is the ONLY source of truth for whether the athlete has run today. Never state or imply a run was completed unless that block says so, and never convert a walk/hike/ride into "your run". If the athlete disagrees with the data, say plainly what is recorded (activity type, time, distance, duration) and what the diary shows, and invite them to upload the file if it is missing — do not invent a session to agree with them.
+
 
 RECOMMENDATION ACTIONS:
 - WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with one of these markers on its own line:
