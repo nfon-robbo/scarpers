@@ -1283,16 +1283,25 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
               return "";
             }
           };
+          // Only RUNNING activities can complete a scheduled run. A walk, ride,
+          // swim or hike on the same day must NEVER be reported as "you already
+          // did today's run" — that produced flatly false coaching replies.
+          const isRunType = (t: unknown) => /\brun|jog|treadmill|trail/i.test(String(t || ""));
+          const isWalkType = (t: unknown) => /walk|hike/i.test(String(t || ""));
+          const meaningful = (a: any) =>
+            typeof a.start_time === "string"
+            && Number(a.distance_meters || 0) >= 500
+            && Number(a.duration_seconds || 0) >= 60;
           const completedActivityDates = new Set(
             (activities || [])
-              .filter((a: any) =>
-                typeof a.start_time === "string"
-                && Number(a.distance_meters || 0) >= 500
-                && Number(a.duration_seconds || 0) >= 60
-              )
+              .filter((a: any) => meaningful(a) && isRunType(a.activity_type))
               .map((a: any) => activityDateInTz(a.start_time))
               .filter(Boolean),
           );
+          const todayNonRunActivities = (activities || []).filter(
+            (a: any) => meaningful(a) && !isRunType(a.activity_type),
+          );
+
           // Day headings appear either as markdown headings ("### Friday 04/09/2026")
           // or as bold lines ("**Friday 04/09/2026** — Walk/Run Intervals…").
           // Match both, otherwise the diary looks empty and the coach wrongly
