@@ -576,6 +576,7 @@ const TrainingPlanPage = () => {
   const racePredictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const racePredictSeededRef = useRef(false);
   const [editingWorkout, setEditingWorkout] = useState<ParsedWorkout | null>(null);
+  const [paceAdjustDate, setPaceAdjustDate] = useState<string | null>(null);
   const [showPostAnalysis, setShowPostAnalysis] = useState(false);
   const [postAnalysisResult, setPostAnalysisResult] = useState<string | null>(null);
   const [postAnalyzing, setPostAnalyzing] = useState(false);
