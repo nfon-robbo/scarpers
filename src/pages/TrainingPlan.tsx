@@ -3831,6 +3831,7 @@ ${mainRow}
               goalTime={goalTime}
               raceDistance={raceDistance}
               onEditWorkout={(w) => setEditingWorkout(w)}
+              onAdjustPace={(dateUk) => setPaceAdjustDate(dateUk)}
               isPaused={isPlanPaused}
               pauseWindow={pauseWindow}
               pauseReason={pauseReason}
