@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { format, addDays, differenceInDays, startOfWeek, isSameDay, isToday } from "date-fns";
-import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays } from "lucide-react";
+import { ChevronRight, Dumbbell, Clock, Activity, CheckCircle2, GripVertical, Footprints, PersonStanding, Pencil, RefreshCw, Loader2, Plus, Trash2, CalendarDays, Gauge } from "lucide-react";
+import { paceContextForWorkout } from "@/lib/pace-adjustment";
 import BenchmarkConfirmCard from "@/components/BenchmarkConfirmCard";
 import { supabase } from "@/integrations/supabase/client";
 import type { BenchmarkProtocol } from "@/lib/benchmark-token";
