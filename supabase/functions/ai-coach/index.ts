@@ -1335,9 +1335,16 @@ Analyze the athlete's readiness and decide whether to adjust the planned workout
               if (!entry || completedActivityDates.has(info.date)) return false;
               return !/\brest\b/i.test(entry);
             });
-          const completionDirective = completedActivityDates.has(todayStr)
-            ? `\nTODAY COMPLETION OVERRIDE (AUTHORITATIVE):\n- The athlete has already completed a run today, ${todayInfo.weekday} ${todayStr}.\n- Today's planned session is finished and MUST be discussed only in the past tense. Never say they "have a scheduled workout for today", never suggest doing or changing it today, and never emit [[ACTION:day:${todayStr}]].\n- Any proposed plan edit must target the next un-completed scheduled workout${nextActionableEntry ? ` on ${nextActionableEntry.weekday} ${nextActionableEntry.date}` : " after today"}, and the reply must explicitly say today's run is already complete.\n`
+          const todayNonRunToday = todayNonRunActivities.filter(
+            (a: any) => activityDateInTz(a.start_time) === todayInfo.date,
+          );
+          const nonRunDirective = todayNonRunToday.length
+            ? `\nTODAY'S NON-RUN ACTIVITY (FACTUAL):\n${todayNonRunToday.map((a: any) => `- ${a.activity_type || "activity"}, ${(Number(a.distance_meters || 0) / 1000).toFixed(2)} km, ${Math.round(Number(a.duration_seconds || 0) / 60)} min`).join("\n")}\n- These are NOT runs and do NOT complete a scheduled running session. Never describe a walk/hike/ride as "your run for today".\n`
             : "";
+          const completionDirective = completedActivityDates.has(todayStr)
+            ? `\nTODAY COMPLETION OVERRIDE (AUTHORITATIVE):\n- The athlete has already completed a RUN today, ${todayInfo.weekday} ${todayStr}.\n- Today's planned session is finished and MUST be discussed only in the past tense. Never say they "have a scheduled workout for today", never suggest doing or changing it today, and never emit [[ACTION:day:${todayStr}]].\n- Any proposed plan edit must target the next un-completed scheduled workout${nextActionableEntry ? ` on ${nextActionableEntry.weekday} ${nextActionableEntry.date}` : " after today"}, and the reply must explicitly say today's run is already complete.\n${nonRunDirective}`
+            : `\nTODAY COMPLETION STATUS (AUTHORITATIVE):\n- NO run has been recorded today, ${todayInfo.weekday} ${todayStr}. Never claim the athlete has already run today.\n- If the diary lookup above shows a session scheduled for today, that session is STILL TO DO. Never say "you do not have a scheduled run today" when the diary shows one.\n${nonRunDirective}`;
+
           chatPlanContext = `\nACTIVE TRAINING PLAN (today is ${todayStr}, UK format DD/MM/YYYY):
 - Start date: ${activePlan.start_date || "n/a"}
 - Race date: ${activePlan.race_date || "n/a"}
