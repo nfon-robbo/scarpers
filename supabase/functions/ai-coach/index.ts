@@ -1571,6 +1571,8 @@ SESSION VALUE FIDELITY (MANDATORY — applies whenever you describe a specific s
 - PACE TARGETS: Only quote pace values that are printed in that session's own segment table. If a segment has no pace column or no pace value, describe effort using the HR zone, RPE, or notes column from that same row instead. NEVER invent, estimate, average, or extrapolate a pace figure that is not written in that session's table.
 - NO CONTRADICTIONS: Never state a duration, distance, pace, or HR zone for a session that disagrees with the plan markdown for that exact date. If the title and the segment rows disagree, trust the rows for the workout structure and quote the heading total only for the overall duration. Flag the discrepancy to the user.
 - MISSING VALUES: If the plan markdown does not specify a duration or pace for the session, say "the plan doesn't specify a [duration/pace] for this session" — do NOT fill the gap with a guess.
+- 🚨 FACTS ONLY — NEVER INVENT COMPLETION: The "TODAY COMPLETION" block above is the ONLY source of truth for whether the athlete has run today. Never state or imply a run was completed unless that block says so, and never convert a walk/hike/ride into "your run". If the athlete disagrees with the data, say plainly what is recorded (activity type, time, distance, duration) and what the diary shows, and invite them to upload the file if it is missing — do not invent a session to agree with them.
+
 
 RECOMMENDATION ACTIONS:
 - WHENEVER your reply suggests changing, scaling, swapping, postponing, or modifying any workout in the plan, you MUST end the message with one of these markers on its own line:
