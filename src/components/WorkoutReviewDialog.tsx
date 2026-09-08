@@ -13,6 +13,8 @@ import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/nig
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { toStepsPerMinute } from "@/lib/cadence";
 
+import PaceAdjustDialog from "@/components/PaceAdjustDialog";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -147,6 +149,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   // Feedback state
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [pace, setPace] = useState<Pace | null>(null);
+  const [paceAdjustOpen, setPaceAdjustOpen] = useState(false);
+  const [activePlan, setActivePlan] = useState<{ id: string; content: string; userId: string } | null>(null);
   const [feel, setFeel] = useState<Feel | null>(null);
   const [injury, setInjury] = useState<Injury | null>(null);
   // Niggle follow-up: where is it? Seeded from the athlete's known injury history.
@@ -611,6 +615,31 @@ Total length: 150 words max. Do not include the original next-session table agai
             <p className="text-sm font-semibold">Quick check-in</p>
             <ChoiceRow label="How difficult was it?" options={["Too easy","Just right","Hard","Too hard"]} value={difficulty} onChange={setDifficulty} />
             <ChoiceRow label="Were the run paces…" options={["Too slow","Just right","Too fast"]} value={pace} onChange={setPace} />
+            {(pace === "Too slow" || pace === "Too fast") && workoutDate && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={async () => {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session?.user) return;
+                  const { data: plan } = await supabase
+                    .from("training_plans")
+                    .select("id, content")
+                    .eq("user_id", session.user.id)
+                    .eq("archived", false)
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  if (!plan?.content) return;
+                  setActivePlan({ id: (plan as any).id, content: plan.content, userId: session.user.id });
+                  setPaceAdjustOpen(true);
+                }}
+              >
+                Adjust my plan paces
+              </Button>
+            )}
             <ChoiceRow label="How do you feel?" options={["Fresh","OK","Tired","Exhausted"]} value={feel} onChange={setFeel} />
             <ChoiceRow label="Any injuries?" options={["No injuries","Minor niggle","Sore","Painful"]} value={injury} onChange={(v) => { setInjury(v); if (v === "No injuries") { setNiggleLocation(null); setNiggleOther(""); } }} />
             {hasNiggle && (
