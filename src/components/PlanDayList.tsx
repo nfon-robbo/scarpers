@@ -45,6 +45,8 @@ interface PlanDayListProps {
   goalTime?: string;
   raceDistance?: string;
   onEditWorkout?: (workout: ParsedWorkout) => void;
+  /** Open the cross-plan pace adjustment dialog for this day (DD/MM/YYYY). */
+  onAdjustPace?: (dateUk: string) => void;
   isPaused?: boolean;
   pauseWindow?: { start: Date; end: Date } | null;
   pauseReason?: string | null;
@@ -500,6 +502,7 @@ export default function PlanDayList({
   goalTime,
   raceDistance,
   onEditWorkout,
+  onAdjustPace,
   isPaused = false,
   pauseWindow = null,
   pauseReason = null,
