@@ -1100,6 +1100,18 @@ export default function PlanDayList({
                       <Pencil className="w-3 h-3 mr-1" /> Edit / Replace
                     </Button>
                   )}
+                  {onAdjustPace && paceContextForWorkout(selectedWorkout) && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        const w = selectedWorkout;
+                        setSelectedWorkout(null);
+                        onAdjustPace(w!.date);
+                      }}
+                    >
+                      <Gauge className="w-3 h-3 mr-1" /> Adjust pace
+                    </Button>
+                  )}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedWorkout.dateObj ? format(selectedWorkout.dateObj, "EEEE, d MMMM yyyy") : selectedWorkout.date}
