@@ -3844,6 +3844,17 @@ ${mainRow}
               }}
             />
 
+            <PaceAdjustDialog
+              open={!!paceAdjustDate}
+              onOpenChange={(o) => { if (!o) setPaceAdjustDate(null); }}
+              planId={savedPlanId ?? null}
+              planContent={content}
+              dateUk={paceAdjustDate ?? ""}
+              userId={user?.id ?? null}
+              completedIso={completedDates}
+              onApplied={(newContent) => { setContent(newContent); }}
+            />
+
             <WorkoutEditDialog
               open={!!editingWorkout}
               onOpenChange={(o) => { if (!o) setEditingWorkout(null); }}
