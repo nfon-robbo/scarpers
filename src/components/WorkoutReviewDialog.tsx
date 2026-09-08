@@ -760,6 +760,19 @@ Total length: 150 words max. Do not include the original next-session table agai
           </div>
         )}
       </DialogContent>
+      {activePlan && (
+        <PaceAdjustDialog
+          open={paceAdjustOpen}
+          onOpenChange={setPaceAdjustOpen}
+          planId={activePlan.id}
+          planContent={activePlan.content}
+          dateUk={workoutDate ? format(workoutDate, "dd/MM/yyyy") : ""}
+          userId={activePlan.userId}
+          direction={pace === "Too fast" ? "slower" : "faster"}
+          feedback={`After this session the athlete said the run pace was ${pace?.toLowerCase()}.`}
+          onApplied={(c) => setActivePlan((p) => (p ? { ...p, content: c } : p))}
+        />
+      )}
     </Dialog>
   );
 }
