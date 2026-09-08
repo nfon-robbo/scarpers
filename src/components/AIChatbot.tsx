@@ -27,6 +27,8 @@ import {
 } from "@/lib/plan-day-actions";
 import { logPlanEdit } from "@/lib/plan-edit-log";
 import { parseChatRecommendation, parsePaceChangeRecommendation } from "@/lib/chat-recommendation-parser";
+import PaceAdjustDialog from "@/components/PaceAdjustDialog";
+import { getPaceContextForDate } from "@/lib/pace-adjustment";
 
 interface Message {
   role: "user" | "assistant";
@@ -959,6 +961,20 @@ const AIChatbot = () => {
                         >
                           ✨ Apply suggested workout
                         </Button>
+                        {activePlanContent && getPaceContextForDate(activePlanContent, scope.dateUk) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs justify-start"
+                            disabled={loading}
+                            onClick={() => setPaceAdjust({
+                              dateUk: scope.dateUk,
+                              feedback: [...messages].reverse().find((mm) => mm.role === "user")?.content ?? "",
+                            })}
+                          >
+                            🏃 Adjust pace across my plan
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -1157,6 +1173,16 @@ const AIChatbot = () => {
           )}
         </div>
       </CardContent>
+      <PaceAdjustDialog
+        open={!!paceAdjust}
+        onOpenChange={(o) => { if (!o) setPaceAdjust(null); }}
+        planId={activePlanId}
+        planContent={activePlanContent ?? ""}
+        dateUk={paceAdjust?.dateUk ?? ""}
+        userId={activePlanUserId}
+        feedback={paceAdjust?.feedback}
+        onApplied={(newContent) => setActivePlanContent(newContent)}
+      />
     </Card>
   );
 };
