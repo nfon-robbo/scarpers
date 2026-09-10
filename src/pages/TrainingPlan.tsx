@@ -1192,10 +1192,12 @@ const TrainingPlanPage = () => {
     let undoPlanId: string | null = null;
     setContent(newContent);
     if (savedPlanId && user) {
-      // Race-day reachability guard — extend via AI if the splice somehow
-      // dropped the race day entry (e.g. moving the race itself).
+      // Race-day reachability guard — only intervene when the move itself
+      // broke race-day reachability. A plan that was already missing race day
+      // must never block (or silently revert) a simple workout move.
       const raceIsoForGuard = raceDate ? toLocalISODate(raceDate) : null;
-      if (raceIsoForGuard && !validatePlanReachesRaceDay(newContent, raceIsoForGuard)) {
+      const wasReachable = raceIsoForGuard ? validatePlanReachesRaceDay(previousContent, raceIsoForGuard) : true;
+      if (raceIsoForGuard && wasReachable && !validatePlanReachesRaceDay(newContent, raceIsoForGuard)) {
         const extended = await extendPlanToRaceDay(newContent, raceIsoForGuard);
         if (extended && validatePlanReachesRaceDay(extended, raceIsoForGuard)) {
           newContent = extended;
@@ -1215,8 +1217,12 @@ const TrainingPlanPage = () => {
       // weekday already present in the plan — that is how off-schedule days
       // (e.g. Sunday) used to survive validation.
       const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
-      newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
+      const validatedMove = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
+      // Never let validation silently swallow the moved session (e.g. when the
+      // target date already had a block). Keep the un-validated move instead.
+      newContent = validatedMove.includes(toDmy) ? validatedMove : newContent;
       setContent(newContent);
+
 
       const { data: savedRows, error } = await supabase
         .from("training_plans")
