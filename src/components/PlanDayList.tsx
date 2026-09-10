@@ -868,7 +868,7 @@ export default function PlanDayList({
                       isDragSource && "opacity-40",
                       dragSourceDate && dragSourceDate !== key && "cursor-pointer hover:bg-primary/10"
                     )}
-                    onClick={() => {
+                    onClickCapture={() => {
                       if (dragSourceDate && dragSourceDate !== key && onMoveWorkout) {
                         const src = dragSourceDate;
                         setDragSourceDate(null);
