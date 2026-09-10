@@ -1152,7 +1152,14 @@ const TrainingPlanPage = () => {
 
   // Move a single workout from one date to another by rewriting the bold date marker in the markdown
   const moveWorkoutDate = async (fromIso: string, toIso: string) => {
-    if (!content) return;
+    if (!content || !savedPlanId || !user) {
+      toast({
+        title: "Could not move workout",
+        description: "Your plan is not ready to save. Refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     const fromParts = fromIso.split("-");
     const toParts = toIso.split("-");
     if (fromParts.length !== 3 || toParts.length !== 3) return;
@@ -1209,12 +1216,26 @@ const TrainingPlanPage = () => {
       // (e.g. Sunday) used to survive validation.
       const moveDays = Array.from(new Set([...(trainingDays || []), toWeekday]));
       newContent = validatePlanForSave(newContent, { trainingDays: moveDays, source: "workout move" }).content;
+      setContent(newContent);
 
-      const { error } = await supabase.from("training_plans").update({ content: newContent }).eq("id", savedPlanId);
-      if (!error) {
-        pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
-        undoPlanId = savedPlanId;
+      const { data: savedRows, error } = await supabase
+        .from("training_plans")
+        .update({ content: newContent })
+        .eq("id", savedPlanId)
+        .eq("user_id", user.id)
+        .select("id");
+      if (error || !savedRows?.length) {
+        console.error("Workout move save failed:", error || "No plan row was updated");
+        setContent(previousContent);
+        toast({
+          title: "Workout was not moved",
+          description: error?.message || "The change could not be saved. Please refresh and try again.",
+          variant: "destructive",
+        });
+        return;
       }
+      pushUndoEntry(savedPlanId, previousContent, `${fromDmy} workout move`);
+      undoPlanId = savedPlanId;
     }
 
     // Remove the workout from intervals.icu on its original date, then push
