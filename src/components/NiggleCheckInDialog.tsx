@@ -204,37 +204,49 @@ Format as markdown:
 
             {done && (() => {
               const goAhead = /verdict:\s*go\s*ahead/i.test(advice) && !/verdict:\s*(modify|rest)/i.test(advice);
-              if (goAhead) {
-                return (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Okay — I don't need to adjust today's workout. I'll keep it as planned.
-                    </p>
-                    <Button size="sm" variant="outline" className="w-full" onClick={close}>
-                      Keep as planned
-                    </Button>
-                  </div>
-                );
-              }
               return (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      close();
-                      navigate("/training-plan", { state: { applyRecommendation: advice } });
-                    }}
-                  >
-                    Adjust today's workout
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1" onClick={close}>
-                    Keep as planned
-                  </Button>
+                <div className="space-y-2">
+                  {goAhead ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Okay — I don't need to adjust today's workout. I'll keep it as planned.
+                      </p>
+                      <Button size="sm" variant="outline" className="w-full" onClick={close}>
+                        Keep as planned
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          close();
+                          navigate("/training-plan", { state: { applyRecommendation: advice } });
+                        }}
+                      >
+                        Adjust today's workout
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1" onClick={close}>
+                        Keep as planned
+                      </Button>
+                    </div>
+                  )}
+                  {trend === "Better" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs"
+                      onClick={async () => { await resolveNiggle(niggle.id); close(); }}
+                    >
+                      The niggle has gone — stop asking
+                    </Button>
+                  )}
                 </div>
               );
             })()}
+          </div>
+        )}
                 {trend === "Better" && (
                   <Button
                     size="sm"
