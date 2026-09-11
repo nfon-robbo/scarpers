@@ -202,7 +202,21 @@ Format as markdown:
               </div>
             )}
 
-            {done && (
+            {done && (() => {
+              const goAhead = /verdict:\s*go\s*ahead/i.test(advice) && !/verdict:\s*(modify|rest)/i.test(advice);
+              if (goAhead) {
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Okay — I don't need to adjust today's workout. I'll keep it as planned.
+                    </p>
+                    <Button size="sm" variant="outline" className="w-full" onClick={close}>
+                      Keep as planned
+                    </Button>
+                  </div>
+                );
+              }
+              return (
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Button
@@ -219,6 +233,8 @@ Format as markdown:
                     Keep as planned
                   </Button>
                 </div>
+              );
+            })()}
                 {trend === "Better" && (
                   <Button
                     size="sm"
