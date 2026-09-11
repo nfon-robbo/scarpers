@@ -247,20 +247,6 @@ Format as markdown:
             })()}
           </div>
         )}
-                {trend === "Better" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full text-xs"
-                    onClick={async () => { await resolveNiggle(niggle.id); close(); }}
-                  >
-                    The niggle has gone — stop asking
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
