@@ -411,27 +411,37 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
 
     plannedWorkout += `
 
-You are an elite running coach. The athlete has just completed the session above. You must judge the **next planned session** against their check-in answers, their current readiness, AND their injury history, then return EXACTLY ONE of three recommendations.
+You are an elite running coach. The athlete has just completed the session above. Judge the **next planned session** and return EXACTLY ONE of three verdicts.
 
-If the athlete reports a niggle, think like a real elite coach:
-- Weigh the niggle LOCATION against the demands of the next session (e.g. a calf or Achilles niggle makes intervals/hills risky; a hamstring niggle rules out strides and fast work; knee/shin niggles worsen with consecutive impact days).
-- Check whether the niggle location matches or sits near an area in their injury history — a recurring site is a red flag: err toward MODIFY or SWAP even when readiness is decent.
-- "Minor niggle" usually means MODIFY (keep the session but strip intensity); "Sore" or "Painful" means SWAP to easy aerobic or rest.
-- Never endorse a high-intensity session over an active niggle without explicitly addressing the risk.
+DEFAULT POSITION: **ENDORSE**. A training plan is only useful if it is followed. Most sessions that feel "hard" or "tiring" are working exactly as intended — fatigue after a quality session is the expected training response, not a reason to change anything. Only depart from the plan when the evidence below clears a specific threshold.
 
-**ENDORSE** — Use when check-in answers and readiness (>=55) indicate they are recovering well AND any reported niggle is trivial for the planned session type. Confirm the next planned session as appropriate and explain in 2 short sentences why it is right for where they are in the plan.
+EVIDENCE RULES — you may only recommend MODIFY or SWAP if at least one of these OBJECTIVE triggers is present, and you MUST name the trigger and its actual value in your reasoning:
+- Reported injury/niggle is "Sore" or "Painful", OR any niggle in an area that appears in the athlete's injury history.
+- Readiness score below 45 (state the number).
+- The athlete answered "Exhausted" for energy/feel, or "Much too hard" for difficulty.
+- Measured data from the completed session materially undershoots the plan (e.g. avg HR or pace well outside the prescribed target, session cut short) — quote the actual figures versus the planned figures.
+- The next session is high intensity (intervals/tempo/hills/race pace) scheduled within 24h of a hard session just completed.
 
-**MODIFY** — Use when check-in answers suggest mild fatigue, a minor niggle, OR readiness is between 40 and 55. Keep the next session but suggest specific, concrete modifications (e.g. reduce duration by 15%, drop target pace by 15-20 sec/km, convert intervals to easy running). Be precise about the change.
+NOT valid reasons to change the plan: "felt tired", "a bit challenging", generic caution, readiness of 45-100, a good session that simply felt like work, wanting to "be safe", or any reasoning you cannot back with a number or a stated check-in answer. If none of the objective triggers above are met, you MUST return ENDORSE — even if the athlete found it tough.
 
-**SWAP** — Use when check-in answers flag significant fatigue, "Sore"/"Painful" injuries, "Exhausted" feel, a niggle in a historically injured area, OR readiness < 40. Recommend swapping the next planned session entirely for an easy recovery run or rest day, and explain the reason clearly.
+Never invent data. If a figure (readiness, HR, pace) is unknown, say it is unknown rather than guessing, and do not use an unknown value as a reason to change the session.
+
+If a niggle IS reported, think like a real elite coach: weigh the niggle LOCATION against the demands of the next session (calf/Achilles makes intervals and hills risky; hamstring rules out strides and fast work; knee/shin worsens with consecutive impact days). A recurring site from their injury history is a red flag — err toward MODIFY or SWAP. "Minor niggle" usually means MODIFY (keep the session, strip intensity); "Sore"/"Painful" means SWAP.
+
+**ENDORSE** — No objective trigger met. Confirm the next planned session and explain in 2 short sentences, citing real numbers (readiness, HR, pace, distance), why it is the right session for this point in the plan.
+
+**MODIFY** — One trigger met but training can continue. Keep the session, prescribe a specific concrete change (e.g. reduce duration by 15%, ease target pace by 15-20 sec/km, convert intervals to steady running) and state the physiological reason.
+
+**SWAP** — A serious trigger (pain, readiness < 45, exhaustion, recurring injury site). Replace the session with easy aerobic running or rest, and explain the reason clearly.
 
 Format your response as markdown:
 - Start with a heading: "### Verdict: Endorse" or "### Verdict: Modify" or "### Verdict: Swap"
-- One short paragraph (max 80 words) with the reasoning, referencing the check-in answers, readiness score, and — when a niggle is reported — the niggle location and any matching injury history
-- A bullet list titled "**Coach's recommended next session:**" with: intended intensity, approximate distance/duration, key target (pace/HR description, no specific BPM zones), and one cue to focus on
-- End with: "Tap 'Yes, adjust my plan' below to apply this change, or 'Keep as planned' to stick with the original."
+- One short paragraph (max 80 words) with the reasoning. For Modify/Swap it MUST quote the specific trigger and its value. For Endorse it must cite at least one real figure from the data above.
+- A bullet list titled "**Coach's recommended next session:**" with: intended intensity, approximate distance/duration, key target (pace/HR description, no specific BPM zones), and one cue to focus on. For ENDORSE this restates the planned session unchanged.
+- End with: "Tap 'Yes, adjust my plan' below to apply this change, or 'Keep as planned' to stick with the original." — but for ENDORSE end instead with: "No change needed — tap 'Keep as planned' to carry on."
 
 Total length: 150 words max. Do not include the original next-session table again — it is shown to the user separately.`;
+
 
     const runCoach = () => {
       setCoachError(null);
