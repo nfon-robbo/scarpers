@@ -391,13 +391,13 @@ Deno.serve(async (req) => {
       else daysWritten += 1;
     }
 
-    const summary = `${stageRows.length} sleep segment(s) · ${daysWritten} day(s) of metrics`;
+    const summary = `${stageRows.length} sleep segment(s) · ${daysWritten} day(s) of metrics · ${workoutsAdded} workout(s)`;
     await supabase
       .from("apple_health_tokens")
       .update({ last_seen_at: new Date().toISOString(), last_payload_summary: summary })
       .eq("id", tokenRow.id);
 
-    return json({ ok: true, sleepSegments: stageRows.length, days: daysWritten, summary });
+    return json({ ok: true, sleepSegments: stageRows.length, days: daysWritten, workouts: workoutsAdded, summary });
   } catch (e) {
     console.error("apple-health-ingest failed", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
