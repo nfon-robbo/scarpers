@@ -48,6 +48,23 @@ async function syncIntervals(accessToken: string, apikey: string, baseUrl: strin
   } catch { /* silent */ }
 }
 
+// Fills in missing GPS routes from Intervals.icu (Garmin Connect never writes
+// route data into Apple Health, so those activities arrive map-less).
+async function syncRoutes(accessToken: string, apikey: string, baseUrl: string) {
+  if (!shouldRun("intervals-routes")) return;
+  try {
+    await fetch(`${baseUrl}/functions/v1/intervals-routes`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ days: 30 }),
+    });
+  } catch { /* silent */ }
+}
+
 export async function runAllSyncs(): Promise<void> {
   if (inFlight) return inFlight;
 
