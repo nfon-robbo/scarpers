@@ -96,6 +96,51 @@ const METRIC_FIELD: Record<string, string> = {
 const sleepDayFor = (start: ReturnType<typeof parseHaeDate>, end: ReturnType<typeof parseHaeDate>, fallback: string) =>
   end?.localDay ?? start?.localDay ?? fallback;
 
+/** Convert an HAE quantity object / plain number to a number in base units. */
+const qty = (v: unknown): number | null => {
+  if (v && typeof v === "object") return num((v as any).qty ?? (v as any).value);
+  return num(v);
+};
+
+/** Distance/elevation values arrive with a unit label; normalise to metres. */
+const toMetres = (v: unknown): number | null => {
+  const value = qty(v);
+  if (value === null) return null;
+  const units = String((v as any)?.units ?? "").toLowerCase();
+  if (units.includes("mi")) return value * 1609.344;
+  if (units === "m" || units.includes("meter") || units.includes("metre")) return value;
+  if (units.includes("ft") || units.includes("feet")) return value * 0.3048;
+  if (units.includes("cm")) return value / 100;
+  return value * 1000; // default km
+};
+
+/** Map an Apple workout name onto the app's activity types. */
+const workoutType = (raw: string): string => {
+  const n = raw.toLowerCase();
+  if (n.includes("run")) return "running";
+  if (n.includes("walk")) return "walking";
+  if (n.includes("hik")) return "hiking";
+  if (n.includes("cycl") || n.includes("bike") || n.includes("biking")) return "cycling";
+  if (n.includes("swim")) return "swimming";
+  return raw || "workout";
+};
+
+const avgOf = (rows: unknown): { avg: number | null; max: number | null } => {
+  if (!Array.isArray(rows) || rows.length === 0) return { avg: null, max: null };
+  const values = rows
+    .map((r: any) => num(r?.Avg ?? r?.avg ?? r?.qty ?? r?.value))
+    .filter((v): v is number => v !== null);
+  const maxes = rows
+    .map((r: any) => num(r?.Max ?? r?.max ?? r?.qty ?? r?.value))
+    .filter((v): v is number => v !== null);
+  if (values.length === 0) return { avg: null, max: null };
+  return {
+    avg: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    max: maxes.length ? Math.round(Math.max(...maxes)) : null,
+  };
+};
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -140,7 +185,78 @@ Deno.serve(async (req) => {
       ? payload.metrics
       : [];
 
-    if (metrics.length === 0) return json({ ok: true, sleepSegments: 0, days: 0, note: "No metrics in payload" });
+    const workouts: any[] = Array.isArray(payload?.data?.workouts)
+      ? payload.data.workouts
+      : Array.isArray(payload?.workouts)
+      ? payload.workouts
+      : [];
+
+    // ---- Workouts (runs, walks, rides, ...) -------------------------------
+    let workoutsAdded = 0;
+    for (const w of workouts) {
+      const start = parseHaeDate(w?.start ?? w?.startDate ?? w?.date);
+      if (!start) continue;
+      const end = parseHaeDate(w?.end ?? w?.endDate);
+
+      const name = String(w?.name ?? w?.workoutActivityType ?? "").trim();
+      const type = workoutType(name);
+
+      let duration = qty(w?.duration);
+      if (duration !== null && duration < 1000 && end) {
+        // HAE sometimes reports duration in minutes; prefer the real span.
+        const span = (end.date.getTime() - start.date.getTime()) / 1000;
+        if (span > 0 && Math.abs(span - duration) > 120) duration = span;
+      }
+      if (duration === null && end) duration = (end.date.getTime() - start.date.getTime()) / 1000;
+      if (!duration || duration < 60) continue; // ignore stubs
+
+      const distance = toMetres(w?.distance);
+      const hr = avgOf(w?.heartRateData);
+      const calories = qty(w?.activeEnergyBurned ?? w?.activeEnergy ?? w?.totalEnergy);
+      const ascent = toMetres(w?.elevationUp ?? w?.elevation?.ascent);
+      const steps = qty(w?.stepCount);
+
+      // Skip if an activity already exists around this start time (Strava,
+      // Intervals.icu or a FIT upload may already have it).
+      const windowStart = new Date(start.date.getTime() - 15 * 60 * 1000).toISOString();
+      const windowEnd = new Date(start.date.getTime() + 15 * 60 * 1000).toISOString();
+      const { data: clash } = await supabase
+        .from("activities")
+        .select("id")
+        .eq("user_id", userId)
+        .gte("start_time", windowStart)
+        .lte("start_time", windowEnd)
+        .limit(1);
+      if (clash && clash.length > 0) continue;
+
+      const { error: actErr } = await supabase.from("activities").insert({
+        user_id: userId,
+        activity_type: type,
+        start_time: start.date.toISOString(),
+        duration_seconds: Math.round(duration),
+        distance_meters: distance,
+        avg_heart_rate: hr.avg,
+        max_heart_rate: hr.max,
+        avg_speed: distance && duration ? distance / duration : null,
+        total_ascent: ascent,
+        calories: calories ?? null,
+        total_steps: steps ? Math.round(steps) : null,
+        source_file: "apple_health",
+        raw_data: w,
+      });
+      if (actErr) console.error("workout insert failed", actErr);
+      else workoutsAdded += 1;
+    }
+
+    if (metrics.length === 0) {
+      const summaryOnly = `${workoutsAdded} workout(s)`;
+      await supabase
+        .from("apple_health_tokens")
+        .update({ last_seen_at: new Date().toISOString(), last_payload_summary: summaryOnly })
+        .eq("id", tokenRow.id);
+      return json({ ok: true, sleepSegments: 0, days: 0, workouts: workoutsAdded });
+    }
+
 
     const stageRows: StageRow[] = [];
     const sleepTotals = new Map<string, { deep: number; rem: number; light: number; awake: number; total: number }>();
@@ -275,13 +391,13 @@ Deno.serve(async (req) => {
       else daysWritten += 1;
     }
 
-    const summary = `${stageRows.length} sleep segment(s) · ${daysWritten} day(s) of metrics`;
+    const summary = `${stageRows.length} sleep segment(s) · ${daysWritten} day(s) of metrics · ${workoutsAdded} workout(s)`;
     await supabase
       .from("apple_health_tokens")
       .update({ last_seen_at: new Date().toISOString(), last_payload_summary: summary })
       .eq("id", tokenRow.id);
 
-    return json({ ok: true, sleepSegments: stageRows.length, days: daysWritten, summary });
+    return json({ ok: true, sleepSegments: stageRows.length, days: daysWritten, workouts: workoutsAdded, summary });
   } catch (e) {
     console.error("apple-health-ingest failed", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

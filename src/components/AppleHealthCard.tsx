@@ -112,6 +112,8 @@ const AppleHealthCard = () => {
           <li>Paste the web address below, set format to <strong>JSON</strong>, and add a header
             <strong> Authorization</strong> with value <strong>Bearer YOUR-KEY</strong>.</li>
           <li>Select <strong>Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Step Count, Active Energy</strong>.</li>
+          <li>Turn on <strong>Workouts</strong> in the same automation so runs and walks come across too.</li>
+
           <li>Set it to run automatically (hourly or each morning) and save.</li>
         </ol>
 
