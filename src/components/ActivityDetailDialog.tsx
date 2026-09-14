@@ -112,6 +112,35 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
   const hasMap = track.length >= 1 ||
     (data?.latitude != null && data?.longitude != null && Math.abs(data.latitude) > 0.01);
 
+  const routeLookupResult: string | null = (data?.raw_data as any)?.route_lookup?.result ?? null;
+  const [fetchingRoute, setFetchingRoute] = useState(false);
+
+  const fetchRoute = async () => {
+    if (!activityId) return;
+    setFetchingRoute(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("intervals-routes", {
+        body: { activityIds: [activityId], force: true },
+      });
+      if (error) throw error;
+      if ((res as any)?.skipped === "not_connected") {
+        toast({
+          title: "Intervals.icu not connected",
+          description: "Connect Intervals.icu in Settings → Integrations to pull routes for watch activities.",
+        });
+      } else if ((res as any)?.updated > 0) {
+        const { data: row } = await supabase.from("activities").select("*").eq("id", activityId).maybeSingle();
+        setData(row as ActivityRow);
+        toast({ title: "Route added" });
+      } else {
+        toast({ title: "No route found", description: "Intervals.icu has no GPS trace for this activity." });
+      }
+    } catch (e: any) {
+      toast({ title: "Couldn't fetch route", description: e?.message ?? "Please try again.", variant: "destructive" });
+    }
+    setFetchingRoute(false);
+  };
+
   // ---- Derived stats (Garmin-like) ----
   const derived = useMemo(() => {
     if (!data) return null;
