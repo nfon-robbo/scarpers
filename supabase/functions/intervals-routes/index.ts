@@ -197,12 +197,21 @@ serve(async (req) => {
 
       let points: Array<[number, number]> = [];
       if (best && bestDelta <= MATCH_WINDOW_MS) {
+        const apiRoot = baseUrl.replace(/\/athlete\/.*$/, "");
         try {
-          const streamResp = await fetch(`${baseUrl.replace(/\/athlete\/.*$/, "")}/activity/${best.id}/streams?types=latlng`, { headers });
-          if (streamResp.ok) points = pointsFromStreams(await streamResp.json());
-          else console.error(`Streams failed for ${best.id} [${streamResp.status}]`);
+          const mapResp = await fetch(`${apiRoot}/activity/${best.id}/map`, { headers });
+          if (mapResp.ok) points = pointsFromMap(await mapResp.json());
+          else console.error(`Map failed for ${best.id} [${mapResp.status}]`);
         } catch (e) {
-          console.error("Stream fetch error", e);
+          console.error("Map fetch error", e);
+        }
+        if (points.length < 2) {
+          try {
+            const streamResp = await fetch(`${apiRoot}/activity/${best.id}/streams?types=lat,lng`, { headers });
+            if (streamResp.ok) points = pointsFromStreams(await streamResp.json());
+          } catch (e) {
+            console.error("Stream fetch error", e);
+          }
         }
       }
 
