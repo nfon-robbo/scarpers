@@ -364,6 +364,39 @@ export type Database = {
         }
         Relationships: []
       }
+      apple_health_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          last_payload_summary: string | null
+          last_seen_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          token_hint: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_payload_summary?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          token_hint?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_payload_summary?: string | null
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          token_hint?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       benchmark_rejections: {
         Row: {
           activity_id: string
