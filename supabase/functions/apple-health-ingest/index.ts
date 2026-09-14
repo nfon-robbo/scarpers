@@ -185,7 +185,78 @@ Deno.serve(async (req) => {
       ? payload.metrics
       : [];
 
-    if (metrics.length === 0) return json({ ok: true, sleepSegments: 0, days: 0, note: "No metrics in payload" });
+    const workouts: any[] = Array.isArray(payload?.data?.workouts)
+      ? payload.data.workouts
+      : Array.isArray(payload?.workouts)
+      ? payload.workouts
+      : [];
+
+    // ---- Workouts (runs, walks, rides, ...) -------------------------------
+    let workoutsAdded = 0;
+    for (const w of workouts) {
+      const start = parseHaeDate(w?.start ?? w?.startDate ?? w?.date);
+      if (!start) continue;
+      const end = parseHaeDate(w?.end ?? w?.endDate);
+
+      const name = String(w?.name ?? w?.workoutActivityType ?? "").trim();
+      const type = workoutType(name);
+
+      let duration = qty(w?.duration);
+      if (duration !== null && duration < 1000 && end) {
+        // HAE sometimes reports duration in minutes; prefer the real span.
+        const span = (end.date.getTime() - start.date.getTime()) / 1000;
+        if (span > 0 && Math.abs(span - duration) > 120) duration = span;
+      }
+      if (duration === null && end) duration = (end.date.getTime() - start.date.getTime()) / 1000;
+      if (!duration || duration < 60) continue; // ignore stubs
+
+      const distance = toMetres(w?.distance);
+      const hr = avgOf(w?.heartRateData);
+      const calories = qty(w?.activeEnergyBurned ?? w?.activeEnergy ?? w?.totalEnergy);
+      const ascent = toMetres(w?.elevationUp ?? w?.elevation?.ascent);
+      const steps = qty(w?.stepCount);
+
+      // Skip if an activity already exists around this start time (Strava,
+      // Intervals.icu or a FIT upload may already have it).
+      const windowStart = new Date(start.date.getTime() - 15 * 60 * 1000).toISOString();
+      const windowEnd = new Date(start.date.getTime() + 15 * 60 * 1000).toISOString();
+      const { data: clash } = await supabase
+        .from("activities")
+        .select("id")
+        .eq("user_id", userId)
+        .gte("start_time", windowStart)
+        .lte("start_time", windowEnd)
+        .limit(1);
+      if (clash && clash.length > 0) continue;
+
+      const { error: actErr } = await supabase.from("activities").insert({
+        user_id: userId,
+        activity_type: type,
+        start_time: start.date.toISOString(),
+        duration_seconds: Math.round(duration),
+        distance_meters: distance,
+        avg_heart_rate: hr.avg,
+        max_heart_rate: hr.max,
+        avg_speed: distance && duration ? distance / duration : null,
+        total_ascent: ascent,
+        calories: calories ?? null,
+        total_steps: steps ? Math.round(steps) : null,
+        source_file: "apple_health",
+        raw_data: w,
+      });
+      if (actErr) console.error("workout insert failed", actErr);
+      else workoutsAdded += 1;
+    }
+
+    if (metrics.length === 0) {
+      const summaryOnly = `${workoutsAdded} workout(s)`;
+      await supabase
+        .from("apple_health_tokens")
+        .update({ last_seen_at: new Date().toISOString(), last_payload_summary: summaryOnly })
+        .eq("id", tokenRow.id);
+      return json({ ok: true, sleepSegments: 0, days: 0, workouts: workoutsAdded });
+    }
+
 
     const stageRows: StageRow[] = [];
     const sleepTotals = new Map<string, { deep: number; rem: number; light: number; awake: number; total: number }>();
