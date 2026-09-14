@@ -278,12 +278,32 @@ Deno.serve(async (req) => {
       const windowEnd = new Date(start.date.getTime() + 15 * 60 * 1000).toISOString();
       const { data: clash } = await supabase
         .from("activities")
-        .select("id")
+        .select("id, raw_data, latitude")
         .eq("user_id", userId)
         .gte("start_time", windowStart)
         .lte("start_time", windowEnd)
         .limit(1);
-      if (clash && clash.length > 0) continue;
+      if (clash && clash.length > 0) {
+        // Duplicate of an existing activity — but if this send carries a GPS
+        // route the stored copy doesn't have, enrich it instead of skipping.
+        const existing = clash[0] as { id: string; raw_data: any; latitude: number | null };
+        const existingPolyline = existing.raw_data?.map_polyline ?? existing.raw_data?.mapPolyline;
+        if (mapPolyline && !existingPolyline) {
+          const mergedRaw = { ...(existing.raw_data ?? {}), map_polyline: mapPolyline };
+          const { error: upErr } = await supabase
+            .from("activities")
+            .update({
+              raw_data: mergedRaw,
+              ...(existing.latitude === null && firstPoint
+                ? { latitude: firstPoint.lat, longitude: firstPoint.lng }
+                : {}),
+            })
+            .eq("id", existing.id);
+          if (upErr) console.error("route enrich failed", upErr);
+          else workoutsUpdated += 1;
+        }
+        continue;
+      }
 
       const sourceId = `apple_health:${String(w?.id ?? start.date.toISOString())}`;
       const rawData: any = { ...w };
