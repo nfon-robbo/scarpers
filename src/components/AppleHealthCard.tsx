@@ -108,13 +108,16 @@ const AppleHealthCard = () => {
         <ol className="text-xs text-muted-foreground space-y-1 list-decimal pl-4">
           <li>Install <strong>Health Auto Export — JSON/CSV</strong> from the App Store and allow it to read Apple Health.</li>
           <li>Create your key below and copy it.</li>
-          <li>In the app: <strong>Automations → Add automation → REST API</strong>.</li>
-          <li>Paste the web address below, set format to <strong>JSON</strong>, and add a header
+          <li>In the app, create <strong>two automations</strong> (Health Auto Export only allows one data type per automation):</li>
+          <li className="list-none pl-4">
+            <strong>Automation 1 — Metrics:</strong> Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Step Count, Active Energy.
+          </li>
+          <li className="list-none pl-4">
+            <strong>Automation 2 — Workouts:</strong> Workouts, so runs and walks come across too.
+          </li>
+          <li>For each automation: paste the web address below, set format to <strong>JSON</strong>, and add a header
             <strong> Authorization</strong> with value <strong>Bearer YOUR-KEY</strong>.</li>
-          <li>Select <strong>Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Step Count, Active Energy</strong>.</li>
-          <li>Turn on <strong>Workouts</strong> in the same automation so runs and walks come across too.</li>
-
-          <li>Set it to run automatically (hourly or each morning) and save.</li>
+          <li>Set both to run automatically (hourly or each morning) and save.</li>
         </ol>
 
         <div className="space-y-1">
