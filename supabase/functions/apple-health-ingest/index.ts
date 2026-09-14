@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
         total_ascent: ascent,
         calories: calories ?? null,
         total_steps: steps ? Math.round(steps) : null,
-        source_file: "apple_health",
+        source_file: `apple_health:${String(w?.id ?? start.date.toISOString())}`,
         raw_data: w,
       });
       if (actErr) console.error("workout insert failed", actErr);
