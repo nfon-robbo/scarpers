@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { calculateSleepScore, scoreLabel } from "@/lib/sleep-score";
 
 type StageTotals = { deep: number; rem: number; light: number; awake: number; sleep: number };
-type SourceKey = "health_connect" | "manual";
+type SourceKey = "health_connect" | "apple_health" | "manual";
 type SourceRow = { source: SourceKey; totals: StageTotals; bedtime: string | null; wake: string | null };
 type Row = { date: string; sources: SourceRow[]; sleepScore: number | null };
 
@@ -33,7 +33,7 @@ const fmtH = (secs: number) => {
 };
 
 const sourceLabel = (s: SourceKey) =>
-  s === "health_connect" ? "Android sync" : "Manual";
+  s === "health_connect" ? "Android sync" : s === "apple_health" ? "iPhone sync" : "Manual";
 
 const sleepScoreFor = (t: StageTotals) => calculateSleepScore({
   deep: t.deep,
@@ -164,7 +164,7 @@ const SleepSourcesPanel = () => {
         .select("date, stage, duration_seconds, source, start_time, end_time")
         .eq("user_id", user.id)
         .gte("date", since)
-        .in("source", ["health_connect", "manual"]),
+        .in("source", ["health_connect", "apple_health", "manual"]),
       supabase
         .from("daily_metrics")
         .select("date, sleep_score, created_at")
@@ -182,7 +182,7 @@ const SleepSourcesPanel = () => {
     const timeMap = new Map<string, Map<SourceKey, { start: number | null; end: number | null }>>();
     for (const r of data ?? []) {
       const src = (r.source ?? "health_connect") as SourceKey;
-      if (!["health_connect", "manual"].includes(src)) continue;
+      if (!["health_connect", "apple_health", "manual"].includes(src)) continue;
       if (!map.has(r.date)) map.set(r.date, new Map());
       const sm = map.get(r.date)!;
       if (!sm.has(src)) sm.set(src, { deep: 0, rem: 0, light: 0, awake: 0, sleep: 0 });
