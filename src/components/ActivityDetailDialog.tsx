@@ -16,6 +16,7 @@ import ActivityCharts from "@/components/ActivityCharts";
 import { decodePolyline } from "@/lib/polyline";
 import { bpmToZone } from "@shared/hr-zones";
 import { useHrZones } from "@/hooks/useHrZones";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   activityId: string | null;
@@ -68,6 +69,7 @@ const teDescription = (te: number) => {
 const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
   const { fmt, label, units } = useUnits();
   const { zones: userZones } = useHrZones();
+  const { toast } = useToast();
   const [data, setData] = useState<ActivityRow | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -111,6 +113,35 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
 
   const hasMap = track.length >= 1 ||
     (data?.latitude != null && data?.longitude != null && Math.abs(data.latitude) > 0.01);
+
+  const routeLookupResult: string | null = (data?.raw_data as any)?.route_lookup?.result ?? null;
+  const [fetchingRoute, setFetchingRoute] = useState(false);
+
+  const fetchRoute = async () => {
+    if (!activityId) return;
+    setFetchingRoute(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("intervals-routes", {
+        body: { activityIds: [activityId], force: true },
+      });
+      if (error) throw error;
+      if ((res as any)?.skipped === "not_connected") {
+        toast({
+          title: "Intervals.icu not connected",
+          description: "Connect Intervals.icu in Settings → Integrations to pull routes for watch activities.",
+        });
+      } else if ((res as any)?.updated > 0) {
+        const { data: row } = await supabase.from("activities").select("*").eq("id", activityId).maybeSingle();
+        setData(row as ActivityRow);
+        toast({ title: "Route added" });
+      } else {
+        toast({ title: "No route found", description: "Intervals.icu has no GPS trace for this activity." });
+      }
+    } catch (e: any) {
+      toast({ title: "Couldn't fetch route", description: e?.message ?? "Please try again.", variant: "destructive" });
+    }
+    setFetchingRoute(false);
+  };
 
   // ---- Derived stats (Garmin-like) ----
   const derived = useMemo(() => {
@@ -411,6 +442,26 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                           ) : (
                             <ActivityMap track={[{ lat: data.latitude!, lng: data.longitude! }]} interactive height={300} />
                           )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {!hasMap && (
+                      <Card>
+                        <CardContent className="p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> No route
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {routeLookupResult === "none"
+                                ? "No GPS route was recorded for this activity, and none was found on Intervals.icu."
+                                : "This activity arrived without a GPS route. If it's on Intervals.icu, the route can be pulled in."}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={fetchRoute} disabled={fetchingRoute}>
+                            {fetchingRoute ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Looking…</> : "Look for route"}
+                          </Button>
                         </CardContent>
                       </Card>
                     )}
