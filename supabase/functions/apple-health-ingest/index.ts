@@ -191,6 +191,18 @@ Deno.serve(async (req) => {
       ? payload.workouts
       : [];
 
+    console.log(
+      "payload shape",
+      JSON.stringify({
+        topKeys: Object.keys(payload ?? {}),
+        dataKeys: payload?.data ? Object.keys(payload.data) : null,
+        metrics: metrics.length,
+        workouts: workouts.length,
+        bytes: raw.length,
+        firstWorkoutKeys: workouts[0] ? Object.keys(workouts[0]) : null,
+      }),
+    );
+
     // ---- Workouts (runs, walks, rides, ...) -------------------------------
     let workoutsAdded = 0;
     for (const w of workouts) {
