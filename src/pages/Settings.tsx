@@ -20,6 +20,7 @@ import IntervalsCredentials from "@/components/IntervalsCredentials";
 import PastChats from "@/components/PastChats";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import HealthConnectCard from "@/components/HealthConnectCard";
+import AppleHealthCard from "@/components/AppleHealthCard";
 
 interface UnitOption<K extends keyof UnitPreferences> {
   key: K;
@@ -535,6 +536,7 @@ const Settings = () => {
           <Smartphone className="w-3 h-3 inline mr-1" />
           Android-only. Health Connect pulls the latest sleep stages, resting HR, steps and active calories from Garmin Connect via Health Connect. First-time sync is capped at the past year.
         </p>
+        <AppleHealthCard />
       </CollapsibleSection>
 
       {isAdmin && (
