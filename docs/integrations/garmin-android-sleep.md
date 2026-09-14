@@ -31,4 +31,6 @@ If you're not on Android, your watch is dead, or you're travelling without your 
 
 ## iPhone users
 
-Native iPhone sync (Apple Health → Scarpers via a webhook bridge) is **on the roadmap but not yet built**. For now, use the screenshot upload above. If you'd like iPhone sync prioritised, send feedback from the app.
+iPhone sync is available via Apple Health and the Health Auto Export app — see
+[Apple Health on iPhone](./apple-health-iphone.md). Set it up in
+**Settings → Integrations → Apple Health (iPhone)**.
