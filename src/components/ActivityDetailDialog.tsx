@@ -415,6 +415,26 @@ const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
                       </Card>
                     )}
 
+                    {!hasMap && (
+                      <Card>
+                        <CardContent className="p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> No route
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {routeLookupResult === "none"
+                                ? "No GPS route was recorded for this activity, and none was found on Intervals.icu."
+                                : "This activity arrived without a GPS route. If it's on Intervals.icu, the route can be pulled in."}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={fetchRoute} disabled={fetchingRoute}>
+                            {fetchingRoute ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Looking…</> : "Look for route"}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Detailed stats grid */}
                     <Card>
                       <CardContent className="p-4">
