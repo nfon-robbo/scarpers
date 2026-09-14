@@ -235,6 +235,7 @@ Deno.serve(async (req) => {
 
     // ---- Workouts (runs, walks, rides, ...) -------------------------------
     let workoutsAdded = 0;
+    let workoutsUpdated = 0;
     for (const w of workouts) {
       const start = parseHaeDate(w?.start ?? w?.startDate ?? w?.date);
       if (!start) continue;
