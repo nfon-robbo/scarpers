@@ -96,6 +96,51 @@ const METRIC_FIELD: Record<string, string> = {
 const sleepDayFor = (start: ReturnType<typeof parseHaeDate>, end: ReturnType<typeof parseHaeDate>, fallback: string) =>
   end?.localDay ?? start?.localDay ?? fallback;
 
+/** Convert an HAE quantity object / plain number to a number in base units. */
+const qty = (v: unknown): number | null => {
+  if (v && typeof v === "object") return num((v as any).qty ?? (v as any).value);
+  return num(v);
+};
+
+/** Distance/elevation values arrive with a unit label; normalise to metres. */
+const toMetres = (v: unknown): number | null => {
+  const value = qty(v);
+  if (value === null) return null;
+  const units = String((v as any)?.units ?? "").toLowerCase();
+  if (units.includes("mi")) return value * 1609.344;
+  if (units === "m" || units.includes("meter") || units.includes("metre")) return value;
+  if (units.includes("ft") || units.includes("feet")) return value * 0.3048;
+  if (units.includes("cm")) return value / 100;
+  return value * 1000; // default km
+};
+
+/** Map an Apple workout name onto the app's activity types. */
+const workoutType = (raw: string): string => {
+  const n = raw.toLowerCase();
+  if (n.includes("run")) return "running";
+  if (n.includes("walk")) return "walking";
+  if (n.includes("hik")) return "hiking";
+  if (n.includes("cycl") || n.includes("bike") || n.includes("biking")) return "cycling";
+  if (n.includes("swim")) return "swimming";
+  return raw || "workout";
+};
+
+const avgOf = (rows: unknown): { avg: number | null; max: number | null } => {
+  if (!Array.isArray(rows) || rows.length === 0) return { avg: null, max: null };
+  const values = rows
+    .map((r: any) => num(r?.Avg ?? r?.avg ?? r?.qty ?? r?.value))
+    .filter((v): v is number => v !== null);
+  const maxes = rows
+    .map((r: any) => num(r?.Max ?? r?.max ?? r?.qty ?? r?.value))
+    .filter((v): v is number => v !== null);
+  if (values.length === 0) return { avg: null, max: null };
+  return {
+    avg: Math.round(values.reduce((a, b) => a + b, 0) / values.length),
+    max: maxes.length ? Math.round(Math.max(...maxes)) : null,
+  };
+};
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
