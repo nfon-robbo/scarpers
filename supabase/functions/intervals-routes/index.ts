@@ -55,6 +55,20 @@ function recentlyChecked(raw: any): boolean {
   return Number.isFinite(ts) && Date.now() - ts < RECHECK_AFTER_MS;
 }
 
+// Intervals.icu exposes the route on /activity/{id}/map as `latlngs`
+// (pairs, with nulls where GPS had no fix).
+function pointsFromMap(map: any): Array<[number, number]> {
+  const list = map?.latlngs;
+  if (!Array.isArray(list)) return [];
+  const out: Array<[number, number]> = [];
+  for (const p of list) {
+    if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+      out.push([Number(p[0]), Number(p[1])]);
+    }
+  }
+  return out;
+}
+
 function pointsFromStreams(streams: any): Array<[number, number]> {
   const list = Array.isArray(streams) ? streams : streams?.streams;
   if (!Array.isArray(list)) return [];
