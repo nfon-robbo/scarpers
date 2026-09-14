@@ -85,7 +85,10 @@ export async function runAllSyncs(): Promise<void> {
 
     const tasks: Promise<void>[] = [];
     if (stravaTok.data) tasks.push(syncStrava(accessToken, apikey, baseUrl));
-    if (intervalsCreds.data) tasks.push(syncIntervals(accessToken, apikey, baseUrl));
+    if (intervalsCreds.data) {
+      tasks.push(syncIntervals(accessToken, apikey, baseUrl));
+      tasks.push(syncRoutes(accessToken, apikey, baseUrl));
+    }
 
     await Promise.allSettled(tasks);
 
