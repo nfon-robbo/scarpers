@@ -114,6 +114,36 @@ const toMetres = (v: unknown): number | null => {
   return value * 1000; // default km
 };
 
+/** Google Encoded Polyline Algorithm encoder. Returns an empty string for no points. */
+const encodePolyline = (points: Array<{ lat: number; lng: number }>): string => {
+  if (!points.length) return "";
+  let encoded = "";
+  let prevLat = 0;
+  let prevLng = 0;
+  for (const { lat, lng } of points) {
+    const vLat = Math.round(lat * 1e5);
+    const vLng = Math.round(lng * 1e5);
+    encoded += encodeSignedValue(vLat - prevLat);
+    encoded += encodeSignedValue(vLng - prevLng);
+    prevLat = vLat;
+    prevLng = vLng;
+  }
+  return encoded;
+};
+
+const encodeSignedValue = (n: number): string => {
+  const shifted = n < 0 ? ~(n << 1) : n << 1;
+  let value = shifted;
+  let result = "";
+  do {
+    let chunk = value & 0x1f;
+    value >>= 5;
+    if (value > 0) chunk |= 0x20;
+    result += String.fromCharCode(chunk + 63);
+  } while (value > 0);
+  return result;
+};
+
 /** Map an Apple workout name onto the app's activity types. */
 const workoutType = (raw: string): string => {
   const n = raw.toLowerCase();
@@ -228,6 +258,20 @@ Deno.serve(async (req) => {
       const ascent = toMetres(w?.elevationUp ?? w?.elevation?.ascent);
       const steps = qty(w?.stepCount);
 
+      // Extract GPS route if Health Auto Export sent it.
+      const routePoints: Array<{ lat: number; lng: number }> = [];
+      const rawRoute = w?.route;
+      if (Array.isArray(rawRoute)) {
+        for (const pt of rawRoute) {
+          if (!pt || typeof pt !== "object") continue;
+          const lat = num(pt.latitude ?? pt.lat);
+          const lng = num(pt.longitude ?? pt.lon ?? pt.lng);
+          if (lat !== null && lng !== null) routePoints.push({ lat, lng });
+        }
+      }
+      const mapPolyline = routePoints.length > 1 ? encodePolyline(routePoints) : null;
+      const firstPoint = routePoints[0];
+
       // Skip if an activity already exists around this start time (Strava,
       // Intervals.icu or a FIT upload may already have it).
       const windowStart = new Date(start.date.getTime() - 15 * 60 * 1000).toISOString();
@@ -241,6 +285,10 @@ Deno.serve(async (req) => {
         .limit(1);
       if (clash && clash.length > 0) continue;
 
+      const sourceId = `apple_health:${String(w?.id ?? start.date.toISOString())}`;
+      const rawData: any = { ...w };
+      if (mapPolyline) rawData.map_polyline = mapPolyline;
+
       const { error: actErr } = await supabase.from("activities").insert({
         user_id: userId,
         activity_type: type,
@@ -253,8 +301,10 @@ Deno.serve(async (req) => {
         total_ascent: ascent,
         calories: calories ?? null,
         total_steps: steps ? Math.round(steps) : null,
-        source_file: `apple_health:${String(w?.id ?? start.date.toISOString())}`,
-        raw_data: w,
+        latitude: firstPoint?.lat ?? null,
+        longitude: firstPoint?.lng ?? null,
+        source_file: sourceId,
+        raw_data: rawData,
       });
       if (actErr) console.error("workout insert failed", actErr);
       else workoutsAdded += 1;

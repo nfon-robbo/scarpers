@@ -100,7 +100,7 @@ const AppleHealthCard = () => {
           {row?.last_seen_at && <CheckCircle2 className="w-4 h-4 text-primary" />}
         </CardTitle>
         <CardDescription>
-          Send sleep stages, resting heart rate, HRV, steps and calories from your iPhone automatically,
+          Send sleep stages, resting heart rate, HRV, steps, calories and workouts from your iPhone automatically,
           using the Health Auto Export app.
         </CardDescription>
       </CardHeader>
@@ -113,7 +113,7 @@ const AppleHealthCard = () => {
             <strong>Automation 1 — Metrics:</strong> Sleep Analysis, Resting Heart Rate, Heart Rate Variability, Step Count, Active Energy.
           </li>
           <li className="list-none pl-4">
-            <strong>Automation 2 — Workouts:</strong> Workouts, so runs and walks come across too.
+            <strong>Automation 2 — Workouts:</strong> Workouts. In the Workout Configuration, turn on <strong>Include Route Data</strong> so maps draw your route.
           </li>
           <li>For each automation: paste the web address below, set format to <strong>JSON</strong>, and add a header
             <strong> Authorization</strong> with value <strong>Bearer YOUR-KEY</strong>.</li>
