@@ -69,6 +69,7 @@ const teDescription = (te: number) => {
 const ActivityDetailDialog = ({ activityId, onClose }: Props) => {
   const { fmt, label, units } = useUnits();
   const { zones: userZones } = useHrZones();
+  const { toast } = useToast();
   const [data, setData] = useState<ActivityRow | null>(null);
   const [loading, setLoading] = useState(false);
 
