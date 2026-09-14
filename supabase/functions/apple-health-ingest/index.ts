@@ -114,6 +114,36 @@ const toMetres = (v: unknown): number | null => {
   return value * 1000; // default km
 };
 
+/** Google Encoded Polyline Algorithm encoder. Returns an empty string for no points. */
+const encodePolyline = (points: Array<{ lat: number; lng: number }>): string => {
+  if (!points.length) return "";
+  let encoded = "";
+  let prevLat = 0;
+  let prevLng = 0;
+  for (const { lat, lng } of points) {
+    const vLat = Math.round(lat * 1e5);
+    const vLng = Math.round(lng * 1e5);
+    encoded += encodeSignedValue(vLat - prevLat);
+    encoded += encodeSignedValue(vLng - prevLng);
+    prevLat = vLat;
+    prevLng = vLng;
+  }
+  return encoded;
+};
+
+const encodeSignedValue = (n: number): string => {
+  const shifted = n < 0 ? ~(n << 1) : n << 1;
+  let value = shifted;
+  let result = "";
+  do {
+    let chunk = value & 0x1f;
+    value >>= 5;
+    if (value > 0) chunk |= 0x20;
+    result += String.fromCharCode(chunk + 63);
+  } while (value > 0);
+  return result;
+};
+
 /** Map an Apple workout name onto the app's activity types. */
 const workoutType = (raw: string): string => {
   const n = raw.toLowerCase();
