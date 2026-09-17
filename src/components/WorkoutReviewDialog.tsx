@@ -9,6 +9,8 @@ import { streamAICoach } from "@/lib/ai-stream";
 
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/niggles";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { toStepsPerMinute } from "@/lib/cadence";
