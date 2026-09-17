@@ -181,103 +181,117 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   useEffect(() => {
     if (!open) return;
     setReviewContent("");
-    setReviewLoading(true);
+    setReviewLoading(false);
     setReviewError(null);
     setCoachError(null);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
+    setNotes("");
     setNiggleLocation(null); setNiggleOther("");
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
     setNextSession(null); setReadinessScore(null);
     hydratedRef.current = null;
 
-    if (!workout || !activity) { setReviewLoading(false); return; }
+    if (!workout || !activity) return;
 
     let cancelled = false;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setReviewLoading(false); return; }
+      if (!session) return;
 
-      // 1. Try to load any saved review (selections + cached AI text)
+      // Load any saved review (selections, notes + cached AI text)
       const { data: saved } = await supabase
         .from("workout_reviews")
-        .select("difficulty, pace, feel, injury, ai_summary, coach_recommendation")
+        .select("difficulty, pace, feel, injury, notes, ai_summary, coach_recommendation")
         .eq("activity_id", activity.id)
         .maybeSingle();
 
       if (cancelled) return;
+      hydratedRef.current = activity.id;
 
       if (saved) {
-        hydratedRef.current = activity.id;
         if (saved.difficulty) setDifficulty(saved.difficulty as Difficulty);
         if (saved.pace) setPace(saved.pace as Pace);
         if (saved.feel) setFeel(saved.feel as Feel);
         if (saved.injury) setInjury(saved.injury as Injury);
+        if ((saved as any).notes) setNotes((saved as any).notes as string);
         if (saved.coach_recommendation) {
           setCoachContent(saved.coach_recommendation);
           setCoachDone(true);
         }
-        if (saved.ai_summary) {
-          setReviewContent(saved.ai_summary);
-          setReviewLoading(false);
-          return; // don't regenerate the AI summary if we already have it cached
-        }
-      } else {
-        hydratedRef.current = activity.id;
+        if (saved.ai_summary) setReviewContent(saved.ai_summary);
       }
-
-      const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
-      const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
-      const avgHr = activity.avg_heart_rate || "N/A";
-      const maxHr = activity.max_heart_rate || "N/A";
-      const avgCad = toStepsPerMinute(activity.avg_cadence) ?? "N/A";
-      const cals = activity.calories || "N/A";
-      const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
-
-      let plannedWorkout = workout.title + "\n";
-      for (const s of workout.segments || []) {
-        plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
-      }
-
-      const runReview = () => {
-        setReviewError(null);
-        setReviewLoading(true);
-        let accumulated = "";
-        streamAICoach({
-          type: "workout-review",
-          token: session.access_token,
-          featureName: "review",
-          activitySummary,
-          plannedWorkout,
-          onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
-          onDone: async () => {
-            if (cancelled) return;
-            setReviewLoading(false);
-            // Cache the AI summary so we don't regenerate next time
-            try {
-              await supabase.from("workout_reviews").upsert({
-                user_id: session.user.id,
-                activity_id: activity.id,
-                ai_summary: accumulated,
-              } as any, { onConflict: "activity_id" });
-            } catch (e) { console.error("[review] failed to cache ai_summary", e); }
-          },
-          onError: (err) => {
-            if (cancelled) return;
-            setReviewLoading(false);
-            setReviewError(err);
-          },
-        });
-      };
-      reviewRetryRef.current = runReview;
-      runReview();
     })();
     return () => { cancelled = true; };
   }, [open, workout, activity]);
 
+  /**
+   * The analysis is only produced AFTER the athlete has answered the check-in
+   * questions and written their notes, so the coach's explanation of what
+   * happened is grounded in what the athlete actually reported.
+   */
+  const generateReview = async () => {
+    if (!workout || !activity) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
+    const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
+    const avgHr = activity.avg_heart_rate || "N/A";
+    const maxHr = activity.max_heart_rate || "N/A";
+    const avgCad = toStepsPerMinute(activity.avg_cadence) ?? "N/A";
+    const cals = activity.calories || "N/A";
+    const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
+
+    let plannedWorkout = workout.title + "\n";
+    for (const s of workout.segments || []) {
+      plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
+    }
+
+    plannedWorkout += `\n## Athlete Check-in (answered before this analysis)\n`;
+    plannedWorkout += `- Difficulty: ${difficulty ?? "not answered"}\n`;
+    plannedWorkout += `- Pace felt: ${pace ?? "not answered"}\n`;
+    plannedWorkout += `- Energy/feel: ${feel ?? "not answered"}\n`;
+    plannedWorkout += `- Injuries: ${injury ?? "not answered"}\n`;
+    if (hasNiggle && resolvedNiggleLocation) plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
+    plannedWorkout += `- Athlete's own notes: ${notes.trim() ? notes.trim() : "(none given)"}\n`;
+    plannedWorkout += `\nUse the athlete's answers and notes together with the measured data to explain, as a professional coach, what actually happened in this session. If their notes explain a gap (e.g. they skipped a session, were unwell, were very tired, cut it short), say so plainly instead of guessing. Never invent data or reasons that are not supported by the numbers or by what they told you.\n`;
+
+    const runReview = () => {
+      setReviewError(null);
+      setReviewLoading(true);
+      let accumulated = "";
+      streamAICoach({
+        type: "workout-review",
+        token: session.access_token,
+        featureName: "review",
+        activitySummary,
+        plannedWorkout,
+        onDelta: (text) => { accumulated += text; setReviewContent(accumulated); },
+        onDone: async () => {
+          setReviewLoading(false);
+          try {
+            await supabase.from("workout_reviews").upsert({
+              user_id: session.user.id,
+              activity_id: activity.id,
+              difficulty, pace, feel, injury, notes: notes.trim() || null,
+              ai_summary: accumulated,
+            } as any, { onConflict: "activity_id" });
+          } catch (e) { console.error("[review] failed to cache ai_summary", e); }
+        },
+        onError: (err) => {
+          setReviewLoading(false);
+          setReviewError(err);
+        },
+      });
+    };
+    reviewRetryRef.current = runReview;
+    runReview();
+  };
+
   // Persist check-in selections whenever the user changes one
   useEffect(() => {
     if (!open || !activity || hydratedRef.current !== activity.id) return;
-    if (!difficulty && !pace && !feel && !injury) return;
+    if (!difficulty && !pace && !feel && !injury && !notes.trim()) return;
     const t = setTimeout(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -289,11 +303,13 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
           pace,
           feel,
           injury,
+          notes: notes.trim() || null,
         } as any, { onConflict: "activity_id" });
       } catch (e) { console.error("[review] failed to save selections", e); }
     }, 400);
     return () => clearTimeout(t);
-  }, [open, activity, difficulty, pace, feel, injury]);
+  }, [open, activity, difficulty, pace, feel, injury, notes]);
+
 
   const feedbackComplete = !!(difficulty && pace && feel && injury) && (!hasNiggle || !!resolvedNiggleLocation);
 
