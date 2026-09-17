@@ -1,0 +1,1 @@
+ALTER TABLE public.workout_reviews ADD COLUMN IF NOT EXISTS notes text;
