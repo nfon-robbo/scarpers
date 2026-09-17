@@ -394,7 +394,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     for (const s of workout.segments || []) {
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
-    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n- Athlete's own notes: ${notes.trim() || "(none given)"}\n`;
 
     // Athlete's own injury history from their profile — the coach must weigh
     // this like a real elite coach, not treat the niggle in isolation.
