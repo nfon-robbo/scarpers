@@ -153,6 +153,10 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [activePlan, setActivePlan] = useState<{ id: string; content: string; userId: string } | null>(null);
   const [feel, setFeel] = useState<Feel | null>(null);
   const [injury, setInjury] = useState<Injury | null>(null);
+  // Free-text notes: anything the numbers can't show (skipped a session, felt
+  // rough, cut it short). Fed into the analysis before it is written.
+  const [notes, setNotes] = useState("");
+
   // Niggle follow-up: where is it? Seeded from the athlete's known injury history.
   const [niggleLocation, setNiggleLocation] = useState<string | null>(null);
   const [niggleOther, setNiggleOther] = useState("");
