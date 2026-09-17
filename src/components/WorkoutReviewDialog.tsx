@@ -610,39 +610,14 @@ Total length: 150 words max. Do not include the original next-session table agai
 
 
 
-        <div className="mt-3">
-          {reviewLoading && !reviewContent && (
-            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Analyzing your workout...</span>
-            </div>
-          )}
-          {reviewContent && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <MarkdownRenderer content={reviewContent} />
-            </div>
-          )}
-          {reviewLoading && reviewContent && (
-            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Still writing...</span>
-            </div>
-          )}
-          {!reviewLoading && reviewError && (
-            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
-              <p className="text-sm">{reviewError}</p>
-              <Button size="sm" onClick={() => reviewRetryRef.current?.()}>
-                <Loader2 className="w-4 h-4 mr-2" />
-                Retry
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Athlete feedback questionnaire */}
-        {!reviewLoading && reviewContent && !coachContent && (
+        {/* Athlete check-in FIRST — the analysis is written afterwards using
+            these answers and the notes. */}
+        {!reviewContent && !reviewLoading && (
           <div className="mt-4 p-3 rounded-lg border border-border bg-muted/20 space-y-3">
             <p className="text-sm font-semibold">Quick check-in</p>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Answer these first and we'll then explain what happened in this run.
+            </p>
             <ChoiceRow label="How difficult was it?" options={["Too easy","Just right","Hard","Too hard"]} value={difficulty} onChange={setDifficulty} />
             <ChoiceRow label="Were the run paces…" options={["Too slow","Just right","Too fast"]} value={pace} onChange={setPace} />
             {(pace === "Too slow" || pace === "Too fast") && workoutDate && (
@@ -694,6 +669,70 @@ Total length: 150 words max. Do not include the original next-session table agai
                 )}
               </div>
             )}
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Anything else we should know? <span className="font-normal">(optional)</span>
+              </p>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="e.g. I skipped Tuesday's session, I was very tired, I stopped at traffic lights, it was boiling out"
+                className="text-sm"
+              />
+            </div>
+
+            <Button
+              onClick={generateReview}
+              disabled={!feedbackComplete || reviewLoading}
+              className="w-full"
+              size="sm"
+            >
+              {reviewLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analysing…</>
+                : <><Sparkles className="w-4 h-4 mr-2" />Analyse my run</>}
+            </Button>
+            {!feedbackComplete && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Answer the questions above to get your analysis.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3">
+          {reviewLoading && !reviewContent && (
+            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Analysing your workout...</span>
+            </div>
+          )}
+          {reviewContent && (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <MarkdownRenderer content={reviewContent} />
+            </div>
+          )}
+          {reviewLoading && reviewContent && (
+            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Still writing...</span>
+            </div>
+          )}
+          {!reviewLoading && reviewError && (
+            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+              <p className="text-sm">{reviewError}</p>
+              <Button size="sm" onClick={() => reviewRetryRef.current?.()}>
+                <Loader2 className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Coach recommendation for the next session — after the analysis */}
+        {!reviewLoading && reviewContent && !coachContent && (
+          <div className="mt-3">
             <Button
               onClick={submitFeedback}
               disabled={!feedbackComplete || coachLoading || !canRequestCoach}
@@ -708,12 +747,13 @@ Total length: 150 words max. Do not include the original next-session table agai
                   : <><Sparkles className="w-4 h-4 mr-2" />Get elite coach recommendation</>}
             </Button>
             {!canRequestCoach && (
-              <p className="text-[11px] text-muted-foreground text-center">
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
                 Your check-in answers are saved automatically.
               </p>
             )}
           </div>
         )}
+
 
         {/* Next planned session snapshot — shown alongside coach recommendation */}
         {coachContent && nextSession && (
