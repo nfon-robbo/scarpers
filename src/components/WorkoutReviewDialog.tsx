@@ -9,6 +9,8 @@ import { streamAICoach } from "@/lib/ai-stream";
 
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 import { NIGGLE_AREAS, extractProfileInjuryAreas, recordNiggle } from "@/lib/niggles";
 import { ParsedWorkout, parseWorkoutsFromPlan } from "@/lib/plan-export";
 import { toStepsPerMinute } from "@/lib/cadence";
@@ -120,7 +122,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     // questionnaire is asked again from the FIT data.
     const resetForFreshReview = () => {
       setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
-      setNiggleLocation(null); setNiggleOther("");
+      setNiggleLocation(null); setNiggleOther(""); setNotes("");
+
       setCoachContent(""); setCoachDone(false); setCoachLoading(false);
       setReviewContent(""); setReviewError(null); setCoachError(null);
       hydratedRef.current = null;
@@ -153,6 +156,10 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   const [activePlan, setActivePlan] = useState<{ id: string; content: string; userId: string } | null>(null);
   const [feel, setFeel] = useState<Feel | null>(null);
   const [injury, setInjury] = useState<Injury | null>(null);
+  // Free-text notes: anything the numbers can't show (skipped a session, felt
+  // rough, cut it short). Fed into the analysis before it is written.
+  const [notes, setNotes] = useState("");
+
   // Niggle follow-up: where is it? Seeded from the athlete's known injury history.
   const [niggleLocation, setNiggleLocation] = useState<string | null>(null);
   const [niggleOther, setNiggleOther] = useState("");
@@ -181,103 +188,117 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
   useEffect(() => {
     if (!open) return;
     setReviewContent("");
-    setReviewLoading(true);
+    setReviewLoading(false);
     setReviewError(null);
     setCoachError(null);
     setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
+    setNotes("");
     setNiggleLocation(null); setNiggleOther("");
     setCoachContent(""); setCoachLoading(false); setCoachDone(false);
     setNextSession(null); setReadinessScore(null);
     hydratedRef.current = null;
 
-    if (!workout || !activity) { setReviewLoading(false); return; }
+    if (!workout || !activity) return;
 
     let cancelled = false;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setReviewLoading(false); return; }
+      if (!session) return;
 
-      // 1. Try to load any saved review (selections + cached AI text)
+      // Load any saved review (selections, notes + cached AI text)
       const { data: saved } = await supabase
         .from("workout_reviews")
-        .select("difficulty, pace, feel, injury, ai_summary, coach_recommendation")
+        .select("difficulty, pace, feel, injury, notes, ai_summary, coach_recommendation")
         .eq("activity_id", activity.id)
         .maybeSingle();
 
       if (cancelled) return;
+      hydratedRef.current = activity.id;
 
       if (saved) {
-        hydratedRef.current = activity.id;
         if (saved.difficulty) setDifficulty(saved.difficulty as Difficulty);
         if (saved.pace) setPace(saved.pace as Pace);
         if (saved.feel) setFeel(saved.feel as Feel);
         if (saved.injury) setInjury(saved.injury as Injury);
+        if ((saved as any).notes) setNotes((saved as any).notes as string);
         if (saved.coach_recommendation) {
           setCoachContent(saved.coach_recommendation);
           setCoachDone(true);
         }
-        if (saved.ai_summary) {
-          setReviewContent(saved.ai_summary);
-          setReviewLoading(false);
-          return; // don't regenerate the AI summary if we already have it cached
-        }
-      } else {
-        hydratedRef.current = activity.id;
+        if (saved.ai_summary) setReviewContent(saved.ai_summary);
       }
-
-      const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
-      const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
-      const avgHr = activity.avg_heart_rate || "N/A";
-      const maxHr = activity.max_heart_rate || "N/A";
-      const avgCad = toStepsPerMinute(activity.avg_cadence) ?? "N/A";
-      const cals = activity.calories || "N/A";
-      const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
-
-      let plannedWorkout = workout.title + "\n";
-      for (const s of workout.segments || []) {
-        plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
-      }
-
-      const runReview = () => {
-        setReviewError(null);
-        setReviewLoading(true);
-        let accumulated = "";
-        streamAICoach({
-          type: "workout-review",
-          token: session.access_token,
-          featureName: "review",
-          activitySummary,
-          plannedWorkout,
-          onDelta: (text) => { if (cancelled) return; accumulated += text; setReviewContent(accumulated); },
-          onDone: async () => {
-            if (cancelled) return;
-            setReviewLoading(false);
-            // Cache the AI summary so we don't regenerate next time
-            try {
-              await supabase.from("workout_reviews").upsert({
-                user_id: session.user.id,
-                activity_id: activity.id,
-                ai_summary: accumulated,
-              } as any, { onConflict: "activity_id" });
-            } catch (e) { console.error("[review] failed to cache ai_summary", e); }
-          },
-          onError: (err) => {
-            if (cancelled) return;
-            setReviewLoading(false);
-            setReviewError(err);
-          },
-        });
-      };
-      reviewRetryRef.current = runReview;
-      runReview();
     })();
     return () => { cancelled = true; };
   }, [open, workout, activity]);
 
+  /**
+   * The analysis is only produced AFTER the athlete has answered the check-in
+   * questions and written their notes, so the coach's explanation of what
+   * happened is grounded in what the athlete actually reported.
+   */
+  const generateReview = async () => {
+    if (!workout || !activity) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const distKm = activity.distance_meters ? (activity.distance_meters / 1000).toFixed(2) : "N/A";
+    const durMin = activity.duration_seconds ? Math.round(activity.duration_seconds / 60) : "N/A";
+    const avgHr = activity.avg_heart_rate || "N/A";
+    const maxHr = activity.max_heart_rate || "N/A";
+    const avgCad = toStepsPerMinute(activity.avg_cadence) ?? "N/A";
+    const cals = activity.calories || "N/A";
+    const activitySummary = `Distance: ${distKm} km\nDuration: ${durMin} min\nAvg HR: ${avgHr} bpm\nMax HR: ${maxHr} bpm\nAvg Cadence: ${avgCad} spm\nCalories: ${cals}`;
+
+    let plannedWorkout = workout.title + "\n";
+    for (const s of workout.segments || []) {
+      plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone} | ${s.notes || ""}\n`;
+    }
+
+    plannedWorkout += `\n## Athlete Check-in (answered before this analysis)\n`;
+    plannedWorkout += `- Difficulty: ${difficulty ?? "not answered"}\n`;
+    plannedWorkout += `- Pace felt: ${pace ?? "not answered"}\n`;
+    plannedWorkout += `- Energy/feel: ${feel ?? "not answered"}\n`;
+    plannedWorkout += `- Injuries: ${injury ?? "not answered"}\n`;
+    if (hasNiggle && resolvedNiggleLocation) plannedWorkout += `- Niggle location: ${resolvedNiggleLocation}\n`;
+    plannedWorkout += `- Athlete's own notes: ${notes.trim() ? notes.trim() : "(none given)"}\n`;
+    plannedWorkout += `\nUse the athlete's answers and notes together with the measured data to explain, as a professional coach, what actually happened in this session. If their notes explain a gap (e.g. they skipped a session, were unwell, were very tired, cut it short), say so plainly instead of guessing. Never invent data or reasons that are not supported by the numbers or by what they told you.\n`;
+
+    const runReview = () => {
+      setReviewError(null);
+      setReviewLoading(true);
+      let accumulated = "";
+      streamAICoach({
+        type: "workout-review",
+        token: session.access_token,
+        featureName: "review",
+        activitySummary,
+        plannedWorkout,
+        onDelta: (text) => { accumulated += text; setReviewContent(accumulated); },
+        onDone: async () => {
+          setReviewLoading(false);
+          try {
+            await supabase.from("workout_reviews").upsert({
+              user_id: session.user.id,
+              activity_id: activity.id,
+              difficulty, pace, feel, injury, notes: notes.trim() || null,
+              ai_summary: accumulated,
+            } as any, { onConflict: "activity_id" });
+          } catch (e) { console.error("[review] failed to cache ai_summary", e); }
+        },
+        onError: (err) => {
+          setReviewLoading(false);
+          setReviewError(err);
+        },
+      });
+    };
+    reviewRetryRef.current = runReview;
+    runReview();
+  };
+
   // Persist check-in selections whenever the user changes one
   useEffect(() => {
     if (!open || !activity || hydratedRef.current !== activity.id) return;
-    if (!difficulty && !pace && !feel && !injury) return;
+    if (!difficulty && !pace && !feel && !injury && !notes.trim()) return;
     const t = setTimeout(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -289,11 +310,13 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
           pace,
           feel,
           injury,
+          notes: notes.trim() || null,
         } as any, { onConflict: "activity_id" });
       } catch (e) { console.error("[review] failed to save selections", e); }
     }, 400);
     return () => clearTimeout(t);
-  }, [open, activity, difficulty, pace, feel, injury]);
+  }, [open, activity, difficulty, pace, feel, injury, notes]);
+
 
   const feedbackComplete = !!(difficulty && pace && feel && injury) && (!hasNiggle || !!resolvedNiggleLocation);
 
@@ -371,7 +394,7 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     for (const s of workout.segments || []) {
       plannedWorkout += `${s.segment}: ${s.duration} | Target: ${s.target} | ${s.hrZone}\n`;
     }
-    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n`;
+    plannedWorkout += `\n## Athlete Feedback\n- Difficulty: ${difficulty}\n- Pace felt: ${pace}\n- Energy/feel: ${feel}\n- Injuries: ${injury}\n- Athlete's own notes: ${notes.trim() || "(none given)"}\n`;
 
     // Athlete's own injury history from their profile — the coach must weigh
     // this like a real elite coach, not treat the niggle in isolation.
@@ -590,39 +613,14 @@ Total length: 150 words max. Do not include the original next-session table agai
 
 
 
-        <div className="mt-3">
-          {reviewLoading && !reviewContent && (
-            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Analyzing your workout...</span>
-            </div>
-          )}
-          {reviewContent && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <MarkdownRenderer content={reviewContent} />
-            </div>
-          )}
-          {reviewLoading && reviewContent && (
-            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Still writing...</span>
-            </div>
-          )}
-          {!reviewLoading && reviewError && (
-            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
-              <p className="text-sm">{reviewError}</p>
-              <Button size="sm" onClick={() => reviewRetryRef.current?.()}>
-                <Loader2 className="w-4 h-4 mr-2" />
-                Retry
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Athlete feedback questionnaire */}
-        {!reviewLoading && reviewContent && !coachContent && (
+        {/* Athlete check-in FIRST — the analysis is written afterwards using
+            these answers and the notes. */}
+        {!reviewContent && !reviewLoading && (
           <div className="mt-4 p-3 rounded-lg border border-border bg-muted/20 space-y-3">
             <p className="text-sm font-semibold">Quick check-in</p>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Answer these first and we'll then explain what happened in this run.
+            </p>
             <ChoiceRow label="How difficult was it?" options={["Too easy","Just right","Hard","Too hard"]} value={difficulty} onChange={setDifficulty} />
             <ChoiceRow label="Were the run paces…" options={["Too slow","Just right","Too fast"]} value={pace} onChange={setPace} />
             {(pace === "Too slow" || pace === "Too fast") && workoutDate && (
@@ -674,6 +672,70 @@ Total length: 150 words max. Do not include the original next-session table agai
                 )}
               </div>
             )}
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Anything else we should know? <span className="font-normal">(optional)</span>
+              </p>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="e.g. I skipped Tuesday's session, I was very tired, I stopped at traffic lights, it was boiling out"
+                className="text-sm"
+              />
+            </div>
+
+            <Button
+              onClick={generateReview}
+              disabled={!feedbackComplete || reviewLoading}
+              className="w-full"
+              size="sm"
+            >
+              {reviewLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analysing…</>
+                : <><Sparkles className="w-4 h-4 mr-2" />Analyse my run</>}
+            </Button>
+            {!feedbackComplete && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Answer the questions above to get your analysis.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mt-3">
+          {reviewLoading && !reviewContent && (
+            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Analysing your workout...</span>
+            </div>
+          )}
+          {reviewContent && (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <MarkdownRenderer content={reviewContent} />
+            </div>
+          )}
+          {reviewLoading && reviewContent && (
+            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Still writing...</span>
+            </div>
+          )}
+          {!reviewLoading && reviewError && (
+            <div className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+              <p className="text-sm">{reviewError}</p>
+              <Button size="sm" onClick={() => reviewRetryRef.current?.()}>
+                <Loader2 className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Coach recommendation for the next session — after the analysis */}
+        {!reviewLoading && reviewContent && !coachContent && (
+          <div className="mt-3">
             <Button
               onClick={submitFeedback}
               disabled={!feedbackComplete || coachLoading || !canRequestCoach}
@@ -688,12 +750,13 @@ Total length: 150 words max. Do not include the original next-session table agai
                   : <><Sparkles className="w-4 h-4 mr-2" />Get elite coach recommendation</>}
             </Button>
             {!canRequestCoach && (
-              <p className="text-[11px] text-muted-foreground text-center">
+              <p className="text-[11px] text-muted-foreground text-center mt-1.5">
                 Your check-in answers are saved automatically.
               </p>
             )}
           </div>
         )}
+
 
         {/* Next planned session snapshot — shown alongside coach recommendation */}
         {coachContent && nextSession && (

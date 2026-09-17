@@ -2041,6 +2041,7 @@ export type Database = {
           feel: string | null
           id: string
           injury: string | null
+          notes: string | null
           pace: string | null
           updated_at: string
           user_id: string
@@ -2054,6 +2055,7 @@ export type Database = {
           feel?: string | null
           id?: string
           injury?: string | null
+          notes?: string | null
           pace?: string | null
           updated_at?: string
           user_id: string
@@ -2067,6 +2069,7 @@ export type Database = {
           feel?: string | null
           id?: string
           injury?: string | null
+          notes?: string | null
           pace?: string | null
           updated_at?: string
           user_id?: string
