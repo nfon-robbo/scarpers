@@ -122,7 +122,8 @@ export default function WorkoutReviewDialog({ open, onOpenChange, workout, activ
     // questionnaire is asked again from the FIT data.
     const resetForFreshReview = () => {
       setDifficulty(null); setPace(null); setFeel(null); setInjury(null);
-      setNiggleLocation(null); setNiggleOther("");
+      setNiggleLocation(null); setNiggleOther(""); setNotes("");
+
       setCoachContent(""); setCoachDone(false); setCoachLoading(false);
       setReviewContent(""); setReviewError(null); setCoachError(null);
       hydratedRef.current = null;
